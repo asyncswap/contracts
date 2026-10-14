@@ -1,0 +1,20 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["dependencies"]
+ffi = true
+fs_permissions = [
+  { access = "read", path = "./broadcast/" },
+  { access = "read-write", path = "./deployments/" },
+]
+solc_version = "0.8.26"
+# Required: without the optimizer AsyncSwap exceeds the EIP-170 24,576-byte runtime limit.
+optimizer = true
+optimizer_runs = 1_000_000
+
+[dependencies]
+forge-std = "1.16.0"
+uniswap-v4-core = "4"
+solmate = "6.8.0"
+
+# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

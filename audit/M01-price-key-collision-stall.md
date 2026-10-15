@@ -69,14 +69,13 @@ When the keys are equal the quotient is on the order of `buyOut`, so the `mulDiv
 for any realistic escrowed amount, and the exact check runs only on that boundary — the common,
 strictly-ordered path keeps the cheap key comparison.
 
-**House-always-wins rounding.** The exact tie `buyIn * sellIn == sellOut * buyOut` is treated as a
-cross (`>=`), so the protocol always executes an available trade rather than leaving value resting in
-a crossed book. Exhaustive search over all small integers plus ~1,000,000 randomized large crossing
-pairs and the tightest-cross boundary confirms that **every** genuine cross (including the tie)
-produces a non-zero, minimum-respecting match in `_matchAmounts` — so no stall remains, and each
-maker is always paid at least their signed limit for the input consumed. Direct order-to-order
-matches are a pure swap of the two escrowed inputs (zero protocol fee, exact conservation), so the
-protocol is never the party that loses a rounding sub-unit.
+**Tie handling.** The exact tie `buyIn * sellIn == sellOut * buyOut` is treated as a cross (`>=`), so
+an available trade executes rather than resting in a crossed book. Exhaustive search over all small
+integers plus ~1,000,000 randomized large crossing pairs and the tightest-cross boundary confirms that
+**every** genuine cross (including the tie) produces a non-zero, minimum-respecting match in
+`_matchAmounts`: no stall remains, and each maker is always paid at least their signed limit for the
+input consumed. A direct order-to-order match is a pure swap of the two escrowed inputs with zero
+protocol fee and exact conservation, so no rounding sub-unit accrues to or against the protocol.
 
 ## Tests
 

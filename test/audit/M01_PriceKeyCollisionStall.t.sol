@@ -81,8 +81,8 @@ contract M01_PriceKeyCollisionStallTest is SetupHook {
         assertEq(_remaining(bob, true, 1e18 - 1, 3e18 - 2), 1e18 - 1, "sell intact");
     }
 
-    /// @dev An exact tie (buyIn*sellIn == sellOut*buyOut) at equal keys must execute in the
-    ///      protocol's favor rather than resting.
+    /// @dev An exact tie (buyIn*sellIn == sellOut*buyOut) at equal keys must execute rather
+    ///      than resting.
     function test_M01_exactTieExecutes() public {
         _submit(alice, false, 3e18, 1e18); // buy  key 3e18
         _submit(bob, true, 1e18, 3e18); // sell key 3e18, exact tie with the buy

@@ -5,11 +5,10 @@ import {RadixPriceTree} from "@async-swap/libraries/RadixPriceTree.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title MatchingEngine
-/// @notice Bounded continuous price-time matching prototype. It maintains a
-///         radix-indexed limit book and emits deterministic fill instructions.
-/// @dev This first version is an algorithm harness: it does not custody or
-///      settle tokens. Settlement must be integrated with the Async Swap hook
-///      before this can be used for live orders.
+/// @notice Standalone price-time matching harness. It maintains a radix-indexed
+///         limit book and emits deterministic fill instructions.
+/// @dev Algorithm and gas benchmark only: it does not custody or settle tokens.
+///      Live orders settle through the AsyncSwap hook and AsyncMatching.
 contract MatchingEngine {
     using RadixPriceTree for RadixPriceTree.Tree;
 

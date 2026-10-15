@@ -119,8 +119,8 @@ contract Router is EIP712 {
         require(userParams.amountOutMin == order.amountOutMin, "amountOutMin mismatch");
         require(userParams.priorityFee == order.priorityFee, "priorityFee mismatch");
 
-        // msg.value invariant: native input requires exact deposit, ERC20 input forbids overpay.
-        // Without this an attacker can sweep ETH stranded from prior overpays in this contract.
+        // msg.value invariant: native input requires the exact deposit; ERC20 input forbids any
+        // value, so no ETH accumulates in the router between calls.
         Currency input = order.zeroForOne ? order.key.currency0 : order.key.currency1;
         if (input.isAddressZero()) {
             require(msg.value == order.amountIn, "msg.value != order.amountIn");
@@ -276,9 +276,8 @@ contract Router is EIP712 {
                 )
             );
             // Maker pays their input to PM (settling the swap). For native input the
-            // router itself holds the ETH (forwarded via msg.value on swap()), and the
-            // CurrencySettler.settle native branch sends from address(this) regardless
-            // of the `payer` argument, so we still pass `user` for symmetry/logging.
+            // router holds the ETH forwarded on swap(), and the native settle branch
+            // pays from address(this) regardless of the `payer` argument.
             Currency input = orderData.order.zeroForOne ? orderData.order.key.currency0 : orderData.order.key.currency1;
             if (action == uint8(ActionType.SwapWithSig)) {
                 (, PermitData memory permit) = abi.decode(data, (SwapCallback, PermitData));
@@ -342,8 +341,8 @@ contract Router is EIP712 {
         POOLMANAGER.settle();
     }
 
-    /// @dev Priority bids use the pool's USDC numeraire. In signed-order mode the maker still
-    ///      needs an ERC-20 approval for this separate bid; the signed order commits to its amount.
+    /// @dev Priority bids use the pool's USDC numeraire. Signed orders also require an ERC-20
+    ///      approval for the bid; the signed order commits to its amount.
     function _settlePriorityFee(AsyncOrder memory order) private {
         uint256 amount = order.priorityFee;
         if (amount == 0) return;

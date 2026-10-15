@@ -25,9 +25,8 @@ abstract contract BaseHook is IHooks, ImmutableState {
     function getHookPermissions() public pure virtual returns (Hooks.Permissions memory);
 
     /// @notice Validates the deployed hook address agrees with the expected permissions of the hook
-    /// @dev this function is virtual so that we can override it during testing,
-    /// which allows us to deploy an implementation to any address
-    /// and then etch the bytecode into the correct address
+    /// @dev Virtual so tests can override it, deploy an implementation at any address,
+    /// and etch the bytecode at the permission-encoded address.
     function validateHookAddress(BaseHook _this) internal pure virtual {
         Hooks.validateHookPermissions(_this, getHookPermissions());
     }

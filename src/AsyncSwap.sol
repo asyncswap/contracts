@@ -22,8 +22,8 @@ import {BaseHook} from "src/BaseHook.sol";
 /// @title AsyncSwap
 /// @author @msakiart
 /// @notice Uniswap v4 hook that converts an exact-input swap into an open async order: the maker
-///         deposits their input via `_beforeSwap`; crossing orders can settle directly at the
-///         resting limit, with fillers still available for unmatched orders.
+///         deposits their input via `_beforeSwap`. Crossing orders settle directly at the resting
+///         limit; fillers settle unmatched orders.
 ///
 ///         Makers can also act by EIP-712 signature (`setExecutorWithSig`, `updatePriceWithSig`) so a
 ///         relayer pays gas and the wallet shows a readable message. See `OrderSignatures` for types.
@@ -395,7 +395,8 @@ contract AsyncSwap is BaseHook, EIP712 {
     }
 
     /// @dev The self-call boundary makes a failed AMM attempt atomic while preserving the resting
-    ///      order. The transient pool id lets beforeSwap bypass order creation for this one swap only.
+    ///      order. PoolManager skips hook callbacks when the hook itself is the swap caller, so this
+    ///      swap does not create an order.
     function fillOrderFromPoolLiquidity(AsyncOrder calldata order, bytes32 id) external {
         if (msg.sender != address(this)) revert NotSelf();
         PoolId poolId = order.key.toId();
@@ -490,9 +491,9 @@ contract AsyncSwap is BaseHook, EIP712 {
             )
         );
         bytes32 id = keccak256(abi.encode(block.chainid, poolId, hookData.user, zeroForOne, salt));
-        // Collision walk: same maker submitting identical (amountIn, amountOutMin) twice
-        // in the same block would land on the same salt. Re-hash with an attempt counter
-        // until the slot is free. The caller pays the extra gas, so no griefing surface.
+        // Collision walk: the same maker submitting identical (amountIn, amountOutMin) twice
+        // in one block lands on the same salt. Re-hash with an attempt counter until the
+        // slot is free. The caller pays the extra gas.
         while (state.orders[id].amountIn != 0) {
             salt = keccak256(abi.encode(salt));
             id = keccak256(abi.encode(block.chainid, poolId, hookData.user, zeroForOne, salt));
@@ -598,10 +599,9 @@ contract AsyncSwap is BaseHook, EIP712 {
 
     /// @notice Accept ETH transfers. The Router (or any caller paying for a native-output
     /// fill) forwards `msg.value` to the hook before triggering `executeOrder`. The hook
-    /// records the deposit on a transient slot so `executeOrder` can settle ONLY against
-    /// the filler's freshly-deposited ETH — never against donated, stranded, or in-flight
-    /// escrow balance. Plain transfers (no executeOrder follow-up) just sit in balance
-    /// and can be returned by recovery flows; they cannot be drained via fillOrder.
+    /// records the deposit on a transient slot so `executeOrder` settles only against the
+    /// filler's same-transaction deposit. ETH sent without a follow-up `executeOrder` stays
+    /// in the hook balance and is recoverable only through `sweep`.
     receive() external payable {
         assembly ("memory-safe") {
             let cur := tload(PENDING_NATIVE_DEPOSIT_SLOT)

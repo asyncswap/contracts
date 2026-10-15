@@ -19,8 +19,8 @@ using AsyncOrderLibrary for AsyncOrder global;
 /// @param priorityFee  Non-refundable USDC bid for equal-price priority. Priority-fee mode requires at
 ///                     least $0.10; filled portions are donated to active LPs, and any remainder is
 ///                     donated when canceled or moved to the protocol FeeVault if no LPs are active.
-/// @param sqrtPrice    Pool sqrt-price the maker is willing to settle at if they cancel into a regular
-///                     Uniswap swap. Used as the limit for the cancel-into-swap fallback.
+/// @param sqrtPrice    Sqrt-price limit passed to `PoolManager.swap` on submission. The hook consumes
+///                     the whole input in `beforeSwap`, so the pool never trades against it.
 /// @param salt         Contract-assigned salt that disambiguates orders. The hook computes this at create
 ///                     time from `keccak256(timestamp, block.number, msg.sender, owner, amountIn,
 ///                     amountOutMin, priorityFee)` and emits it in `AsyncOrderCreated` so the maker can reference the
@@ -45,7 +45,7 @@ library AsyncOrderLibrary {
     /// @notice Stable identifier for an order, derived from its addressing fields.
     /// @dev    (chainId, poolId, owner, zeroForOne, salt) uniquely identifies one open order.
     ///         - `block.chainid` keeps ids unique across chains where the same PoolKey can be
-    ///           deployed (Unichain mainnet + Sepolia, or future chains).
+    ///           deployed (for example Unichain mainnet and Sepolia).
     ///         - `salt` is contract-assigned at create time and stored off-chain (in the event
     ///           log) so the maker can pass it back when calling cancel / updatePrice / fill.
     ///         `view` (not `pure`) because `block.chainid` reads EVM context.

@@ -12,10 +12,10 @@ import {IERC20Minimal} from "v4-core/interfaces/external/IERC20Minimal.sol";
 import {Currency} from "v4-core/types/Currency.sol";
 import {PoolKey} from "v4-core/types/PoolKey.sol";
 
-/// @notice Submits an async swap order via the Router. The hook now auto-assigns a salt on
-///         create, so the script passes `order.salt = bytes32(0)` and parses the actual salt
-///         out of the `AsyncOrderCreated` event log post-broadcast (so 04_Cancel / 05_Execute
-///         can reference the same order via the persisted salt).
+/// @notice Submits an async swap order via the Router. The hook assigns the salt on create, so
+///         the script passes `order.salt = bytes32(0)`, reads the assigned salt from the
+///         `AsyncOrderCreated` event after the broadcast, and persists it for 04_Cancel and
+///         05_Execute.
 contract SwapScript is FFIHelper {
     Router router;
     PoolKey key;
@@ -46,8 +46,7 @@ contract SwapScript is FFIHelper {
 
         Currency input = order.zeroForOne ? key.currency0 : key.currency1;
 
-        // Record logs so we can pluck the assigned salt out of AsyncOrderCreated
-        // after the broadcast completes.
+        // Record logs to read the assigned salt from AsyncOrderCreated after the broadcast.
         vm.recordLogs();
         vm.startBroadcast(OWNER);
         IERC20Minimal(Currency.unwrap(input)).approve(address(router), order.amountIn);

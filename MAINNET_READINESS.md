@@ -4,11 +4,11 @@ Status: BLOCKED. No mainnet deployment was broadcast during this preparation.
 
 ## Native settlement remediation
 
-Native ETH proceeds and refunds now mint PoolManager ERC-6909 claims (ID 0) directly to recipients. Matching, manual fills, LP fills, and cancellations no longer call native recipients. ERC20 settlement is unchanged.
+Native ETH proceeds and refunds mint PoolManager ERC-6909 claims (ID 0) directly to recipients. Matching, manual fills, LP fills, and cancellations make no calls to native recipients. ERC20 settlement transfers tokens directly.
 
-The previous rejecting-best-buyer denial of service is covered by `test_rejectingBestBuyerReceivesClaimsWithoutBlocking`, which now requires successful matching and credits the rejecting recipient. NativeClaims redeems only the caller's claims after a PoolManager approval, to a chosen nonzero recipient. Failed transfers restore claims and allowance atomically. Tests cover partial redemption, unauthorized access, callback authentication, reentrant unlock attempts, and double spending.
+A recipient that rejects ETH is covered by `test_rejectingBestBuyerReceivesClaimsWithoutBlocking`, which requires successful matching and credits the rejecting recipient with claims. NativeClaims redeems only the caller's claims after a PoolManager approval, to a chosen nonzero recipient. Failed transfers restore claims and allowance atomically. Tests cover partial redemption, unauthorized access, callback authentication, reentrant unlock attempts, and double spending.
 
-This resolves the reproduced native-recipient issue, not the complete mainnet review. ERC20 callback behavior and the broader matching/settlement architecture still require security review.
+This covers native settlement only. ERC20 callback behavior and the broader matching/settlement architecture require security review.
 
 ## Evidence collected
 

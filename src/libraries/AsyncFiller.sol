@@ -192,8 +192,8 @@ library AsyncFiller {
         if (amount == 0) return;
         Currency numeraire = self.numeraire;
         if (self.poolManager.getLiquidity(key.toId()) == 0) {
-            // No LPs can receive a PoolManager donation. Forfeit the non-refundable bid
-            // to the protocol FeeVault rather than returning it or leaving it on the hook.
+            // No active LP can receive a PoolManager donation, so the non-refundable
+            // bid is forfeited to the protocol FeeVault.
             self.numeraire.settle(self.poolManager, hook, amount, true);
             self.numeraire.take(self.poolManager, self.feeVault, amount, true);
             emit PriorityFeeForfeited(key.toId(), id, maker, amount);
@@ -412,9 +412,8 @@ library AsyncFiller {
         return (uint128(priorityFee) << 64) | uint128(type(uint64).max - sequence);
     }
 
-    /// @dev Keep the radix key bounded for pathological ratios while allowing legacy-valid
-    ///      orders whose WAD-scaled ratio rounds below one. Normal token amounts retain the
-    ///      exact WAD key; only values outside uint128's range saturate at the boundary.
+    /// @dev WAD-scaled price ratio bounded to the radix key range: a ratio that rounds to zero
+    ///      maps to 1 and a ratio above uint128 saturates at the maximum.
     function _priceKey(bool isBuy, uint256 amountIn, uint256 amountOut) private pure returns (uint128) {
         uint256 price =
             isBuy ? Math.mulDiv(amountIn, PRICE_SCALE, amountOut) : Math.mulDiv(amountOut, PRICE_SCALE, amountIn);

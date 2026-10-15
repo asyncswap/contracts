@@ -19,7 +19,7 @@ contract DeployHookScript is FFIHelper {
     AsyncSwap public hook;
     Router router;
 
-    /// @dev Top-byte prefix used to visually identify our hook (0x91...).
+    /// @dev Top-byte prefix used to visually identify the hook (0x91...).
     uint160 internal constant HOOK_PREFIX = uint160(0x91) << 152;
     uint160 internal constant HOOK_PREFIX_MASK = uint160(0xFF) << 152;
     /// @dev Canonical Permit2 (same address on every chain).

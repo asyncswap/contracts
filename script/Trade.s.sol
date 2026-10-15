@@ -52,11 +52,9 @@ contract TradeScript is FFIHelper {
         (address inAddr, address outAddr, uint256 amountIn, uint256 amountOutMin) = _resolveTrade();
         (PoolKey memory key, bool zeroForOne) = _buildPoolKey(inAddr, outAddr);
 
-        // Auto-initialize the pool if it isn't yet. We read slot0 first because
-        // wrapping `manager.initialize` in try/catch under vm.startBroadcast()
-        // still records the call for the broadcast replay, which then reverts
-        // outside the try frame with PoolAlreadyInitialized. Reading state up
-        // front lets us conditionally broadcast.
+        // Initialize the pool only when slot0 is unset. A try/catch around
+        // `manager.initialize` under vm.startBroadcast() would record the call
+        // for the replay, which then reverts with PoolAlreadyInitialized.
         (uint160 currentSqrtPrice,,,) = manager.getSlot0(key.toId());
         if (currentSqrtPrice == 0) {
             uint160 initSqrtPrice = uint160(vm.envOr("INIT_SQRT_PRICE_X96", uint256(2 ** 96)));

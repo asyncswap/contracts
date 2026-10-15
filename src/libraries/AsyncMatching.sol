@@ -15,7 +15,7 @@ import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {RadixPriceTree} from "@async-swap/libraries/RadixPriceTree.sol";
 
-/// @notice Linked matching module operating on the hook's existing order and radix-book storage.
+/// @notice Linked matching module operating on the hook's order and radix-book storage.
 /// @dev Public library calls use DELEGATECALL, so ERC-6909 escrow remains owned by Async Swap.
 library AsyncMatching {
     using CurrencySettler for Currency;
@@ -335,7 +335,7 @@ library AsyncMatching {
         private
     {
         currency.settle(manager, hook, amount, true);
-        // Native claims have no recipient callback; a rejecting buyer cannot stall the book.
+        // Native output is minted as claims, so settlement makes no call to the recipient.
         currency.take(manager, recipient, amount, currency.isAddressZero());
     }
 
@@ -412,20 +412,16 @@ library AsyncMatching {
 
     /// @notice Decide whether a buy and a sell order cross, i.e. a price exists that satisfies both
     ///         makers' limits.
-    /// @dev The `uint128` price keys stored on the book are truncated WAD ratios, so two orders can
-    ///      round to the SAME key without actually crossing. Deciding solely on the keys lets a pair
-    ///      that merely collides-by-key wedge the top of book: `_matchAmounts` would refuse the trade
-    ///      and the matcher would `break` on it forever. We therefore trust the keys only when they
-    ///      are strictly ordered (truncation cannot invert a strict inequality) and fall back to a
-    ///      full-precision cross-multiply on the ambiguous equal-key case.
+    /// @dev The `uint128` price keys on the book are truncated WAD ratios, so two distinct prices
+    ///      can share a key. Strictly ordered keys decide the result directly, since truncation
+    ///      cannot invert a strict inequality. Equal keys are decided by a full-precision
+    ///      cross-multiply:
     ///
     ///      cross  <=>  buyIn/buyOut >= sellOut/sellIn  <=>  buyIn*sellIn >= sellOut*buyOut
     ///             <=>  floor(buyIn*sellIn / sellOut) >= buyOut   (sellOut, buyOut are nonzero).
     ///
-    ///      The exact tie (`buyIn*sellIn == sellOut*buyOut`) is treated as a cross so the protocol
-    ///      always executes an available trade rather than leaving value resting in a crossed book.
-    ///      When the keys are equal the cross-multiplied quotient is on the order of `buyOut`, so the
-    ///      `mulDiv` cannot overflow for any realistic escrowed amount.
+    ///      An exact tie counts as a cross. With equal keys the quotient is on the order of
+    ///      `buyOut`, so the `mulDiv` cannot overflow for escrowable amounts.
     function _crosses(
         uint128 buyKey,
         uint128 sellKey,

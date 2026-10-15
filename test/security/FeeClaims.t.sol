@@ -20,7 +20,7 @@ contract FeeTestHook is AsyncSwap {
     }
 }
 
-contract I01_FeeClaimsTest is SetupHook {
+contract FeeClaimsTest is SetupHook {
     using PoolIdLibrary for PoolKey;
 
     address alice = makeAddr("alice");

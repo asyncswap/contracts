@@ -5,8 +5,10 @@ import {SetupHook} from "../SetupHook.t.sol";
 import {AsyncSwap} from "@async-swap/AsyncSwap.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 
-contract H04_NatspecMismatchTest is SetupHook {
-    address alice = makeAddr("alice"); // maker (follows NatSpec)
+/// @notice `UserParams.amountOutMin` must equal `order.amountOutMin`; the Router rejects a submission
+///         whose hookData diverges from the signed order.
+contract UserDataMatchesOrderTest is SetupHook {
+    address alice = makeAddr("alice"); // maker
     address bob = makeAddr("bob"); // any filler
 
     function setUp() public override {
@@ -15,7 +17,7 @@ contract H04_NatspecMismatchTest is SetupHook {
         topUp(bob, 100 ether);
     }
 
-    function test_RevertWhen_H04_UserDataDivergesFromOrder() public {
+    function test_RevertWhen_UserDataDivergesFromOrder() public {
         uint256 amountIn = 1 ether;
         uint256 placeholder = 1;
         uint256 realLimit = 1000 ether;

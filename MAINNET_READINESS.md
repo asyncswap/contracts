@@ -2,7 +2,7 @@
 
 Status: BLOCKED. No mainnet deployment was broadcast during this preparation.
 
-## Native settlement remediation
+## Native settlement
 
 Native ETH proceeds and refunds mint PoolManager ERC-6909 claims (ID 0) directly to recipients. Matching, manual fills, LP fills, and cancellations make no calls to native recipients. ERC20 settlement transfers tokens directly.
 
@@ -15,7 +15,7 @@ This covers native settlement only. ERC20 callback behavior and the broader matc
 - Existing suite: 119 passing tests before this preparation.
 - UnichainForkTest: 3 passing tests against block 61279110, using real PoolManager and USDC with test-funded accounts. Covers native/USDC fills, residual cancellation, nonrefundable priority fees without LPs, and continuation after the eight-match bound.
 - MatchingInvariantTest and priority variant: 6 passing invariants, each with 64 runs and depth 64 (4096 calls), fail-on-revert enabled. Checks outstanding escrow, asset conservation, and best prices against a linear scan.
-- Post-remediation full run: 144 tests passed, zero failed. The 3 pinned Unichain fork tests are skipped unless the fork RPC variables are set; with them set they pass (re-run 2026-10-15 against block 61279110). Includes the native LP fill regression and the M01 price-key collision regression (`audit/M01-price-key-collision-stall.md`). Invariants include randomized claim redemption and exact native backing (64 runs, depth 64, fail-on-revert).
+- Full run: 144 tests passed, zero failed. The 3 pinned Unichain fork tests are skipped unless the fork RPC variables are set; with them set they pass (re-run 2026-10-15 against block 61279110). Includes the native LP fill test and the price-key crossing tests (`docs/price-key-crossing.md`). Invariants include randomized claim redemption and exact native backing (64 runs, depth 64, fail-on-revert).
 - Local CREATE2 deployment and indexed frontend: integrated contracts settle 0.4 ETH for 1000 USDC and 0.6 ETH for 1500 USDC, with recipient balances reflecting both fills.
 
 Fork command:
@@ -40,6 +40,6 @@ The fork fixture installs hook code for tests. It is not a rehearsal of the comp
 
 Complete callback safety review beyond native settlement. Stress the integrated custody path at 100 transactions per block with adversarial dust, cancellation, and priority cases. Existing standalone matching benchmarks do not establish integrated throughput. Complete a pinned deployment-script fork rehearsal, final-bytecode verification, and independent security review. Confirm the production indexer/frontend understand all v2 events and order states. The local matching lab uses a separate SQLite indexer.
 
-`script/check-mainnet-readiness.sh` runs the native regression and deliberately keeps release blocked pending independent review and the remaining deployment/stress work.
+`script/check-mainnet-readiness.sh` runs the native rejecting-recipient test and deliberately keeps release blocked pending independent review and the remaining deployment/stress work.
 
 NativeClaims deployment preparation: `script/DeployNativeClaims.s.sol`. No broadcast has been made. Clients must display native proceeds as claim balances, approve claim ID 0 on PoolManager, and call `NativeClaims.redeem(recipient, amount)`. Approval is for claims, not ERC20 or hook executor permissions. Runtime sizes as of 2026-10-15 (`forge build --sizes`): hook 23894 bytes, AsyncMatching 19190 bytes, NativeClaims 1666 bytes.

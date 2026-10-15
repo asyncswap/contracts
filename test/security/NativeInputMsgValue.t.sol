@@ -15,12 +15,14 @@ import {LPFeeLibrary} from "v4-core/libraries/LPFeeLibrary.sol";
 import {PoolId} from "v4-core/types/PoolId.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 
-contract H03_StrandedEthTest is Test {
+/// @notice A native-input swap must send exactly `amountIn` as msg.value; any other value reverts
+///         at the Router before any state changes.
+contract NativeInputMsgValueTest is Test {
     using PoolIdLibrary for PoolKey;
 
     address owner = makeAddr("deployer");
-    address victim = makeAddr("victim");
-    address attacker = makeAddr("attacker");
+    address alice = makeAddr("alice");
+    address bob = makeAddr("bob");
     IPoolManager manager;
     AsyncSwap hook;
     Router router;
@@ -55,11 +57,11 @@ contract H03_StrandedEthTest is Test {
         poolId = key.toId();
         manager.initialize(key, 2 ** 96);
 
-        vm.deal(victim, 100 ether);
-        vm.deal(attacker, 0); // attacker MUST start with no ETH
-        vm.prank(victim);
+        vm.deal(alice, 100 ether);
+        vm.deal(bob, 0); // bob starts with no ETH
+        vm.prank(alice);
         hook.setExecutor(poolId, address(router), true);
-        vm.prank(attacker);
+        vm.prank(bob);
         hook.setExecutor(poolId, address(router), true);
     }
 
@@ -80,17 +82,14 @@ contract H03_StrandedEthTest is Test {
         });
     }
 
-    function test_RevertWhen_H03_NativeInputSwapWithMismatchedMsgValue() public {
-        // Victim's overpay path is now itself blocked at the Router (the same
-        // fix protects symmetrically), so we assert directly that an attacker
-        // attempting a native-input swap with msg.value != amountIn reverts.
-        AsyncOrder memory atkOrder = _order(attacker, true, 1 ether, 1 wei);
-        vm.startPrank(attacker);
+    function test_RevertWhen_NativeInputMsgValueMismatch() public {
+        AsyncOrder memory order = _order(bob, true, 1 ether, 1 wei);
+        vm.startPrank(bob);
         vm.expectRevert();
         router.swap{value: 0}(
-            atkOrder,
+            order,
             abi.encode(
-                AsyncSwap.UserParams({user: attacker, executor: address(router), amountOutMin: 1 wei, priorityFee: 0})
+                AsyncSwap.UserParams({user: bob, executor: address(router), amountOutMin: 1 wei, priorityFee: 0})
             )
         );
         vm.stopPrank();

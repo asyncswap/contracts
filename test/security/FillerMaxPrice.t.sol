@@ -5,9 +5,11 @@ import {SetupHook} from "../SetupHook.t.sol";
 import {AsyncSwap} from "@async-swap/AsyncSwap.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 
-contract H01_MakerFrontrunTest is SetupHook {
-    address alice = makeAddr("alice"); // maker (attacker)
-    address bob = makeAddr("bob"); // filler (victim)
+/// @notice A filler's `maxPrice` bounds what they pay: the fill reverts when the maker's live price
+///         exceeds it, including after a maker `updatePrice`.
+contract FillerMaxPriceTest is SetupHook {
+    address alice = makeAddr("alice"); // maker
+    address bob = makeAddr("bob"); // filler
 
     function setUp() public override {
         super.setUp();
@@ -32,10 +34,10 @@ contract H01_MakerFrontrunTest is SetupHook {
         });
     }
 
-    function test_RevertWhen_H01_FillerProtectionViolated() public {
+    function test_RevertWhen_LivePriceExceedsFillerMax() public {
         uint256 amountIn = 1e18;
         uint256 originalOutMin = 0.8e18;
-        uint256 frontrunOutMin = 1.1e18;
+        uint256 raisedOutMin = 1.1e18;
 
         AsyncOrder memory order = _orderFromMaker(alice, true, amountIn, originalOutMin);
 
@@ -58,7 +60,7 @@ contract H01_MakerFrontrunTest is SetupHook {
         token1.approve(address(router), 2e18);
 
         vm.prank(alice);
-        hook.updatePrice(order, frontrunOutMin);
+        hook.updatePrice(order, raisedOutMin);
 
         vm.prank(bob);
         vm.expectRevert();

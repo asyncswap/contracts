@@ -26,9 +26,9 @@ contract RejectingNativeBuyer {
 /// @notice Native recipients cannot block matching by rejecting ETH.
 contract MatchingAdversarialTest is NativeAsyncSwapTest {
     function test_rejectingBestBuyerReceivesClaimsWithoutBlocking() public {
-        RejectingNativeBuyer attacker = new RejectingNativeBuyer();
-        erc20.mint(address(attacker), 1 ether);
-        attacker.place(router, hook, erc20, key);
+        RejectingNativeBuyer rejector = new RejectingNativeBuyer();
+        erc20.mint(address(rejector), 1 ether);
+        rejector.place(router, hook, erc20, key);
 
         vm.deal(alice, 2 ether);
         vm.prank(alice);
@@ -38,8 +38,8 @@ contract MatchingAdversarialTest is NativeAsyncSwapTest {
         vm.prank(alice);
         router.swap{value: 1 ether}(sell, data);
         assertEq(alice.balance, 1 ether);
-        assertEq(manager.balanceOf(address(attacker), 0), 1 ether);
-        assertEq(address(attacker).balance, 0);
+        assertEq(manager.balanceOf(address(rejector), 0), 1 ether);
+        assertEq(address(rejector).balance, 0);
         assertEq(manager.balanceOf(address(hook), 0), 0);
         (bool found,,,) = hook.bestOrder(poolId, true);
         assertFalse(found, "bid fully matched");

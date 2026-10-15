@@ -59,9 +59,7 @@ contract OwnerDirectCancelTest is SetupHook {
         SmartMaker maker = new SmartMaker(manager, hook, router);
         topUp(address(maker), 100 ether);
 
-        // Re-grant authorisation explicitly through the contract (topUp's own
-        // grant was made on behalf of `maker` as msg.sender during a vm.prank,
-        // so it's already in place — but we make the test self-contained).
+        // Grant the Router from the maker contract itself so the test is self-contained.
         maker.authorizeRouter(poolId, true);
 
         AsyncOrder memory order = AsyncOrder({
@@ -86,9 +84,8 @@ contract OwnerDirectCancelTest is SetupHook {
         maker.authorizeRouter(poolId, false);
         assertFalse(hook.isExecutor(poolId, address(maker), address(router)), "router revoked");
 
-        // Direct cancel through the maker's own unlock — msg.sender to hook is
-        // the maker contract itself, so the executor==owner branch kicks in
-        // and the cancel succeeds without re-granting.
+        // Direct cancel through the maker's own unlock: msg.sender to the hook is the maker
+        // contract, so the executor == owner branch applies and no grant is needed.
         maker.cancelDirectly(order);
         assertEq(token0.balanceOf(address(maker)), makerToken0Before, "input refunded");
         (uint256 amountIn,) = hook.asyncOrderInfo(poolId, _orderIdFor(address(maker), true, order.salt));

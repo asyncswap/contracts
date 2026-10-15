@@ -76,7 +76,7 @@ contract SelfExecutor {
 }
 
 /// @dev Tries to pull ERC-6909 fee claims out of the vault without being the vault.
-contract ClaimThief {
+contract VaultOutsider {
     IPoolManager pm;
     address vault;
 
@@ -100,7 +100,7 @@ contract ClaimThief {
 /// @dev Native-output maker whose receive() re-enters mid-fill, while the hook still holds a
 ///      positive ETH delta equal to the not-yet-minted fee. Tries to spend that credit on a
 ///      second native-output order it executes itself.
-contract FeeCreditGrabber {
+contract ReenteringMaker {
     Router router;
     AsyncSwap hook;
     PoolKey key;
@@ -257,7 +257,7 @@ contract FeeCollectTest is Test {
         vm.expectRevert(stdError.arithmeticError); // allowance underflow
         manager.transferFrom(address(vault), bob, id, fee);
 
-        ClaimThief t = new ClaimThief(manager, address(vault));
+        VaultOutsider t = new VaultOutsider(manager, address(vault));
         vm.expectRevert(stdError.arithmeticError); // burn: allowance underflow
         t.burnViaUnlock(id, fee);
 
@@ -289,7 +289,7 @@ contract FeeCollectTest is Test {
     /* ---------------- mid-fill reentrancy cannot capture the unminted fee credit ---------------- */
 
     function test_reentrantMaker_cannotSpendHookFeeCredit() public {
-        FeeCreditGrabber m = new FeeCreditGrabber(router, hook, key, erc20);
+        ReenteringMaker m = new ReenteringMaker(router, hook, key, erc20);
         erc20.mint(address(m), 10 ether);
 
         // Order A: big, gets filled by bob. Order B: tiny, so amountOutMin_B + fee_B <= fee_A.
@@ -322,7 +322,7 @@ contract FeeCollectTest is Test {
     /* ---------------- robustness: collect has no amount parameter ---------------- */
 
     function test_info_collectRevertsIfClaimsExceedInt128() public {
-        // Only reachable with a worthless attacker-minted token; included to document the limit.
+        // Only reachable with a worthless token minted by the caller; included to document the limit.
         MockERC20 junk = new MockERC20("Junk", "JNK", 18);
         Currency j = Currency.wrap(address(junk));
         uint256 huge = uint256(uint128(type(int128).max)) + 1;

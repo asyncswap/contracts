@@ -15,9 +15,9 @@ import {LPFeeLibrary} from "v4-core/libraries/LPFeeLibrary.sol";
 import {PoolId} from "v4-core/types/PoolId.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 
-/// @notice H05 regression: native fills must pay the live price exactly. Stale or
-/// inflated deposits revert atomically, so the filler cannot strand an overpayment.
-contract H05_NativeOverpayStrandedTest is Test {
+/// @notice Native fills must pay the live price exactly. Stale or inflated deposits revert
+/// atomically, so no ETH is left behind in the hook or the Router.
+contract NativeFillExactPaymentTest is Test {
     using PoolIdLibrary for PoolKey;
 
     address owner = makeAddr("deployer");
@@ -130,26 +130,26 @@ contract H05_NativeOverpayStrandedTest is Test {
         assertEq(priceAfter, priceBefore, "price unchanged");
     }
 
-    function test_H05_loweredPrice_rejectsStaleDeposit() public {
+    function test_loweredPrice_rejectsStaleDeposit() public {
         AsyncOrder memory order = _createNativeOutputOrder(1 ether, 1 ether);
         vm.prank(alice);
         hook.updatePrice(order, 0.6 ether);
         _assertRejectedFill(order, 1 ether);
     }
 
-    function test_H05_inflatedStructPrice_rejectsOverpayment() public {
+    function test_inflatedStructPrice_rejectsOverpayment() public {
         AsyncOrder memory order = _createNativeOutputOrder(1 ether, 0.6 ether);
         order.amountOutMin = 1 ether;
         _assertRejectedFill(order, 1 ether);
     }
 
-    function test_H05_underpayment_cannotConsumeDonatedEth() public {
+    function test_underpayment_cannotConsumeDonatedEth() public {
         AsyncOrder memory order = _createNativeOutputOrder(1 ether, 1 ether);
         vm.deal(address(hook), 10 ether);
         _assertRejectedFill(order, 0.6 ether);
     }
 
-    function testFuzz_H05_overpaymentReverts(uint96 excess) public {
+    function testFuzz_overpaymentReverts(uint96 excess) public {
         vm.assume(excess > 0);
         AsyncOrder memory order = _createNativeOutputOrder(1 ether, 0.6 ether);
         uint256 payment = 0.6 ether + uint256(excess);
@@ -158,7 +158,7 @@ contract H05_NativeOverpayStrandedTest is Test {
         _assertRejectedFill(order, payment);
     }
 
-    function test_H05_exactLivePrice_succeedsWithStaleStruct() public {
+    function test_exactLivePrice_succeedsWithStaleStruct() public {
         AsyncOrder memory order = _createNativeOutputOrder(1 ether, 1 ether);
         vm.prank(alice);
         hook.updatePrice(order, 0.6 ether);
@@ -178,7 +178,7 @@ contract H05_NativeOverpayStrandedTest is Test {
         assertEq(remaining, 0, "order consumed");
     }
 
-    function test_H05_livePriceAboveMax_revertsAtomically() public {
+    function test_livePriceAboveMax_revertsAtomically() public {
         AsyncOrder memory order = _createNativeOutputOrder(1 ether, 1 ether);
         uint256 fillerBefore = bob.balance;
         uint256 fee = hook.calculatePoolFee(order.key.fee, 1 ether);
@@ -191,7 +191,7 @@ contract H05_NativeOverpayStrandedTest is Test {
         assertEq(remaining, 1 ether);
     }
 
-    function test_H05_control_fairFill_noStranding() public {
+    function test_control_fairFill_noStranding() public {
         AsyncOrder memory order = _createNativeOutputOrder(1 ether, 0.9 ether);
         uint256 makerBefore = alice.balance;
         uint256 fee = hook.calculatePoolFee(order.key.fee, 0.9 ether);
@@ -219,7 +219,7 @@ contract H05_NativeOverpayStrandedTest is Test {
         router.fillOrder{value: 0.9 ether + fee}(order, 0.9 ether + fee, "");
     }
 
-    function test_L02_nativeInput_rejectsMismatchedOwner() public {
+    function test_nativeInput_rejectsMismatchedOwner() public {
         AsyncOrder memory order = _order(bob, true, 1 ether, 0.9 ether);
         uint256 makerBefore = alice.balance;
         vm.prank(alice);

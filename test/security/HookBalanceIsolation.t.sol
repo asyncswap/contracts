@@ -13,7 +13,7 @@ import {LPFeeLibrary} from "v4-core/libraries/LPFeeLibrary.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 
 /// @dev Acts as maker and its own executor, then fills its own order directly via the hook.
-contract Drainer {
+contract SelfExecutingMaker {
     using CurrencySettler for Currency;
 
     IPoolManager pm;
@@ -53,9 +53,10 @@ contract Drainer {
     }
 }
 
-/// @notice M-01 regression: a self-authorized executor must not drain ERC20 held by the hook.
-contract SR_M01_ERC20StrandedDrainTest is Test {
-    function test_RevertWhen_M01_SelfExecutorDrainsStrandedERC20() public {
+/// @notice A self-authorized executor cannot pay a fill out of ERC20 held by the hook; output must
+///         be settled to the hook's credit in the same unlock.
+contract HookBalanceIsolationTest is Test {
+    function test_RevertWhen_SelfExecutorFillsFromHookBalance() public {
         IPoolManager manager = new PoolManager(address(this));
         MockERC20 a = new MockERC20("A", "A", 18);
         MockERC20 b = new MockERC20("B", "B", 18);
@@ -71,13 +72,13 @@ contract SR_M01_ERC20StrandedDrainTest is Test {
         manager.initialize(key, 2 ** 96);
 
         t1.mint(address(hook), 500 ether); // stranded / mistakenly sent tokens
-        Drainer d = new Drainer(manager, hook, key);
+        SelfExecutingMaker d = new SelfExecutingMaker(manager, hook, key);
         t0.mint(address(d), 1);
 
         vm.expectRevert();
         d.go(499 ether);
 
         assertEq(t1.balanceOf(address(hook)), 500 ether, "stranded balance untouched");
-        assertEq(t1.balanceOf(address(d)), 0, "attacker gained nothing");
+        assertEq(t1.balanceOf(address(d)), 0, "caller gained nothing");
     }
 }

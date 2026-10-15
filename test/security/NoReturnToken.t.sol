@@ -16,8 +16,8 @@ import {LPFeeLibrary} from "v4-core/libraries/LPFeeLibrary.sol";
 import {PoolId} from "v4-core/types/PoolId.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 
-/// @notice L-03 regression: tokens returning no data (USDT-style) work for create, fill and cancel.
-contract SR_L03_NoReturnTokenTest is Test {
+/// @notice Tokens that return no data from transfer (USDT-style) work for create, fill and cancel.
+contract NoReturnTokenTest is Test {
     using PoolIdLibrary for PoolKey;
 
     IPoolManager manager;
@@ -86,7 +86,7 @@ contract SR_L03_NoReturnTokenTest is Test {
             keccak256(abi.encode(block.timestamp, block.number, address(manager), maker, amountIn, amountOutMin, 0));
     }
 
-    function test_L03_noReturnTokenAsMakerInput_createAndCancel() public {
+    function test_noReturnTokenAsMakerInput_createAndCancel() public {
         AsyncOrder memory order = _place(true, 100e6, 99e6);
         assertEq(usdt.balanceOf(maker), 900e6, "input escrowed");
         vm.prank(maker);
@@ -94,7 +94,7 @@ contract SR_L03_NoReturnTokenTest is Test {
         assertEq(usdt.balanceOf(maker), 1000e6, "input returned");
     }
 
-    function test_L03_noReturnTokenAsFillerOutput_fill() public {
+    function test_noReturnTokenAsFillerOutput_fill() public {
         AsyncOrder memory order = _place(false, 100e6, 99e6);
         uint256 gross = 99e6 + hook.calculatePoolFee(key.fee, 99e6);
         vm.prank(filler);

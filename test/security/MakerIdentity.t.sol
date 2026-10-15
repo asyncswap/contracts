@@ -4,7 +4,9 @@ import {SetupHook} from "../SetupHook.t.sol";
 import {AsyncSwap} from "@async-swap/AsyncSwap.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 
-contract L02_MakerIdentityTest is SetupHook {
+/// @notice `order.owner`, `UserParams.user`, and the submitting account must agree; a mismatch
+///         reverts before any input is transferred.
+contract MakerIdentityTest is SetupHook {
     address alice = makeAddr("alice");
     address bob = makeAddr("bob");
 
@@ -34,11 +36,11 @@ contract L02_MakerIdentityTest is SetupHook {
         assertEq(stored, 0, "no unexpected order created");
     }
 
-    function test_L02_mismatchedOwnerRevertsBeforeTransfer() public {
+    function test_mismatchedOwnerRevertsBeforeTransfer() public {
         _reject(bob, alice, "Only owner can swap");
     }
 
-    function test_L02_mismatchedUserDataRevertsBeforeTransfer() public {
+    function test_mismatchedUserDataRevertsBeforeTransfer() public {
         _reject(alice, bob, "user mismatch");
     }
 }

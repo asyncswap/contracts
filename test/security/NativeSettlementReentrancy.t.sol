@@ -15,17 +15,10 @@ import {LPFeeLibrary} from "v4-core/libraries/LPFeeLibrary.sol";
 import {PoolId} from "v4-core/types/PoolId.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 
-/// @notice H06 (secondary): native-transfer reentrancy in fill/cancel is MITIGATED.
-///
-/// AsyncFiller.fill/cancel perform the PoolManager `take` of native currency (a raw call with
-/// all remaining gas) to `order.owner` / `filler` AFTER `delete self.orders[id]` (CEI). When the
-/// recipient is a malicious contract, its receive() fires mid-settlement and attempts to re-enter:
-///   - router.swap / fillOrder / cancelOrder -> POOLMANAGER.unlock -> reverts (already unlocked)
-///   - hook.executeOrder directly            -> reverts (order deleted / PENDING ledger short)
-///
-/// The malicious recipient swallows the failed re-entry (low-level call) so the outer settlement
-/// still succeeds; we then assert no double-spend occurred and every re-entry attempt failed.
-contract MaliciousActor {
+/// @notice Native payouts in fill and cancel are minted as PoolManager claims, so settlement never
+///         calls the recipient. A recipient contract whose receive() would re-enter the Router or
+///         the hook therefore never runs, and each maker is paid exactly once.
+contract ReenteringRecipient {
     Router public router;
     AsyncSwap public hook;
     PoolKey public key;
@@ -98,26 +91,26 @@ contract MaliciousActor {
         });
     }
 
-    /// Fires when the hook pays this contract native ETH mid fill/cancel. Attempts to re-enter
-    /// and double-spend. All attempts are expected to fail; we record and swallow them.
+    /// Would run only if settlement sent ETH directly. Attempts to re-enter and records the
+    /// outcome of each call.
     receive() external payable {
         if (!armed) return;
         armed = false; // single-shot to avoid unbounded recursion
 
         AsyncOrder memory o = reentryOrder;
 
-        // 1) Re-enter cancel of the same (now-deleted) order to reclaim input again.
+        // 1) Cancel the same order again.
         reentryAttempts++;
         (bool ok1,) = address(router).call(abi.encodeWithSelector(Router.cancelOrder.selector, o));
         if (ok1) reentrySuccesses++;
 
-        // 2) Re-enter fillOrder while PM is still unlocked.
+        // 2) Fill the same order.
         reentryAttempts++;
         (bool ok2,) =
             address(router).call(abi.encodeWithSelector(Router.fillOrder.selector, o, type(uint256).max, bytes("")));
         if (ok2) reentrySuccesses++;
 
-        // 3) Re-enter executeOrder directly on the hook.
+        // 3) Call executeOrder directly on the hook.
         reentryAttempts++;
         (bool ok3,) =
             address(hook).call(abi.encodeWithSelector(AsyncSwap.executeOrder.selector, o, abi.encode(address(this))));
@@ -125,11 +118,11 @@ contract MaliciousActor {
     }
 }
 
-contract H06_NativeReentrancyDefenseTest is Test {
+contract NativeSettlementReentrancyTest is Test {
     using PoolIdLibrary for PoolKey;
 
     address owner = makeAddr("deployer");
-    address bob = makeAddr("bob"); // honest filler
+    address bob = makeAddr("bob"); // filler
     IPoolManager manager;
     AsyncSwap hook;
     Router router;
@@ -175,8 +168,8 @@ contract H06_NativeReentrancyDefenseTest is Test {
      *  Reentrancy on native-OUTPUT fill (maker receives ETH)             *
      * ------------------------------------------------------------------ */
 
-    function test_H06_reentrancyOnFill_blocked() public {
-        MaliciousActor maker = new MaliciousActor(router, hook, key, erc20);
+    function test_reentrancyOnFill_blocked() public {
+        ReenteringRecipient maker = new ReenteringRecipient(router, hook, key, erc20);
         erc20.mint(address(maker), 10 ether);
         vm.prank(address(maker));
         maker.approveRouter(10 ether);
@@ -202,7 +195,7 @@ contract H06_NativeReentrancyDefenseTest is Test {
         uint256 makerEthBefore = address(maker).balance;
         uint256 fee = hook.calculatePoolFee(order.key.fee, amountOutMin);
 
-        // Honest fill credits claims without invoking the malicious receive().
+        // The fill credits claims; the recipient's receive() does not run.
         vm.prank(bob);
         router.fillOrder{value: amountOutMin + fee}(order, type(uint256).max, "");
 
@@ -210,9 +203,9 @@ contract H06_NativeReentrancyDefenseTest is Test {
         emit log_named_uint("reentry successes", maker.reentrySuccesses());
         emit log_named_uint("maker ETH received", address(maker).balance - makerEthBefore);
 
-        // Defense holds: every re-entry attempt failed, maker paid out exactly once.
-        assertEq(maker.reentryAttempts(), 0, "native callback removed from settlement");
-        assertEq(maker.reentrySuccesses(), 0, "all re-entries reverted");
+        // No re-entry occurred and the maker was paid exactly once.
+        assertEq(maker.reentryAttempts(), 0, "settlement does not call the recipient");
+        assertEq(maker.reentrySuccesses(), 0, "no re-entry succeeded");
         assertEq(
             address(maker).balance - makerEthBefore + manager.balanceOf(address(maker), 0),
             amountOutMin,
@@ -229,8 +222,8 @@ contract H06_NativeReentrancyDefenseTest is Test {
      *  Reentrancy on native-INPUT cancel (maker receives ETH back)       *
      * ------------------------------------------------------------------ */
 
-    function test_H06_reentrancyOnCancel_blocked() public {
-        MaliciousActor maker = new MaliciousActor(router, hook, key, erc20);
+    function test_reentrancyOnCancel_blocked() public {
+        ReenteringRecipient maker = new ReenteringRecipient(router, hook, key, erc20);
         vm.deal(address(maker), 5 ether);
 
         uint256 amountIn = 1 ether; // ETH in
@@ -253,7 +246,7 @@ contract H06_NativeReentrancyDefenseTest is Test {
 
         uint256 makerEthBefore = address(maker).balance;
 
-        // Cancel credits 1 ETH in claims without invoking receive().
+        // Cancel credits 1 ETH in claims; receive() does not run.
         vm.prank(address(maker));
         maker.cancel(order);
 
@@ -261,8 +254,8 @@ contract H06_NativeReentrancyDefenseTest is Test {
         emit log_named_uint("reentry successes", maker.reentrySuccesses());
         emit log_named_uint("maker ETH reclaimed", address(maker).balance - makerEthBefore);
 
-        assertEq(maker.reentryAttempts(), 0, "native callback removed from settlement");
-        assertEq(maker.reentrySuccesses(), 0, "all re-entries reverted");
+        assertEq(maker.reentryAttempts(), 0, "settlement does not call the recipient");
+        assertEq(maker.reentrySuccesses(), 0, "no re-entry succeeded");
         assertEq(
             address(maker).balance - makerEthBefore + manager.balanceOf(address(maker), 0),
             amountIn,
@@ -275,10 +268,10 @@ contract H06_NativeReentrancyDefenseTest is Test {
     }
 
     /* ------------------------------------------------------------------ *
-     *  CONTROL: honest maker (EOA) fills/cancels with no re-entry         *
+     *  Control: EOA maker, no recipient contract                          *
      * ------------------------------------------------------------------ */
 
-    function test_H06_control_honestFill_succeeds() public {
+    function test_control_eoaFill_succeeds() public {
         address alice = makeAddr("alice");
         vm.deal(alice, 100 ether);
         erc20.mint(alice, 100 ether);

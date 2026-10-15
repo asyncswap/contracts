@@ -5,21 +5,12 @@ import {SetupHook} from "../SetupHook.t.sol";
 import {AsyncSwap} from "@async-swap/AsyncSwap.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 
-/// @notice M01 (Medium) regression: price-key collisions must not wedge the matching engine.
-///
-/// Crossing was decided by comparing two uint128 WAD price keys, each a truncating mulDiv in
-/// `AsyncFiller._priceKey`. Two orders can round to the SAME key while, at full precision, they
-/// do not cross (buyIn*sellIn < sellOut*buyOut). `_matchAmounts` then correctly returns (0,0) and
-/// `_matchPair` returns false, but both `matchIncoming` and `matchBook` used to `break` on that
-/// result. Because the colliding pair sits at the best bid AND best ask, the break permanently
-/// stalled all automatic matching at the top of book.
-///
-/// Fix: `AsyncMatching._crosses` trusts the keys only when strictly ordered (truncation cannot
-/// invert a strict inequality) and decides the ambiguous equal-key case with a full-precision
-/// cross-multiply, treating the exact tie as a cross. A pair that only collides-by-key is then
-/// correctly seen as non-crossing (so it never blocks genuinely crossing orders), and every real
-/// cross — including the exact tie — executes.
-contract M01_PriceKeyCollisionStallTest is SetupHook {
+/// @notice Crossing is decided exactly. Book price keys are truncated WAD ratios, so two orders
+///         can share a key without crossing; `AsyncMatching._crosses` resolves equal keys with a
+///         full-precision cross-multiply. An equal-key pair that does not cross rests and never
+///         blocks a genuinely crossing order, and an exact tie executes. See
+///         docs/price-key-crossing.md.
+contract PriceKeyCrossingTest is SetupHook {
     address alice = makeAddr("alice");
     address bob = makeAddr("bob");
 
@@ -50,9 +41,9 @@ contract M01_PriceKeyCollisionStallTest is SetupHook {
 
     // currency1 is the numeraire. Buyer: zeroForOne=false (pays currency1). Seller: zeroForOne=true.
 
-    /// @dev A key-colliding, non-crossing pair at the top of book must NOT block a genuinely
-    ///      crossing order from matching. Previously the pair wedged the engine.
-    function test_M01_keyCollisionDoesNotWedgeBook() public {
+    /// @dev An equal-key, non-crossing pair at the top of book does not block a genuinely
+    ///      crossing order from matching.
+    function test_equalKeyNonCrossingPairDoesNotBlockMatching() public {
         // Buy and sell whose keys both truncate to 3000000000000000001 but do NOT actually cross.
         _submit(alice, false, 3e18 + 1, 1e18); // resting buy  B1 (best bid, key K)
         _submit(bob, true, 1e18 - 1, 3e18 - 2); // resting sell S1 (best ask, key K) -- does not cross B1
@@ -64,14 +55,14 @@ contract M01_PriceKeyCollisionStallTest is SetupHook {
         // A genuinely crossing sell (ask key 2e18 < K) arrives and MUST match B1.
         _submit(bob, true, 1e18, 2e18); // S2
 
-        assertEq(_remaining(alice, false, 3e18 + 1, 1e18), 0, "B1 fully matched against S2 (book not wedged)");
+        assertEq(_remaining(alice, false, 3e18 + 1, 1e18), 0, "B1 fully matched against S2");
         assertEq(_remaining(bob, true, 1e18, 2e18), 0, "S2 fully consumed");
         assertEq(_remaining(bob, true, 1e18 - 1, 3e18 - 2), 1e18 - 1, "S1 still resting, correctly left alone");
     }
 
-    /// @dev matchBook on a book holding only a key-colliding non-crossing pair returns 0 and leaves
-    ///      both orders intact. This is correct (they do not cross), not a wedge.
-    function test_M01_matchBookMakesNoFalseMatch() public {
+    /// @dev matchBook on a book holding only an equal-key, non-crossing pair returns 0 and leaves
+    ///      both orders intact.
+    function test_matchBookMakesNoFalseMatch() public {
         _submit(alice, false, 3e18 + 1, 1e18);
         _submit(bob, true, 1e18 - 1, 3e18 - 2);
 
@@ -83,7 +74,7 @@ contract M01_PriceKeyCollisionStallTest is SetupHook {
 
     /// @dev An exact tie (buyIn*sellIn == sellOut*buyOut) at equal keys must execute rather
     ///      than resting.
-    function test_M01_exactTieExecutes() public {
+    function test_exactTieExecutes() public {
         _submit(alice, false, 3e18, 1e18); // buy  key 3e18
         _submit(bob, true, 1e18, 3e18); // sell key 3e18, exact tie with the buy
 

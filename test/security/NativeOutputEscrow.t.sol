@@ -15,11 +15,13 @@ import {LPFeeLibrary} from "v4-core/libraries/LPFeeLibrary.sol";
 import {PoolId} from "v4-core/types/PoolId.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 
-contract C01_CommingledEscrowTest is Test {
+/// @notice A native-output fill pays only from the filler's same-transaction deposit; the hook's
+///         own ETH balance is never used.
+contract NativeOutputEscrowTest is Test {
     using PoolIdLibrary for PoolKey;
 
     address owner = makeAddr("deployer");
-    address attacker = makeAddr("attacker");
+    address filler = makeAddr("filler");
     IPoolManager manager;
     AsyncSwap hook;
     Router router;
@@ -54,9 +56,9 @@ contract C01_CommingledEscrowTest is Test {
         poolId = key.toId();
         manager.initialize(key, 2 ** 96);
 
-        vm.deal(attacker, 1 ether);
-        erc20.mint(attacker, 1);
-        vm.prank(attacker);
+        vm.deal(filler, 1 ether);
+        erc20.mint(filler, 1);
+        vm.prank(filler);
         hook.setExecutor(poolId, address(router), true);
     }
 
@@ -78,29 +80,27 @@ contract C01_CommingledEscrowTest is Test {
         });
     }
 
-    function test_RevertWhen_C01_FillerDoesNotDepositNativeOutput() public {
+    function test_RevertWhen_FillerDoesNotDepositNativeOutput() public {
         uint256 STRANDED = 10 ether;
         vm.deal(address(hook), STRANDED);
 
-        AsyncOrder memory order = _order({ownerAddr: attacker, zeroForOne: false, amountIn: 1, amountOutMin: STRANDED});
+        AsyncOrder memory order = _order({ownerAddr: filler, zeroForOne: false, amountIn: 1, amountOutMin: STRANDED});
 
-        vm.startPrank(attacker);
+        vm.startPrank(filler);
         erc20.approve(address(router), 1);
         router.swap(
             order,
             abi.encode(
-                AsyncSwap.UserParams({
-                    user: attacker, executor: address(router), amountOutMin: STRANDED, priorityFee: 0
-                })
+                AsyncSwap.UserParams({user: filler, executor: address(router), amountOutMin: STRANDED, priorityFee: 0})
             )
         );
         vm.stopPrank();
 
         // Patch salt so the fillOrder path resolves the same orderId the hook stored under.
         order.salt =
-            keccak256(abi.encode(block.timestamp, block.number, address(manager), attacker, uint256(1), STRANDED, 0));
+            keccak256(abi.encode(block.timestamp, block.number, address(manager), filler, uint256(1), STRANDED, 0));
 
-        vm.prank(attacker);
+        vm.prank(filler);
         vm.expectRevert();
         router.fillOrder{value: 0}(order, type(uint256).max, "");
     }

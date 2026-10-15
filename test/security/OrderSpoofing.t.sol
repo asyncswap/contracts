@@ -11,19 +11,19 @@ import {CustomRevert} from "v4-core/libraries/CustomRevert.sol";
 import {Hooks} from "v4-core/libraries/Hooks.sol";
 import {PoolKey} from "v4-core/types/PoolKey.sol";
 
-/// @dev Opens an order naming `victim` as maker and the victim's executor (Router), funding it itself.
-contract Spoofer {
+/// @dev Opens an order naming another account as maker and that account's executor (Router), funding it itself.
+contract ThirdPartySubmitter {
     using CurrencySettler for Currency;
 
     IPoolManager pm;
     PoolKey key;
-    address victim;
+    address maker;
     address executor;
 
-    constructor(IPoolManager _pm, PoolKey memory _key, address _victim, address _executor) {
+    constructor(IPoolManager _pm, PoolKey memory _key, address _maker, address _executor) {
         pm = _pm;
         key = _key;
-        victim = _victim;
+        maker = _maker;
         executor = _executor;
     }
 
@@ -35,21 +35,21 @@ contract Spoofer {
         pm.swap(
             key,
             SwapParams(true, -1 ether, 4295128740),
-            abi.encode(AsyncSwap.UserParams({user: victim, executor: executor, amountOutMin: 1, priorityFee: 0}))
+            abi.encode(AsyncSwap.UserParams({user: maker, executor: executor, amountOutMin: 1, priorityFee: 0}))
         );
         key.currency0.settle(pm, address(this), 1 ether, false);
         return "";
     }
 }
 
-/// @notice L-01 regression: only the declared executor itself may open orders for a maker.
-contract SR_L01_OrderSpoofingTest is SetupHook {
-    function test_RevertWhen_L01_NonExecutorOpensOrderForMaker() public {
-        address victim = makeAddr("victim");
-        topUp(victim, 1 ether); // grants setExecutor(victim -> router)
-        assertTrue(hook.isExecutor(poolId, victim, address(router)));
+/// @notice Only the declared executor itself may open orders for a maker.
+contract OrderSpoofingTest is SetupHook {
+    function test_RevertWhen_NonExecutorOpensOrderForMaker() public {
+        address maker = makeAddr("maker");
+        topUp(maker, 1 ether); // grants setExecutor(maker -> router)
+        assertTrue(hook.isExecutor(poolId, maker, address(router)));
 
-        Spoofer s = new Spoofer(manager, key, victim, address(router));
+        ThirdPartySubmitter s = new ThirdPartySubmitter(manager, key, maker, address(router));
         token0.mint(address(s), 1 ether);
 
         vm.expectRevert(

@@ -49,7 +49,9 @@ contract Attacker is IUnlockCallback {
         // Forged hookData: names the victim as `user`, attacker as `executor`. The hook should
         // reject because the victim never authorized `address(this)` as an executor.
         manager.swap(
-            poolKey, sp, abi.encode(AsyncSwap.UserParams({user: victim, executor: address(this), amountOutMin: 1}))
+            poolKey,
+            sp,
+            abi.encode(AsyncSwap.UserParams({user: victim, executor: address(this), amountOutMin: 1, priorityFee: 0}))
         );
         Currency input = zeroForOne ? poolKey.currency0 : poolKey.currency1;
         input.settle(manager, address(this), 1, false);
@@ -80,6 +82,7 @@ contract H02_ExecutorForgeryTest is SetupHook {
             zeroForOne: true,
             amountIn: amountIn,
             amountOutMin: amountOutMin,
+            priorityFee: 0,
             sqrtPrice: 2 ** 96,
             salt: bytes32(0)
         });
@@ -88,7 +91,11 @@ contract H02_ExecutorForgeryTest is SetupHook {
         token0.approve(address(router), amountIn);
         router.swap(
             victimOrder,
-            abi.encode(AsyncSwap.UserParams({user: victim, executor: address(router), amountOutMin: amountOutMin}))
+            abi.encode(
+                AsyncSwap.UserParams({
+                    user: victim, executor: address(router), amountOutMin: amountOutMin, priorityFee: 0
+                })
+            )
         );
         vm.stopPrank();
 

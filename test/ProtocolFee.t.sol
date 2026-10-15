@@ -10,10 +10,10 @@ contract ProtocolFeeTest is SetupHook {
         address filler = makeAddr("filler");
         topUp(maker, 1 ether);
         topUp(filler, 100_000_000);
-        AsyncOrder memory order = AsyncOrder(key, maker, true, 1 ether, 99_700_000, 2 ** 96, bytes32(0));
+        AsyncOrder memory order = AsyncOrder(key, maker, true, 1 ether, 99_700_000, 0, 2 ** 96, bytes32(0));
         vm.startPrank(maker);
         token0.approve(address(router), 1 ether);
-        router.swap(order, abi.encode(AsyncSwap.UserParams(maker, address(router), 99_700_000)));
+        router.swap(order, abi.encode(AsyncSwap.UserParams(maker, address(router), 99_700_000, 0)));
         vm.stopPrank();
         order.salt = _expectedSalt(maker, 1 ether, 99_700_000);
         uint256 makerBefore = token1.balanceOf(maker);

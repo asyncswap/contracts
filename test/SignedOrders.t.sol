@@ -50,6 +50,7 @@ contract SignedOrdersTest is SetupHook {
             zeroForOne: true,
             amountIn: AMOUNT_IN,
             amountOutMin: amountOutMin,
+            priorityFee: 0,
             sqrtPrice: 2 ** 96,
             salt: bytes32(0)
         });
@@ -358,12 +359,12 @@ contract SignedOrdersTest is SetupHook {
     function test_typeStrings() public pure {
         assertEq(
             OrderSignatures.PERMIT2_WITNESS_TYPE,
-            "AsyncOrder witness)AsyncOrder(address maker,address tokenIn,address tokenOut,uint256 amountIn,uint256 amountOutMin,PoolKey pool)PoolKey(address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks)TokenPermissions(address token,uint256 amount)"
+            "AsyncOrder witness)AsyncOrder(address maker,address tokenIn,address tokenOut,uint256 amountIn,uint256 amountOutMin,uint256 priorityFee,PoolKey pool)PoolKey(address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks)TokenPermissions(address token,uint256 amount)"
         );
         assertEq(
             OrderSignatures.ASYNC_ORDER_TYPEHASH,
             keccak256(
-                "AsyncOrder(address maker,address tokenIn,address tokenOut,uint256 amountIn,uint256 amountOutMin,PoolKey pool)PoolKey(address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks)"
+                "AsyncOrder(address maker,address tokenIn,address tokenOut,uint256 amountIn,uint256 amountOutMin,uint256 priorityFee,PoolKey pool)PoolKey(address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks)"
             )
         );
         assertEq(

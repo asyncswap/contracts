@@ -19,7 +19,8 @@ import {AsyncSwap} from "src/AsyncSwap.sol";
 /// @author @msakiart
 /// @notice Thin entrypoint for makers (`swap`), fillers (`fillOrder`), and makers cancelling orders
 ///         (`cancelOrder`). All three actions go through `IPoolManager.unlock` so the hook can
-///         operate on PM debts.
+///         operate on PM debts. Native payouts/refunds are PoolManager claims (ID 0),
+///         redeemable through NativeClaims after approval; ERC20 payouts remain direct.
 ///
 ///         Gasless variants (`swapWithSig`, `cancelWithSig`) take the maker's EIP-712 signature so a
 ///         relayer can submit. Signed creates pull input through Permit2 with the order as witness,
@@ -48,12 +49,15 @@ contract Router is EIP712 {
         Swap,
         FillOrder,
         Cancel,
-        SwapWithSig
+        SwapWithSig,
+        MatchBook,
+        PoolLiquidityFill
     }
 
     struct SwapCallback {
         ActionType action;
         AsyncOrder order;
+        uint8 maxMatches;
     }
 
     /// @notice Permit2 signature + nonce/deadline for a signed create.
@@ -113,6 +117,7 @@ contract Router is EIP712 {
         require(userParams.user == order.owner, "user mismatch");
         require(userParams.executor == address(this), "Use router as your executor!");
         require(userParams.amountOutMin == order.amountOutMin, "amountOutMin mismatch");
+        require(userParams.priorityFee == order.priorityFee, "priorityFee mismatch");
 
         // msg.value invariant: native input requires exact deposit, ERC20 input forbids overpay.
         // Without this an attacker can sweep ETH stranded from prior overpays in this contract.
@@ -126,7 +131,7 @@ contract Router is EIP712 {
             tstore(USER_LOCATION, caller())
             tstore(ASYNC_FILLER_LOCATION, onBehalf)
         }
-        POOLMANAGER.unlock(abi.encode(SwapCallback({action: ActionType.Swap, order: order})));
+        POOLMANAGER.unlock(abi.encode(SwapCallback({action: ActionType.Swap, order: order, maxMatches: 0})));
     }
 
     /// @notice Filler completes an open order, paying the maker's net minimum plus the protocol fee.
@@ -161,7 +166,7 @@ contract Router is EIP712 {
         } else {
             require(msg.value == 0, "msg.value forbidden for ERC20 output");
         }
-        POOLMANAGER.unlock(abi.encode(SwapCallback({action: ActionType.FillOrder, order: order})));
+        POOLMANAGER.unlock(abi.encode(SwapCallback({action: ActionType.FillOrder, order: order, maxMatches: 0})));
     }
 
     /// @notice Relayer submits a maker's signed order. The maker signs a Permit2
@@ -184,7 +189,9 @@ contract Router is EIP712 {
             tstore(USER_LOCATION, maker)
             tstore(ASYNC_FILLER_LOCATION, onBehalf)
         }
-        POOLMANAGER.unlock(abi.encode(SwapCallback({action: ActionType.SwapWithSig, order: order}), permit));
+        POOLMANAGER.unlock(
+            abi.encode(SwapCallback({action: ActionType.SwapWithSig, order: order, maxMatches: 0}), permit)
+        );
     }
 
     /// @notice Relayer submits a maker's signed EIP-712 `CancelOrder`. Input returns to the maker.
@@ -198,7 +205,7 @@ contract Router is EIP712 {
         (uint256 amountIn,) = HOOK.asyncOrderInfo(order.key.toId(), id);
         bytes32 digest = _hashTypedDataV4(OrderSignatures.hashCancel(order, id, amountIn, nonce, deadline));
         if (!SignatureChecker.isValidSignatureNow(order.owner, digest, signature)) revert InvalidSignature();
-        POOLMANAGER.unlock(abi.encode(SwapCallback({action: ActionType.Cancel, order: order})));
+        POOLMANAGER.unlock(abi.encode(SwapCallback({action: ActionType.Cancel, order: order, maxMatches: 0})));
     }
 
     /// @notice EIP-712 domain separator for Router-verified signatures (`CancelOrder`).
@@ -213,7 +220,30 @@ contract Router is EIP712 {
         assembly ("memory-safe") {
             tstore(USER_LOCATION, caller())
         }
-        POOLMANAGER.unlock(abi.encode(SwapCallback({action: ActionType.Cancel, order: order})));
+        POOLMANAGER.unlock(abi.encode(SwapCallback({action: ActionType.Cancel, order: order, maxMatches: 0})));
+    }
+
+    /// @notice Anyone can continue a crossed book after a transaction hits the automatic match cap.
+    /// @dev Work is capped at eight matched pairs per unlock to keep gas predictable.
+    function matchBook(PoolKey calldata key, uint8 maxMatches) external {
+        AsyncOrder memory placeholder;
+        placeholder.key = key;
+        POOLMANAGER.unlock(
+            abi.encode(SwapCallback({action: ActionType.MatchBook, order: placeholder, maxMatches: maxMatches}))
+        );
+    }
+
+    /// @notice Retry a resting order against the pool's active Uniswap v4 LP positions.
+    /// @dev The order is left untouched when the pool cannot fully fill it at its minimum output.
+    function fillFromPoolLiquidity(AsyncOrder calldata order) external {
+        address onBehalf = address(this);
+        assembly ("memory-safe") {
+            tstore(USER_LOCATION, caller())
+            tstore(ASYNC_FILLER_LOCATION, onBehalf)
+        }
+        POOLMANAGER.unlock(
+            abi.encode(SwapCallback({action: ActionType.PoolLiquidityFill, order: order, maxMatches: 0}))
+        );
     }
 
     /// @notice PM unlock-callback dispatcher. The action enum is read from transient storage, set
@@ -238,7 +268,10 @@ contract Router is EIP712 {
                 SwapParams(orderData.order.zeroForOne, -orderData.order.amountIn.toInt256(), orderData.order.sqrtPrice),
                 abi.encode(
                     AsyncSwap.UserParams({
-                        user: user, executor: asyncFiller, amountOutMin: orderData.order.amountOutMin
+                        user: user,
+                        executor: asyncFiller,
+                        amountOutMin: orderData.order.amountOutMin,
+                        priorityFee: orderData.order.priorityFee
                     })
                 )
             );
@@ -253,6 +286,10 @@ contract Router is EIP712 {
             } else {
                 input.settle(POOLMANAGER, user, orderData.order.amountIn, false);
             }
+            _settlePriorityFee(orderData.order);
+            // The hook records the order during `swap`, but it only becomes matchable after
+            // this maker's input has been settled into PoolManager escrow.
+            HOOK.matchNewOrder(orderData.order);
         } else if (action == uint8(ActionType.FillOrder)) {
             // Read the LIVE price from hook storage — the caller's `order.amountOutMin` may be
             // stale if the maker called updatePrice after submitting.
@@ -277,6 +314,10 @@ contract Router is EIP712 {
             HOOK.executeOrder(orderData.order, abi.encode(user));
         } else if (action == uint8(ActionType.Cancel)) {
             HOOK.cancelOrder(orderData.order);
+        } else if (action == uint8(ActionType.MatchBook)) {
+            HOOK.matchBook(orderData.order.key, orderData.maxMatches);
+        } else if (action == uint8(ActionType.PoolLiquidityFill)) {
+            HOOK.tryFillOrderFromPoolLiquidity(orderData.order);
         }
 
         return "";
@@ -299,6 +340,18 @@ contract Router is EIP712 {
             permit.signature
         );
         POOLMANAGER.settle();
+    }
+
+    /// @dev Priority bids use the pool's USDC numeraire. In signed-order mode the maker still
+    ///      needs an ERC-20 approval for this separate bid; the signed order commits to its amount.
+    function _settlePriorityFee(AsyncOrder memory order) private {
+        uint256 amount = order.priorityFee;
+        if (amount == 0) return;
+        Currency numeraire = HOOK.numeraire();
+        POOLMANAGER.sync(numeraire);
+        IERC20(Currency.unwrap(numeraire)).safeTransferFrom(order.owner, address(POOLMANAGER), amount);
+        POOLMANAGER.settleFor(address(HOOK));
+        HOOK.recordPriorityFee(order.key, order.owner, amount);
     }
 
     /// @dev MUST match AsyncOrderLibrary.orderId exactly: (chainId, poolId, owner, zeroForOne, salt).

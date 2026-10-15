@@ -36,12 +36,17 @@ contract Drainer {
         pm.swap(
             key,
             SwapParams(true, -1, 4295128740),
-            abi.encode(AsyncSwap.UserParams({user: address(this), executor: address(this), amountOutMin: amountOutMin}))
+            abi.encode(
+                AsyncSwap.UserParams({
+                    user: address(this), executor: address(this), amountOutMin: amountOutMin, priorityFee: 0
+                })
+            )
         );
         key.currency0.settle(pm, address(this), 1, false);
-        bytes32 salt =
-            keccak256(abi.encode(block.timestamp, block.number, address(pm), address(this), uint256(1), amountOutMin));
-        AsyncOrder memory o = AsyncOrder(key, address(this), true, 1, amountOutMin, 0, salt);
+        bytes32 salt = keccak256(
+            abi.encode(block.timestamp, block.number, address(pm), address(this), uint256(1), amountOutMin, 0)
+        );
+        AsyncOrder memory o = AsyncOrder(key, address(this), true, 1, amountOutMin, 0, 0, salt);
         // Without pre-settling output, the hook must not pay it from its own token balance.
         hook.executeOrder(o, abi.encode(address(this)));
         return "";

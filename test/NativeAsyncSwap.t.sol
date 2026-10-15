@@ -74,7 +74,7 @@ contract NativeAsyncSwapTest is Test {
 
     /// @dev Predict the contract-assigned salt; mirrors `_createOrder`.
     function _expectedSalt(address user, uint256 amountIn, uint256 amountOutMin) internal view returns (bytes32) {
-        return keccak256(abi.encode(block.timestamp, block.number, address(manager), user, amountIn, amountOutMin));
+        return keccak256(abi.encode(block.timestamp, block.number, address(manager), user, amountIn, amountOutMin, 0));
     }
 
     function _orderIdFor(address maker, bool zeroForOne, bytes32 salt) internal view returns (bytes32) {
@@ -92,6 +92,7 @@ contract NativeAsyncSwapTest is Test {
             zeroForOne: zeroForOne,
             amountIn: amountIn,
             amountOutMin: amountOutMin,
+            priorityFee: 0,
             sqrtPrice: 2 ** 96,
             salt: bytes32(0)
         });
@@ -112,7 +113,10 @@ contract NativeAsyncSwapTest is Test {
         vm.startPrank(alice);
         // No ERC20 approve needed for native input — caller forwards ETH via msg.value.
         router.swap{value: 1 ether}(
-            order, abi.encode(AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 0.95 ether}))
+            order,
+            abi.encode(
+                AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 0.95 ether, priorityFee: 0})
+            )
         );
         vm.stopPrank();
 
@@ -130,7 +134,10 @@ contract NativeAsyncSwapTest is Test {
 
         vm.startPrank(alice);
         router.swap{value: 1 ether}(
-            order, abi.encode(AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 0.95 ether}))
+            order,
+            abi.encode(
+                AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 0.95 ether, priorityFee: 0})
+            )
         );
         vm.stopPrank();
 
@@ -152,7 +159,8 @@ contract NativeAsyncSwapTest is Test {
             0.95 ether + hook.calculatePoolFee(order.key.fee, 0.95 ether),
             "filler paid TST"
         );
-        assertEq(bob.balance - bobEthBefore, 1 ether, "filler received real ETH");
+        assertEq(bob.balance, bobEthBefore, "no native callback during fill");
+        assertEq(manager.balanceOf(bob, 0), 1 ether, "filler received ETH claims");
         assertEq(erc20.balanceOf(alice) - aliceErc20Before, 0.95 ether, "maker received real TST");
     }
 
@@ -165,7 +173,10 @@ contract NativeAsyncSwapTest is Test {
         vm.startPrank(alice);
         erc20.approve(address(router), type(uint256).max);
         router.swap(
-            order, abi.encode(AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 0.9 ether}))
+            order,
+            abi.encode(
+                AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 0.9 ether, priorityFee: 0})
+            )
         );
         vm.stopPrank();
 
@@ -184,7 +195,10 @@ contract NativeAsyncSwapTest is Test {
         vm.startPrank(alice);
         erc20.approve(address(router), type(uint256).max);
         router.swap(
-            order, abi.encode(AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 0.9 ether}))
+            order,
+            abi.encode(
+                AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 0.9 ether, priorityFee: 0})
+            )
         );
         vm.stopPrank();
 
@@ -206,7 +220,8 @@ contract NativeAsyncSwapTest is Test {
             bobEthBefore - bob.balance, 0.9 ether + hook.calculatePoolFee(order.key.fee, 0.9 ether), "filler paid ETH"
         );
         assertEq(erc20.balanceOf(bob) - bobErc20Before, 1 ether, "filler received TST");
-        assertEq(alice.balance - aliceEthBefore, 0.9 ether, "maker received ETH");
+        assertEq(alice.balance, aliceEthBefore, "no native callback during fill");
+        assertEq(manager.balanceOf(alice, 0), 0.9 ether, "maker received ETH claims");
     }
 
     /* ------------------------------- cancel native input ------------------------------ */
@@ -219,7 +234,10 @@ contract NativeAsyncSwapTest is Test {
 
         vm.startPrank(alice);
         router.swap{value: 1 ether}(
-            order, abi.encode(AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 0.95 ether}))
+            order,
+            abi.encode(
+                AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 0.95 ether, priorityFee: 0})
+            )
         );
         order = _withAssignedSalt(order);
         router.cancelOrder(order);
@@ -228,7 +246,8 @@ contract NativeAsyncSwapTest is Test {
         bytes32 id = _orderIdFor(alice, true, order.salt);
         (uint256 leftIn,) = hook.asyncOrderInfo(poolId, id);
         assertEq(leftIn, 0, "order deleted");
-        // Submit + cancel is net-zero on alice's ETH balance.
-        assertEq(alice.balance, aliceEthBefore, "maker reclaimed real ETH");
+        // Submit + cancel preserves wallet ETH plus withdrawable claims.
+        assertEq(alice.balance, aliceEthBefore - 1 ether, "native refund remains in PoolManager");
+        assertEq(manager.balanceOf(alice, 0), 1 ether, "maker reclaimed ETH claims");
     }
 }

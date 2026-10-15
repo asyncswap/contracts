@@ -56,7 +56,9 @@ contract MaliciousActor {
         router.swap{value: amountIn}(
             o,
             abi.encode(
-                AsyncSwap.UserParams({user: address(this), executor: address(router), amountOutMin: amountOutMin})
+                AsyncSwap.UserParams({
+                    user: address(this), executor: address(router), amountOutMin: amountOutMin, priorityFee: 0
+                })
             )
         );
     }
@@ -67,7 +69,9 @@ contract MaliciousActor {
         router.swap(
             o,
             abi.encode(
-                AsyncSwap.UserParams({user: address(this), executor: address(router), amountOutMin: amountOutMin})
+                AsyncSwap.UserParams({
+                    user: address(this), executor: address(router), amountOutMin: amountOutMin, priorityFee: 0
+                })
             )
         );
     }
@@ -88,6 +92,7 @@ contract MaliciousActor {
             zeroForOne: zeroForOne,
             amountIn: amountIn,
             amountOutMin: amountOutMin,
+            priorityFee: 0,
             sqrtPrice: 2 ** 96,
             salt: bytes32(0)
         });
@@ -163,7 +168,7 @@ contract H06_NativeReentrancyDefenseTest is Test {
     }
 
     function _expectedSalt(address user, uint256 amountIn, uint256 amountOutMin) internal view returns (bytes32) {
-        return keccak256(abi.encode(block.timestamp, block.number, address(manager), user, amountIn, amountOutMin));
+        return keccak256(abi.encode(block.timestamp, block.number, address(manager), user, amountIn, amountOutMin, 0));
     }
 
     /* ------------------------------------------------------------------ *
@@ -188,6 +193,7 @@ contract H06_NativeReentrancyDefenseTest is Test {
             zeroForOne: false,
             amountIn: amountIn,
             amountOutMin: amountOutMin,
+            priorityFee: 0,
             sqrtPrice: 2 ** 96,
             salt: _expectedSalt(address(maker), amountIn, amountOutMin)
         });
@@ -196,7 +202,7 @@ contract H06_NativeReentrancyDefenseTest is Test {
         uint256 makerEthBefore = address(maker).balance;
         uint256 fee = hook.calculatePoolFee(order.key.fee, amountOutMin);
 
-        // Honest fill; the malicious maker's receive() will try to re-enter.
+        // Honest fill credits claims without invoking the malicious receive().
         vm.prank(bob);
         router.fillOrder{value: amountOutMin + fee}(order, type(uint256).max, "");
 
@@ -205,9 +211,13 @@ contract H06_NativeReentrancyDefenseTest is Test {
         emit log_named_uint("maker ETH received", address(maker).balance - makerEthBefore);
 
         // Defense holds: every re-entry attempt failed, maker paid out exactly once.
-        assertGt(maker.reentryAttempts(), 0, "receive() ran and attempted re-entry");
+        assertEq(maker.reentryAttempts(), 0, "native callback removed from settlement");
         assertEq(maker.reentrySuccesses(), 0, "all re-entries reverted");
-        assertEq(address(maker).balance - makerEthBefore, amountOutMin, "maker paid exactly once, no double-spend");
+        assertEq(
+            address(maker).balance - makerEthBefore + manager.balanceOf(address(maker), 0),
+            amountOutMin,
+            "maker paid exactly once, no double-spend"
+        );
 
         // Order is gone.
         bytes32 id = keccak256(abi.encode(block.chainid, poolId, address(maker), false, order.salt));
@@ -235,6 +245,7 @@ contract H06_NativeReentrancyDefenseTest is Test {
             zeroForOne: true,
             amountIn: amountIn,
             amountOutMin: amountOutMin,
+            priorityFee: 0,
             sqrtPrice: 2 ** 96,
             salt: _expectedSalt(address(maker), amountIn, amountOutMin)
         });
@@ -242,7 +253,7 @@ contract H06_NativeReentrancyDefenseTest is Test {
 
         uint256 makerEthBefore = address(maker).balance;
 
-        // Cancel returns the 1 ETH input to the maker; receive() attempts to re-enter.
+        // Cancel credits 1 ETH in claims without invoking receive().
         vm.prank(address(maker));
         maker.cancel(order);
 
@@ -250,9 +261,13 @@ contract H06_NativeReentrancyDefenseTest is Test {
         emit log_named_uint("reentry successes", maker.reentrySuccesses());
         emit log_named_uint("maker ETH reclaimed", address(maker).balance - makerEthBefore);
 
-        assertGt(maker.reentryAttempts(), 0, "receive() ran and attempted re-entry");
+        assertEq(maker.reentryAttempts(), 0, "native callback removed from settlement");
         assertEq(maker.reentrySuccesses(), 0, "all re-entries reverted");
-        assertEq(address(maker).balance - makerEthBefore, amountIn, "reclaimed input exactly once, no double-spend");
+        assertEq(
+            address(maker).balance - makerEthBefore + manager.balanceOf(address(maker), 0),
+            amountIn,
+            "reclaimed input exactly once, no double-spend"
+        );
 
         bytes32 id = keccak256(abi.encode(block.chainid, poolId, address(maker), true, order.salt));
         (uint256 leftIn,) = hook.asyncOrderInfo(poolId, id);
@@ -279,6 +294,7 @@ contract H06_NativeReentrancyDefenseTest is Test {
             zeroForOne: false,
             amountIn: amountIn,
             amountOutMin: amountOutMin,
+            priorityFee: 0,
             sqrtPrice: 2 ** 96,
             salt: bytes32(0)
         });
@@ -287,7 +303,11 @@ contract H06_NativeReentrancyDefenseTest is Test {
         erc20.approve(address(router), type(uint256).max);
         router.swap(
             order,
-            abi.encode(AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: amountOutMin}))
+            abi.encode(
+                AsyncSwap.UserParams({
+                    user: alice, executor: address(router), amountOutMin: amountOutMin, priorityFee: 0
+                })
+            )
         );
         vm.stopPrank();
         order.salt = _expectedSalt(alice, amountIn, amountOutMin);
@@ -298,7 +318,11 @@ contract H06_NativeReentrancyDefenseTest is Test {
         router.fillOrder{value: amountOutMin + fee}(order, type(uint256).max, "");
 
         emit log_named_uint("maker ETH received", alice.balance - aliceEthBefore);
-        assertEq(alice.balance - aliceEthBefore, amountOutMin, "honest fill pays maker exactly the live price");
+        assertEq(
+            alice.balance - aliceEthBefore + manager.balanceOf(alice, 0),
+            amountOutMin,
+            "honest fill pays maker exactly the live price"
+        );
         assertEq(address(hook).balance, 0, "no stranded ETH on fair honest fill");
     }
 }

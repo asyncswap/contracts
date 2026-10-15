@@ -66,7 +66,7 @@ contract H05_NativeOverpayStrandedTest is Test {
     }
 
     function _expectedSalt(address user, uint256 amountIn, uint256 amountOutMin) internal view returns (bytes32) {
-        return keccak256(abi.encode(block.timestamp, block.number, address(manager), user, amountIn, amountOutMin));
+        return keccak256(abi.encode(block.timestamp, block.number, address(manager), user, amountIn, amountOutMin, 0));
     }
 
     function _orderIdFor(address maker, bool zeroForOne, bytes32 salt) internal view returns (bytes32) {
@@ -84,6 +84,7 @@ contract H05_NativeOverpayStrandedTest is Test {
             zeroForOne: zeroForOne,
             amountIn: amountIn,
             amountOutMin: amountOutMin,
+            priorityFee: 0,
             sqrtPrice: 2 ** 96,
             salt: bytes32(0)
         });
@@ -100,7 +101,11 @@ contract H05_NativeOverpayStrandedTest is Test {
         erc20.approve(address(router), type(uint256).max);
         router.swap(
             order,
-            abi.encode(AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: amountOutMin}))
+            abi.encode(
+                AsyncSwap.UserParams({
+                    user: alice, executor: address(router), amountOutMin: amountOutMin, priorityFee: 0
+                })
+            )
         );
         vm.stopPrank();
         order.salt = _expectedSalt(alice, amountIn, amountOutMin);
@@ -164,7 +169,8 @@ contract H05_NativeOverpayStrandedTest is Test {
         vm.prank(bob);
         router.fillOrder{value: 0.6 ether + fee}(order, 1 ether, "");
         assertEq(fillerBefore - bob.balance, 0.6 ether + fee, "filler pays live price");
-        assertEq(alice.balance - makerBefore, 0.6 ether, "maker receives live price");
+        assertEq(alice.balance, makerBefore);
+        assertEq(manager.balanceOf(alice, 0), 0.6 ether, "maker receives live price claims");
         assertEq(erc20.balanceOf(bob) - tokensBefore, 1 ether, "filler receives input");
         assertEq(address(hook).balance, 0, "no stranded ETH");
         assertEq(address(router).balance, 0, "no stranded ETH in router");
@@ -191,7 +197,8 @@ contract H05_NativeOverpayStrandedTest is Test {
         uint256 fee = hook.calculatePoolFee(order.key.fee, 0.9 ether);
         vm.prank(bob);
         router.fillOrder{value: 0.9 ether + fee}(order, 0.9 ether + fee, "");
-        assertEq(alice.balance - makerBefore, 0.9 ether);
+        assertEq(alice.balance, makerBefore);
+        assertEq(manager.balanceOf(alice, 0), 0.9 ether);
         assertEq(address(hook).balance, 0);
         assertEq(address(router).balance, 0);
     }
@@ -218,7 +225,10 @@ contract H05_NativeOverpayStrandedTest is Test {
         vm.prank(alice);
         vm.expectRevert("Only owner can swap");
         router.swap{value: 1 ether}(
-            order, abi.encode(AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 0.9 ether}))
+            order,
+            abi.encode(
+                AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 0.9 ether, priorityFee: 0})
+            )
         );
         assertEq(alice.balance, makerBefore);
         assertEq(address(router).balance, 0);

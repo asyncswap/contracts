@@ -46,14 +46,14 @@ contract I01_FeeClaimsTest is SetupHook {
     }
 
     function _create(bool direction, uint256 gross) internal returns (AsyncOrder memory order) {
-        order = AsyncOrder(key, alice, direction, gross, 1 ether, 2 ** 96, bytes32(0));
+        order = AsyncOrder(key, alice, direction, gross, 1 ether, 0, 2 ** 96, bytes32(0));
         Currency input = direction ? key.currency0 : key.currency1;
         vm.startPrank(alice);
         if (!input.isAddressZero()) {
             (direction ? token0 : token1).approve(address(router), gross);
         }
         router.swap{value: input.isAddressZero() ? gross : 0}(
-            order, abi.encode(AsyncSwap.UserParams(alice, address(router), 1 ether))
+            order, abi.encode(AsyncSwap.UserParams(alice, address(router), 1 ether, 0))
         );
         vm.stopPrank();
         order.salt = _expectedSalt(alice, gross, 1 ether);
@@ -174,8 +174,8 @@ contract I01_FeeClaimsTest is SetupHook {
         assertEq(bob.balance, 2 ether);
         vm.prank(alice);
         router.cancelOrder(order);
-        assertEq(alice.balance, 10 ether);
-        assertEq(address(manager).balance, 0);
+        assertEq(alice.balance + manager.balanceOf(alice, 0), 10 ether);
+        assertEq(address(manager).balance, 10 ether);
     }
 
     function test_failedNativeRecipient_preservesClaims() public {

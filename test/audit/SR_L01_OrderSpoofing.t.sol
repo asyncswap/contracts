@@ -35,7 +35,7 @@ contract Spoofer {
         pm.swap(
             key,
             SwapParams(true, -1 ether, 4295128740),
-            abi.encode(AsyncSwap.UserParams({user: victim, executor: executor, amountOutMin: 1}))
+            abi.encode(AsyncSwap.UserParams({user: victim, executor: executor, amountOutMin: 1, priorityFee: 0}))
         );
         key.currency0.settle(pm, address(this), 1 ether, false);
         return "";

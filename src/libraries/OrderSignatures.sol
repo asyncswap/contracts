@@ -18,7 +18,7 @@ library OrderSignatures {
         "PoolKey(address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks)";
 
     bytes internal constant ASYNC_ORDER_TYPE =
-        "AsyncOrder(address maker,address tokenIn,address tokenOut,uint256 amountIn,uint256 amountOutMin,PoolKey pool)";
+        "AsyncOrder(address maker,address tokenIn,address tokenOut,uint256 amountIn,uint256 amountOutMin,uint256 priorityFee,PoolKey pool)";
 
     bytes32 internal constant POOL_KEY_TYPEHASH = keccak256(POOL_KEY_TYPE);
 
@@ -79,6 +79,7 @@ library OrderSignatures {
                 tokenOut,
                 order.amountIn,
                 order.amountOutMin,
+                order.priorityFee,
                 hashPoolKey(order.key)
             )
         );

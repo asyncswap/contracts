@@ -7,6 +7,9 @@ import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {Currency} from "v4-core/types/Currency.sol";
 import {PoolId} from "v4-core/types/PoolId.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {RadixPriceTree} from "@async-swap/libraries/RadixPriceTree.sol";
+import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
 
 /// @title AsyncFiller
 /// @author @msakiart
@@ -20,18 +23,75 @@ import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 library AsyncFiller {
     using CurrencySettler for Currency;
     using PoolIdLibrary for PoolKey;
+    using RadixPriceTree for RadixPriceTree.Tree;
+    using StateLibrary for IPoolManager;
 
-    /// @notice Open-order record. v1 is full-fill only — partials are not supported and
-    ///         a successful fill deletes the record entirely.
+    uint256 private constant PRICE_SCALE = 1e18;
+    uint64 internal constant MAX_PRIORITY_FEE = type(uint64).max;
+    /// @dev $0.10 in six-decimal USDC base units. Async Swap pools are configured with USDC as numeraire.
+    uint64 internal constant MIN_PRIORITY_FEE = 100_000;
+
+    enum OrderingMode {
+        FIFO,
+        PriorityFee
+    }
+
+    /// @notice Open-order record. Filler fills are full-order; direct matches can reduce it
+    ///         partially while keeping the remaining input in escrow.
     struct OrderInfo {
+        address owner;
         uint256 amountIn;
         uint256 amountOutMin;
+        uint128 price;
+        bytes32 previous;
+        bytes32 next;
+        bool isBuy;
+        bool zeroForOne;
+        uint64 sequence;
+        uint64 priorityFee;
+        uint128 priorityKey;
+        bool priorityFeeEscrowed;
+    }
+
+    struct PriceLevel {
+        bytes32 head;
+        bytes32 tail;
+        uint32 orderCount;
+        RadixPriceTree.Tree priorityOrders;
+        mapping(uint128 priorityKey => bytes32 orderId) priorityOrderIds;
+    }
+
+    struct MatchAmounts {
+        uint256 assetAmount;
+        uint256 quoteAmount;
+    }
+
+    struct NewOrder {
+        bytes32 id;
+        address owner;
+        uint256 amountIn;
+        uint256 amountOutMin;
+        bool isBuy;
+        bool zeroForOne;
+        uint256 priorityFee;
     }
 
     struct State {
         IPoolManager poolManager;
+        Currency numeraire;
+        address feeVault;
         mapping(bytes32 orderId => OrderInfo) orders;
         mapping(address owner => mapping(address executor => bool)) isExecutor;
+    }
+
+    struct Book {
+        uint64 nextSequence;
+        uint64 openOrderCount;
+        OrderingMode orderingMode;
+        RadixPriceTree.Tree bids;
+        RadixPriceTree.Tree asks;
+        mapping(uint128 price => PriceLevel) bidLevels;
+        mapping(uint128 price => PriceLevel) askLevels;
     }
 
     event AsyncOrderCreated(
@@ -55,12 +115,137 @@ library AsyncFiller {
     event AsyncOrderCancelled(PoolId indexed poolId, bytes32 indexed orderId, address indexed owner, uint256 amountIn);
 
     event OrderFeeAccrued(bytes32 indexed orderId, Currency indexed currency, uint256 amount);
+    event PriorityFeeDonated(PoolId indexed poolId, bytes32 indexed orderId, address indexed maker, uint256 amount);
+    event PriorityFeeForfeited(PoolId indexed poolId, bytes32 indexed orderId, address indexed maker, uint256 amount);
+    event OrderingModeChanged(PoolId indexed poolId, OrderingMode mode);
 
     error OrderAlreadyExists();
     error OrderNotFound();
     error NotOrderOwner();
     error NotAuthorizedExecutor();
     error ZeroAmount();
+    error PriorityFeeTooLarge();
+    error PriorityFeeTooSmall();
+    error PriorityFeeNotEscrowed();
+    error InvalidOrderingModeChange();
+
+    function addOrder(
+        State storage self,
+        Book storage book,
+        bytes32 id,
+        address owner,
+        uint256 amountIn,
+        uint256 amountOutMin,
+        bool isBuy,
+        bool zeroForOne,
+        uint256 priorityFee
+    ) internal {
+        if (book.orderingMode == OrderingMode.FIFO && priorityFee != 0) {
+            revert InvalidOrderingModeChange();
+        }
+        if (book.orderingMode == OrderingMode.PriorityFee && priorityFee < MIN_PRIORITY_FEE) {
+            revert PriorityFeeTooSmall();
+        }
+        if (priorityFee > MAX_PRIORITY_FEE) revert PriorityFeeTooLarge();
+        uint128 price = _priceKey(isBuy, amountIn, amountOutMin);
+        uint64 sequence = ++book.nextSequence;
+        self.orders[id] = OrderInfo({
+            owner: owner,
+            amountIn: amountIn,
+            amountOutMin: amountOutMin,
+            price: price,
+            previous: bytes32(0),
+            next: bytes32(0),
+            isBuy: isBuy,
+            zeroForOne: zeroForOne,
+            sequence: sequence,
+            priorityFee: uint64(priorityFee),
+            priorityKey: _priorityKey(uint64(priorityFee), sequence),
+            priorityFeeEscrowed: priorityFee == 0
+        });
+        _append(self, book, id);
+    }
+
+    function setOrderingMode(Book storage book, PoolId poolId, OrderingMode mode) internal {
+        if (book.openOrderCount != 0) revert InvalidOrderingModeChange();
+        book.orderingMode = mode;
+        emit OrderingModeChanged(poolId, mode);
+    }
+
+    function recordPriorityFee(State storage self, bytes32 id, uint256 amount, Currency numeraire) internal {
+        OrderInfo storage info = self.orders[id];
+        if (info.amountIn == 0 || info.priorityFeeEscrowed || info.priorityFee != amount || amount == 0) {
+            revert PriorityFeeNotEscrowed();
+        }
+        numeraire.take(self.poolManager, address(this), amount, true);
+        info.priorityFeeEscrowed = true;
+    }
+
+    function settlePriorityFee(
+        State storage self,
+        PoolKey memory key,
+        bytes32 id,
+        address maker,
+        uint256 amount,
+        address hook
+    ) internal {
+        if (amount == 0) return;
+        Currency numeraire = self.numeraire;
+        if (self.poolManager.getLiquidity(key.toId()) == 0) {
+            // No LPs can receive a PoolManager donation. Forfeit the non-refundable bid
+            // to the protocol FeeVault rather than returning it or leaving it on the hook.
+            self.numeraire.settle(self.poolManager, hook, amount, true);
+            self.numeraire.take(self.poolManager, self.feeVault, amount, true);
+            emit PriorityFeeForfeited(key.toId(), id, maker, amount);
+            return;
+        }
+        uint256 amount0 = numeraire == key.currency0 ? amount : 0;
+        uint256 amount1 = numeraire == key.currency1 ? amount : 0;
+        self.poolManager.donate(key, amount0, amount1, "");
+        numeraire.settle(self.poolManager, hook, amount, true);
+        emit PriorityFeeDonated(key.toId(), id, maker, amount);
+    }
+
+    function bestOrder(State storage self, Book storage book, bool isBuy)
+        internal
+        view
+        returns (bool found, uint128 price, bytes32 orderId, address owner)
+    {
+        (found, price) = isBuy ? book.bids.best(true) : book.asks.best(false);
+        if (found) {
+            orderId = bestAtPrice(book, isBuy, price);
+            owner = self.orders[orderId].owner;
+        }
+    }
+
+    function level(Book storage book, bool isBuy, uint128 price)
+        internal
+        view
+        returns (bytes32 head, bytes32 tail, uint32 orderCount)
+    {
+        PriceLevel storage priceLevel = isBuy ? book.bidLevels[price] : book.askLevels[price];
+        if (book.orderingMode == OrderingMode.FIFO) return (priceLevel.head, priceLevel.tail, priceLevel.orderCount);
+        (bool hasHead, uint128 highestKey) = priceLevel.priorityOrders.best(true);
+        (bool hasTail, uint128 lowestKey) = priceLevel.priorityOrders.best(false);
+        head = hasHead ? priceLevel.priorityOrderIds[highestKey] : bytes32(0);
+        tail = hasTail ? priceLevel.priorityOrderIds[lowestKey] : bytes32(0);
+        return (head, tail, priceLevel.orderCount);
+    }
+
+    function bestAtPrice(Book storage book, bool isBuy, uint128 price) internal view returns (bytes32 id) {
+        PriceLevel storage priceLevel = isBuy ? book.bidLevels[price] : book.askLevels[price];
+        if (book.orderingMode == OrderingMode.FIFO) return priceLevel.head;
+        (, uint128 priorityKey) = priceLevel.priorityOrders.best(true);
+        return priceLevel.priorityOrderIds[priorityKey];
+    }
+
+    /// @notice Remove an order after a successful full fill against PoolManager liquidity.
+    function clearLiquidityFilledOrder(State storage self, Book storage book, bytes32 id) internal {
+        OrderInfo storage info = self.orders[id];
+        if (info.amountIn == 0) revert OrderNotFound();
+        _remove(self, book, id);
+        delete self.orders[id];
+    }
 
     function isExecutor(AsyncOrder calldata order, State storage self, address executor) internal view returns (bool) {
         return self.isExecutor[order.owner][executor];
@@ -70,7 +255,8 @@ library AsyncFiller {
     ///         the maker, AND `caller` must equal `order.owner` — both checked here.
     function updatePrice(
         State storage self,
-        AsyncOrder calldata order,
+        Book storage book,
+        AsyncOrder memory order,
         bytes32 id,
         uint256 newAmountOutMin,
         address caller
@@ -80,7 +266,12 @@ library AsyncFiller {
         OrderInfo storage info = self.orders[id];
         if (info.amountIn == 0) revert OrderNotFound();
         uint256 old = info.amountOutMin;
+        _remove(self, book, id);
         info.amountOutMin = newAmountOutMin;
+        info.price = _priceKey(info.isBuy, info.amountIn, newAmountOutMin);
+        // A maker price update re-enters the queue with fresh time priority.
+        info.sequence = ++book.nextSequence;
+        _append(self, book, id);
         emit AsyncOrderPriceUpdated(order.key.toId(), id, old, newAmountOutMin);
     }
 
@@ -93,7 +284,8 @@ library AsyncFiller {
     ///      Both currency deltas net to zero. A failed fill reverts all legs.
     function fill(
         State storage self,
-        AsyncOrder calldata order,
+        Book storage book,
+        AsyncOrder memory order,
         bytes32 id,
         address hook,
         address executor,
@@ -106,18 +298,20 @@ library AsyncFiller {
         uint256 amountIn = info.amountIn;
         uint256 amountOutMin = info.amountOutMin;
         if (amountIn == 0) revert OrderNotFound();
+        if (info.priorityFee != 0 && !info.priorityFeeEscrowed) revert PriorityFeeNotEscrowed();
 
         Currency input = order.zeroForOne ? order.key.currency0 : order.key.currency1;
         Currency output = order.zeroForOne ? order.key.currency1 : order.key.currency0;
 
-        delete self.orders[id];
+        _remove(self, book, id);
 
         // Output side: ERC20 output must already be settled to the hook's credit by the executor
         // (`PoolManager.settleFor(hook)`), so the hook never spends its own token balance. Native
         // output is settled from the filler's same-tx deposit, guarded by the hook's ledger.
         // Then take real tokens straight to the maker — both legs net the hook's output delta to zero.
         if (output.isAddressZero()) output.settle(self.poolManager, hook, amountOutMin + fee, false);
-        output.take(self.poolManager, order.owner, amountOutMin, false);
+        // Native proceeds are redeemable claims; settlement never invokes native recipients.
+        output.take(self.poolManager, order.owner, amountOutMin, output.isAddressZero());
 
         if (fee != 0) {
             output.take(self.poolManager, feeVault, fee, true);
@@ -125,32 +319,107 @@ library AsyncFiller {
         }
 
         input.settle(self.poolManager, hook, amountIn, true);
-        input.take(self.poolManager, filler, amountIn, false);
+        input.take(self.poolManager, filler, amountIn, input.isAddressZero());
+        settleOrderPriorityFee(self, order.key, id, hook);
+        delete self.orders[id];
         emit AsyncOrderFilled(order.key.toId(), id, filler, amountIn, amountOutMin);
+    }
+
+    function settleOrderPriorityFee(State storage self, PoolKey memory key, bytes32 id, address hook) internal {
+        OrderInfo storage info = self.orders[id];
+        if (info.priorityFee != 0 && !info.priorityFeeEscrowed) revert PriorityFeeNotEscrowed();
+        settlePriorityFee(self, key, id, info.owner, info.priorityFee, hook);
     }
 
     /// @notice Cancel an unfilled order. Must be called inside an unlock context. Auth: `executor`
     ///         must be either the order owner themselves (smart-contract makers calling the hook
     ///         directly from their own unlock) or an executor the maker authorised via
     ///         `setExecutor`. Funds always return to `order.owner`.
-    function cancel(State storage self, AsyncOrder calldata order, bytes32 id, address hook, address executor)
-        internal
-    {
+    function cancel(
+        State storage self,
+        Book storage book,
+        AsyncOrder memory order,
+        bytes32 id,
+        address hook,
+        address executor
+    ) internal {
         if (executor != order.owner && !self.isExecutor[order.owner][executor]) {
             revert NotAuthorizedExecutor();
         }
         OrderInfo storage info = self.orders[id];
         uint256 amountIn = info.amountIn;
         if (amountIn == 0) revert OrderNotFound();
+        uint256 priorityFee = info.priorityFee;
+        if (priorityFee != 0 && !info.priorityFeeEscrowed) revert PriorityFeeNotEscrowed();
 
         Currency input = order.zeroForOne ? order.key.currency0 : order.key.currency1;
+        _remove(self, book, id);
         delete self.orders[id];
 
         // Burn the hook's 6909 input claim, then return real input tokens to the maker
-        // directly — no separate withdrawal step required.
+        // as native claims or real ERC20 tokens, depending on the input currency.
         input.settle(self.poolManager, hook, amountIn, true);
-        input.take(self.poolManager, order.owner, amountIn, false);
+        input.take(self.poolManager, order.owner, amountIn, input.isAddressZero());
+        settlePriorityFee(self, order.key, id, order.owner, priorityFee, hook);
 
         emit AsyncOrderCancelled(order.key.toId(), id, order.owner, amountIn);
+    }
+
+    function _append(State storage self, Book storage book, bytes32 id) internal {
+        OrderInfo storage order = self.orders[id];
+        PriceLevel storage priceLevel = order.isBuy ? book.bidLevels[order.price] : book.askLevels[order.price];
+        if (priceLevel.orderCount == 0) {
+            if (order.isBuy) book.bids.insert(order.price);
+            else book.asks.insert(order.price);
+        }
+        if (book.orderingMode == OrderingMode.PriorityFee) {
+            order.priorityKey = _priorityKey(order.priorityFee, order.sequence);
+            priceLevel.priorityOrders.insert(order.priorityKey);
+            priceLevel.priorityOrderIds[order.priorityKey] = id;
+        } else {
+            order.previous = priceLevel.tail;
+            if (priceLevel.tail == bytes32(0)) priceLevel.head = id;
+            else self.orders[priceLevel.tail].next = id;
+            priceLevel.tail = id;
+        }
+        ++priceLevel.orderCount;
+        ++book.openOrderCount;
+    }
+
+    function _remove(State storage self, Book storage book, bytes32 id) internal {
+        OrderInfo storage order = self.orders[id];
+        PriceLevel storage priceLevel = order.isBuy ? book.bidLevels[order.price] : book.askLevels[order.price];
+        if (book.orderingMode == OrderingMode.PriorityFee) {
+            priceLevel.priorityOrders.remove(order.priorityKey);
+            delete priceLevel.priorityOrderIds[order.priorityKey];
+        } else {
+            if (order.previous == bytes32(0)) priceLevel.head = order.next;
+            else self.orders[order.previous].next = order.next;
+            if (order.next == bytes32(0)) priceLevel.tail = order.previous;
+            else self.orders[order.next].previous = order.previous;
+        }
+        --priceLevel.orderCount;
+        --book.openOrderCount;
+        if (priceLevel.orderCount == 0) {
+            if (order.isBuy) book.bids.remove(order.price);
+            else book.asks.remove(order.price);
+            if (order.isBuy) delete book.bidLevels[order.price];
+            else delete book.askLevels[order.price];
+        }
+    }
+
+    function _priorityKey(uint64 priorityFee, uint64 sequence) private pure returns (uint128) {
+        return (uint128(priorityFee) << 64) | uint128(type(uint64).max - sequence);
+    }
+
+    /// @dev Keep the radix key bounded for pathological ratios while allowing legacy-valid
+    ///      orders whose WAD-scaled ratio rounds below one. Normal token amounts retain the
+    ///      exact WAD key; only values outside uint128's range saturate at the boundary.
+    function _priceKey(bool isBuy, uint256 amountIn, uint256 amountOut) private pure returns (uint128) {
+        uint256 price =
+            isBuy ? Math.mulDiv(amountIn, PRICE_SCALE, amountOut) : Math.mulDiv(amountOut, PRICE_SCALE, amountIn);
+        if (price == 0) return 1;
+        if (price > type(uint128).max) return type(uint128).max;
+        return uint128(price);
     }
 }

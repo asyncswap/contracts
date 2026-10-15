@@ -72,6 +72,7 @@ contract C01_CommingledEscrowTest is Test {
             zeroForOne: zeroForOne,
             amountIn: amountIn,
             amountOutMin: amountOutMin,
+            priorityFee: 0,
             sqrtPrice: 2 ** 96,
             salt: bytes32(0)
         });
@@ -86,13 +87,18 @@ contract C01_CommingledEscrowTest is Test {
         vm.startPrank(attacker);
         erc20.approve(address(router), 1);
         router.swap(
-            order, abi.encode(AsyncSwap.UserParams({user: attacker, executor: address(router), amountOutMin: STRANDED}))
+            order,
+            abi.encode(
+                AsyncSwap.UserParams({
+                    user: attacker, executor: address(router), amountOutMin: STRANDED, priorityFee: 0
+                })
+            )
         );
         vm.stopPrank();
 
         // Patch salt so the fillOrder path resolves the same orderId the hook stored under.
         order.salt =
-            keccak256(abi.encode(block.timestamp, block.number, address(manager), attacker, uint256(1), STRANDED));
+            keccak256(abi.encode(block.timestamp, block.number, address(manager), attacker, uint256(1), STRANDED, 0));
 
         vm.prank(attacker);
         vm.expectRevert();

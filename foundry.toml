@@ -8,9 +8,10 @@ fs_permissions = [
   { access = "read-write", path = "./deployments/" },
 ]
 solc_version = "0.8.26"
-# Required: without the optimizer AsyncSwap exceeds the EIP-170 24,576-byte runtime limit.
+# Keep linked continuous matching deployable under EIP-170 while retaining more optimization than
+# the minimum-size setting.
 optimizer = true
-optimizer_runs = 1_000_000
+optimizer_runs = 1_000
 
 [dependencies]
 forge-std = "1.16.0"

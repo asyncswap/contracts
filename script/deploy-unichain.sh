@@ -23,6 +23,7 @@ source "$CONFIG_FILE"
 set +a
 
 : "${RPC_URL:?Set RPC_URL in .env.deploy}"
+: "${ASYNC_MATCHING_LIBRARY_ADDRESS:?Deploy AsyncMatching.sol:AsyncMatching and set ASYNC_MATCHING_LIBRARY_ADDRESS in .env.deploy}"
 chain_config_values="$(python3 - "$CHAIN_CONFIG" "$CHAIN_KEY" <<'PY'
 import json
 import re
@@ -72,7 +73,19 @@ if [[ "$usdc_code" == "0x" || -z "$usdc_code" ]]; then
   exit 1
 fi
 
-forge_args=(script "$ROOT_DIR/script/01_DeployHook.s.sol" --rpc-url "$RPC_URL" --ffi --sender "$OWNER")
+matching_library_code="$(cast code "$ASYNC_MATCHING_LIBRARY_ADDRESS" --rpc-url "$RPC_URL")"
+if [[ "$matching_library_code" == "0x" || -z "$matching_library_code" ]]; then
+  echo "Refusing deployment: AsyncMatching library $ASYNC_MATCHING_LIBRARY_ADDRESS has no contract code on this RPC." >&2
+  exit 1
+fi
+
+forge_args=(
+  script "$ROOT_DIR/script/01_DeployHook.s.sol"
+  --rpc-url "$RPC_URL"
+  --ffi
+  --sender "$OWNER"
+  --libraries "src/libraries/AsyncMatching.sol:AsyncMatching:$ASYNC_MATCHING_LIBRARY_ADDRESS"
+)
 if [[ "$mode" == "broadcast" ]]; then
   : "${DEPLOYER_ACCOUNT:?Set DEPLOYER_ACCOUNT to a Foundry keystore for $OWNER}"
   forge_args+=(--broadcast --account "$DEPLOYER_ACCOUNT")

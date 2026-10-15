@@ -107,12 +107,12 @@ contract SetupHook is Test {
     }
 
     /// @dev Predict the salt the hook assigns on a fresh `_createOrder`. Mirrors
-    ///      `keccak256(abi.encode(block.timestamp, block.number, msg.sender, user, amountIn, amountOutMin))`
+    ///      `keccak256(abi.encode(block.timestamp, block.number, msg.sender, user, amountIn, amountOutMin, priorityFee))`
     ///      where `msg.sender` at the hook is the PoolManager (since `_beforeSwap` is invoked by PM).
     ///      Only valid when the (user, amountIn, amountOutMin) tuple is fresh in the current block —
     ///      a colliding tuple would trigger the in-contract salt-walk.
     function _expectedSalt(address user, uint256 amountIn, uint256 amountOutMin) internal view returns (bytes32) {
-        return keccak256(abi.encode(block.timestamp, block.number, address(manager), user, amountIn, amountOutMin));
+        return keccak256(abi.encode(block.timestamp, block.number, address(manager), user, amountIn, amountOutMin, 0));
     }
 
     /// @dev Compute the orderId the hook will store under, for an order with the given assigned salt.

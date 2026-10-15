@@ -26,6 +26,7 @@ contract H04_NatspecMismatchTest is SetupHook {
             zeroForOne: true,
             amountIn: amountIn,
             amountOutMin: placeholder,
+            priorityFee: 0,
             sqrtPrice: 2 ** 96,
             salt: bytes32(0)
         });
@@ -34,7 +35,10 @@ contract H04_NatspecMismatchTest is SetupHook {
         token0.approve(address(router), amountIn);
         vm.expectRevert();
         router.swap(
-            order, abi.encode(AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: realLimit}))
+            order,
+            abi.encode(
+                AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: realLimit, priorityFee: 0})
+            )
         );
         vm.stopPrank();
     }

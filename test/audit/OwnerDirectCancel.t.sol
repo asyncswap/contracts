@@ -35,7 +35,9 @@ contract SmartMaker is IUnlockCallback {
         router.swap(
             order,
             abi.encode(
-                AsyncSwap.UserParams({user: address(this), executor: address(router), amountOutMin: order.amountOutMin})
+                AsyncSwap.UserParams({
+                    user: address(this), executor: address(router), amountOutMin: order.amountOutMin, priorityFee: 0
+                })
             )
         );
     }
@@ -68,6 +70,7 @@ contract OwnerDirectCancelTest is SetupHook {
             zeroForOne: true,
             amountIn: 1 ether,
             amountOutMin: 0.9 ether,
+            priorityFee: 0,
             sqrtPrice: 2 ** 96,
             salt: bytes32(0)
         });

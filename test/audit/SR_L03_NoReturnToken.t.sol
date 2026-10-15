@@ -69,16 +69,21 @@ contract SR_L03_NoReturnTokenTest is Test {
             zeroForOne: zeroForOne,
             amountIn: amountIn,
             amountOutMin: amountOutMin,
+            priorityFee: 0,
             sqrtPrice: zeroForOne ? 4295128740 : 1461446703485210103287273052203988822378723970341,
             salt: bytes32(0)
         });
         vm.prank(maker);
         router.swap(
             order,
-            abi.encode(AsyncSwap.UserParams({user: maker, executor: address(router), amountOutMin: amountOutMin}))
+            abi.encode(
+                AsyncSwap.UserParams({
+                    user: maker, executor: address(router), amountOutMin: amountOutMin, priorityFee: 0
+                })
+            )
         );
         order.salt =
-            keccak256(abi.encode(block.timestamp, block.number, address(manager), maker, amountIn, amountOutMin));
+            keccak256(abi.encode(block.timestamp, block.number, address(manager), maker, amountIn, amountOutMin, 0));
     }
 
     function test_L03_noReturnTokenAsMakerInput_createAndCancel() public {

@@ -38,6 +38,7 @@ contract SwapScript is FFIHelper {
             zeroForOne: vm.envOr("ZERO_FOR_ONE", true),
             amountIn: vm.envUint("AMOUNT_IN"),
             amountOutMin: vm.envUint("AMOUNT_OUT_MIN"),
+            priorityFee: 0,
             sqrtPrice: sqrtPrice,
             // Initial submit: ignored by the hook, which assigns its own salt.
             salt: bytes32(0)
@@ -52,7 +53,11 @@ contract SwapScript is FFIHelper {
         IERC20Minimal(Currency.unwrap(input)).approve(address(router), order.amountIn);
         router.swap(
             order,
-            abi.encode(AsyncSwap.UserParams({user: OWNER, executor: address(router), amountOutMin: order.amountOutMin}))
+            abi.encode(
+                AsyncSwap.UserParams({
+                    user: OWNER, executor: address(router), amountOutMin: order.amountOutMin, priorityFee: 0
+                })
+            )
         );
         vm.stopBroadcast();
 

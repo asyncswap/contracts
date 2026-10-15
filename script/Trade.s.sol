@@ -81,12 +81,14 @@ contract TradeScript is FFIHelper {
             zeroForOne: zeroForOne,
             amountIn: amountIn,
             amountOutMin: amountOutMin,
+            priorityFee: 0,
             sqrtPrice: 2 ** 96,
             // Hook auto-assigns the real salt on create; placeholder here.
             salt: bytes32(0)
         });
-        bytes memory userData =
-            abi.encode(AsyncSwap.UserParams({user: OWNER, executor: address(router), amountOutMin: amountOutMin}));
+        bytes memory userData = abi.encode(
+            AsyncSwap.UserParams({user: OWNER, executor: address(router), amountOutMin: amountOutMin, priorityFee: 0})
+        );
 
         console.log("amountIn:    ", amountIn);
         console.log("amountOutMin:", amountOutMin);

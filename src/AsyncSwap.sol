@@ -2,6 +2,7 @@
 pragma solidity 0.8.26;
 
 import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
+import {AsyncMatching} from "@async-swap/libraries/AsyncMatching.sol";
 import {OrderSignatures} from "@async-swap/libraries/OrderSignatures.sol";
 import {AsyncOrder, AsyncOrderLibrary} from "@async-swap/types/AsyncOrder.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
@@ -21,8 +22,8 @@ import {BaseHook} from "src/BaseHook.sol";
 /// @title AsyncSwap
 /// @author @msakiart
 /// @notice Uniswap v4 hook that converts an exact-input swap into an open async order: the maker
-///         deposits their input via `_beforeSwap`, and a filler later settles by paying the maker's
-///         limit-priced output. v1 is full-fill only.
+///         deposits their input via `_beforeSwap`; crossing orders can settle directly at the
+///         resting limit, with fillers still available for unmatched orders.
 ///
 ///         Makers can also act by EIP-712 signature (`setExecutorWithSig`, `updatePriceWithSig`) so a
 ///         relayer pays gas and the wallet shows a readable message. See `OrderSignatures` for types.
@@ -31,10 +32,12 @@ contract AsyncSwap is BaseHook, EIP712 {
     using CurrencySettler for Currency;
     using PoolIdLibrary for PoolKey;
     using AsyncFiller for AsyncFiller.State;
+    using AsyncFiller for AsyncFiller.Book;
     using AsyncOrderLibrary for AsyncOrder;
 
     /// @notice Per-pool order book.
     mapping(PoolId poolId => AsyncFiller.State) public asyncOrders;
+    mapping(PoolId poolId => AsyncFiller.Book) private priceBooks;
 
     /// @notice Protocol owner authorized to collect vault fees and sweep stranded balances.
     address public owner;
@@ -62,7 +65,6 @@ contract AsyncSwap is BaseHook, EIP712 {
         uint128 hookLPfeeAmount1
     );
 
-    error UnsupportedLiquidity();
     error ExactInputOnly();
     error UnaccountedNativeOutput();
     error NotOwner();
@@ -73,6 +75,7 @@ contract AsyncSwap is BaseHook, EIP712 {
     error InvalidNumeraire();
     error NumeraireRequired();
     error DynamicFeeRequired();
+    error NotSelf();
 
     /// @notice Emitted when ownership is transferred.
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
@@ -90,6 +93,20 @@ contract AsyncSwap is BaseHook, EIP712 {
     /// @dev `allow` is the resulting permission, including when the value is unchanged.
     event ExecutorSet(PoolId indexed poolId, address indexed maker, address indexed executor, bool allow);
 
+    /// @notice Pairwise direct escrow match; emitted by the linked matcher at the hook address.
+    event AsyncOrdersMatched(
+        PoolId indexed poolId,
+        bytes32 indexed sellOrderId,
+        bytes32 indexed buyOrderId,
+        uint256 assetAmount,
+        uint256 numeraireAmount
+    );
+
+    /// @notice An open order was fully executed against active Uniswap v4 pool liquidity.
+    event AsyncOrderLiquidityFilled(
+        PoolId indexed poolId, bytes32 indexed orderId, address indexed maker, uint256 amountIn, uint256 amountOut
+    );
+
     /// @notice Restricts a call to the protocol owner.
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
@@ -103,6 +120,9 @@ contract AsyncSwap is BaseHook, EIP712 {
     ///      accumulated balance (which may include donations, stranded ETH,
     ///      or in-flight native-input escrow). Cleared after each settle.
     bytes32 constant PENDING_NATIVE_DEPOSIT_SLOT = 0x9c2a7e4f3b1d8a5c6e0f2d4b7a9c1e3d5f8b6a0c2e4d7b9f1a3c5e7d9b1f3a50;
+    /// @dev Transient hand-off from `_beforeSwap` to the Router after it settles the new input.
+    bytes32 constant PENDING_MATCH_ID_SLOT = 0x247d5e35be7fbfd4d95fd66ea940bfb4ee942bef70db6afae46dc83ce0f89eb2;
+    bytes32 constant PENDING_MATCH_EXECUTOR_SLOT = 0x9583e36f799bab8c4d06dc676d85ba05b4dfbde5934d5684d8e431d0fd3948da;
 
     /// @notice Hook params decoded from the `hookData` of `IPoolManager.swap`. The maker sets
     ///         `amountOutMin` (their limit price); `executor` is the address authorized to call fill.
@@ -113,6 +133,7 @@ contract AsyncSwap is BaseHook, EIP712 {
         address user;
         address executor;
         uint256 amountOutMin;
+        uint256 priorityFee;
     }
 
     /// @param _owner Explicit protocol owner. Not `msg.sender`: CREATE2 deployments run the
@@ -163,6 +184,8 @@ contract AsyncSwap is BaseHook, EIP712 {
         if (!(key.currency0 == numeraire || key.currency1 == numeraire)) revert NumeraireRequired();
         if (key.fee != LPFeeLibrary.DYNAMIC_FEE_FLAG) revert DynamicFeeRequired();
         asyncOrders[key.toId()].poolManager = poolManager;
+        asyncOrders[key.toId()].numeraire = numeraire;
+        asyncOrders[key.toId()].feeVault = address(feeVault);
         return this.beforeInitialize.selector;
     }
 
@@ -193,7 +216,8 @@ contract AsyncSwap is BaseHook, EIP712 {
         override
         returns (bytes4)
     {
-        revert UnsupportedLiquidity();
+        // LP positions supply the inventory used by the guarded order-fill path below.
+        return this.beforeAddLiquidity.selector;
     }
 
     /// @notice Read an order's currently-open input amount. Returns 0 if the order does not exist.
@@ -209,6 +233,73 @@ contract AsyncSwap is BaseHook, EIP712 {
     {
         AsyncFiller.OrderInfo storage info = asyncOrders[poolId].orders[orderId];
         return (info.amountIn, info.amountOutMin);
+    }
+
+    function asyncOrderPriorityFee(PoolId poolId, bytes32 orderId) external view returns (uint256) {
+        return asyncOrders[poolId].orders[orderId].priorityFee;
+    }
+
+    function orderingMode(PoolId poolId) external view returns (AsyncFiller.OrderingMode) {
+        return priceBooks[poolId].orderingMode;
+    }
+
+    function setOrderingMode(PoolKey calldata key, AsyncFiller.OrderingMode mode) external onlyOwner {
+        PoolId poolId = key.toId();
+        AsyncMatching.setOrderingMode(priceBooks[poolId], poolId, mode);
+    }
+
+    /// @notice Convert the just-settled USDC bid into an ERC-6909 claim owned by the hook.
+    /// @dev Called by the order's authorized executor inside the Router's PoolManager unlock.
+    function recordPriorityFee(PoolKey calldata key, address maker, uint256 amount) external {
+        bytes32 id;
+        address executor;
+        assembly ("memory-safe") {
+            id := tload(PENDING_MATCH_ID_SLOT)
+            executor := tload(PENDING_MATCH_EXECUTOR_SLOT)
+        }
+        if (id == bytes32(0) || msg.sender != executor) revert AsyncFiller.NotAuthorizedExecutor();
+        AsyncFiller.State storage state = asyncOrders[key.toId()];
+        if (state.orders[id].owner != maker) revert AsyncFiller.OrderNotFound();
+        AsyncMatching.recordPriorityFee(state, id, amount, numeraire);
+    }
+
+    /// @notice Return the best live limit order for a pool side. `isBuy` is true
+    ///         when the maker escrows the pool numeraire to buy the other asset.
+    ///         `priceKey` is a WAD-scaled raw-amount ratio for sorting within this pool,
+    ///         not a human-readable price. Equal-price orders follow submission order.
+    function bestOrder(PoolId poolId, bool isBuy)
+        external
+        view
+        returns (bool found, uint128 priceKey, bytes32 orderId, address maker)
+    {
+        return AsyncMatching.bestOrder(asyncOrders[poolId], priceBooks[poolId], isBuy);
+    }
+
+    /// @notice Return the first and last order under the pool's configured ordering mode, plus count.
+    function orderBookLevel(PoolId poolId, bool isBuy, uint128 priceKey)
+        external
+        view
+        returns (bytes32 head, bytes32 tail, uint32 count)
+    {
+        return AsyncMatching.level(priceBooks[poolId], isBuy, priceKey);
+    }
+
+    /// @notice Read one live order and its FIFO neighbor when the pool uses FIFO ordering.
+    function orderBookOrder(PoolId poolId, bytes32 orderId)
+        external
+        view
+        returns (
+            address maker,
+            uint256 amountIn,
+            uint256 amountOutMin,
+            uint128 priceKey,
+            bool isBuy,
+            bytes32 previousOrderId,
+            bytes32 nextOrderId
+        )
+    {
+        AsyncFiller.OrderInfo storage info = asyncOrders[poolId].orders[orderId];
+        return (info.owner, info.amountIn, info.amountOutMin, info.price, info.isBuy, info.previous, info.next);
     }
 
     function isExecutor(PoolId poolId, address maker, address executor) external view returns (bool) {
@@ -250,21 +341,96 @@ contract AsyncSwap is BaseHook, EIP712 {
         }
         AsyncFiller.State storage state = asyncOrders[order.key.toId()];
         uint256 fee = calculatePoolFee(order.key.fee, state.orders[id].amountOutMin);
-        state.fill(order, id, address(this), msg.sender, filler, address(feeVault), fee);
+        AsyncMatching.fill(
+            state,
+            priceBooks[order.key.toId()],
+            AsyncMatching.FillParams({
+                order: order,
+                id: id,
+                hook: address(this),
+                executor: msg.sender,
+                filler: filler,
+                feeVault: address(feeVault),
+                fee: fee
+            })
+        );
+    }
+
+    /// @notice Match the order just created by the current Router unlock callback.
+    /// @dev The Router calls this only after settling the maker's input. The transient hand-off
+    ///      prevents stale order ids or a different executor from triggering a match.
+    function matchNewOrder(AsyncOrder calldata order) external returns (uint8 matched) {
+        bytes32 id;
+        address executor;
+        assembly ("memory-safe") {
+            id := tload(PENDING_MATCH_ID_SLOT)
+            executor := tload(PENDING_MATCH_EXECUTOR_SLOT)
+            tstore(PENDING_MATCH_ID_SLOT, 0)
+            tstore(PENDING_MATCH_EXECUTOR_SLOT, 0)
+        }
+        if (id == bytes32(0) || msg.sender != executor) revert AsyncFiller.NotAuthorizedExecutor();
+        AsyncFiller.State storage state = asyncOrders[order.key.toId()];
+        if (state.orders[id].owner != order.owner) revert AsyncFiller.OrderNotFound();
+        matched = AsyncMatching.matchIncoming(state, priceBooks[order.key.toId()], order.key, id, address(this));
+        if (state.orders[id].amountIn != 0) {
+            // A failed quote, insufficient active liquidity, or a price outside the maker's
+            // minimum reverts only this external self-call. The order itself remains resting.
+            try this.fillOrderFromPoolLiquidity(order, id) {} catch {}
+        }
+    }
+
+    /// @notice Permissionless executor entry for retrying a resting order against current pool LPs.
+    /// @dev Must run inside PoolManager.unlock. Router calls this after validating the request path.
+    function tryFillOrderFromPoolLiquidity(AsyncOrder calldata order) external returns (bool filled) {
+        if (!asyncOrders[order.key.toId()].isExecutor[order.owner][msg.sender]) {
+            revert AsyncFiller.NotAuthorizedExecutor();
+        }
+        bytes32 id = order.orderId();
+        if (asyncOrders[order.key.toId()].orders[id].amountIn == 0) revert AsyncFiller.OrderNotFound();
+        try this.fillOrderFromPoolLiquidity(order, id) {
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /// @dev The self-call boundary makes a failed AMM attempt atomic while preserving the resting
+    ///      order. The transient pool id lets beforeSwap bypass order creation for this one swap only.
+    function fillOrderFromPoolLiquidity(AsyncOrder calldata order, bytes32 id) external {
+        if (msg.sender != address(this)) revert NotSelf();
+        PoolId poolId = order.key.toId();
+        AsyncFiller.State storage state = asyncOrders[poolId];
+        AsyncMatching.fillFromPoolLiquidity(
+            state, priceBooks[poolId], order.key, id, state.orders[id].owner, address(this)
+        );
+    }
+
+    /// @notice Permissionlessly continue a crossed book inside a PoolManager unlock.
+    /// @dev The Router exposes the unlock wrapper; each call processes at most eight pairs.
+    function matchBook(PoolKey calldata key, uint8 maxMatches) external returns (uint8 matched) {
+        return AsyncMatching.matchBook(asyncOrders[key.toId()], priceBooks[key.toId()], key, maxMatches, address(this));
     }
 
     /// @notice Maker updates the limit price of an unfilled order. Direct call from the maker —
     ///         pure state mutation, no PM interaction, so no unlock or router needed.
     function updatePrice(AsyncOrder calldata order, uint256 newAmountOutMin) external {
         bytes32 id = order.orderId();
-        asyncOrders[order.key.toId()].updatePrice(order, id, newAmountOutMin, msg.sender);
+        AsyncMatching.updatePrice(
+            asyncOrders[order.key.toId()],
+            priceBooks[order.key.toId()],
+            AsyncMatching.UpdateParams({order: order, id: id, newAmountOutMin: newAmountOutMin, caller: msg.sender})
+        );
     }
 
     /// @notice Maker cancels an unfilled order. Must be called via an authorized executor inside
     ///         an `IPoolManager.unlock` context. The executor must have asserted maker identity.
     function cancelOrder(AsyncOrder calldata order) external {
         bytes32 id = order.orderId();
-        asyncOrders[order.key.toId()].cancel(order, id, address(this), msg.sender);
+        AsyncMatching.cancel(
+            asyncOrders[order.key.toId()],
+            priceBooks[order.key.toId()],
+            AsyncMatching.CancelParams({order: order, id: id, hook: address(this), executor: msg.sender})
+        );
     }
 
     /// @inheritdoc BaseHook
@@ -286,7 +452,7 @@ contract AsyncSwap is BaseHook, EIP712 {
 
         // Escrow the entire deposit; fees are earned only on successful fill.
         specified.take(poolManager, address(this), amountTaken, true);
-        _createOrder(poolId, params.zeroForOne, amountTaken, hookData);
+        _createOrder(poolId, params.zeroForOne, amountTaken, hookData, specified == numeraire);
 
         if (specified == key.currency0) {
             emit HookSwap(PoolId.unwrap(poolId), sender, amountTaken.toInt128(), 0, 0, 0);
@@ -299,7 +465,9 @@ contract AsyncSwap is BaseHook, EIP712 {
     }
 
     /// @dev Extracted to keep `_beforeSwap` stack-shallow.
-    function _createOrder(PoolId poolId, bool zeroForOne, uint256 amountIn, UserParams memory hookData) private {
+    function _createOrder(PoolId poolId, bool zeroForOne, uint256 amountIn, UserParams memory hookData, bool isBuy)
+        private
+    {
         AsyncFiller.State storage state = asyncOrders[poolId];
 
         // executor must already be authorised by the user — no implicit grant via hookData.
@@ -311,7 +479,15 @@ contract AsyncSwap is BaseHook, EIP712 {
         // `AsyncOrderLibrary.orderId` (chainId, poolId, owner, zeroForOne, salt), since
         // the cancel/updatePrice/fill paths recompute the id via the library.
         bytes32 salt = keccak256(
-            abi.encode(block.timestamp, block.number, msg.sender, hookData.user, amountIn, hookData.amountOutMin)
+            abi.encode(
+                block.timestamp,
+                block.number,
+                msg.sender,
+                hookData.user,
+                amountIn,
+                hookData.amountOutMin,
+                hookData.priorityFee
+            )
         );
         bytes32 id = keccak256(abi.encode(block.chainid, poolId, hookData.user, zeroForOne, salt));
         // Collision walk: same maker submitting identical (amountIn, amountOutMin) twice
@@ -322,7 +498,23 @@ contract AsyncSwap is BaseHook, EIP712 {
             id = keccak256(abi.encode(block.chainid, poolId, hookData.user, zeroForOne, salt));
         }
 
-        state.orders[id] = AsyncFiller.OrderInfo({amountIn: amountIn, amountOutMin: hookData.amountOutMin});
+        AsyncMatching.addOrder(
+            state,
+            priceBooks[poolId],
+            AsyncFiller.NewOrder({
+                id: id,
+                owner: hookData.user,
+                amountIn: amountIn,
+                amountOutMin: hookData.amountOutMin,
+                isBuy: isBuy,
+                zeroForOne: zeroForOne,
+                priorityFee: hookData.priorityFee
+            })
+        );
+        assembly ("memory-safe") {
+            tstore(PENDING_MATCH_ID_SLOT, id)
+            tstore(PENDING_MATCH_EXECUTOR_SLOT, mload(add(hookData, 0x20)))
+        }
         emit AsyncFiller.AsyncOrderCreated(poolId, id, hookData.user, zeroForOne, amountIn, hookData.amountOutMin, salt);
     }
 
@@ -375,7 +567,7 @@ contract AsyncSwap is BaseHook, EIP712 {
             deadline,
             signature
         );
-        asyncOrders[poolId].updatePrice(order, id, newAmountOutMin, order.owner);
+        asyncOrders[poolId].updatePrice(priceBooks[poolId], order, id, newAmountOutMin, order.owner);
     }
 
     /// @notice Revoke a signed action before a relayer submits it.

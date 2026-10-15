@@ -113,6 +113,7 @@ contract FFIHelper is Script, DeploymentsRegistry {
             zeroForOne: json.readBool(".zeroForOne"),
             amountIn: json.readUint(".amountIn"),
             amountOutMin: json.readUint(".amountOutMin"),
+            priorityFee: 0,
             sqrtPrice: uint160(json.readUint(".sqrtPrice")),
             salt: json.readBytes32(".salt")
         });

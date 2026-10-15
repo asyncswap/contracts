@@ -11,15 +11,19 @@ using AsyncOrderLibrary for AsyncOrder global;
 /// @param key          The Uniswap V4 PoolKey identifying the pool the order is placed against.
 /// @param owner        The maker who supplied `amountIn` of the input currency at order submission.
 /// @param zeroForOne   Direction of the order. true => input is currency0, output is currency1.
-/// @param amountIn     Amount of input currency the maker is offering. v1 is exact-input, full-fill only.
+/// @param amountIn     Amount of input currency the maker escrowed. Direct matching may partially fill it;
+///                     unused input is returned when the maker's minimum output is satisfied.
 /// @param amountOutMin Minimum amount of output currency the maker accepts. The implicit limit price is
-///                     `amountOutMin / amountIn`. A filler MUST deliver at least this much output to claim
-///                     the maker's input.
+///                     `amountOutMin / amountIn`. A filler or direct match must satisfy the live minimum
+///                     for the amount it consumes.
+/// @param priorityFee  Non-refundable USDC bid for equal-price priority. Priority-fee mode requires at
+///                     least $0.10; filled portions are donated to active LPs, and any remainder is
+///                     donated when canceled or moved to the protocol FeeVault if no LPs are active.
 /// @param sqrtPrice    Pool sqrt-price the maker is willing to settle at if they cancel into a regular
 ///                     Uniswap swap. Used as the limit for the cancel-into-swap fallback.
 /// @param salt         Contract-assigned salt that disambiguates orders. The hook computes this at create
 ///                     time from `keccak256(timestamp, block.number, msg.sender, owner, amountIn,
-///                     amountOutMin)` and emits it in `AsyncOrderCreated` so the maker can reference the
+///                     amountOutMin, priorityFee)` and emits it in `AsyncOrderCreated` so the maker can reference the
 ///                     order in cancel / updatePrice. Submitters pass `bytes32(0)` on create — the value
 ///                     in this slot is only read on cancel / updatePrice / fill paths.
 struct AsyncOrder {
@@ -28,6 +32,7 @@ struct AsyncOrder {
     bool zeroForOne;
     uint256 amountIn;
     uint256 amountOutMin;
+    uint256 priorityFee;
     uint160 sqrtPrice;
     bytes32 salt;
 }

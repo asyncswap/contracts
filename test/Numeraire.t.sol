@@ -146,15 +146,16 @@ contract NumeraireTest is Test {
         uint256 fee = (netOutput / 997) * 3 + ((netOutput % 997) * 3) / 997;
         uint256 grossOutput = netOutput + fee;
         bool direction = Currency.unwrap(key.currency0) == address(input);
-        AsyncOrder memory order = AsyncOrder(key, maker, direction, amountIn, netOutput, 2 ** 96, bytes32(0));
+        AsyncOrder memory order = AsyncOrder(key, maker, direction, amountIn, netOutput, 0, 2 ** 96, bytes32(0));
         input.mint(maker, amountIn);
         output.mint(filler, grossOutput);
         vm.startPrank(maker);
         hook.setExecutor(key.toId(), address(router), true);
         input.approve(address(router), amountIn);
-        router.swap(order, abi.encode(AsyncSwap.UserParams(maker, address(router), netOutput)));
+        router.swap(order, abi.encode(AsyncSwap.UserParams(maker, address(router), netOutput, 0)));
         vm.stopPrank();
-        order.salt = keccak256(abi.encode(block.timestamp, block.number, address(manager), maker, amountIn, netOutput));
+        order.salt =
+            keccak256(abi.encode(block.timestamp, block.number, address(manager), maker, amountIn, netOutput, 0));
         vm.startPrank(filler);
         output.approve(address(router), grossOutput);
         router.fillOrder(order, grossOutput, "");

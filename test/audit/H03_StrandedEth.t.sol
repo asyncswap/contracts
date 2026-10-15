@@ -74,6 +74,7 @@ contract H03_StrandedEthTest is Test {
             zeroForOne: zeroForOne,
             amountIn: amountIn,
             amountOutMin: amountOutMin,
+            priorityFee: 0,
             sqrtPrice: 2 ** 96,
             salt: bytes32(0)
         });
@@ -87,7 +88,10 @@ contract H03_StrandedEthTest is Test {
         vm.startPrank(attacker);
         vm.expectRevert();
         router.swap{value: 0}(
-            atkOrder, abi.encode(AsyncSwap.UserParams({user: attacker, executor: address(router), amountOutMin: 1 wei}))
+            atkOrder,
+            abi.encode(
+                AsyncSwap.UserParams({user: attacker, executor: address(router), amountOutMin: 1 wei, priorityFee: 0})
+            )
         );
         vm.stopPrank();
     }

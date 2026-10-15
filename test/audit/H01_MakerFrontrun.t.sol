@@ -26,6 +26,7 @@ contract H01_MakerFrontrunTest is SetupHook {
             zeroForOne: zeroForOne,
             amountIn: amountIn,
             amountOutMin: amountOutMin,
+            priorityFee: 0,
             sqrtPrice: 2 ** 96,
             salt: bytes32(0)
         });
@@ -42,7 +43,11 @@ contract H01_MakerFrontrunTest is SetupHook {
         token0.approve(address(router), amountIn);
         router.swap(
             order,
-            abi.encode(AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: originalOutMin}))
+            abi.encode(
+                AsyncSwap.UserParams({
+                    user: alice, executor: address(router), amountOutMin: originalOutMin, priorityFee: 0
+                })
+            )
         );
         vm.stopPrank();
 

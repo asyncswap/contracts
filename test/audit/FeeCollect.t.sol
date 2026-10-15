@@ -48,13 +48,17 @@ contract SelfExecutor {
         pm.swap(
             key,
             SwapParams(zfo, -int256(amountIn), 2 ** 96),
-            abi.encode(AsyncSwap.UserParams({user: address(this), executor: address(this), amountOutMin: amountOutMin}))
+            abi.encode(
+                AsyncSwap.UserParams({
+                    user: address(this), executor: address(this), amountOutMin: amountOutMin, priorityFee: 0
+                })
+            )
         );
         input.settle(pm, address(this), amountIn, false);
 
         bytes32 salt =
-            keccak256(abi.encode(block.timestamp, block.number, address(pm), address(this), amountIn, amountOutMin));
-        AsyncOrder memory o = AsyncOrder(key, address(this), zfo, amountIn, amountOutMin, 0, salt);
+            keccak256(abi.encode(block.timestamp, block.number, address(pm), address(this), amountIn, amountOutMin, 0));
+        AsyncOrder memory o = AsyncOrder(key, address(this), zfo, amountIn, amountOutMin, 0, 0, salt);
 
         if (output.isAddressZero()) {
             (bool ok,) = address(hook).call{value: pay}("");
@@ -120,11 +124,13 @@ contract FeeCreditGrabber {
     }
 
     function submit(uint256 amountIn, uint256 amountOutMin) external {
-        AsyncOrder memory o = AsyncOrder(key, address(this), false, amountIn, amountOutMin, 2 ** 96, bytes32(0));
+        AsyncOrder memory o = AsyncOrder(key, address(this), false, amountIn, amountOutMin, 0, 2 ** 96, bytes32(0));
         router.swap(
             o,
             abi.encode(
-                AsyncSwap.UserParams({user: address(this), executor: address(router), amountOutMin: amountOutMin})
+                AsyncSwap.UserParams({
+                    user: address(this), executor: address(router), amountOutMin: amountOutMin, priorityFee: 0
+                })
             )
         );
     }
@@ -181,7 +187,7 @@ contract FeeCollectTest is Test {
     }
 
     function _salt(address user, uint256 amountIn, uint256 amountOutMin) internal view returns (bytes32) {
-        return keccak256(abi.encode(block.timestamp, block.number, address(manager), user, amountIn, amountOutMin));
+        return keccak256(abi.encode(block.timestamp, block.number, address(manager), user, amountIn, amountOutMin, 0));
     }
 
     /* ---------------- fee is enforced by the hook, not just the Router ---------------- */
@@ -223,7 +229,7 @@ contract FeeCollectTest is Test {
 
         s.run(false, 1 ether, amountOutMin, amountOutMin + fee);
         assertEq(manager.balanceOf(address(vault), eth.toId()), fee);
-        assertEq(address(s).balance, 10 ether - fee);
+        assertEq(address(s).balance + manager.balanceOf(address(s), 0), 10 ether - fee);
         assertEq(address(hook).balance, 0, "no ETH stranded in hook");
     }
 
@@ -234,8 +240,8 @@ contract FeeCollectTest is Test {
         vm.startPrank(bob);
         hook.setExecutor(poolId, address(router), true);
         erc20.approve(address(router), type(uint256).max);
-        AsyncOrder memory o = AsyncOrder(key, bob, false, 1 ether, 1 ether, 2 ** 96, bytes32(0));
-        router.swap(o, abi.encode(AsyncSwap.UserParams(bob, address(router), 1 ether)));
+        AsyncOrder memory o = AsyncOrder(key, bob, false, 1 ether, 1 ether, 0, 2 ** 96, bytes32(0));
+        router.swap(o, abi.encode(AsyncSwap.UserParams(bob, address(router), 1 ether, 0)));
         o.salt = _salt(bob, 1 ether, 1 ether);
         fee = hook.calculatePoolFee(key.fee, 1 ether);
         router.fillOrder{value: 1 ether + fee}(o, type(uint256).max, "");
@@ -265,8 +271,8 @@ contract FeeCollectTest is Test {
         vm.startPrank(bob);
         hook.setExecutor(poolId, address(router), true);
         erc20.approve(address(router), type(uint256).max);
-        AsyncOrder memory o = AsyncOrder(key, bob, false, 5 ether, 1 ether, 2 ** 96, bytes32(0));
-        router.swap(o, abi.encode(AsyncSwap.UserParams(bob, address(router), 1 ether)));
+        AsyncOrder memory o = AsyncOrder(key, bob, false, 5 ether, 1 ether, 0, 2 ** 96, bytes32(0));
+        router.swap(o, abi.encode(AsyncSwap.UserParams(bob, address(router), 1 ether, 0)));
         vm.stopPrank();
         uint256 fee = _fillOneNativeOutputOrder();
 
@@ -293,18 +299,18 @@ contract FeeCollectTest is Test {
         m.submit(1 ether, outA);
         m.submit(1 ether, outB);
         AsyncOrder memory a =
-            AsyncOrder(key, address(m), false, 1 ether, outA, 2 ** 96, _salt(address(m), 1 ether, outA));
+            AsyncOrder(key, address(m), false, 1 ether, outA, 0, 2 ** 96, _salt(address(m), 1 ether, outA));
         AsyncOrder memory b =
-            AsyncOrder(key, address(m), false, 1 ether, outB, 2 ** 96, _salt(address(m), 1 ether, outB));
+            AsyncOrder(key, address(m), false, 1 ether, outB, 0, 2 ** 96, _salt(address(m), 1 ether, outB));
         m.arm(b);
 
         uint256 mBefore = address(m).balance;
         vm.prank(bob);
         router.fillOrder{value: outA + feeA}(a, type(uint256).max, "");
 
-        assertTrue(m.reentryReverted(), "reentrant executeOrder must fail");
-        assertEq(bytes4(m.reentryError()), AsyncSwap.UnaccountedNativeOutput.selector);
-        assertEq(address(m).balance - mBefore, outA, "maker got exactly net A");
+        assertFalse(m.reentryReverted(), "native callback never runs");
+        assertEq(address(m).balance, mBefore);
+        assertEq(manager.balanceOf(address(m), 0), outA, "maker credited exactly net A");
         assertEq(manager.balanceOf(address(vault), eth.toId()), feeA, "full fee A in vault");
         assertEq(
             hook.asyncOrder(poolId, keccak256(abi.encode(block.chainid, poolId, address(m), false, b.salt))),

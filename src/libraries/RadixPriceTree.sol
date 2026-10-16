@@ -3,7 +3,10 @@ pragma solidity 0.8.26;
 
 /// @notice Patricia radix index for uint128 price levels. Inserts and removals
 ///         traverse at most 128 branch bits; each distinct price creates one
-///         leaf and at most one branch node.
+///         leaf and at most one branch node. Node ids released by `remove` are
+///         recycled by later inserts, so the id counter only grows with the peak
+///         number of simultaneously stored prices and can never be exhausted in
+///         practice (2^31 simultaneous levels).
 library RadixPriceTree {
     struct Node {
         uint32 parent;
@@ -17,6 +20,8 @@ library RadixPriceTree {
     struct Tree {
         uint32 root;
         uint32 nextNodeId;
+        /// @dev Ids released by `remove`; `_newNode` pops from here before growing `nextNodeId`.
+        uint32[] freeIds;
         mapping(uint32 id => Node) nodes;
         mapping(uint128 price => uint32 id) leaves;
     }
@@ -83,7 +88,7 @@ library RadixPriceTree {
 
         if (leafId == self.root) {
             self.root = 0;
-            delete self.nodes[leafId];
+            _freeNode(self, leafId);
             return;
         }
 
@@ -99,8 +104,8 @@ library RadixPriceTree {
             self.nodes[grandparentId].right = siblingId;
         }
         self.nodes[siblingId].parent = grandparentId;
-        delete self.nodes[branchId];
-        delete self.nodes[leafId];
+        _freeNode(self, branchId);
+        _freeNode(self, leafId);
     }
 
     function best(Tree storage self, bool highest) internal view returns (bool found, uint128 price) {
@@ -113,11 +118,25 @@ library RadixPriceTree {
         return (true, self.nodes[cursor].price);
     }
 
+    /// @dev Reuse a released id first; only grow the counter when none is free. A freed id
+    ///      is referenced by nothing (its parent, sibling and `leaves` entries were rewired in
+    ///      `remove`), so reusing it cannot alias a live node.
     function _newNode(Tree storage self) private returns (uint32 id) {
+        uint256 free = self.freeIds.length;
+        if (free != 0) {
+            id = self.freeIds[free - 1];
+            self.freeIds.pop();
+            return id;
+        }
         unchecked {
             id = ++self.nextNodeId;
         }
         if (id == 0) revert NodeIdOverflow();
+    }
+
+    function _freeNode(Tree storage self, uint32 id) private {
+        delete self.nodes[id];
+        self.freeIds.push(id);
     }
 
     function _bitSet(uint128 value, uint8 bit) private pure returns (bool) {

@@ -1,14 +1,10 @@
+![Async Swap](docs/assets/async-swap-banner.png)
+
 # Async Swap v2
 
-Async Swap is a Uniswap v4 hook that turns exact-input swaps into resting limit orders with an on-chain order book and matching engine.
+Async Swap is an on-chain order book and matching engine built as a Uniswap v4 hook. Traders set a limit price for assets paired with USDC. Orders can match with other traders, available pool liquidity, or independent fillers who keep funds in their wallets until they choose to fill.
 
-The live Async Swap order state is indexed by `AsyncFiller.Book`: a Patricia radix tree locates bid/ask price levels. Better prices always execute first. Each pool can use FIFO or USDC priority bids to resolve orders at the same price. In priority-bid mode, every order must bid at least $0.10 (100,000 units of six-decimal USDC); a larger bid ranks first and equal bids use FIFO. Priority bids affect matching within this book, not block-builder transaction inclusion order. Price updates re-enter with fresh time priority.
-
-When a new order crosses the book, the Router immediately matches it against up to eight resting orders in the same PoolManager unlock. Matching burns both makers’ ERC-6909 escrow claims and transfers the corresponding tokens to the counterparties. Partial fills stay in the book; input left after a maker’s minimum output is met is returned. Priority bids are escrowed as PoolManager claims when the order is created. A proportional share is donated to currently active v4 LPs as input fills, in the same unlock as settlement. The bid is non-refundable: its remaining share is donated when the order is canceled or terminates; if the pool has no active liquidity, the amount is routed to the protocol FeeVault. If more than eight pairs are crossed, anyone can call `Router.matchBook` to continue in another bounded transaction.
-
-Pool owners can also add ordinary Uniswap v4 liquidity positions. After order-to-order matching, Async Swap tries the remaining order against active pool liquidity. It executes only if the pool consumes the full remaining input and returns at least the maker’s remaining minimum output. Otherwise that attempt rolls back and the order remains available to another counterparty or filler. Anyone can retry a resting order through `Router.fillFromPoolLiquidity` after liquidity or the pool price changes. These fills charge a 30 bps v4 LP fee, accrued to active positions; LPs bear the usual inventory and price risk.
-
-The standalone `MatchingEngine` is an algorithm and stress-test harness; its measurements do not describe the integrated hook’s gas use. Priority bids only resolve same-price book matches. They do not reserve a transaction’s first or last position in a block, prevent builders from reordering transactions, or guarantee execution. Active v4 liquidity means positions in range at the current tick when `donate` runs; out-of-range LP positions do not receive that donation.
+Book matching prioritizes price, with FIFO or USDC bids breaking same-price ties. Liquidity providers earn a 0.30% fee on fills against their active positions. Unfilled amounts remain open for later execution, repricing, or cancellation; fills depend on available liquidity and counterparties.
 
 ## Documentation
 

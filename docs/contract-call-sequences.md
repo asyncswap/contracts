@@ -1,6 +1,6 @@
 # Contract call sequences
 
-The [V2 README](../README.md#contract-call-sequence) contains the short order sequence; this page contains the detailed sequences. See [order lifecycle and priority bids](order-lifecycle.md) for the flowcharts.
+The [protocol overview](protocol.md#3-placing-an-order) contains the short order sequence; this page contains the detailed sequences. See [order lifecycle and priority bids](order-lifecycle.md) for the flowcharts.
 
 Solid arrows are calls or actions; dashed arrows are returns or delivered results. Each sequence groups related transactions; it is not one transaction from top to bottom. The app and wallet represent the user interface, not trusted settlement components. An indexer may observe emitted events for discovery, but neither an API nor an indexer is required by the contracts.
 

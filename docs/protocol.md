@@ -54,8 +54,8 @@ flowchart LR
     Filler_ --> Radix
     Hook --> Sigs
     Router --> Sigs
-    Hook -->|take / burn / settle / donate| PM
-    PM -->|fee claims credited to| Vault
+    Hook -->|mint / take / burn / settle / donate| PM
+    PM -.->|accounting credit, not a contract call| Vault
     Vault -->|burn + take| PM
     Maker -->|redeem| NativeClaims
     NativeClaims -->|burn ID 0, send ETH| PM
@@ -67,6 +67,8 @@ positions, and they are the inventory for the LP-fill path. No swap ever reaches
 directly, because `beforeSwap` consumes the whole input as an order; the only AMM swaps are the ones
 the hook itself performs when it fills a resting order from pool liquidity. The standalone
 `MatchingEngine.sol` is a benchmark harness and is not deployed.
+
+FeeVault owns claims recorded in PoolManager. Crediting those claims does not call FeeVault.
 
 ## 2. Where funds live
 
@@ -82,7 +84,7 @@ flowchart TB
     Escrow -->|cancel: full remainder| MakerW
     Escrow -->|match or fill: input| CounterW["Counterparty wallet"]
     CounterW -->|output| MakerW
-    CounterW -->|30 bps fee on a filler fill| Fees
+    FillerW["Filler wallet"] -->|protocol fee from gross output payment| Fees
     Escrow -->|priority bid share| Reserves
     Escrow -->|bid with no active LP| Fees
     Fees -->|collect| OwnerW["Owner-chosen recipient"]
@@ -130,7 +132,15 @@ sequenceDiagram
     end
     R->>H: matchNewOrder(order)
     H->>AM: match up to 8 crossing resting orders
-    H->>AM: try the remainder against active LP liquidity (atomic, rolls back if short)
+    opt Incoming order still open
+        H->>H: guarded self-call for LP fill
+        H->>AM: try full remainder against active LP liquidity
+        AM-->>H: Fill succeeds or LP attempt rolls back
+    end
+    H-->>R: Matched pair count
+    R-->>PM: Callback complete
+    PM-->>R: Unlock complete with settled deltas
+    R-->>M: Transaction succeeds
     Note over H: emits AsyncOrderCreated, AsyncOrdersMatched / AsyncOrderLiquidityFilled
 ```
 
@@ -213,4 +223,4 @@ flowchart LR
 normal ERC-20 asset.
 
 See also [`price-key-crossing.md`](price-key-crossing.md) for how truncated price keys decide
-whether two orders cross, and `MAINNET_READINESS.md` for the release gate.
+whether two orders cross, and [mainnet readiness](../MAINNET_READINESS.md) for the release gate.

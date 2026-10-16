@@ -1,3 +1,5 @@
+![Async Swap](docs/assets/async-swap-banner.png)
+
 # Async Swap v2
 
 Async Swap is a Uniswap v4 hook that turns exact-input swaps into resting limit orders with an on-chain order book and matching engine.

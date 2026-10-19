@@ -160,7 +160,8 @@ library AsyncFiller {
             zeroForOne: zeroForOne,
             sequence: sequence,
             priorityFee: uint64(priorityFee),
-            priorityKey: _priorityKey(uint64(priorityFee), sequence),
+            // An unpaid bid buys no priority: the order queues as if its bid were 0 until the bid is escrowed.
+            priorityKey: _priorityKey(0, sequence),
             priorityFeeEscrowed: priorityFee == 0
         });
         _append(self, book, id);
@@ -172,13 +173,26 @@ library AsyncFiller {
         emit OrderingModeChanged(poolId, mode);
     }
 
-    function recordPriorityFee(State storage self, bytes32 id, uint256 amount, Currency numeraire) internal {
+    function recordPriorityFee(State storage self, Book storage book, bytes32 id, uint256 amount, Currency numeraire)
+        internal
+    {
         OrderInfo storage info = self.orders[id];
         if (info.amountIn == 0 || info.priorityFeeEscrowed || info.priorityFee != amount || amount == 0) {
             revert PriorityFeeNotEscrowed();
         }
         numeraire.take(self.poolManager, address(this), amount, true);
         info.priorityFeeEscrowed = true;
+        // Now that the bid is paid, the order takes the place in its level that the bid earns.
+        if (book.orderingMode == OrderingMode.PriorityFee) {
+            _remove(self, book, id);
+            _append(self, book, id);
+        }
+    }
+
+    /// @notice The bid an order has actually escrowed. A bid that was never paid counts as 0
+    ///         everywhere (priority, settlement, refunds), so an unpaid bid can never block the book.
+    function paidPriorityFee(OrderInfo storage info) internal view returns (uint256) {
+        return info.priorityFeeEscrowed ? info.priorityFee : 0;
     }
 
     function settlePriorityFee(
@@ -298,7 +312,6 @@ library AsyncFiller {
         uint256 amountIn = info.amountIn;
         uint256 amountOutMin = info.amountOutMin;
         if (amountIn == 0) revert OrderNotFound();
-        if (info.priorityFee != 0 && !info.priorityFeeEscrowed) revert PriorityFeeNotEscrowed();
 
         Currency input = order.zeroForOne ? order.key.currency0 : order.key.currency1;
         Currency output = order.zeroForOne ? order.key.currency1 : order.key.currency0;
@@ -327,8 +340,7 @@ library AsyncFiller {
 
     function settleOrderPriorityFee(State storage self, PoolKey memory key, bytes32 id, address hook) internal {
         OrderInfo storage info = self.orders[id];
-        if (info.priorityFee != 0 && !info.priorityFeeEscrowed) revert PriorityFeeNotEscrowed();
-        settlePriorityFee(self, key, id, info.owner, info.priorityFee, hook);
+        settlePriorityFee(self, key, id, info.owner, paidPriorityFee(info), hook);
     }
 
     /// @notice Cancel an unfilled order. Must be called inside an unlock context. Auth: `executor`
@@ -349,8 +361,8 @@ library AsyncFiller {
         OrderInfo storage info = self.orders[id];
         uint256 amountIn = info.amountIn;
         if (amountIn == 0) revert OrderNotFound();
-        uint256 priorityFee = info.priorityFee;
-        if (priorityFee != 0 && !info.priorityFeeEscrowed) revert PriorityFeeNotEscrowed();
+        // Only a paid bid is settled; an order whose bid was never paid can still always be cancelled.
+        uint256 priorityFee = paidPriorityFee(info);
 
         Currency input = order.zeroForOne ? order.key.currency0 : order.key.currency1;
         _remove(self, book, id);
@@ -373,7 +385,7 @@ library AsyncFiller {
             else book.asks.insert(order.price);
         }
         if (book.orderingMode == OrderingMode.PriorityFee) {
-            order.priorityKey = _priorityKey(order.priorityFee, order.sequence);
+            order.priorityKey = _priorityKey(uint64(paidPriorityFee(order)), order.sequence);
             priceLevel.priorityOrders.insert(order.priorityKey);
             priceLevel.priorityOrderIds[order.priorityKey] = id;
         } else {

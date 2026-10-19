@@ -99,8 +99,14 @@ library AsyncMatching {
         book.setOrderingMode(poolId, mode);
     }
 
-    function recordPriorityFee(AsyncFiller.State storage self, bytes32 id, uint256 amount, Currency numeraire) public {
-        self.recordPriorityFee(id, amount, numeraire);
+    function recordPriorityFee(
+        AsyncFiller.State storage self,
+        AsyncFiller.Book storage book,
+        bytes32 id,
+        uint256 amount,
+        Currency numeraire
+    ) public {
+        self.recordPriorityFee(book, id, amount, numeraire);
     }
 
     function bestOrder(AsyncFiller.State storage self, AsyncFiller.Book storage book, bool isBuy)
@@ -202,8 +208,7 @@ library AsyncMatching {
         uint256 amountOutMin = info.amountOutMin;
         if (amountIn == 0) revert AsyncFiller.OrderNotFound();
         uint256 amountOut = _swapAgainstPool(self.poolManager, key, info.zeroForOne, amountIn, amountOutMin, hook);
-        uint256 priorityFee = info.priorityFee;
-        if (priorityFee != 0 && !info.priorityFeeEscrowed) revert AsyncFiller.PriorityFeeNotEscrowed();
+        uint256 priorityFee = AsyncFiller.paidPriorityFee(info);
         Currency output = info.zeroForOne ? key.currency1 : key.currency0;
         output.take(self.poolManager, maker, amountOut, output.isAddressZero());
         AsyncFiller._remove(self, book, id);
@@ -392,9 +397,9 @@ library AsyncMatching {
         address hook
     ) private returns (uint256 unfilledPriorityFee) {
         AsyncFiller.OrderInfo storage info = self.orders[id];
-        uint256 oldPriorityFee = info.priorityFee;
+        // A bid that was never paid counts as 0, so it neither blocks the match nor gets paid out.
+        uint256 oldPriorityFee = AsyncFiller.paidPriorityFee(info);
         if (oldPriorityFee == 0) return 0;
-        if (!info.priorityFeeEscrowed) revert AsyncFiller.PriorityFeeNotEscrowed();
         uint256 filledPriorityFee = Math.mulDiv(oldPriorityFee, inputUsed, oldInput);
         unfilledPriorityFee = oldPriorityFee - filledPriorityFee;
         // A proportional share is earned only for the input that actually filled. The

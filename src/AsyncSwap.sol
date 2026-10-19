@@ -235,8 +235,9 @@ contract AsyncSwap is BaseHook, EIP712 {
         return (info.amountIn, info.amountOutMin);
     }
 
+    /// @notice The priority bid an order has escrowed; a bid that was never paid reads as 0.
     function asyncOrderPriorityFee(PoolId poolId, bytes32 orderId) external view returns (uint256) {
-        return asyncOrders[poolId].orders[orderId].priorityFee;
+        return AsyncFiller.paidPriorityFee(asyncOrders[poolId].orders[orderId]);
     }
 
     function orderingMode(PoolId poolId) external view returns (AsyncFiller.OrderingMode) {

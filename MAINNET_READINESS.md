@@ -15,7 +15,8 @@ This covers native settlement only. ERC20 callback behavior and the broader matc
 - Existing suite: 119 passing tests before this preparation.
 - UnichainForkTest: 3 passing tests against block 61279110, using real PoolManager and USDC with test-funded accounts. Covers native/USDC fills, residual cancellation, nonrefundable priority fees without LPs, and continuation after the eight-match bound.
 - MatchingInvariantTest and priority variant: 6 passing invariants, each with 64 runs and depth 64 (4096 calls), fail-on-revert enabled. Checks outstanding escrow, asset conservation, and best prices against a linear scan.
-- Full run: 144 tests passed, zero failed. The 3 pinned Unichain fork tests are skipped unless the fork RPC variables are set; with them set they pass (re-run 2026-10-15 against block 61279110). Includes the native LP fill test and the price-key crossing tests (`docs/price-key-crossing.md`). Invariants include randomized claim redemption and exact native backing (64 runs, depth 64, fail-on-revert).
+- UnpaidBidInvariantTest: 7 passing invariants (128 runs, depth 64) with orders whose priority bid was never paid (placed straight through the PoolManager, down to 1 wei, bids up to `uint64` max): matching never reverts, a crossing taker can always trade, every open order can be cancelled, an unpaid bid buys no priority, plus escrow, conservation and best-price checks. Against the code before #9, five of them fail.
+- Full run: 155 tests passed, zero failed (2026-10-19, at the audit freeze). The 3 pinned Unichain fork tests are skipped unless the fork RPC variables are set; with them set they pass (re-run 2026-10-15 against block 61279110). Includes the native LP fill test and the price-key crossing tests (`docs/price-key-crossing.md`). Invariants include randomized claim redemption and exact native backing (64 runs, depth 64, fail-on-revert).
 - Local CREATE2 deployment and indexed frontend: integrated contracts settle 0.4 ETH for 1000 USDC and 0.6 ETH for 1500 USDC, with recipient balances reflecting both fills.
 
 Fork command:
@@ -32,7 +33,7 @@ The fork fixture installs hook code for tests. It is not a rehearsal of the comp
 - Chain: Unichain 130.
 - PoolManager: 0x1F98400000000000000000000000000000000004. Source: https://developers.uniswap.org/docs/protocols/v4/deployments
 - USDC configuration: 0x078D782b760474a361dDA0AF3839290b0EF57AD6. Revalidate issuer address and decimals in the final rehearsal.
-- Current artifact runtime size: hook 23894 bytes, leaving 682 bytes under EIP-170. Recheck after fixes.
+- Current artifact runtime size: hook 24,428 bytes, leaving 148 bytes under EIP-170 (after #9). Recheck after any further change.
 - Deployment wrapper checks library code presence, not exact runtime identity. Pin and verify the final library and hook runtime hashes.
 - Owner in current script: 0xb1F0982E02f9F71E60512fd47471d76610CcB556. Confirm final owner, operational permissions, and funding before broadcast.
 
@@ -42,4 +43,4 @@ Complete callback safety review beyond native settlement. Stress the integrated 
 
 `script/check-mainnet-readiness.sh` runs the native rejecting-recipient test and deliberately keeps release blocked pending independent review and the remaining deployment/stress work.
 
-NativeClaims deployment preparation: `script/DeployNativeClaims.s.sol`. No broadcast has been made. Clients must display native proceeds as claim balances, approve claim ID 0 on PoolManager, and call `NativeClaims.redeem(recipient, amount)`. Approval is for claims, not ERC20 or hook executor permissions. Runtime sizes as of 2026-10-15 (`forge build --sizes`): hook 23894 bytes, AsyncMatching 19190 bytes, NativeClaims 1666 bytes.
+NativeClaims deployment preparation: `script/DeployNativeClaims.s.sol`. No broadcast has been made. Clients must display native proceeds as claim balances, approve claim ID 0 on PoolManager, and call `NativeClaims.redeem(recipient, amount)`. Approval is for claims, not ERC20 or hook executor permissions. Runtime sizes as of 2026-10-19 (`forge build --sizes`): hook 24,428 bytes, AsyncMatching 19,440 bytes, NativeClaims 1,666 bytes.

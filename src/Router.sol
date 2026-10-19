@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.26;
 
 import {ISignatureTransfer} from "@async-swap/interfaces/ISignatureTransfer.sol";
 import {OrderSignatures} from "@async-swap/libraries/OrderSignatures.sol";

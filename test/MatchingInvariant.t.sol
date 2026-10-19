@@ -131,7 +131,7 @@ contract MatchingInvariantTest is StdInvariant, Test {
         return false;
     }
 
-    function setUp() public {
+    function setUp() public virtual {
         manager = new PoolManager(address(this));
         usdc = new MockERC20("USD Coin", "USDC", 6);
         uint160 flags = uint160(
@@ -171,7 +171,7 @@ contract MatchingInvariantTest is StdInvariant, Test {
         assertEq(manager.balanceOf(address(hook), uint160(address(usdc))), usdcOwed, "USDC escrow obligations");
     }
 
-    function invariant_assetsConserved() public view {
+    function invariant_assetsConserved() public view virtual {
         uint256 ethTotal = address(manager).balance;
         uint256 usdcTotal = usdc.balanceOf(address(manager));
         for (uint256 i; i < 4; ++i) {

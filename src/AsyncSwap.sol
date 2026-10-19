@@ -260,7 +260,7 @@ contract AsyncSwap is BaseHook, EIP712 {
         if (id == bytes32(0) || msg.sender != executor) revert AsyncFiller.NotAuthorizedExecutor();
         AsyncFiller.State storage state = asyncOrders[key.toId()];
         if (state.orders[id].owner != maker) revert AsyncFiller.OrderNotFound();
-        AsyncMatching.recordPriorityFee(state, id, amount, numeraire);
+        AsyncMatching.recordPriorityFee(state, priceBooks[key.toId()], id, amount, numeraire);
     }
 
     /// @notice Return the best live limit order for a pool side. `isBuy` is true

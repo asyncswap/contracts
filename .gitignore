@@ -7,9 +7,14 @@ cache/
 .env.*
 !.env.deploy.example
 
-# Local deployment output
+# Local deployment output. The per-chain registry deployments/<chainId>/<chainId>.json
+# is tracked: it is the record of what is live and what downstream (indexer,
+# api, app) generate their addresses from. Receipts and verify inputs stay local.
 broadcast/
-deployments/
+deployments/*
+!deployments/*/
+deployments/*/*
+!deployments/*/[0-9]*.json
 
 # Soldeer dependencies are managed by the lockfile; required git submodules are tracked separately
 dependencies/forge-std-1.16.0/

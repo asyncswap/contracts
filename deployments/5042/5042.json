@@ -1,0 +1,31 @@
+{
+  "chainId": 5042,
+  "contracts": {
+    "AsyncMatching": {
+      "address": "0xC6e128BddfFb107566D3dE8B180d7978022803B1",
+      "startBlock": 26278471,
+      "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "PoolManager": {
+      "address": "0x8366a39CC670B4001A1121B8F6A443A643e40951",
+      "startBlock": 1948011,
+      "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "AsyncSwap": {
+      "address": "0x911947FB822261F19Cb644191244bef29CAE6888",
+      "startBlock": 26278562,
+      "txHash": "0xcc1fab1c0235a06f9f8156a729b021f58d84f194360d55f2d7f152d2c64c3d77"
+    },
+    "Router": {
+      "address": "0x36f8e4a87c815Fd9Ae4112788DFF6EE64A7193f8",
+      "startBlock": 26278562,
+      "txHash": "0x5c82cab853bab85a448e8870abd2b7a1725ba978b385becf9fb40ed007157e82"
+    },
+    "FeeVault": {
+      "address": "0x0B0F6c47447E841166d64257CeF52166Dd2aA86a",
+      "startBlock": 26278562,
+      "txHash": "0xcc1fab1c0235a06f9f8156a729b021f58d84f194360d55f2d7f152d2c64c3d77"
+    }
+  },
+  "updatedAt": 1792162233
+}

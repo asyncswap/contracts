@@ -15,6 +15,10 @@ import {Hooks} from "v4-core/libraries/Hooks.sol";
 import {LPFeeLibrary} from "v4-core/libraries/LPFeeLibrary.sol";
 import {Currency} from "v4-core/types/Currency.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
+import {PoolModifyLiquidityTest} from "v4-core/test/PoolModifyLiquidityTest.sol";
+import {ModifyLiquidityParams} from "v4-core/types/PoolOperation.sol";
+import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
+import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 
 contract MatchingHandler is Test {
     using PoolIdLibrary for PoolKey;
@@ -29,6 +33,7 @@ contract MatchingHandler is Test {
     uint256 public submissions;
     uint256 public cancellations;
     uint256 public updates;
+    uint256 public lpFills;
 
     constructor(AsyncSwap h, Router r, MockERC20 u, PoolKey memory k, bool p) {
         hook = h;
@@ -106,6 +111,16 @@ contract MatchingHandler is Test {
         router.matchBook(key, uint8(bound(count, 1, 8)));
     }
 
+    /// @dev Permissionless retry of a resting order against pool LPs. Counts only real fills.
+    function lpFill(uint256 index) external {
+        if (orders.length == 0) return;
+        AsyncOrder memory order = orders[index % orders.length];
+        bytes32 orderId = id(order);
+        if (hook.asyncOrder(key.toId(), orderId) == 0) return;
+        router.fillFromPoolLiquidity(order);
+        if (hook.asyncOrder(key.toId(), orderId) == 0) ++lpFills;
+    }
+
     function id(AsyncOrder memory order) public view returns (bytes32) {
         return keccak256(abi.encode(block.chainid, key.toId(), order.owner, order.zeroForOne, order.salt));
     }
@@ -131,6 +146,22 @@ contract MatchingInvariantTest is StdInvariant, Test {
         return false;
     }
 
+    function initialSqrtPrice() internal pure virtual returns (uint160) {
+        return 2 ** 96;
+    }
+
+    /// @dev Hook for subclasses that add Uniswap LP positions before the fuzz campaign.
+    function _seedLiquidity() internal virtual {}
+
+    function _selectors() internal pure virtual returns (bytes4[] memory selectors) {
+        selectors = new bytes4[](5);
+        selectors[0] = MatchingHandler.submit.selector;
+        selectors[1] = MatchingHandler.cancel.selector;
+        selectors[2] = MatchingHandler.reprice.selector;
+        selectors[3] = MatchingHandler.clear.selector;
+        selectors[4] = MatchingHandler.redeem.selector;
+    }
+
     function setUp() public virtual {
         manager = new PoolManager(address(this));
         usdc = new MockERC20("USD Coin", "USDC", 6);
@@ -142,16 +173,11 @@ contract MatchingInvariantTest is StdInvariant, Test {
         hook = AsyncSwap(payable(address(flags)));
         Router router = new Router(manager, hook, ISignatureTransfer(address(0)));
         key = PoolKey(Currency.wrap(address(0)), Currency.wrap(address(usdc)), LPFeeLibrary.DYNAMIC_FEE_FLAG, 1, hook);
-        manager.initialize(key, 2 ** 96);
+        manager.initialize(key, initialSqrtPrice());
         if (priorityMode()) hook.setOrderingMode(key, AsyncFiller.OrderingMode.PriorityFee);
+        _seedLiquidity();
         handler = new MatchingHandler(hook, router, usdc, key, priorityMode());
-        bytes4[] memory selectors = new bytes4[](5);
-        selectors[0] = MatchingHandler.submit.selector;
-        selectors[1] = MatchingHandler.cancel.selector;
-        selectors[2] = MatchingHandler.reprice.selector;
-        selectors[3] = MatchingHandler.clear.selector;
-        selectors[4] = MatchingHandler.redeem.selector;
-        targetSelector(FuzzSelector(address(handler), selectors));
+        targetSelector(FuzzSelector(address(handler), _selectors()));
         targetContract(address(handler));
     }
 
@@ -217,5 +243,98 @@ contract MatchingInvariantTest is StdInvariant, Test {
 contract PriorityMatchingInvariantTest is MatchingInvariantTest {
     function priorityMode() internal pure override returns (bool) {
         return true;
+    }
+}
+
+/// @notice Same campaign with real Uniswap v4 liquidity in range, so book matching, pool fills
+///         (automatic on submit and via permissionless retry) and cancels interleave. The pool
+///         is priced at 2,000 USDC per ETH, inside the handler's 1,000-4,000 price range, so
+///         roughly half of all submissions are eligible for a pool fill.
+contract LpMatchingInvariantTest is MatchingInvariantTest {
+    using StateLibrary for IPoolManager;
+    // sqrt(2000e6 / 1e18) * 2^96 with ETH as currency0 and 6-decimal USDC as currency1.
+    uint160 constant SQRT_PRICE_2000 = 3543191142285914327220224;
+    int24 constant TICK_2000 = -200311;
+
+    uint256 seededEth;
+    uint256 seededUsdc;
+
+    receive() external payable {}
+
+    function initialSqrtPrice() internal pure override returns (uint160) {
+        return SQRT_PRICE_2000;
+    }
+
+    function _seedLiquidity() internal override {
+        PoolModifyLiquidityTest lp = new PoolModifyLiquidityTest(manager);
+        vm.deal(address(this), 20_000 ether);
+        usdc.mint(address(this), 50_000_000e6);
+        usdc.approve(address(lp), type(uint256).max);
+        uint256 ethBefore = address(manager).balance;
+        uint256 usdcBefore = usdc.balanceOf(address(manager));
+        // ~1% band around spot; 1e20 liquidity is ~11k ETH / ~22M USDC of depth.
+        lp.modifyLiquidity{value: 20_000 ether}(
+            key, ModifyLiquidityParams(TICK_2000 - 100, TICK_2000 + 100, 1e20, 0), ""
+        );
+        seededEth = address(manager).balance - ethBefore;
+        seededUsdc = usdc.balanceOf(address(manager)) - usdcBefore;
+        assertGt(IPoolManager(address(manager)).getLiquidity(key.toId()), 0, "liquidity active at spot");
+    }
+
+    function _selectors() internal pure override returns (bytes4[] memory selectors) {
+        bytes4[] memory base = super._selectors();
+        selectors = new bytes4[](base.length + 1);
+        for (uint256 i; i < base.length; ++i) {
+            selectors[i] = base[i];
+        }
+        selectors[base.length] = MatchingHandler.lpFill.selector;
+    }
+
+    /// @dev Sanity check that the campaign's price range actually reaches the pool: a sell below
+    ///      spot and a buy above spot both fill on submit, so the fuzz actions exercise the fill path.
+    function test_campaignPricesReachThePool() public {
+        address seller = handler.actors(0);
+        uint256 usdcBefore = usdc.balanceOf(seller);
+        handler.submit(0, true, 1 ether, 1_500e6, 0);
+        assertEq(hook.asyncOrder(key.toId(), handler.id(handler.orderAt(0))), 0, "sell below spot fills from the pool");
+        assertGe(usdc.balanceOf(seller) - usdcBefore, 1_500e6, "seller paid at least the limit in USDC");
+
+        address buyer = handler.actors(1);
+        handler.submit(1, false, 1 ether, 2_500e6, 0);
+        assertEq(hook.asyncOrder(key.toId(), handler.id(handler.orderAt(1))), 0, "buy above spot fills from the pool");
+        assertGe(manager.balanceOf(buyer, 0), 1 ether, "buyer receives native output as claims");
+
+        handler.submit(2, true, 1 ether, 3_000e6, 0);
+        assertEq(hook.asyncOrder(key.toId(), handler.id(handler.orderAt(2))), 1 ether, "sell above spot rests");
+    }
+
+    /// @dev With LPs in the pool the manager also holds pool reserves, so native claims are a
+    ///      lower bound on its balance rather than equal to it. Totals stay exactly conserved.
+    function invariant_assetsConserved() public view override {
+        uint256 ethTotal = address(manager).balance;
+        uint256 usdcTotal = usdc.balanceOf(address(manager));
+        uint256 nativeClaims = manager.balanceOf(address(hook), 0) + manager.balanceOf(address(hook.feeVault()), 0);
+        for (uint256 i; i < 4; ++i) {
+            address actor = handler.actors(i);
+            ethTotal += actor.balance;
+            usdcTotal += usdc.balanceOf(actor);
+            nativeClaims += manager.balanceOf(actor, 0);
+        }
+        assertGe(address(manager).balance, nativeClaims, "every native claim is backed");
+        assertEq(ethTotal, 4_000 ether + seededEth, "ETH conserved across book, pool and actors");
+        assertEq(usdcTotal, 40_000_000e6 + seededUsdc, "USDC conserved across book, pool and actors");
+    }
+
+    /// @dev A pool fill may never leave the hook holding output claims: the maker is paid out
+    ///      (ERC20 transfer, or native claims in the maker's own name).
+    function invariant_hookHoldsNoUsdcBeyondEscrow() public view {
+        uint256 usdcOwed;
+        for (uint256 i; i < handler.orderCount(); ++i) {
+            AsyncOrder memory order = handler.orderAt(i);
+            bytes32 orderId = handler.id(order);
+            if (!order.zeroForOne) usdcOwed += hook.asyncOrder(key.toId(), orderId);
+            usdcOwed += hook.asyncOrderPriorityFee(key.toId(), orderId);
+        }
+        assertEq(manager.balanceOf(address(hook), uint160(address(usdc))), usdcOwed);
     }
 }

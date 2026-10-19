@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.26;
 
 /// @title ISignatureTransfer
 /// @notice Minimal subset of Uniswap Permit2's SignatureTransfer interface used by the Router.

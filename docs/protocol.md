@@ -96,9 +96,12 @@ the maker's live minimum plus 30 bps of gross output, and that fee lands in the 
 an LP fill charges the 30 bps dynamic LP fee to the active v4 positions. `calculateHookFee` is zero.
 Priority bids are escrowed as hook claims when the order is created (`recordPriorityFee`), donated
 proportionally to active LPs as input fills, and forfeited to the FeeVault only when the pool has no
-active liquidity at that moment.
+active liquidity at that moment. A bid counts only once it is escrowed: an order whose bid was never
+paid (placed straight through the PoolManager, not the Router) queues as if its bid were 0, and
+fills, matches and cancels settle only the paid bid, so an unpaid bid can never block the book
+(`test/UnpaidBidInvariant.t.sol`).
 
-Invariant proved in `v2-proofs` and fuzzed by `MatchingInvariantTest`: the hook's claim balance for
+Invariant proved in `v2-proofs` and fuzzed by `MatchingInvariantTest` and `UnpaidBidInvariantTest`: the hook's claim balance for
 each currency equals the sum of remaining inputs of open orders plus escrowed bids, and nothing is
 created or destroyed by a match. The hook's own token balance is zero between transactions, so
 `sweep` can only move stranded ETH or donations, never escrow.

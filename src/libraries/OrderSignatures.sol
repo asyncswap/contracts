@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.26;
 
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {Currency} from "v4-core/types/Currency.sol";

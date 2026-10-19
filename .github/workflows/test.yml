@@ -1,0 +1,43 @@
+name: CI
+
+permissions: {}
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Foundry project
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Show Forge version
+        run: forge --version
+
+      - name: Install Soldeer dependencies
+        run: forge soldeer install
+
+      - name: Run Forge fmt
+        run: forge fmt --check
+
+      # Fails when a contract goes over the EIP-170 limit (24,576 bytes); the hook has little room left.
+      - name: Run Forge build (with contract sizes)
+        run: forge build --sizes
+
+      # The invariant suites run at the depth MAINNET_READINESS.md records, failing on any unexpected revert.
+      - name: Run Forge tests
+        env:
+          FOUNDRY_INVARIANT_RUNS: "64"
+          FOUNDRY_INVARIANT_DEPTH: "64"
+        run: forge test -vvv

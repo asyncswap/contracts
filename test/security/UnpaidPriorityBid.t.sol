@@ -92,7 +92,9 @@ contract UnpaidPriorityBidTest is SetupHook {
         router.swap(
             bid,
             abi.encode(
-                AsyncSwap.UserParams({user: taker, executor: address(router), amountOutMin: 0.5 ether, priorityFee: 100_000})
+                AsyncSwap.UserParams({
+                    user: taker, executor: address(router), amountOutMin: 0.5 ether, priorityFee: 100_000
+                })
             )
         );
         vm.stopPrank();

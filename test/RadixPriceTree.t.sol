@@ -40,14 +40,22 @@ contract RadixPriceTreeTest is Test {
     }
 
     function test_counterTracksPeakNotHistory() public {
-        for (uint128 p = 1; p <= 8; ++p) h.insert(p);
+        for (uint128 p = 1; p <= 8; ++p) {
+            h.insert(p);
+        }
         uint32 peak = h.nextNodeId();
         assertEq(peak, 15, "8 levels = 1 + 2*7 ids");
-        for (uint128 p = 1; p <= 8; ++p) h.remove(p);
+        for (uint128 p = 1; p <= 8; ++p) {
+            h.remove(p);
+        }
         assertEq(h.freeCount(), 15, "all ids released");
         for (uint256 round; round < 50; ++round) {
-            for (uint128 p = 1; p <= 8; ++p) h.insert(p + uint128(round) * 100);
-            for (uint128 p = 1; p <= 8; ++p) h.remove(p + uint128(round) * 100);
+            for (uint128 p = 1; p <= 8; ++p) {
+                h.insert(p + uint128(round) * 100);
+            }
+            for (uint128 p = 1; p <= 8; ++p) {
+                h.remove(p + uint128(round) * 100);
+            }
         }
         assertEq(h.nextNodeId(), peak, "churn never grows the counter");
         assertEq(h.freeCount(), 15);

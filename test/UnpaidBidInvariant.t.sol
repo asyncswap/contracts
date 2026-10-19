@@ -207,7 +207,9 @@ contract UnpaidBidInvariantTest is PriorityMatchingInvariantTest {
         for (uint256 i; i < count; ++i) {
             AsyncOrder memory order = unpaid.orderAt(i);
             bytes32 orderId = unpaid.id(order);
-            if (unpaid.isUnpaid(orderId)) assertEq(hook.asyncOrderPriorityFee(key.toId(), orderId), 0, "unpaid bid counted");
+            if (unpaid.isUnpaid(orderId)) {
+                assertEq(hook.asyncOrderPriorityFee(key.toId(), orderId), 0, "unpaid bid counted");
+            }
         }
         for (uint256 side; side < 2; ++side) {
             (bool found, uint128 price, bytes32 bestId,) = hook.bestOrder(key.toId(), side == 1);

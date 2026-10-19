@@ -1,7 +1,7 @@
 # Audit scope: Async Swap
 
-- **Repository:** https://github.com/asyncswap/contracts
-- **Code frozen at:** `dc8042d3eff80d042f92b7cc4300cb3ef56a3c1f` on `main`. It includes every fix below. This file was added afterwards in a docs-only commit (`audit/`); `src/` and `script/` are identical at both.
+- **Repository:** <https://github.com/asyncswap/contracts>
+- **Code frozen at:** `dc8042d3eff80d042f92b7cc4300cb3ef56a3c1f` on `main`.
 - **Compiler:** solc 0.8.26, optimizer on (`optimizer_runs = 1_000_000`); see `foundry.toml`.
 - **Chain:** Unichain (130) first; any EVM chain with Uniswap v4 later.
 - **Builds on:** Uniswap v4 `PoolManager` (hooks), Permit2 for signed orders, OpenZeppelin `SafeERC20`.
@@ -100,7 +100,7 @@ priority keys), native ETH held as ERC-6909 claims, and whether any order can bl
 | AI-assisted review (2026-10-10) | Earlier design at `760699a` | M-01, M-02, L-01..L-03, I-01, I-03 fixed; I-02 acknowledged |
 | Pre-freeze review (2026-10-19) | Matching engine | Unpaid priority bid could freeze a pool: fixed in #9, invariant tests in #10 |
 
-Reports and per-finding evidence: https://github.com/asyncswap/protocol/tree/dev/audits. Every fix carries over
+Reports and per-finding evidence: <https://github.com/asyncswap/protocol/tree/dev/audits>. Every fix carries over
 and has a regression test in `test/security/`.
 
 ## Testing
@@ -110,4 +110,4 @@ and has a regression test in `test/security/`.
 (`test/UnpaidBidInvariant.t.sol`: matching never reverts, crossing takers always trade, every order is cancellable,
 unpaid bids buy no priority) and 17 security regression suites in `test/security/`. Hook runtime: 24,428 bytes
 (148 under EIP-170). Lean 4 specifications of the protocol are in
-https://github.com/asyncswap/contracts-proofs.
+<https://github.com/asyncswap/contracts-proofs>.

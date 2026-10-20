@@ -287,10 +287,20 @@ theorem unlockCallback_cancel (hget : ∀ w s, ext.get (ext.set w s) = s) (o : A
 
 /-! ## `fillOrder`
 
-`Router.fillOrder` is not translated: its body sends ETH with `address(HOOK).call{value: msg.value}("")`,
-which formal-ast leaves opaque (`Ext.fn_Router_fillOrder_403`). What it does before `unlock` is record
-the caller and `maxPrice` in transient storage and hand `SwapCallback(FillOrder, order, 0)` to
-`PoolManager.unlock`. The fill's checks run in `unlockCallback`'s FillOrder branch, which is translated. -/
+`Router.fillOrder` checks `msg.value` against the order's live price (native output: it forwards the ETH
+to the hook first), records the caller and `maxPrice` in transient storage and hands
+`SwapCallback(FillOrder, order, 0)` to `PoolManager.unlock`. The fill's price check runs in
+`unlockCallback`'s FillOrder branch. -/
+
+/-- `order.zeroForOne ? currency1 : currency0` -/
+def outputCurrency (o : AsyncOrder) : Nat := if o.zeroForOne then o.key.currency1 else o.key.currency0
+
+theorem Binds.isNative_output {cfg : V2.Config} {env : Env} {o : AsyncOrder} (hb : Binds cfg env o) :
+    cfg.isNative (absOrder o).output = decide (outputCurrency o = 0) := by
+  have := hb.numeraire
+  cases hz : o.zeroForOne <;>
+    simp [V2.Config.isNative, V2.Order.output, V2.OrderKey.output, V2.Order.key, absOrder, outputCurrency, hz,
+      hb.native0, this]
 
 /-- `order.key.toId()` -/
 def poolIdOf (key : PoolKey) : Nat :=
@@ -341,36 +351,89 @@ theorem unlockCallback_fill_maxPrice (hget : ∀ w s, ext.get (ext.set w s) = s)
   · simp at h
 
 
-open Ext (fn_Router_fillOrder_403)
+/-- A view call leaves the world as it was. -/
+@[simp] theorem run_view {α : Type} (f : Env → σ → Except Revert α) (env : Env) (s : σ) :
+    (view f : M σ α) env s = (match f env s with | .ok v => .ok (v, s) | .error e => .error e) := by
+  simp only [view, run_bind, run_read, run_get]
+  cases f env s <;> rfl
 
-/-- What `Router.fillOrder`'s Solidity body (`src/Router.sol:146-170`) and `PoolManager.unlock` do, stated
-because formal-ast leaves the body opaque: a call that does not revert ran the FillOrder callback, from the
-PoolManager, in a world whose transient `maxPrice` slot holds the caller's `maxPrice` and where the hook's
-views report the spec world's stored order and fee. -/
-def FillOrderReachesCallback (o : AsyncOrder) (maxPrice : Nat) (W : V2.World) (env : Env) : Prop :=
-  ∃ (env₀ : Env) (w₀ : σ) (r : List Nat) (w₁ : σ),
-    env₀.sender = ext.POOLMANAGER ∧ (ext.get w₀).«transient» Router.MAX_PRICE_LOCATION = maxPrice
-    ∧ ext.view_AsyncSwap_asyncOrderInfo env₀ (tstore ext w₀ Router.ACTION_LOCATION 1) ext.HOOK
-        (poolIdOf ext o.key) (orderIdOf ext env₀ o)
-        = .ok ((W.orders (absOrder o).key).amountIn, (W.orders (absOrder o).key).amountOutMin)
-    ∧ (∀ x, ext.view_AsyncSwap_calculatePoolFee env₀ (tstore ext w₀ Router.ACTION_LOCATION 1) ext.HOOK o.key.fee x
-        = .ok (poolFee x))
-    ∧ Router.unlockCallback ext (callbackData 1 o 0) env₀ w₀ = .ok (r, w₁)
-    ∧ env₀.chainid = env.chainid
+theorem view_ok_iff {α : Type} (x : Except Revert α) (s s' : σ) (a : α) :
+    ((match x with | .ok v => .ok (v, s) | .error e => .error e : Except Revert (α × σ)) = .ok (a, s'))
+      ↔ x = .ok a ∧ s = s' := by
+  cases x <;> simp [eq_comm]
 
-/-- **`Router.fillOrder` enforces the spec's price bound** (conditional on its untranslated body): a call
-of the generated model's `fn_Router_fillOrder_403` that does not revert, and that reached the FillOrder
-callback as its Solidity body does, filled only at `liveGross W key ≤ maxPrice`, the conjunct of the
-spec's `fillGuard` the Router owns. The rest of `fillGuard` (executor approval, open order, escrowed bid,
-the filler's balance) is the hook's. -/
+/-- The world `fillOrder` reads the hook's views in: caller, filler and `maxPrice` stored. -/
+def fillWorld (w : σ) (env : Env) (maxPrice : Nat) : σ :=
+  tstore ext (tstore ext (tstore ext w Router.USER_LOCATION env.sender) Router.ASYNC_FILLER_LOCATION env.self)
+    Router.MAX_PRICE_LOCATION maxPrice
+
+/-- The hook's views report the spec world's stored order and the spec's `poolFee`. -/
+def ViewsReport (W : V2.World) (o : AsyncOrder) (env : Env) (s : σ) : Prop :=
+  ext.view_AsyncSwap_asyncOrderInfo env s ext.HOOK (poolIdOf ext o.key) (orderIdOf ext env o)
+      = .ok ((W.orders (absOrder o).key).amountIn, (W.orders (absOrder o).key).amountOutMin)
+  ∧ ∀ x, ext.view_AsyncSwap_calculatePoolFee env s ext.HOOK o.key.fee x = .ok (poolFee x)
+
+set_option maxHeartbeats 1000000 in
+/-- **`Router.fillOrder` is sound for the spec's `fillGuard` `msg.value` conjunct.** A call that does not
+revert sent exactly the order's live gross price (`liveGross`) when the output is native, and nothing
+when it is an ERC-20. -/
+theorem fillOrder_value_sound {cfg : V2.Config} {env : Env} {o : AsyncOrder} (hb : Binds cfg env o)
+    (maxPrice : Nat) (d : List Nat) (w w' : σ) (W : V2.World) (hv : ViewsReport ext W o env (fillWorld ext w env maxPrice))
+    (h : Router.fillOrder ext o maxPrice d env w = .ok ((), w')) :
+    if cfg.isNative (absOrder o).output then env.value = V2.Protocol.liveGross W (absOrder o).key
+    else env.value = 0 := by
+  rw [hb.isNative_output]
+  obtain ⟨hinfo, hfee⟩ := hv
+  simp only [fillWorld, tstore, poolIdOf, orderIdOf] at hinfo hfee
+  simp only [V2.Protocol.liveGross, gross]
+  simp [Router.fillOrder, CurrencyLibrary.isAddressZero, CurrencyLibrary.ADDRESS_ZERO, Router._orderId,
+    PoolIdLibrary.toId, view, hinfo, hfee, addc, outputCurrency] at h ⊢
+  repeat' split at h
+  all_goals simp_all
+
+set_option maxHeartbeats 1000000 in
+/-- **`Router.fillOrder` forwards the fill with the caller's `maxPrice`.** A call that does not revert ran
+`PoolManager.unlock(SwapCallback(FillOrder, order, 0))` from a world whose transient `maxPrice` slot holds
+`maxPrice`, provided the hook's `receive` (native output) leaves the Router's storage alone. -/
+theorem fillOrder_forwards (hget : ∀ w s, ext.get (ext.set w s) = s) (o : AsyncOrder) (maxPrice : Nat)
+    (d : List Nat) (env : Env) (w w' : σ)
+    (hrecv : ∀ v e s r s', ext.lowCall ext.HOOK v [] e s = .ok (r, s') → ext.get s' = ext.get s)
+    (h : Router.fillOrder ext o maxPrice d env w = .ok ((), w')) :
+    ∃ w₀ r, (ext.get w₀).«transient» Router.MAX_PRICE_LOCATION = maxPrice
+      ∧ ext.call_IPoolManager_unlock ext.POOLMANAGER (callbackData 1 o 0) env w₀ = .ok (r, w') := by
+  simp [Router.fillOrder, CurrencyLibrary.isAddressZero, CurrencyLibrary.ADDRESS_ZERO, Router._orderId,
+    PoolIdLibrary.toId, addc] at h
+  repeat' split at h
+  all_goals try (simp at h; done)
+  all_goals
+    simp only [Except.ok.injEq, Prod.mk.injEq, true_and] at h
+    subst h
+    refine ⟨_, _, ?_, by assumption⟩
+    try (rw [hrecv _ _ _ _ _ (by assumption)])
+    first
+      | simp [hget, upd]
+      | (simp only [view_ok_iff, ite_ok_error_eq_ok, Prod.mk.injEq] at *
+         casesm* _ ∧ _
+         subst_vars
+         simp [hget, upd])
+
+/-- **`Router.fillOrder` enforces the spec's price bound.** A call that does not revert filled only at
+`liveGross W key ≤ maxPrice`, the `fillGuard` conjunct the Router owns, given what the PoolManager does
+(`unlock` runs this Router's `unlockCallback` on the same data, from the PoolManager, in the same world)
+and that the hook's views report the spec world. The rest of `fillGuard` (executor approval, open order,
+escrowed bid, the filler's balance) is the hook's. -/
 theorem fillOrder_maxPrice (hget : ∀ w s, ext.get (ext.set w s) = s) (o : AsyncOrder) (he : Encodable o)
     (maxPrice : Nat) (d : List Nat) (env : Env) (w w' : σ) (W : V2.World)
-    (hcall : fn_Router_fillOrder_403 ext o maxPrice d env w = .ok ((), w'))
-    (hbody : fn_Router_fillOrder_403 ext o maxPrice d env w = .ok ((), w') →
-      FillOrderReachesCallback ext o maxPrice W env) :
+    (hrecv : ∀ v e s r s', ext.lowCall ext.HOOK v [] e s = .ok (r, s') → ext.get s' = ext.get s)
+    (hunlock : ∀ w₀ r w₁, ext.call_IPoolManager_unlock ext.POOLMANAGER (callbackData 1 o 0) env w₀ = .ok (r, w₁) →
+      ∃ env₀ r' w₂, env₀.sender = ext.POOLMANAGER
+        ∧ ViewsReport ext W o env₀ (tstore ext w₀ Router.ACTION_LOCATION 1)
+        ∧ Router.unlockCallback ext (callbackData 1 o 0) env₀ w₀ = .ok (r', w₂))
+    (h : Router.fillOrder ext o maxPrice d env w = .ok ((), w')) :
     V2.Protocol.liveGross W (absOrder o).key ≤ maxPrice := by
-  obtain ⟨env₀, w₀, r, w₁, hpm, hmax, hinfo, hfee, hcb, -⟩ := hbody hcall
+  obtain ⟨w₀, r, hmax, hu⟩ := fillOrder_forwards ext hget o maxPrice d env w w' hrecv h
+  obtain ⟨env₀, r', w₂, hpm, ⟨hinfo, hfee⟩, hcb⟩ := hunlock w₀ r w' hu
   rw [← hmax]
-  exact unlockCallback_fill_maxPrice ext hget o he env₀ hpm w₀ W hinfo hfee r w₁ hcb
+  exact unlockCallback_fill_maxPrice ext hget o he env₀ hpm w₀ W hinfo hfee r' w₂ hcb
 
 end Router

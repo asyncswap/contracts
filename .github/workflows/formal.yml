@@ -4,9 +4,9 @@ permissions: {}
 
 on:
   push:
-    paths: ["formal/**", ".github/workflows/formal.yml"]
+    paths: ["formal/**", "src/**", "foundry.toml", "remappings.txt", "soldeer.lock", ".github/workflows/formal.yml"]
   pull_request:
-    paths: ["formal/**", ".github/workflows/formal.yml"]
+    paths: ["formal/**", "src/**", "foundry.toml", "remappings.txt", "soldeer.lock", ".github/workflows/formal.yml"]
   workflow_dispatch:
 
 jobs:
@@ -48,4 +48,57 @@ jobs:
         run: |
           if grep -rnwE --include='*.lean' 'sorry|admit|axiom' AsyncSwapSpec AsyncSwapProtocol Generated Refinement; then
             echo "::error::sorry, admit or axiom found in formal/"; exit 1
+          fi
+
+  # The Lean model in formal/Generated is the formalmind CLI's output for src/ and is committed. This regenerates
+  # it with a pinned release and fails when the committed copy is stale: after changing src/, run
+  # `formal/scripts/generate.sh` and commit the result (the refinement proofs are checked against it).
+  generated:
+    name: formal/Generated matches src/
+    runs-on: ubuntu-latest
+    # Advisory while the check settles in; make it required once it has run clean for a while.
+    continue-on-error: true
+    permissions:
+      contents: read
+    env:
+      FORMALMIND_VERSION: "0.1.0"
+      SOLC_VERSION: "0.8.26"
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install Soldeer dependencies
+        run: forge soldeer install
+
+      # formalmind looks for solc in svm's folder.
+      - name: Install solc
+        run: |
+          file=$(curl -sSfL https://binaries.soliditylang.org/linux-amd64/list.json | jq -r ".releases[\"$SOLC_VERSION\"]")
+          mkdir -p "$HOME/.svm/$SOLC_VERSION"
+          curl -sSfL "https://binaries.soliditylang.org/linux-amd64/$file" -o "$HOME/.svm/$SOLC_VERSION/solc-$SOLC_VERSION"
+          chmod +x "$HOME/.svm/$SOLC_VERSION/solc-$SOLC_VERSION"
+
+      - name: Install formalmind
+        run: |
+          base="https://github.com/formalmind/formalmind/releases/download/formalmind-cli-v$FORMALMIND_VERSION"
+          cd "$RUNNER_TEMP"
+          curl -sSfLO "$base/formalmind-x86_64-unknown-linux-gnu.tar.gz"
+          curl -sSfLO "$base/SHA256SUMS"
+          grep x86_64-unknown-linux-gnu SHA256SUMS | sha256sum -c -
+          tar -xzf formalmind-x86_64-unknown-linux-gnu.tar.gz
+          echo "FORMALMIND=$RUNNER_TEMP/formalmind" >> "$GITHUB_ENV"
+
+      - name: Regenerate formal/Generated
+        run: formal/scripts/generate.sh
+
+      - name: Committed model is current
+        run: |
+          if ! git diff --exit-code --stat formal/Generated; then
+            echo "::error::formal/Generated is stale: run formal/scripts/generate.sh (formalmind $FORMALMIND_VERSION) and commit the result"
+            exit 1
           fi

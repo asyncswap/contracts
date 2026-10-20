@@ -17,6 +17,11 @@ lake exe cache get   # Mathlib build cache
 lake build           # every theorem; no sorry, no extra axioms
 ```
 
+CI (`.github/workflows/formal.yml`) runs `lake build` and rejects `sorry`, `admit` and `axiom` on every
+push and pull request that touches `formal/`. The generated models are committed: after a change to
+`src/`, run `scripts/generate.sh` (formal-ast with `call{value:}` support, asyncswap/formalmind) and
+commit the result; the refinement theorems then fail to build if a refined function changed.
+
 Each file in `Generated/` carries its own copy of formal-ast's `FormalAst` prelude, so the two are
 built as separate modules and never imported together.
 
@@ -33,7 +38,7 @@ as proved when a theorem in this folder names its generated def.
 | `AsyncSwap.isExecutor` (`Trade.s.sol`) | `isExecutor_refines` | `World.isExecutor`, read by `createHookGuard`, `fillGuard`, `cancelHookGuard` |
 | `Router.swap` (`03_Swap.s.sol`, `Trade.s.sol`) | `swap_sound`, `swap_complete`, `swapGuard_router`, `userParamsOf_abiEncode` | the Router's conjuncts of `swapGuard` (owner = caller, `UserParams`, `msg.value`), then `unlock(SwapCallback(Swap, order))` |
 | `Router.cancelOrder` (`04_CancelOrder.s.sol`) | `cancelOrder_sound`, `cancelOrder_complete`, `spec_cancelOrder_owner`, `unlockCallback_cancel` | `cancelOrder`'s `sender = o.owner`; the callback becomes `HOOK.cancelOrder(order)` with the same order |
-| `Router.fillOrder` (`05_ExecuteOrder.s.sol`) | `fillOrder_maxPrice` (via `unlockCallback_fill_maxPrice`) | `fillGuard`'s `liveGross ≤ maxPrice` |
+| `Router.fillOrder` (`05_ExecuteOrder.s.sol`) | `fillOrder_value_sound`, `fillOrder_forwards`, `fillOrder_maxPrice`, `unlockCallback_fill_maxPrice` | `fillGuard`'s `msg.value` conjunct (native output pays exactly `liveGross`, ERC-20 output pays nothing) and `liveGross ≤ maxPrice` |
 
 What "refines" means here, per def: **sound** (a run that does not revert satisfies the spec
 guard's conjuncts this contract checks) and **complete** (when they hold, the def does exactly the
@@ -48,11 +53,9 @@ their ABI types, which any calldata order does).
 
 ## Gaps
 
-- **`Router.fillOrder` is opaque in the generated model.** Its body sends ETH with
-  `address(HOOK).call{value: msg.value}("")`, which formal-ast does not translate yet. Its theorem is
-  conditional: `FillOrderReachesCallback` states, as a hypothesis, what the body and
-  `PoolManager.unlock` do. The FillOrder callback itself (`unlockCallback_fill_maxPrice`) is proved
-  against the generated code. The `msg.value == livePrice` check for native output is not covered.
+- **External contracts are hypotheses.** `fillOrder_maxPrice` assumes what the PoolManager does
+  (`unlock` runs this Router's `unlockCallback` on the same data) and that the hook's `receive` leaves the
+  Router's storage alone; the hook's views are assumed to report the spec world.
 - **Cross-contract composition.** `Router.swap` / `cancelOrder` end at `PoolManager.unlock` and the
   callback ends at `HOOK.*`; the PoolManager and the hook are `Ext` calls in the Router model. The
   hook's half of `swapGuard`, `cancelHookGuard` and `fillGuard` (executor approval, open order,
@@ -60,7 +63,7 @@ their ABI types, which any calldata order does).
   `Generated/AsyncSwap.lean`. A full refinement needs an abstraction from the hook's storage
   (`asyncOrders`, `priceBooks`) to `World.orders` / `openKeys`. Several hook functions are opaque in the
   model (`_createOrder`, `AsyncFiller._append` / `_remove` / `level`, `CurrencySettler.settle`).
-- **Token movements.** `_settlePriorityFee`, `_settleWithPermit`, `CurrencySettler.settle`,
+- **Token movements.** `_settlePriorityFee`, `_settleWithPermit`,
   `CurrencyLibrary.transfer` are opaque, so the spec's ledger effects (`bal`, `claims`, deltas) are not
   yet tied to code.
 - **Routing of Swap / Match / LiquidityFill callbacks** (actions 0, 4, 5) is not proved; Cancel (2)

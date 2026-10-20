@@ -1,0 +1,51 @@
+name: Lean proofs
+
+permissions: {}
+
+on:
+  push:
+    paths: ["formal/**", ".github/workflows/formal.yml"]
+  pull_request:
+    paths: ["formal/**", ".github/workflows/formal.yml"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: lake build (formal/)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: formal
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Install elan
+        run: |
+          curl -sSfL https://elan.lean-lang.org/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Cache Mathlib and build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            formal/.lake
+            ~/.cache/mathlib
+          key: lake-${{ runner.os }}-${{ hashFiles('formal/lean-toolchain', 'formal/lake-manifest.json') }}
+          restore-keys: lake-${{ runner.os }}-
+
+      - name: Fetch Mathlib cache
+        run: lake exe cache get
+
+      # Spec, generated models and refinement theorems.
+      - name: Build all proofs
+        run: lake build
+
+      - name: No sorry, admit or new axioms
+        run: |
+          if grep -rnwE --include='*.lean' 'sorry|admit|axiom' AsyncSwapSpec AsyncSwapProtocol Generated Refinement; then
+            echo "::error::sorry, admit or axiom found in formal/"; exit 1
+          fi

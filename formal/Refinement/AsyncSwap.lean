@@ -102,36 +102,41 @@ invariant holds of the world abstracting the pool after the call. -/
 section Invariants
 
 variable (hget : ∀ w s, ext.get (ext.set w s) = s) (cfg : Config) (poolId executor : Nat) (allow : Bool)
-  (env : Env) (w w' : σ) (h : AsyncSwap.setExecutor ext poolId executor allow env w = .ok ((), w'))
+  (env : Env) (w w' : σ)
   (W : World) (hW : W.isExecutor = executors ext w poolId)
-include hget cfg h hW
+include hget cfg hW
 
 /-- Escrow (`Invariants.lean`, `step_escrow`) across `AsyncSwap.setExecutor`. -/
-theorem setExecutor_escrow (hE : Escrow cfg W) :
+theorem setExecutor_escrow (h : AsyncSwap.setExecutor ext poolId executor allow env w = .ok ((), w'))
+    (hE : Escrow cfg W) :
     Escrow cfg { W with isExecutor := executors ext w' poolId } :=
   step_escrow hE (setExecutor_refines ext hget cfg poolId executor allow env w w' h W hW)
     (by simp) (by simp) (by simp)
 
 /-- Balances stay non-negative (`BalNonNeg.lean`, `step_bal_nonneg`) across `AsyncSwap.setExecutor`. -/
-theorem setExecutor_bal_nonneg (hN : BalNonNeg cfg W) :
+theorem setExecutor_bal_nonneg (h : AsyncSwap.setExecutor ext poolId executor allow env w = .ok ((), w'))
+    (hN : BalNonNeg cfg W) :
     BalNonNeg cfg { W with isExecutor := executors ext w' poolId } :=
   step_bal_nonneg (setExecutor_refines ext hget cfg poolId executor allow env w w' h W hW)
     (by simp) (by simp) (by simp) hN
 
 /-- Claims stay non-negative (`ClaimsNonNeg.lean`, `step_claims_nonneg`) across `AsyncSwap.setExecutor`. -/
-theorem setExecutor_claims_nonneg (hE : Escrow cfg W) (hN : ClaimsNonNeg cfg W) :
+theorem setExecutor_claims_nonneg (h : AsyncSwap.setExecutor ext poolId executor allow env w = .ok ((), w'))
+    (hE : Escrow cfg W) (hN : ClaimsNonNeg cfg W) :
     ClaimsNonNeg cfg { W with isExecutor := executors ext w' poolId } :=
   step_claims_nonneg hE (setExecutor_refines ext hget cfg poolId executor allow env w w' h W hW)
     (by simp) (by simp) (by simp) hN
 
 /-- PoolManager backing (`Settlement.lean`, `step_backing`) across `AsyncSwap.setExecutor`. -/
-theorem setExecutor_backing (hb : Backing cfg W) (hu : Users cfg W) :
+theorem setExecutor_backing (h : AsyncSwap.setExecutor ext poolId executor allow env w = .ok ((), w'))
+    (hb : Backing cfg W) (hu : Users cfg W) :
     Backing cfg { W with isExecutor := executors ext w' poolId } :=
   step_backing hb hu (setExecutor_refines ext hget cfg poolId executor allow env w w' h W hW)
     (by simp) (by simp) (by simp)
 
 /-- Token conservation (`Conservation.lean`, `step_conservation`) across `AsyncSwap.setExecutor`. -/
-theorem setExecutor_conservation {S : Finset Address} (hpm : cfg.pm ∈ S) (hhook : cfg.hook ∈ S)
+theorem setExecutor_conservation (h : AsyncSwap.setExecutor ext poolId executor allow env w = .ok ((), w'))
+    {S : Finset Address} (hpm : cfg.pm ∈ S) (hhook : cfg.hook ∈ S)
     (hrouter : cfg.router ∈ S) (hM : Makers S W) :
     ∀ c, total c S { W with isExecutor := executors ext w' poolId } = total c S W :=
   step_conservation hpm hhook hrouter hM (setExecutor_refines ext hget cfg poolId executor allow env w w' h W hW)
@@ -139,7 +144,8 @@ theorem setExecutor_conservation {S : Finset Address} (hpm : cfg.pm ∈ S) (hhoo
 
 /-- Pool reserves stay non-negative (`SupplyNonNeg.lean`, `step_reserves_nonneg`) across
 `AsyncSwap.setExecutor`. -/
-theorem setExecutor_reserves_nonneg (hR : ReservesNonNeg W) :
+theorem setExecutor_reserves_nonneg (h : AsyncSwap.setExecutor ext poolId executor allow env w = .ok ((), w'))
+    (hR : ReservesNonNeg W) :
     ReservesNonNeg { W with isExecutor := executors ext w' poolId } :=
   step_reserves_nonneg (setExecutor_refines ext hget cfg poolId executor allow env w w' h W hW) hR
 

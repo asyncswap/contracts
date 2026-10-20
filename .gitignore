@@ -23,3 +23,6 @@ dependencies/uniswap-v4-core-4/
 
 # Bun/npm dependencies for script/*.ts helpers
 node_modules/
+
+# Lean build output (formal/)
+formal/.lake/

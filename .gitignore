@@ -26,3 +26,6 @@ node_modules/
 
 # Lean build output (formal/)
 formal/.lake/
+
+# Formal Mind's local swarm: its plan, queue, transcripts and run logs (its results are in formal/ and audit/)
+.formal/

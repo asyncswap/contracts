@@ -9,3 +9,5 @@ fa="${FORMALMIND:-formalmind}"
 cd "$root"
 "$fa" --root . src/Router.sol lean formal/Generated/Router.lean --namespace Router
 "$fa" --root . src/AsyncSwap.sol lean formal/Generated/AsyncSwap.lean --namespace AsyncSwap
+"$fa" --root . src/FeeVault.sol lean formal/Generated/FeeVault.lean --namespace FeeVault
+"$fa" --root . src/NativeClaims.sol lean formal/Generated/NativeClaims.lean --namespace NativeClaims

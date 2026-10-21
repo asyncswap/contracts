@@ -3,7 +3,9 @@ name: CI
 permissions: {}
 
 on:
+  # Pull requests run on pull_request; push runs only for main, so a PR branch isn't checked twice.
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 

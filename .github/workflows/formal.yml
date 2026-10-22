@@ -73,6 +73,10 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+        with:
+          # Pinned: a new Foundry release can change test semantics (1.8 made `isolate` the default).
+          # Bump it on purpose, together with the local toolchain (`foundryup --install <version>`).
+          version: v1.8.6
 
       - name: Install Soldeer dependencies
         run: forge soldeer install

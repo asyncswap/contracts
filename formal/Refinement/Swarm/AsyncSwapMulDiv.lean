@@ -347,14 +347,47 @@ theorem mulDiv_spec (x y d : Nat) (env : Env) (s : σ) (hx : x < W) (hy : y < W)
     · rw [ite_pos' hq]; exact mulDiv_ok ext x y d env s hx hy (by omega) hdW hq
     · rw [ite_neg' hq]; exact mulDiv_overflow ext x y d env s hx hy (by omega) (by omega)
 
+/-- The prelude's `mulDivFloor`, run, in the shape of `mulDiv_spec`: a zero `d` panics `0x12` when
+the product fits one word and reverts `MathOverflowedMulDiv` otherwise; a nonzero `d` returns the
+floor when it fits 256 bits and reverts `MathOverflowedMulDiv` when not. -/
+theorem mulDivFloor_run (x y d : Nat) (env : Env) (s : σ) :
+    mulDivFloor (σ := σ) x y d env s
+      = if d = 0 then .error (if x * y < W then panic "0x12" else ⟨"MathOverflowedMulDiv"⟩)
+        else if x * y / d < W then .ok (x * y / d, s)
+        else .error ⟨"MathOverflowedMulDiv"⟩ := by
+  have hW := W_pos
+  have k : d = 0 ∨ (d ≤ x * y / W ∧ W ≤ x * y / d) ∨ (x * y / W < d ∧ x * y / d < W) := by
+    rcases Nat.eq_zero_or_pos d with hd | hd
+    · exact Or.inl hd
+    · right
+      by_cases h : d ≤ x * y / W
+      · left; refine ⟨h, ?_⟩
+        rw [Nat.le_div_iff_mul_le (by omega)] at h
+        rw [Nat.le_div_iff_mul_le hd, Nat.mul_comm W d]; exact h
+      · right; refine ⟨Nat.lt_of_not_le h, ?_⟩
+        rw [Nat.le_div_iff_mul_le (by omega)] at h
+        rw [Nat.div_lt_iff_lt_mul hd, Nat.mul_comm W d]; exact Nat.lt_of_not_le h
+  have hle := Nat.div_le_self (x * y) d
+  unfold mulDivFloor
+  rw [← W_eq]
+  generalize x * y / W = H at *
+  generalize x * y / d = Q at *
+  generalize x * y = P at *
+  simp only [run_ite, run_throw, run_pure]
+  split_ifs <;> first | rfl | (exfalso; omega)
+
 /-- For a nonzero denominator, `Math.mulDiv` is exactly the prelude's floor `mulDivFloor`
 (same result, same world, same revert). -/
 theorem mulDiv_eq_mulDivFloor (x y d : Nat) (env : Env) (s : σ) (hx : x < W) (hy : y < W)
     (hdW : d < W) (hd : d ≠ 0) :
     Math.mulDiv ext x y d env s = mulDivFloor (σ := σ) x y d env s := by
-  rw [mulDiv_spec ext x y d env s hx hy hdW, ite_neg' hd]
-  unfold mulDivFloor
-  rw [W_eq]
-  by_cases hq : x * y / d < 2^256 <;> simp [hd]
+  rw [mulDiv_spec ext x y d env s hx hy hdW, mulDivFloor_run, ite_neg' hd]
+
+/-- On 256-bit inputs, `Math.mulDiv` is exactly the prelude's floor `mulDivFloor` for every
+denominator, zero included (same result, same world, same revert reason). -/
+theorem mulDiv_eq_mulDivFloor_any (x y d : Nat) (env : Env) (s : σ) (hx : x < W) (hy : y < W)
+    (hdW : d < W) :
+    Math.mulDiv ext x y d env s = mulDivFloor (σ := σ) x y d env s := by
+  rw [mulDiv_spec ext x y d env s hx hy hdW, mulDivFloor_run]
 
 end AsyncSwap.Swarm.MulDiv

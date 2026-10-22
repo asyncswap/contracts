@@ -4,6 +4,7 @@ pragma solidity ^0.8.26;
 import {FormalMatchD} from "./FormalMatchD.sol";
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {stdError} from "forge-std/StdError.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @notice Bytecode checks of `formal/Refinement/Swarm/AsyncSwapMatchPair.lean`. `_matchPair` is private;
 ///         `matchBook(key, 1)` runs it exactly once, as `_matchPair(bidId, askId)`, on a crossed book of
@@ -123,16 +124,25 @@ contract AsyncSwapMatchPairFormalTest is FormalMatchD {
         }
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapMatchPair.lean:361 — a non-skipped pair whose resting (older) order has amountOutMin = 0 reverts with panic 0x12 (any amounts).
-    function testFuzz_finding_matchPair_reverts_restingZero(uint256[6] memory s, bool rb, uint256 sellIn, uint256 buyIn)
-        public
-    {
+    /// @notice formal/Refinement/Swarm/AsyncSwapMatchPair.lean:364 — a non-skipped pair whose resting (older) order has amountOutMin = 0 reverts with panic 0x12 when `sell.amountIn * buy.amountIn < 2^256` and with `MathOverflowedMulDiv` otherwise. With `small`, both amounts are below 2^128 so the product fits one word.
+    function testFuzz_matchPair_reverts_restingZero(
+        uint256[6] memory s,
+        bool rb,
+        uint256 sellIn,
+        uint256 buyIn,
+        bool small
+    ) public {
         Case memory c = _mkCase(s, rb ? 1 : 0);
         if (!_strictCross(c)) return;
-        _storeWord(c.pid, c.sellId, 1, bound(sellIn, 1, type(uint256).max));
-        _storeWord(c.pid, c.buyId, 1, bound(buyIn, 1, type(uint256).max));
+        uint256 maxIn = small ? type(uint128).max : type(uint256).max;
+        sellIn = bound(sellIn, 1, maxIn);
+        buyIn = bound(buyIn, 1, maxIn);
+        _storeWord(c.pid, c.sellId, 1, sellIn);
+        _storeWord(c.pid, c.buyId, 1, buyIn);
         _storeWord(c.pid, rb ? c.buyId : c.sellId, 2, 0);
-        vm.expectRevert(stdError.divisionError);
+        // sell.amountIn * buy.amountIn < 2^256 (buyIn >= 1)
+        if (sellIn <= type(uint256).max / buyIn) vm.expectRevert(stdError.divisionError);
+        else vm.expectRevert(Math.MathOverflowedMulDiv.selector);
         _run(_matchCalls(c.k));
     }
 }

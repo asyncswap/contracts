@@ -1,6 +1,7 @@
 import Mathlib
 import Generated.AsyncSwap
 import Refinement.Monad
+import Refinement.Swarm.AsyncSwapMulDiv
 
 /-!
 # AsyncSwap: small internal helpers
@@ -168,24 +169,24 @@ rounding up and there is a remainder, checked). -/
 theorem mulDiv_rounding_eq (x y d r : Nat) (env : Env) (w : σ) :
     Math.mulDiv_11410 ext x y d r env w = mulDivRnd (σ := σ) x y d r env w := by
   unfold Math.mulDiv_11410 mulDivRnd mulDivCeil
+  simp only [run_bind, run_ite, run_pure, run_throw, MulDiv.mulDivFloor_run]
   by_cases hd : d = 0
-  · simp [mulDivFloor, hd]
-  by_cases ho : x * y / d < 2 ^ 256
-  · have ho' := ho; norm_num at ho'
-    by_cases hr : r % 2 = 1
+  · by_cases hc : x * y < W <;> simp [hd, hc]
+  by_cases ho : x * y / d < W
+  · by_cases hr : r % 2 = 1
     · by_cases hm : x * y % d = 0
-      · simp [mulDivFloor, hd, ho', hr, hm, Math.unsignedRoundsUp, modc, ymulmod]
+      · simp [hd, ho, hr, hm, Math.unsignedRoundsUp, modc, ymulmod]
       · have : 0 < x * y % d := Nat.pos_of_ne_zero hm
-        simp [mulDivFloor, hd, ho', hr, hm, Math.unsignedRoundsUp, modc, ymulmod, this]
-    · simp [mulDivFloor, hd, ho', hr, Math.unsignedRoundsUp, modc]
-  · have ho' := ho; norm_num at ho'
-    simp [mulDivFloor, hd, Nat.not_lt.mpr ho']
+        simp [hd, ho, hr, hm, Math.unsignedRoundsUp, modc, ymulmod, this]
+        rcases (addc 256 (x * y / d) 1 env w : Except Revert (Nat × σ)) with e | ⟨a, s'⟩ <;> rfl
+    · simp [hd, ho, hr, Math.unsignedRoundsUp, modc]
+  · simp [hd, ho]
 
 /-- The shared floor `mulDiv` never writes. -/
 theorem mulDivFloor_frame (x y d : Nat) (env : Env) (w w' : σ) (p : Nat)
     (h : mulDivFloor (σ := σ) x y d env w = .ok (p, w')) : w' = w := by
   unfold mulDivFloor at h
-  split_ifs at h <;> cases h; rfl
+  split_ifs at h <;> cases h <;> rfl
 
 /-! ## AsyncFiller._priorityKey -/
 
@@ -251,10 +252,28 @@ theorem crosses_eq (k : Nat) (b s : AsyncFiller.OrderInfo) (bs : AsyncFiller.Ord
     (hd : s.amountOutMin ≠ 0) (ho : b.amountIn * s.amountIn / s.amountOutMin < 2 ^ 256) :
     AsyncMatching.«_crosses» ext k k (pure b) bs (pure s) ss env w
       = .ok (decide (b.amountIn * s.amountIn / s.amountOutMin ≥ b.amountOutMin), w) := by
-  have ho' := ho; norm_num at ho'
-  simp [AsyncMatching.«_crosses», mulDivFloor, hd, ho']
+  have ho' : b.amountIn * s.amountIn / s.amountOutMin < W := ho
+  simp [AsyncMatching.«_crosses», MulDiv.mulDivFloor_run, hd, ho']
 
 /-! ## AsyncMatching._priceKey -/
+
+/-- The clamp after the `mulDiv` in `_priceKey`, for any price computation `m`. Kept apart from
+`priceKey_eq` so the kernel never has to unfold `mulDivFloor` (whose `x * PRICE_SCALE < 2^256`
+guard it would otherwise try to evaluate on a symbolic `x`). -/
+theorem priceKey_tail (m : M σ Nat) (env : Env) (w : σ) :
+    (do
+      let t ← m
+      if (t == 0) = true then pure 1
+        else if decide (t > 2 ^ 128 - 1) = true then pure (2 ^ 128 - 1)
+        else pure (t % 2 ^ 128) : M σ Nat) env w
+      = match m env w with
+        | .ok (p, w') => .ok (if p = 0 then 1 else if p > 2 ^ 128 - 1 then 2 ^ 128 - 1 else p % 2 ^ 128, w')
+        | .error e => .error e := by
+  simp only [run_bind]
+  rcases m env w with e | ⟨p, w'⟩
+  · rfl
+  · simp only
+    split_ifs <;> simp_all <;> omega
 
 /-- `_priceKey` is the floored `mulDiv` price clamped into `[1, 2^128 - 1]`. -/
 theorem priceKey_eq (isBuy : Bool) (a o : Nat) (env : Env) (w : σ) :
@@ -264,11 +283,14 @@ theorem priceKey_eq (isBuy : Bool) (a o : Nat) (env : Env) (w : σ) :
         | .ok (p, w') => .ok (if p = 0 then 1 else if p > 2 ^ 128 - 1 then 2 ^ 128 - 1 else p % 2 ^ 128, w')
         | .error e => .error e := by
   unfold AsyncMatching.«_priceKey»
-  cases isBuy <;> simp only [run_bind, Bool.false_eq_true, ite_false, ite_true] <;>
-  · rcases mulDivFloor (σ := σ) _ _ _ env w with e | ⟨p, w'⟩
-    · rfl
-    · simp only
-      split_ifs <;> simp_all <;> omega
+  cases isBuy
+  · rw [ite_eq_right_of_eq_false _ _ Bool.false_eq_true,
+      ite_eq_right_of_eq_false _ _ Bool.false_eq_true,
+      ite_eq_right_of_eq_false _ _ Bool.false_eq_true]
+    exact priceKey_tail _ _ _
+  · rw [ite_eq_left_of_eq_true _ _ (eq_self true), ite_eq_left_of_eq_true _ _ (eq_self true),
+      ite_eq_left_of_eq_true _ _ (eq_self true)]
+    exact priceKey_tail _ _ _
 
 /-- The key is always in `[1, 2^128 - 1]`, and `_priceKey` writes nothing. -/
 theorem priceKey_range (isBuy : Bool) (a o : Nat) (env : Env) (w w' : σ) (k : Nat)

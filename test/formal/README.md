@@ -12,13 +12,13 @@ forge test --match-path 'test/formal/*'   # every test except the findings
 FOUNDRY_PROFILE=findings forge test       # only the findings: these fail
 ```
 
-**Status:** `formal/Refinement` has 858 theorems, none with `sorry`. 570 have a test and 288 are left
+**Status:** `formal/Refinement` has 862 theorems, none with `sorry`. 570 have a test and 292 are left
 out (reasons below). The functions formal-ast leaves opaque each have a named spec that is checked on the
 bytecode (see [Named specs](#named-specs-for-the-opaque-functions)).
-- 625 tests in `test/formal/` pass on Forge 1.5.1 and 1.8.6.
-- 10 tests are **findings**: they fail on the bytecode by design (see [Findings](#findings)). Their names
-  contain `_finding_`, and `foundry.toml` leaves them out of a plain `forge test` (`no_match_test`), so
-  CI stays green while they're kept.
+- 634 tests in `test/formal/` pass on Forge 1.5.1 and 1.8.6.
+- 1 test is a **finding**: it fails on the bytecode by design (see [Findings](#findings)). Its name
+  contains `_finding_`, and `foundry.toml` leaves it out of a plain `forge test` (`no_match_test`), so
+  CI stays green while it's kept.
 
 The spec libraries (`formal/AsyncSwapSpec`, `formal/AsyncSwapProtocol`) are not mapped here. Their
 theorems are about the abstract `World` / `step` models, not a generated def, and reach the code only
@@ -156,31 +156,27 @@ For each spec:
 - **The fix:** `ShortStringsSpec` (`SpecEip712*.lean`) states the behaviour correctly, and the
   `eip712Domain_*_of_spec` theorems recover the old results from it.
 
-### `mulDiv` with a zero denominator
+### Resolved: `mulDiv` with a zero denominator
 
-The bytecode disproves 8 theorems. All 8 follow from one translation error: formal-ast models
-OpenZeppelin's `Math.mulDiv` with its prelude's `mulDivFloor` (`formal/Generated/*.lean`), which
-panics with `0x12` whenever the denominator is 0. OpenZeppelin 5.0 only divides when the 512-bit
-product fits in one word (`prod1 == 0`). Otherwise it checks `denominator <= prod1` first and reverts
-with `MathOverflowedMulDiv()`. So for `d = 0` and `x·y ≥ 2^256`, the model predicts `Panic(0x12)` and
-the bytecode reverts with `MathOverflowedMulDiv()`.
+The bytecode disproved 8 theorems, and a ninth was found while fixing them. All followed from one
+translation error: formal-ast's prelude modelled OpenZeppelin's `Math.mulDiv` with a `mulDivFloor` that
+panicked with `0x12` whenever the denominator was 0.
+- **What OpenZeppelin 5.0 actually does:** it only divides when the 512-bit product fits in one word
+  (`prod1 == 0`). Otherwise it checks `denominator <= prod1` first and reverts with
+  `MathOverflowedMulDiv()`.
+- **The counterexample:** for `d = 0` and `x·y ≥ 2^256` (for example x = y = 2^128, d = 0), the model
+  predicted `Panic(0x12)` and the bytecode reverted with `MathOverflowedMulDiv()`.
+- **Reachability:** none through the contracts. The hook rejects a zero `amountOutMin`, and escrowed
+  amounts stay below 2^127.
 
-| Theorem | Test | Counterexample |
-|---|---|---|
-| `crosses_run`, `crosses_reverts_div0` | `AsyncSwapCrosses.t.sol` `testFuzz_finding_crosses_run`, `testFuzz_finding_crosses_reverts_div0`, `test_finding_crosses_reverts_div0_counterexample` | equal price keys, both `amountIn = 2^128`, `sell.amountOutMin = 0` |
-| `mulDiv_rounding_eq` | `AsyncSwapHelpers.t.sol` `testFuzz_finding_mulDiv_rounding_eq` | x ≈ 1.475e72, y ≈ 3.994e74, d = 0, rounding up |
-| `floor_run`, `ceil_run` | `AsyncSwapMatchAmounts.t.sol` `testFuzz_finding_floor_run`, `testFuzz_finding_ceil_run` | x = 9.835e76, y = 11075, d = 0 |
-| `matchAmounts_reverts_restingBuy`, `matchAmounts_reverts_restingSell` | `AsyncSwapMatchAmounts.t.sol` `testFuzz_finding_matchAmounts_reverts_resting{Buy,Sell}` | resting `amountOutMin = 0`, the two `amountIn`s multiply past 2^256 |
-| `matchPair_reverts_restingZero` | `AsyncSwapMatchPair.t.sol` `testFuzz_finding_matchPair_reverts_restingZero` | same as the row above |
-
-None of this is reachable on a live book:
-- The hook rejects a zero `amountOutMin` when an order is placed (`AsyncSwap.sol`, `_createOrder`).
-- Escrowed amounts stay below 2^127, so every product fits in one word.
-
-It's a bug in the model, not in the contracts. The swarm's own `mulDiv_zero` (`AsyncSwapMulDiv.lean`)
-states OpenZeppelin's behaviour correctly and passes. The fix belongs in formal-ast's prelude: for
-`d = 0`, panic only when `x·y < 2^256`, and otherwise throw `MathOverflowedMulDiv`. After that, the
-`_finding_` tests should pass, so drop the prefix.
+**Fixed in formal-ast** ([formalmind/formalmind#12](https://github.com/formalmind/formalmind/pull/12),
+CLI 0.1.1): `mulDivFloor` now panics `0x12` only when `x·y < 2^256`, and reverts `MathOverflowedMulDiv`
+otherwise. For `d > 0` this is the same as before. `formal/Generated` was regenerated with it.
+- **Restated to the corrected behaviour:** `floor_run`, `ceil_run`, `crosses_run`,
+  `crosses_reverts_div0`, `matchAmounts_reverts_restingBuy` / `restingSell`,
+  `matchPair_reverts_restingZero` and `settleMatchedPriorityFee_run`.
+- **New:** `mulDiv_eq_mulDivFloor_any` drops the old `d ≠ 0` hypothesis.
+- **Tests:** they're back to their normal names, and they now pass on the bytecode.
 
 ## Where the model and the bytecode differ
 
@@ -685,11 +681,11 @@ Left out:
 
 | Theorem | Lean | Test | Halmos |
 |---|---|---|---|
-| `crosses_run` | [AsyncSwapCrosses.lean:21](../../formal/Refinement/Swarm/AsyncSwapCrosses.lean#L21) | [`AsyncSwapCrosses.t.sol`](AsyncSwapCrosses.t.sol) `testFuzz_finding_crosses_run` **(finding)** | no |
-| `crosses_ne_any` | [AsyncSwapCrosses.lean:42](../../formal/Refinement/Swarm/AsyncSwapCrosses.lean#L42) | [`AsyncSwapCrosses.t.sol`](AsyncSwapCrosses.t.sol) `testFuzz_crosses_ne_any` | no |
-| `crosses_reverts_div0` | [AsyncSwapCrosses.lean:49](../../formal/Refinement/Swarm/AsyncSwapCrosses.lean#L49) | [`AsyncSwapCrosses.t.sol`](AsyncSwapCrosses.t.sol) `testFuzz_finding_crosses_reverts_div0, test_finding_crosses_reverts_div0_counterexample` **(finding)** | no |
-| `crosses_reverts_overflow` | [AsyncSwapCrosses.lean:56](../../formal/Refinement/Swarm/AsyncSwapCrosses.lean#L56) | [`AsyncSwapCrosses.t.sol`](AsyncSwapCrosses.t.sol) `testFuzz_crosses_reverts_overflow` | no |
-| `crosses_frame` | [AsyncSwapCrosses.lean:68](../../formal/Refinement/Swarm/AsyncSwapCrosses.lean#L68) | [`AsyncSwapCrosses.t.sol`](AsyncSwapCrosses.t.sol) `testFuzz_crosses_frame` | no |
+| `crosses_run` | [AsyncSwapCrosses.lean:23](../../formal/Refinement/Swarm/AsyncSwapCrosses.lean#L23) | [`AsyncSwapCrosses.t.sol`](AsyncSwapCrosses.t.sol) `testFuzz_crosses_run` | no |
+| `crosses_ne_any` | [AsyncSwapCrosses.lean:48](../../formal/Refinement/Swarm/AsyncSwapCrosses.lean#L48) | [`AsyncSwapCrosses.t.sol`](AsyncSwapCrosses.t.sol) `testFuzz_crosses_ne_any` | no |
+| `crosses_reverts_div0` | [AsyncSwapCrosses.lean:57](../../formal/Refinement/Swarm/AsyncSwapCrosses.lean#L57) | [`AsyncSwapCrosses.t.sol`](AsyncSwapCrosses.t.sol) `testFuzz_crosses_reverts_div0, test_crosses_reverts_div0_counterexample` | no |
+| `crosses_reverts_overflow` | [AsyncSwapCrosses.lean:66](../../formal/Refinement/Swarm/AsyncSwapCrosses.lean#L66) | [`AsyncSwapCrosses.t.sol`](AsyncSwapCrosses.t.sol) `testFuzz_crosses_reverts_overflow` | no |
+| `crosses_frame` | [AsyncSwapCrosses.lean:78](../../formal/Refinement/Swarm/AsyncSwapCrosses.lean#L78) | [`AsyncSwapCrosses.t.sol`](AsyncSwapCrosses.t.sol) `testFuzz_crosses_frame` | no |
 
 ### `Refinement/Swarm/AsyncSwapDOMAIN_SEPARATOR.lean`
 
@@ -820,37 +816,38 @@ Left out:
 
 | Theorem | Lean | Test | Halmos |
 |---|---|---|---|
-| `bubbleUpAndRevertWith_reverts` | [AsyncSwapHelpers.lean:25](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L25) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_bubbleUpAndRevertWith_reverts` | yes |
-| `address_revert_run` | [AsyncSwapHelpers.lean:32](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L32) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_address_revert_run` | yes |
-| `verifyCallResult_fail` | [AsyncSwapHelpers.lean:39](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L39) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_verifyCallResult_fail` | yes |
-| `verifyCallResult_ok` | [AsyncSwapHelpers.lean:47](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L47) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_verifyCallResult_ok` | yes |
-| `functionCallWithValue_insufficient` | [AsyncSwapHelpers.lean:55](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L55) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_functionCallWithValue_insufficient` | yes |
-| `functionCallWithValue_eq` | [AsyncSwapHelpers.lean:61](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L61) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_functionCallWithValue_eq` | yes |
-| `functionCall_eq` | [AsyncSwapHelpers.lean:68](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L68) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_functionCall_eq` | yes |
-| `callOptionalReturn_after` | [AsyncSwapHelpers.lean:80](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L80) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_callOptionalReturn_after` | yes |
-| `callOptionalReturn_call_reverts` | [AsyncSwapHelpers.lean:105](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L105) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_callOptionalReturn_call_reverts` | yes |
-| `safeTransferFrom_eq` | [AsyncSwapHelpers.lean:113](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L113) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_safeTransferFrom_eq` | yes |
-| `byteLength_run` | [AsyncSwapHelpers.lean:127](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L127) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_byteLength_run` | yes |
-| `byteLength_le` | [AsyncSwapHelpers.lean:133](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L133) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_byteLength_le` | yes |
-| `eip712Name_eq` | [AsyncSwapHelpers.lean:142](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L142) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_eip712Name_eq` | no |
-| `eip712Version_eq` | [AsyncSwapHelpers.lean:151](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L151) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_eip712Version_eq` | no |
-| `unsignedRoundsUp_run` | [AsyncSwapHelpers.lean:162](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L162) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_unsignedRoundsUp_run` | yes |
-| `mulDiv_rounding_eq` | [AsyncSwapHelpers.lean:168](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L168) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_finding_mulDiv_rounding_eq` **(finding)** | yes |
-| `priorityKey_run` | [AsyncSwapHelpers.lean:194](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L194) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_priorityKey_run` | no |
-| `priorityKey_lt_iff` | [AsyncSwapHelpers.lean:216](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L216) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_priorityKey_lt_iff` | no |
-| `crosses_ne` | [AsyncSwapHelpers.lean:241](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L241) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_crosses_ne` | no |
-| `crosses_eq` | [AsyncSwapHelpers.lean:249](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L249) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_crosses_eq` | no |
-| `priceKey_eq` | [AsyncSwapHelpers.lean:260](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L260) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_priceKey_eq, test_priceKey_eq_clampHigh, test_priceKey_eq_clampLow` | no |
-| `priceKey_range` | [AsyncSwapHelpers.lean:274](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L274) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_priceKey_range` | no |
-| `bitSet_run` | [AsyncSwapHelpers.lean:290](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L290) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_bitSet_run` | yes |
-| `freeNode_run` | [AsyncSwapHelpers.lean:302](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L302) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_freeNode_run` | no |
+| `bubbleUpAndRevertWith_reverts` | [AsyncSwapHelpers.lean:26](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L26) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_bubbleUpAndRevertWith_reverts` | yes |
+| `address_revert_run` | [AsyncSwapHelpers.lean:33](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L33) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_address_revert_run` | yes |
+| `verifyCallResult_fail` | [AsyncSwapHelpers.lean:40](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L40) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_verifyCallResult_fail` | yes |
+| `verifyCallResult_ok` | [AsyncSwapHelpers.lean:48](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L48) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_verifyCallResult_ok` | yes |
+| `functionCallWithValue_insufficient` | [AsyncSwapHelpers.lean:56](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L56) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_functionCallWithValue_insufficient` | yes |
+| `functionCallWithValue_eq` | [AsyncSwapHelpers.lean:62](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L62) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_functionCallWithValue_eq` | yes |
+| `functionCall_eq` | [AsyncSwapHelpers.lean:69](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L69) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_functionCall_eq` | yes |
+| `callOptionalReturn_after` | [AsyncSwapHelpers.lean:81](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L81) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_callOptionalReturn_after` | yes |
+| `callOptionalReturn_call_reverts` | [AsyncSwapHelpers.lean:106](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L106) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_callOptionalReturn_call_reverts` | yes |
+| `safeTransferFrom_eq` | [AsyncSwapHelpers.lean:114](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L114) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_safeTransferFrom_eq` | yes |
+| `byteLength_run` | [AsyncSwapHelpers.lean:128](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L128) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_byteLength_run` | yes |
+| `byteLength_le` | [AsyncSwapHelpers.lean:134](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L134) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_byteLength_le` | yes |
+| `eip712Name_eq` | [AsyncSwapHelpers.lean:143](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L143) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_eip712Name_eq` | no |
+| `eip712Version_eq` | [AsyncSwapHelpers.lean:152](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L152) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_eip712Version_eq` | no |
+| `unsignedRoundsUp_run` | [AsyncSwapHelpers.lean:163](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L163) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_unsignedRoundsUp_run` | yes |
+| `mulDiv_rounding_eq` | [AsyncSwapHelpers.lean:169](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L169) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_mulDiv_rounding_eq` | yes |
+| `priorityKey_run` | [AsyncSwapHelpers.lean:195](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L195) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_priorityKey_run` | no |
+| `priorityKey_lt_iff` | [AsyncSwapHelpers.lean:217](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L217) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_priorityKey_lt_iff` | no |
+| `crosses_ne` | [AsyncSwapHelpers.lean:242](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L242) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_crosses_ne` | no |
+| `crosses_eq` | [AsyncSwapHelpers.lean:250](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L250) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_crosses_eq` | no |
+| `priceKey_eq` | [AsyncSwapHelpers.lean:279](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L279) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_priceKey_eq, test_priceKey_eq_clampHigh, test_priceKey_eq_clampLow` | no |
+| `priceKey_range` | [AsyncSwapHelpers.lean:296](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L296) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_priceKey_range` | no |
+| `bitSet_run` | [AsyncSwapHelpers.lean:312](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L312) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_bitSet_run` | yes |
+| `freeNode_run` | [AsyncSwapHelpers.lean:324](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L324) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_freeNode_run` | no |
 
 Left out:
 
 | Theorem | Lean | Reason |
 |---|---|---|
-| `mulDivFloor_frame` | [AsyncSwapHelpers.lean:185](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L185) | model-only helper: a frame lemma about the shared Lean `mulDivFloor` def. `Math.mulDiv` is `pure`, so the compiler already rules out writes, and its value semantics are tested by `mulDiv_rounding_eq`. |
-| `priorityKey_value` | [AsyncSwapHelpers.lean:204](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L204) | model-only helper: a Lean arithmetic identity (`shlw 128 f 64 |
+| `mulDivFloor_frame` | [AsyncSwapHelpers.lean:186](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L186) | model-only helper: a frame lemma about the shared Lean `mulDivFloor` def. `Math.mulDiv` is `pure`, so the compiler already rules out writes, and its value semantics are tested by `mulDiv_rounding_eq`. |
+| `priorityKey_value` | [AsyncSwapHelpers.lean:205](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L205) | model-only helper: a Lean arithmetic identity (`shlw 128 f 64 |
+| `priceKey_tail` | [AsyncSwapHelpers.lean:263](../../formal/Refinement/Swarm/AsyncSwapHelpers.lean#L263) | model-only helper (the clamp after `_priceKey`'s `mulDiv`); covered by the `priceKey_*` tests |
 
 ### `Refinement/Swarm/AsyncSwapInsert.lean`
 
@@ -914,30 +911,31 @@ Left out:
 
 | Theorem | Lean | Test | Halmos |
 |---|---|---|---|
-| `floor_run` | [AsyncSwapMatchAmounts.lean:27](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L27) | [`AsyncSwapMatchAmounts.t.sol`](AsyncSwapMatchAmounts.t.sol) `testFuzz_finding_floor_run` **(finding)** | with edits |
-| `ceil_run` | [AsyncSwapMatchAmounts.lean:33](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L33) | [`AsyncSwapMatchAmounts.t.sol`](AsyncSwapMatchAmounts.t.sol) `testFuzz_finding_ceil_run` **(finding)** | with edits |
-| `ok_restingBuy` | [AsyncSwapMatchAmounts.lean:98](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L98) | [`AsyncSwapMatchAmounts.t.sol`](AsyncSwapMatchAmounts.t.sol) `testFuzz_ok_restingBuy` | no |
-| `ok_restingSell` | [AsyncSwapMatchAmounts.lean:116](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L116) | [`AsyncSwapMatchAmounts.t.sol`](AsyncSwapMatchAmounts.t.sol) `testFuzz_ok_restingSell` | no |
-| `matchAmounts_ok` | [AsyncSwapMatchAmounts.lean:138](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L138) | [`AsyncSwapMatchAmounts.t.sol`](AsyncSwapMatchAmounts.t.sol) `testFuzz_matchAmounts_ok` | no |
-| `matchAmounts_ok_sound` | [AsyncSwapMatchAmounts.lean:157](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L157) | [`AsyncSwapMatchAmounts.t.sol`](AsyncSwapMatchAmounts.t.sol) `testFuzz_matchAmounts_ok_sound` | no |
-| `matchAmounts_reverts_restingBuy` | [AsyncSwapMatchAmounts.lean:175](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L175) | [`AsyncSwapMatchAmounts.t.sol`](AsyncSwapMatchAmounts.t.sol) `testFuzz_finding_matchAmounts_reverts_restingBuy` **(finding)** | no |
-| `matchAmounts_reverts_restingSell` | [AsyncSwapMatchAmounts.lean:183](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L183) | [`AsyncSwapMatchAmounts.t.sol`](AsyncSwapMatchAmounts.t.sol) `testFuzz_finding_matchAmounts_reverts_restingSell` **(finding)** | no |
-| `noerr_restingBuy` | [AsyncSwapMatchAmounts.lean:191](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L191) | [`AsyncSwapMatchAmounts.t.sol`](AsyncSwapMatchAmounts.t.sol) `testFuzz_noerr_restingBuy` | no |
-| `noerr_restingSell` | [AsyncSwapMatchAmounts.lean:228](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L228) | [`AsyncSwapMatchAmounts.t.sol`](AsyncSwapMatchAmounts.t.sol) `testFuzz_noerr_restingSell` | no |
-| `matchAmounts_succeeds` | [AsyncSwapMatchAmounts.lean:268](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L268) | [`AsyncSwapMatchAmounts.t.sol`](AsyncSwapMatchAmounts.t.sol) `testFuzz_matchAmounts_succeeds` | no |
+| `floor_run` | [AsyncSwapMatchAmounts.lean:49](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L49) | [`AsyncSwapMatchAmounts.t.sol`](AsyncSwapMatchAmounts.t.sol) `testFuzz_floor_run` | with edits |
+| `ceil_run` | [AsyncSwapMatchAmounts.lean:62](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L62) | [`AsyncSwapMatchAmounts.t.sol`](AsyncSwapMatchAmounts.t.sol) `testFuzz_ceil_run` | with edits |
+| `ok_restingBuy` | [AsyncSwapMatchAmounts.lean:127](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L127) | [`AsyncSwapMatchAmounts.t.sol`](AsyncSwapMatchAmounts.t.sol) `testFuzz_ok_restingBuy` | no |
+| `ok_restingSell` | [AsyncSwapMatchAmounts.lean:145](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L145) | [`AsyncSwapMatchAmounts.t.sol`](AsyncSwapMatchAmounts.t.sol) `testFuzz_ok_restingSell` | no |
+| `matchAmounts_ok` | [AsyncSwapMatchAmounts.lean:167](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L167) | [`AsyncSwapMatchAmounts.t.sol`](AsyncSwapMatchAmounts.t.sol) `testFuzz_matchAmounts_ok` | no |
+| `matchAmounts_ok_sound` | [AsyncSwapMatchAmounts.lean:186](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L186) | [`AsyncSwapMatchAmounts.t.sol`](AsyncSwapMatchAmounts.t.sol) `testFuzz_matchAmounts_ok_sound` | no |
+| `matchAmounts_reverts_restingBuy` | [AsyncSwapMatchAmounts.lean:206](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L206) | [`AsyncSwapMatchAmounts.t.sol`](AsyncSwapMatchAmounts.t.sol) `testFuzz_matchAmounts_reverts_restingBuy` | no |
+| `matchAmounts_reverts_restingSell` | [AsyncSwapMatchAmounts.lean:217](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L217) | [`AsyncSwapMatchAmounts.t.sol`](AsyncSwapMatchAmounts.t.sol) `testFuzz_matchAmounts_reverts_restingSell` | no |
+| `noerr_restingBuy` | [AsyncSwapMatchAmounts.lean:226](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L226) | [`AsyncSwapMatchAmounts.t.sol`](AsyncSwapMatchAmounts.t.sol) `testFuzz_noerr_restingBuy` | no |
+| `noerr_restingSell` | [AsyncSwapMatchAmounts.lean:263](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L263) | [`AsyncSwapMatchAmounts.t.sol`](AsyncSwapMatchAmounts.t.sol) `testFuzz_noerr_restingSell` | no |
+| `matchAmounts_succeeds` | [AsyncSwapMatchAmounts.lean:303](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L303) | [`AsyncSwapMatchAmounts.t.sol`](AsyncSwapMatchAmounts.t.sol) `testFuzz_matchAmounts_succeeds` | no |
 
 Left out:
 
 | Theorem | Lean | Reason |
 |---|---|---|
-| `default_asset` | [AsyncSwapMatchAmounts.lean:44](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L44) | model-only helper (`default : MatchAmounts` field is 0, `rfl`) |
-| `default_quote` | [AsyncSwapMatchAmounts.lean:45](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L45) | model-only helper (`default : MatchAmounts` field is 0, `rfl`) |
-| `aux_le` | [AsyncSwapMatchAmounts.lean:48](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L48) | model-only helper (Nat arithmetic lemma for `omega`) |
-| `aux_pos` | [AsyncSwapMatchAmounts.lean:57](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L57) | model-only helper (Nat arithmetic lemma) |
-| `aux_mul` | [AsyncSwapMatchAmounts.lean:71](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L71) | model-only helper (Nat arithmetic lemma) |
-| `aux_cancel` | [AsyncSwapMatchAmounts.lean:78](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L78) | model-only helper (Nat arithmetic lemma) |
-| `aux_prod` | [AsyncSwapMatchAmounts.lean:81](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L81) | model-only helper (Nat arithmetic lemma: x,y < 2^128 ⇒ x·y < 2^256) |
-| `spec_pos` | [AsyncSwapMatchAmounts.lean:148](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L148) | spec-only lemma (about `AsyncSwap.matchAmounts`, no contract call) |
+| `floor_cases` | [AsyncSwapMatchAmounts.lean:31](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L31) | model-only arithmetic lemma (for d > 0, `d ≤ x*y/2^256` iff the quotient overflows) |
+| `default_asset` | [AsyncSwapMatchAmounts.lean:73](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L73) | model-only helper (`default : MatchAmounts` field is 0, `rfl`) |
+| `default_quote` | [AsyncSwapMatchAmounts.lean:74](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L74) | model-only helper (`default : MatchAmounts` field is 0, `rfl`) |
+| `aux_le` | [AsyncSwapMatchAmounts.lean:77](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L77) | model-only helper (Nat arithmetic lemma for `omega`) |
+| `aux_pos` | [AsyncSwapMatchAmounts.lean:86](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L86) | model-only helper (Nat arithmetic lemma) |
+| `aux_mul` | [AsyncSwapMatchAmounts.lean:100](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L100) | model-only helper (Nat arithmetic lemma) |
+| `aux_cancel` | [AsyncSwapMatchAmounts.lean:107](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L107) | model-only helper (Nat arithmetic lemma) |
+| `aux_prod` | [AsyncSwapMatchAmounts.lean:110](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L110) | model-only helper (Nat arithmetic lemma: x,y < 2^128 ⇒ x·y < 2^256) |
+| `spec_pos` | [AsyncSwapMatchAmounts.lean:177](../../formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean#L177) | spec-only lemma (about `AsyncSwap.matchAmounts`, no contract call) |
 
 ### `Refinement/Swarm/AsyncSwapMatchBook.lean`
 
@@ -999,7 +997,7 @@ Left out:
 | `matchPair_ok` | [AsyncSwapMatchPair.lean:221](../../formal/Refinement/Swarm/AsyncSwapMatchPair.lean#L221) | [`AsyncSwapMatchPair.t.sol`](AsyncSwapMatchPair.t.sol) `testFuzz_matchPair_ok` | no |
 | `matchPair_true` | [AsyncSwapMatchPair.lean:273](../../formal/Refinement/Swarm/AsyncSwapMatchPair.lean#L273) | [`AsyncSwapMatchPair.t.sol`](AsyncSwapMatchPair.t.sol) `testFuzz_matchPair_true` | no |
 | `matchPair_error` | [AsyncSwapMatchPair.lean:319](../../formal/Refinement/Swarm/AsyncSwapMatchPair.lean#L319) | [`AsyncSwapMatchPair.t.sol`](AsyncSwapMatchPair.t.sol) `testFuzz_matchPair_error` | no |
-| `matchPair_reverts_restingZero` | [AsyncSwapMatchPair.lean:361](../../formal/Refinement/Swarm/AsyncSwapMatchPair.lean#L361) | [`AsyncSwapMatchPair.t.sol`](AsyncSwapMatchPair.t.sol) `testFuzz_finding_matchPair_reverts_restingZero` **(finding)** | no |
+| `matchPair_reverts_restingZero` | [AsyncSwapMatchPair.lean:364](../../formal/Refinement/Swarm/AsyncSwapMatchPair.lean#L364) | [`AsyncSwapMatchPair.t.sol`](AsyncSwapMatchPair.t.sol) `testFuzz_matchPair_reverts_restingZero` | no |
 
 Left out:
 
@@ -1038,7 +1036,7 @@ Left out:
 | `mulDiv_overflow` | [AsyncSwapMulDiv.lean:306](../../formal/Refinement/Swarm/AsyncSwapMulDiv.lean#L306) | [`AsyncSwapMulDiv.t.sol`](AsyncSwapMulDiv.t.sol) `testFuzz_mulDiv_overflow` | yes |
 | `mulDiv_zero` | [AsyncSwapMulDiv.lean:321](../../formal/Refinement/Swarm/AsyncSwapMulDiv.lean#L321) | [`AsyncSwapMulDiv.t.sol`](AsyncSwapMulDiv.t.sol) `testFuzz_mulDiv_zero` | yes |
 | `mulDiv_spec` | [AsyncSwapMulDiv.lean:338](../../formal/Refinement/Swarm/AsyncSwapMulDiv.lean#L338) | [`AsyncSwapMulDiv.t.sol`](AsyncSwapMulDiv.t.sol) `testFuzz_mulDiv_spec` | yes |
-| `mulDiv_eq_mulDivFloor` | [AsyncSwapMulDiv.lean:352](../../formal/Refinement/Swarm/AsyncSwapMulDiv.lean#L352) | [`AsyncSwapMulDiv.t.sol`](AsyncSwapMulDiv.t.sol) `testFuzz_mulDiv_eq_mulDivFloor` | yes |
+| `mulDiv_eq_mulDivFloor` | [AsyncSwapMulDiv.lean:381](../../formal/Refinement/Swarm/AsyncSwapMulDiv.lean#L381) | [`AsyncSwapMulDiv.t.sol`](AsyncSwapMulDiv.t.sol) `testFuzz_mulDiv_eq_mulDivFloor` | yes |
 
 Left out:
 
@@ -1066,6 +1064,8 @@ Left out:
 | `init_spec` | [AsyncSwapMulDiv.lean:199](../../formal/Refinement/Swarm/AsyncSwapMulDiv.lean#L199) | model-only helper (inverse seed lemma) |
 | `inv_spec` | [AsyncSwapMulDiv.lean:208](../../formal/Refinement/Swarm/AsyncSwapMulDiv.lean#L208) | model-only helper (inverse mod 2^256 lemma) |
 | `final` | [AsyncSwapMulDiv.lean:221](../../formal/Refinement/Swarm/AsyncSwapMulDiv.lean#L221) | model-only helper (final-stage arithmetic lemma; its content is tested by mulDiv_ok) |
+| `mulDivFloor_run` | [AsyncSwapMulDiv.lean:353](../../formal/Refinement/Swarm/AsyncSwapMulDiv.lean#L353) | model-only helper (unfolds the prelude `mulDivFloor`); its content is checked by `testFuzz_floor_run` |
+| `mulDiv_eq_mulDivFloor_any` | [AsyncSwapMulDiv.lean:388](../../formal/Refinement/Swarm/AsyncSwapMulDiv.lean#L388) | model-only (relates the generated `Math.mulDiv` to the prelude `mulDivFloor`); both sides are checked on the bytecode by `testFuzz_mulDiv_spec` and `testFuzz_floor_run` |
 
 ### `Refinement/Swarm/AsyncSwapNewNode.lean`
 
@@ -1180,8 +1180,8 @@ Left out:
 | Theorem | Lean | Test | Halmos |
 |---|---|---|---|
 | `priceKey_ok` | [AsyncSwapReduceAfterMatch.lean:95](../../formal/Refinement/Swarm/AsyncSwapReduceAfterMatch.lean#L95) | [`AsyncSwapReduceAfterMatch.t.sol`](AsyncSwapReduceAfterMatch.t.sol) `testFuzz_priceKey_ok` | no |
-| `reduceAfterMatch_ok_close` | [AsyncSwapReduceAfterMatch.lean:136](../../formal/Refinement/Swarm/AsyncSwapReduceAfterMatch.lean#L136) | [`AsyncSwapReduceAfterMatch.t.sol`](AsyncSwapReduceAfterMatch.t.sol) `testFuzz_reduceAfterMatch_ok_close` | no |
-| `reduceAfterMatch_ok_partial` | [AsyncSwapReduceAfterMatch.lean:245](../../formal/Refinement/Swarm/AsyncSwapReduceAfterMatch.lean#L245) | [`AsyncSwapReduceAfterMatch.t.sol`](AsyncSwapReduceAfterMatch.t.sol) `testFuzz_reduceAfterMatch_ok_partial` | no |
+| `reduceAfterMatch_ok_close` | [AsyncSwapReduceAfterMatch.lean:149](../../formal/Refinement/Swarm/AsyncSwapReduceAfterMatch.lean#L149) | [`AsyncSwapReduceAfterMatch.t.sol`](AsyncSwapReduceAfterMatch.t.sol) `testFuzz_reduceAfterMatch_ok_close` | no |
+| `reduceAfterMatch_ok_partial` | [AsyncSwapReduceAfterMatch.lean:258](../../formal/Refinement/Swarm/AsyncSwapReduceAfterMatch.lean#L258) | [`AsyncSwapReduceAfterMatch.t.sol`](AsyncSwapReduceAfterMatch.t.sol) `testFuzz_reduceAfterMatch_ok_partial` | no |
 
 Left out:
 
@@ -1189,7 +1189,7 @@ Left out:
 |---|---|---|
 | `upd_upd` | [AsyncSwapReduceAfterMatch.lean:74](../../formal/Refinement/Swarm/AsyncSwapReduceAfterMatch.lean#L74) | model-only helper (Lean function-update lemma) |
 | `post_ok` | [AsyncSwapReduceAfterMatch.lean:78](../../formal/Refinement/Swarm/AsyncSwapReduceAfterMatch.lean#L78) | model-only helper (the saturating-cast tail of the Lean `_priceKey` def) |
-| `reduceAfterMatch_overuse` | [AsyncSwapReduceAfterMatch.lean:121](../../formal/Refinement/Swarm/AsyncSwapReduceAfterMatch.lean#L121) | private function, hypothesis not reachable: `_reduceMatchedOrders` always passes `inputUsed <= amountIn` (see above) |
+| `reduceAfterMatch_overuse` | [AsyncSwapReduceAfterMatch.lean:134](../../formal/Refinement/Swarm/AsyncSwapReduceAfterMatch.lean#L134) | private function, hypothesis not reachable: `_reduceMatchedOrders` always passes `inputUsed <= amountIn` (see above) |
 
 ### `Refinement/Swarm/AsyncSwapReduceMatchedOrders.lean`
 
@@ -1284,16 +1284,16 @@ Left out:
 
 | Theorem | Lean | Test | Halmos |
 |---|---|---|---|
-| `settleMatchedPriorityFee_run` | [AsyncSwapSettleMatchedPriorityFee.lean:35](../../formal/Refinement/Swarm/AsyncSwapSettleMatchedPriorityFee.lean#L35) | [`AsyncSwapSettleMatchedPriorityFee.t.sol`](AsyncSwapSettleMatchedPriorityFee.t.sol) `testFuzz_settleMatchedPriorityFee_run` | no |
-| `settleMatchedPriorityFee_no_fee` | [AsyncSwapSettleMatchedPriorityFee.lean:74](../../formal/Refinement/Swarm/AsyncSwapSettleMatchedPriorityFee.lean#L74) | [`AsyncSwapSettleMatchedPriorityFee.t.sol`](AsyncSwapSettleMatchedPriorityFee.t.sol) `testFuzz_settleMatchedPriorityFee_no_fee` | no |
-| `settleMatchedPriorityFee_matched` | [AsyncSwapSettleMatchedPriorityFee.lean:96](../../formal/Refinement/Swarm/AsyncSwapSettleMatchedPriorityFee.lean#L96) | [`AsyncSwapSettleMatchedPriorityFee.t.sol`](AsyncSwapSettleMatchedPriorityFee.t.sol) `testFuzz_settleMatchedPriorityFee_matched` | no |
-| `settleMatchedPriorityFee_ok` | [AsyncSwapSettleMatchedPriorityFee.lean:118](../../formal/Refinement/Swarm/AsyncSwapSettleMatchedPriorityFee.lean#L118) | [`AsyncSwapSettleMatchedPriorityFee.t.sol`](AsyncSwapSettleMatchedPriorityFee.t.sol) `testFuzz_settleMatchedPriorityFee_ok` | no |
+| `settleMatchedPriorityFee_run` | [AsyncSwapSettleMatchedPriorityFee.lean:37](../../formal/Refinement/Swarm/AsyncSwapSettleMatchedPriorityFee.lean#L37) | [`AsyncSwapSettleMatchedPriorityFee.t.sol`](AsyncSwapSettleMatchedPriorityFee.t.sol) `testFuzz_settleMatchedPriorityFee_run` | no |
+| `settleMatchedPriorityFee_no_fee` | [AsyncSwapSettleMatchedPriorityFee.lean:81](../../formal/Refinement/Swarm/AsyncSwapSettleMatchedPriorityFee.lean#L81) | [`AsyncSwapSettleMatchedPriorityFee.t.sol`](AsyncSwapSettleMatchedPriorityFee.t.sol) `testFuzz_settleMatchedPriorityFee_no_fee` | no |
+| `settleMatchedPriorityFee_matched` | [AsyncSwapSettleMatchedPriorityFee.lean:103](../../formal/Refinement/Swarm/AsyncSwapSettleMatchedPriorityFee.lean#L103) | [`AsyncSwapSettleMatchedPriorityFee.t.sol`](AsyncSwapSettleMatchedPriorityFee.t.sol) `testFuzz_settleMatchedPriorityFee_matched` | no |
+| `settleMatchedPriorityFee_ok` | [AsyncSwapSettleMatchedPriorityFee.lean:125](../../formal/Refinement/Swarm/AsyncSwapSettleMatchedPriorityFee.lean#L125) | [`AsyncSwapSettleMatchedPriorityFee.t.sol`](AsyncSwapSettleMatchedPriorityFee.t.sol) `testFuzz_settleMatchedPriorityFee_ok` | no |
 
 Left out:
 
 | Theorem | Lean | Reason |
 |---|---|---|
-| `filled_le_fee` | [AsyncSwapSettleMatchedPriorityFee.lean:86](../../formal/Refinement/Swarm/AsyncSwapSettleMatchedPriorityFee.lean#L86) | model-only helper (Nat lemma `fee·u/o <= fee` for `u <= o`; on the bytecode it is checked inside `settleMatchedPriorityFee_ok`) |
+| `filled_le_fee` | [AsyncSwapSettleMatchedPriorityFee.lean:93](../../formal/Refinement/Swarm/AsyncSwapSettleMatchedPriorityFee.lean#L93) | model-only helper (Nat lemma `fee·u/o <= fee` for `u <= o`; on the bytecode it is checked inside `settleMatchedPriorityFee_ok`) |
 
 ### `Refinement/Swarm/AsyncSwapSettleOrderPriorityFee.lean`
 
@@ -1390,19 +1390,19 @@ Left out:
 | `updatePrice_zero` | [AsyncSwapUpdatePrice.lean:98](../../formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean#L98) | [`AsyncSwapUpdatePrice.t.sol`](AsyncSwapUpdatePrice.t.sol) `testFuzz_updatePrice_zero` | yes |
 | `updatePrice_notFound` | [AsyncSwapUpdatePrice.lean:104](../../formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean#L104) | [`AsyncSwapUpdatePrice.t.sol`](AsyncSwapUpdatePrice.t.sol) `testFuzz_updatePrice_notFound` | no |
 | `priceKey_ok` | [AsyncSwapUpdatePrice.lean:127](../../formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean#L127) | [`AsyncSwapUpdatePrice.t.sol`](AsyncSwapUpdatePrice.t.sol) `testFuzz_priceKey_ok` | no |
-| `mid_ok` | [AsyncSwapUpdatePrice.lean:163](../../formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean#L163) | [`AsyncSwapUpdatePrice.t.sol`](AsyncSwapUpdatePrice.t.sol) `testFuzz_mid_ok` | no |
-| `midState_order` | [AsyncSwapUpdatePrice.lean:190](../../formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean#L190) | [`AsyncSwapUpdatePrice.t.sol`](AsyncSwapUpdatePrice.t.sol) `testFuzz_midState_order` | no |
-| `midState_other_order` | [AsyncSwapUpdatePrice.lean:200](../../formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean#L200) | [`AsyncSwapUpdatePrice.t.sol`](AsyncSwapUpdatePrice.t.sol) `testFuzz_midState_other_order` | no |
-| `midState_other_pool` | [AsyncSwapUpdatePrice.lean:205](../../formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean#L205) | [`AsyncSwapUpdatePrice.t.sol`](AsyncSwapUpdatePrice.t.sol) `testFuzz_midState_other_pool` | no |
-| `midState_frame` | [AsyncSwapUpdatePrice.lean:210](../../formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean#L210) | [`AsyncSwapUpdatePrice.t.sol`](AsyncSwapUpdatePrice.t.sol) `testFuzz_midState_frame` | no |
-| `updatePrice_ok` | [AsyncSwapUpdatePrice.lean:223](../../formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean#L223) | [`AsyncSwapUpdatePrice.t.sol`](AsyncSwapUpdatePrice.t.sol) `testFuzz_updatePrice_ok` | no |
+| `mid_ok` | [AsyncSwapUpdatePrice.lean:176](../../formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean#L176) | [`AsyncSwapUpdatePrice.t.sol`](AsyncSwapUpdatePrice.t.sol) `testFuzz_mid_ok` | no |
+| `midState_order` | [AsyncSwapUpdatePrice.lean:203](../../formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean#L203) | [`AsyncSwapUpdatePrice.t.sol`](AsyncSwapUpdatePrice.t.sol) `testFuzz_midState_order` | no |
+| `midState_other_order` | [AsyncSwapUpdatePrice.lean:213](../../formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean#L213) | [`AsyncSwapUpdatePrice.t.sol`](AsyncSwapUpdatePrice.t.sol) `testFuzz_midState_other_order` | no |
+| `midState_other_pool` | [AsyncSwapUpdatePrice.lean:218](../../formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean#L218) | [`AsyncSwapUpdatePrice.t.sol`](AsyncSwapUpdatePrice.t.sol) `testFuzz_midState_other_pool` | no |
+| `midState_frame` | [AsyncSwapUpdatePrice.lean:223](../../formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean#L223) | [`AsyncSwapUpdatePrice.t.sol`](AsyncSwapUpdatePrice.t.sol) `testFuzz_updatePrice_ok` | no |
+| `updatePrice_ok` | [AsyncSwapUpdatePrice.lean:236](../../formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean#L236) | [`AsyncSwapUpdatePrice.t.sol`](AsyncSwapUpdatePrice.t.sol) `testFuzz_updatePrice_ok` | no |
 
 Left out:
 
 | Theorem | Lean | Reason |
 |---|---|---|
 | `post_ok` | [AsyncSwapUpdatePrice.lean:110](../../formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean#L110) | model-only helper (Lean `ite`/`Except` lemma) |
-| `upd_upd` | [AsyncSwapUpdatePrice.lean:146](../../formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean#L146) | model-only helper (lemma about Lean `upd`) |
+| `upd_upd` | [AsyncSwapUpdatePrice.lean:159](../../formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean#L159) | model-only helper (lemma about Lean `upd`) |
 
 ### `Refinement/Swarm/AsyncSwapUpdatePriceWithSig.lean`
 

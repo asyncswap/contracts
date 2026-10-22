@@ -101,7 +101,7 @@ contract AsyncSwapUpdatePriceFormalTest is HookUnlockBase {
         assertEq(p, _priceKey(!zeroForOne, stored, n), "the clamped WAD ratio");
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean:163 — the writes between _remove and _append: amountOutMin := n, price := _priceKey(isBuy, amountIn, n), nextSequence := nextSequence + 1 (no uint64 overflow), sequence := that.
+    /// @notice formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean:176 — the writes between _remove and _append: amountOutMin := n, price := _priceKey(isBuy, amountIn, n), nextSequence := nextSequence + 1 (no uint64 overflow), sequence := that.
     function testFuzz_mid_ok(bool zeroForOne, uint256 amountIn, uint256 n, uint8 others) public {
         for (uint256 i; i < bound(others, 0, 3); ++i) {
             _placeOrder(bob, !zeroForOne, 2 ether + i, 1e30); // non-crossing extra orders bump the sequence
@@ -119,7 +119,7 @@ contract AsyncSwapUpdatePriceFormalTest is HookUnlockBase {
         assertEq(_sequenceOf(poolId, id), seq + 1, "sequence := nextSequence");
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean:190 — repricing never changes the order's escrowed amountIn, owner, side, zeroForOne, priorityFee or escrow flag.
+    /// @notice formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean:203 — repricing never changes the order's escrowed amountIn, owner, side, zeroForOne, priorityFee or escrow flag.
     function testFuzz_midState_order(bool zeroForOne, uint256 amountIn, uint256 n) public {
         (AsyncOrder memory o, bytes32 id) = _live(zeroForOne, amountIn);
         n = bound(n, 1, _maxN(!zeroForOne, hook.asyncOrder(poolId, id)));
@@ -142,7 +142,7 @@ contract AsyncSwapUpdatePriceFormalTest is HookUnlockBase {
         assertEq(hook.asyncOrderPriorityFee(poolId, id), 0);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean:200 — every other order is untouched (checked on an order in a price level the repriced order neither leaves nor joins, so _remove/_append cannot relink it).
+    /// @notice formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean:213 — every other order is untouched (checked on an order in a price level the repriced order neither leaves nor joins, so _remove/_append cannot relink it).
     function testFuzz_midState_other_order(uint256 n) public {
         (, bytes32 otherId) = _placeOrder(bob, true, 3 ether, 9 ether); // ask at price 3
         (AsyncOrder memory o, bytes32 id) = _placeOrder(alice, true, 1 ether, 1 ether); // ask at price 1
@@ -157,7 +157,7 @@ contract AsyncSwapUpdatePriceFormalTest is HookUnlockBase {
         assertTrue(id != otherId);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean:205 — every other pool (orders and book) is untouched.
+    /// @notice formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean:218 — every other pool (orders and book) is untouched.
     function testFuzz_midState_other_pool(uint256 n) public {
         PoolKey memory k2 = PoolKey({
             currency0: currency0, currency1: currency1, fee: LPFeeLibrary.DYNAMIC_FEE_FLAG, tickSpacing: 2, hooks: hook
@@ -178,7 +178,7 @@ contract AsyncSwapUpdatePriceFormalTest is HookUnlockBase {
         assertEq(_bookWord0(p2), book);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean:210 — owner, pendingOwner, nonceUsed, the pool's manager, executors, openOrderCount and orderingMode are unchanged.
+    /// @notice formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean:223 — owner, pendingOwner, nonceUsed, the pool's manager, executors, openOrderCount and orderingMode are unchanged.
     function testFuzz_midState_frame(uint256 n, address someExec, uint256 nonce) public {
         hook.transferOwnership(bob);
         vm.prank(alice);
@@ -202,7 +202,7 @@ contract AsyncSwapUpdatePriceFormalTest is HookUnlockBase {
         assertGt(hook.asyncOrder(poolId, id), 0);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean:223 — a success was by order.owner, n != 0, on a live order, and leaves amountOutMin = n, price key in [1, 2^128), sequence = old nextSequence + 1, amountIn unchanged; no tokens move.
+    /// @notice formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean:236 — a success was by order.owner, n != 0, on a live order, and leaves amountOutMin = n, price key in [1, 2^128), sequence = old nextSequence + 1, amountIn unchanged; no tokens move.
     function testFuzz_updatePrice_ok(
         address caller,
         bool asOwner,

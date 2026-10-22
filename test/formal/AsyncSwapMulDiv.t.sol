@@ -56,7 +56,7 @@ contract AsyncSwapMulDivFormalTest is FormalRefA {
         }
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapMulDiv.lean:352 — for d != 0, mulDiv behaves as the prelude's
+    /// @notice formal/Refinement/Swarm/AsyncSwapMulDiv.lean:381 — for d != 0, mulDiv behaves as the prelude's
     ///         mulDivFloor: the floor quotient when it fits, MathOverflowedMulDiv otherwise.
     function testFuzz_mulDiv_eq_mulDivFloor(uint256 x, uint256 y, uint256 d) public {
         vm.assume(d != 0);

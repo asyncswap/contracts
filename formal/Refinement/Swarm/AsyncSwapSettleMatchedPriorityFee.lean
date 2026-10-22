@@ -1,5 +1,6 @@
 import Generated.AsyncSwap
 import Refinement.Monad
+import Refinement.Swarm.AsyncSwapMulDiv
 
 /-!
 # `AsyncMatching._settleMatchedPriorityFee`
@@ -10,7 +11,8 @@ uint256 inputUsed, uint256 oldInput, address hook) internal returns (uint256 unf
 
 It reads `fee = paidPriorityFee(self.orders[id])` (the escrowed bid, or 0). With `fee = 0` it
 returns 0 and touches nothing. Otherwise it computes `filled = mulDiv(fee, inputUsed, oldInput)`,
-reverts on `oldInput = 0` (panic 0x12), on a result above 2^256 (`MathOverflowedMulDiv`) or when
+reverts on `oldInput = 0` (panic 0x12 when `fee * inputUsed` fits 256 bits, `MathOverflowedMulDiv`
+otherwise), on a result above 2^256 (`MathOverflowedMulDiv`) or when
 `filled > fee` (panic 0x11 from `fee - filled`), then hands `settlePriorityFee(self, key, id,
 self.orders[id].owner, filled, hook)` everything and returns `fee - filled`. It writes no storage
 of its own: every write and external call comes from `settlePriorityFee`.
@@ -39,7 +41,9 @@ theorem settleMatchedPriorityFee_run (self_get : M σ AsyncFiller.State_)
     AsyncMatching.«_settleMatchedPriorityFee» ext self_get self_set key id inputUsed oldInput hook
         env w =
       (if paidFee ((g w).orders id) = 0 then .ok (0, w)
-       else if oldInput = 0 then .error (FormalAst.panic "0x12")
+       else if oldInput = 0 then
+         .error (if paidFee ((g w).orders id) * inputUsed < 2 ^ 256 then FormalAst.panic "0x12"
+                 else ⟨"MathOverflowedMulDiv"⟩)
        else if paidFee ((g w).orders id) * inputUsed / oldInput < 2 ^ 256 then
          if paidFee ((g w).orders id) * inputUsed / oldInput ≤ paidFee ((g w).orders id) then
            match AsyncFiller.settlePriorityFee ext self_get self_set key id
@@ -51,7 +55,8 @@ theorem settleMatchedPriorityFee_run (self_get : M σ AsyncFiller.State_)
          else .error (FormalAst.panic "0x11")
        else .error ⟨"MathOverflowedMulDiv"⟩) := by
   unfold AsyncMatching.«_settleMatchedPriorityFee» AsyncFiller.paidPriorityFee
-  simp only [run_bind, hget, run_pure, mulDivFloor, subc, run_ite, run_throw, beq_iff_eq]
+  simp only [run_bind, hget, run_pure, MulDiv.mulDivFloor_run, MulDiv.W_eq, subc, run_ite,
+    run_throw, beq_iff_eq]
   cases hE : ((g w).orders id).priorityFeeEscrowed
   · simp [hE, paidFee]
   have hp : paidFee ((g w).orders id) = ((g w).orders id).priorityFee := by simp [paidFee, hE]
@@ -60,7 +65,9 @@ theorem settleMatchedPriorityFee_run (self_get : M σ AsyncFiller.State_)
   by_cases h0 : ((g w).orders id).priorityFee = 0
   · simp [h0]
   by_cases hd : oldInput = 0
-  · simp [h0, hd]
+  · by_cases hp : ((g w).orders id).priorityFee * inputUsed < 2 ^ 256
+    · simp only [h0, hd, hp, ↓reduceIte]
+    · simp only [h0, hd, hp, ↓reduceIte]
   by_cases hb : ((g w).orders id).priorityFee * inputUsed / oldInput < 2 ^ 256
   · by_cases hle : ((g w).orders id).priorityFee * inputUsed / oldInput ≤
         ((g w).orders id).priorityFee
@@ -147,7 +154,7 @@ theorem settleMatchedPriorityFee_ok (self_get : M σ AsyncFiller.State_)
         refine ⟨Nat.sub_le _ _, Or.inr ⟨hd, hle, Nat.sub_add_cancel hle, ?_⟩⟩
         rw [hs]
       · simp at h
-    · simp [hb, hle] at h
-  · simp [hb] at h
+    · simp only [hb, hle, ↓reduceIte] at h; cases h
+  · simp only [hb, ↓reduceIte] at h; cases h
 
 end AsyncSwap.Swarm.SettleMatchedPriorityFee

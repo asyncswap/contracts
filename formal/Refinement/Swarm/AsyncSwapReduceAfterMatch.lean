@@ -95,21 +95,34 @@ theorem post_ok (q p : Nat) (w w' : σ)
 theorem priceKey_ok (b : Bool) (a n p : Nat) (env : Env) (w w' : σ)
     (h : AsyncMatching.«_priceKey» ext b a n env w = .ok (p, w')) :
     w' = w ∧ 1 ≤ p ∧ p < 2 ^ 128 := by
-  unfold AsyncMatching.«_priceKey» mulDivFloor at h
-  cases b <;> simp only [run_bind, run_pure, run_ite, run_throw, ite_true, ite_false, Bool.false_eq_true] at h
-  all_goals
-    generalize (_ : Nat) * AsyncMatching.PRICE_SCALE / _ = q at h
-    first
-    | (by_cases hd : a = 0
-       · simp [hd] at h
-       by_cases hb : q < 2 ^ 256
-       · simp [hd, hb] at h; exact post_ok q p w w' h
-       · simp [hd, hb] at h)
-    | (by_cases hd : n = 0
-       · simp [hd] at h
-       by_cases hb : q < 2 ^ 256
-       · simp [hd, hb] at h; exact post_ok q p w w' h
-       · simp [hd, hb] at h)
+  -- The clamp, for any price computation `m` that leaves the world alone. Stated over an
+  -- abstract `m` so the kernel never unfolds `mulDivFloor` (whose `x * PRICE_SCALE < 2^256` guard
+  -- it would otherwise try to evaluate on a symbolic `x`).
+  have tail : ∀ m : M σ Nat, (∀ q w₁, m env w = .ok (q, w₁) → w₁ = w) →
+      (do
+        let t ← m
+        if (t == 0) = true then pure 1
+          else if decide (t > 2 ^ 128 - 1) = true then pure (2 ^ 128 - 1)
+          else pure (t % 2 ^ 128) : M σ Nat) env w = .ok (p, w') →
+      w' = w ∧ 1 ≤ p ∧ p < 2 ^ 128 := by
+    intro m hm hr
+    simp only [run_bind] at hr
+    rcases hq : m env w with e | ⟨q, w₁⟩ <;> rw [hq] at hr
+    · cases hr
+    · rw [hm q w₁ hq] at hr
+      exact post_ok q p w w' (by simpa using hr)
+  have frame : ∀ x y d q w₁, mulDivFloor (σ := σ) x y d env w = .ok (q, w₁) → w₁ = w := by
+    intro x y d q w₁ hm
+    unfold mulDivFloor at hm
+    simp only [run_ite, run_throw, run_pure] at hm
+    repeat' split at hm
+    all_goals (simp only [reduceCtorEq, Except.ok.injEq, Prod.mk.injEq] at hm; try exact hm.2.symm)
+  unfold AsyncMatching.«_priceKey» at h
+  cases b
+  · rw [ite_eq_right_of_eq_false _ _ Bool.false_eq_true] at h
+    exact tail _ (frame _ _ _) h
+  · rw [ite_eq_left_of_eq_true _ _ (eq_self true)] at h
+    exact tail _ (frame _ _ _) h
 
 variable {self_get : M σ AsyncFiller.State_} {self_set : AsyncFiller.State_ → M σ Unit}
     {book_get : M σ AsyncFiller.Book} {book_set : AsyncFiller.Book → M σ Unit}

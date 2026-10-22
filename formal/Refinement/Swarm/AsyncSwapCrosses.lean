@@ -1,6 +1,7 @@
 import Mathlib
 import Generated.AsyncSwap
 import Refinement.Monad
+import Refinement.Swarm.AsyncSwapMulDiv
 
 /-!
 # AsyncMatching._crosses
@@ -8,7 +9,8 @@ import Refinement.Monad
 `_crosses(buyKey, sellKey, buy, sell)`: with distinct price keys the buy crosses iff its key is
 higher; with equal keys it compares `mulDiv(buy.amountIn, sell.amountIn, sell.amountOutMin)` with
 `buy.amountOutMin`. It has no guards of its own; the only reverts come from `Math.mulDiv`
-(`sell.amountOutMin = 0` → panic 0x12, quotient ≥ 2^256 → `MathOverflowedMulDiv`). It writes nothing.
+(`sell.amountOutMin = 0` → panic 0x12 when `buy.amountIn * sell.amountIn` fits 256 bits and
+`MathOverflowedMulDiv` otherwise; quotient ≥ 2^256 → `MathOverflowedMulDiv`). It writes nothing.
 -/
 
 open FormalAst Refinement
@@ -23,19 +25,23 @@ theorem crosses_run (bk sk : Nat) (b s : AsyncFiller.OrderInfo)
     (env : Env) (w : σ) :
     AsyncMatching.«_crosses» ext bk sk (pure b) bs (pure s) ss env w
       = if bk ≠ sk then .ok (decide (bk > sk), w)
-        else if s.amountOutMin = 0 then .error (panic "0x12")
+        else if s.amountOutMin = 0 then
+          .error (if b.amountIn * s.amountIn < 2 ^ 256 then panic "0x12"
+                  else ⟨"MathOverflowedMulDiv"⟩)
         else if b.amountIn * s.amountIn / s.amountOutMin < 2 ^ 256 then
           .ok (decide (b.amountIn * s.amountIn / s.amountOutMin ≥ b.amountOutMin), w)
         else .error ⟨"MathOverflowedMulDiv"⟩ := by
   by_cases h : bk = sk
   · subst h
+    simp only [AsyncMatching.«_crosses», bne_self_eq_false, Bool.false_eq_true, ite_false,
+      run_bind, run_pure, MulDiv.mulDivFloor_run, ne_eq, not_true_eq_false, MulDiv.W_eq]
     by_cases hd : s.amountOutMin = 0
-    · simp [AsyncMatching.«_crosses», mulDivFloor, hd]
+    · by_cases hp : b.amountIn * s.amountIn < 2 ^ 256
+      · have hp' := hp; norm_num at hp'; simp [hd, hp']
+      · have hp' := hp; norm_num at hp'; simp [hd, Nat.not_lt.mpr hp']
     · by_cases ho : b.amountIn * s.amountIn / s.amountOutMin < 2 ^ 256
-      · have ho' := ho; norm_num at ho'
-        simp [AsyncMatching.«_crosses», mulDivFloor, hd, ho']
-      · have ho' := ho; norm_num at ho'
-        simp [AsyncMatching.«_crosses», mulDivFloor, hd, Nat.not_lt.mpr ho']
+      · have ho' := ho; norm_num at ho'; simp [hd, ho']
+      · have ho' := ho; norm_num at ho'; simp [hd, Nat.not_lt.mpr ho']
   · simp [AsyncMatching.«_crosses», h]
 
 /-- Distinct keys: never reverts, returns `buyKey > sellKey`, reads nothing, writes nothing. -/
@@ -45,11 +51,15 @@ theorem crosses_ne_any (bk sk : Nat) (bg : M σ AsyncFiller.OrderInfo)
     AsyncMatching.«_crosses» ext bk sk bg bs sg ss env w = .ok (decide (bk > sk), w) := by
   simp [AsyncMatching.«_crosses», h]
 
-/-- Equal keys and `sell.amountOutMin = 0`: reverts with panic 0x12 (division by zero). -/
+/-- Equal keys and `sell.amountOutMin = 0`: reverts, with panic 0x12 (division by zero) when
+`buy.amountIn * sell.amountIn` fits 256 bits and with `MathOverflowedMulDiv` otherwise
+(OpenZeppelin 5.0.2 checks `denominator <= prod1` before dividing). -/
 theorem crosses_reverts_div0 (k : Nat) (b s : AsyncFiller.OrderInfo)
     (bs : AsyncFiller.OrderInfo → M σ Unit) (ss : AsyncFiller.OrderInfo → M σ Unit)
     (env : Env) (w : σ) (hd : s.amountOutMin = 0) :
-    AsyncMatching.«_crosses» ext k k (pure b) bs (pure s) ss env w = .error (panic "0x12") := by
+    AsyncMatching.«_crosses» ext k k (pure b) bs (pure s) ss env w
+      = .error (if b.amountIn * s.amountIn < 2 ^ 256 then panic "0x12"
+                else ⟨"MathOverflowedMulDiv"⟩) := by
   rw [crosses_run]; simp [hd]
 
 /-- Equal keys and an overflowing quotient: reverts `MathOverflowedMulDiv`. -/
@@ -93,7 +103,7 @@ theorem crosses_frame (bk sk : Nat) (bg : M σ AsyncFiller.OrderInfo)
     · rw [h4] at h; cases h
     rw [h4] at h; simp only at h
     have e4 : w4 = w3 := by
-      unfold mulDivFloor at h4; split_ifs at h4 <;> cases h4; rfl
+      unfold mulDivFloor at h4; split_ifs at h4 <;> cases h4 <;> rfl
     rcases h5 : bg env w4 with e | ⟨o5, w5⟩
     · rw [h5] at h; cases h
     rw [h5] at h; simp only [run_pure] at h

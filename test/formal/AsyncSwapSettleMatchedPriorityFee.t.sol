@@ -33,7 +33,7 @@ contract AsyncSwapSettleMatchedPriorityFeeFormalTest is FormalMatchD {
         return (fees.length > k ? fees[k].amount : 0, true);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapSettleMatchedPriorityFee.lean:35 — no paid fee: returns 0, no effect; otherwise one `settlePriorityFee(owner, fee·inputUsed/oldInput)` and returns fee − filled.
+    /// @notice formal/Refinement/Swarm/AsyncSwapSettleMatchedPriorityFee.lean:37 — no paid fee: returns 0, no effect; otherwise one `settlePriorityFee(owner, fee·inputUsed/oldInput)` and returns fee − filled.
     function testFuzz_settleMatchedPriorityFee_run(uint256[6] memory s, uint8 flags) public {
         Case memory c = _mkCase(s, flags | 4);
         Run memory r = _exec(c);
@@ -59,7 +59,7 @@ contract AsyncSwapSettleMatchedPriorityFeeFormalTest is FormalMatchD {
         }
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapSettleMatchedPriorityFee.lean:74 — no escrowed (or a zero) fee: succeeds, returns 0 and leaves the world unchanged.
+    /// @notice formal/Refinement/Swarm/AsyncSwapSettleMatchedPriorityFee.lean:81 — no escrowed (or a zero) fee: succeeds, returns 0 and leaves the world unchanged.
     function testFuzz_settleMatchedPriorityFee_no_fee(uint256[6] memory s, uint8 flags, bool unpaidBid) public {
         // FIFO (no bid at all), or PriorityFee mode with bids that were never paid
         uint256 f = unpaidBid ? (flags | 4) & ~uint256(16 | 32) : flags & ~uint256(4 | 16 | 32);
@@ -79,7 +79,7 @@ contract AsyncSwapSettleMatchedPriorityFeeFormalTest is FormalMatchD {
         _assertOps(r.ops, _expected(c, r));
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapSettleMatchedPriorityFee.lean:96 — matching path (inputUsed <= oldInput, oldInput != 0) with an escrowed fee: settles filled = fee·inputUsed/oldInput for the owner and returns fee − filled.
+    /// @notice formal/Refinement/Swarm/AsyncSwapSettleMatchedPriorityFee.lean:103 — matching path (inputUsed <= oldInput, oldInput != 0) with an escrowed fee: settles filled = fee·inputUsed/oldInput for the owner and returns fee − filled.
     function testFuzz_settleMatchedPriorityFee_matched(uint256[6] memory s, uint8 flags) public {
         Case memory c = _mkCase(s, flags | 4 | 16 | 32);
         Run memory r = _exec(c);
@@ -103,7 +103,7 @@ contract AsyncSwapSettleMatchedPriorityFeeFormalTest is FormalMatchD {
         _assertOps(r.ops, _expected(c, r));
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapSettleMatchedPriorityFee.lean:118 — on success unfilled <= fee, and either no fee (0, no effect) or one settlement of filled <= fee with unfilled + filled = fee.
+    /// @notice formal/Refinement/Swarm/AsyncSwapSettleMatchedPriorityFee.lean:125 — on success unfilled <= fee, and either no fee (0, no effect) or one settlement of filled <= fee with unfilled + filled = fee.
     function testFuzz_settleMatchedPriorityFee_ok(uint256[6] memory s, uint8 flags) public {
         Case memory c = _mkCase(s, flags);
         Run memory r = _exec(c);

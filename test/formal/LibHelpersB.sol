@@ -374,23 +374,30 @@ abstract contract LibHelpersCasesB is FormalBase {
         return FullMath.mulDiv(x, y, d);
     }
 
-    /// @dev `mulDivRnd`: d = 0 -> Panic(0x12); floor(x*y/d) >= 2^256 -> MathOverflowedMulDiv(); else the floor,
+    /// @dev `mulDivRnd`: d = 0 -> Panic(0x12) when x*y < 2^256, else MathOverflowedMulDiv();
+    ///      floor(x*y/d) >= 2^256 -> MathOverflowedMulDiv(); else the floor,
     ///      plus one (checked: Panic(0x11)) when rounding up (r odd) and x*y % d > 0.
     function _checkMulDivRounding(uint256 x, uint256 y, uint256 d, uint8 r) internal {
         r = uint8(bound(r, 0, 3));
         (bool ok, bytes memory ret) =
             address(_oz()).call(abi.encodeCall(OzLibHarnessB.mulDiv, (x, y, d, Math.Rounding(r))));
-        if (d == 0) {
-            assertFalse(ok);
-            assertEq(ret, abi.encodeWithSignature("Panic(uint256)", 0x12), "d = 0: panic 0x12");
-            return;
-        }
         uint256 hi;
         uint256 lo;
         assembly {
             let mm := mulmod(x, y, not(0))
             lo := mul(x, y)
             hi := sub(sub(mm, lo), lt(mm, lo))
+        }
+        if (d == 0) {
+            // OpenZeppelin 5.0.2 checks `denominator <= prod1` before dividing: a zero `d` panics only when
+            // the product fits one word.
+            assertFalse(ok);
+            if (hi == 0) {
+                assertEq(ret, abi.encodeWithSignature("Panic(uint256)", 0x12), "d = 0, x*y < 2^256: panic 0x12");
+            } else {
+                assertEq(ret, abi.encodeWithSelector(Math.MathOverflowedMulDiv.selector), "d = 0, x*y >= 2^256");
+            }
+            return;
         }
         if (hi >= d) {
             assertFalse(ok);

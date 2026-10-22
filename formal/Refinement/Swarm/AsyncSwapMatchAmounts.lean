@@ -13,7 +13,9 @@ The generated `AsyncMatching.«_matchAmounts»` is a pure function of the two st
   `AsyncSwap.matchAmounts (toSpec sell) (toSpec buy) restingBuy` (`AsyncSwapSpec/Match.lean`);
 * `matchAmounts_ok_sound`: a non-zero result honours both escrows and both limit prices;
 * `matchAmounts_reverts_restingBuy` / `_restingSell`: a zero `amountOutMin` on the resting side
-  reverts with panic `0x12` (the first `mulDiv` divides by it);
+  reverts in the first `mulDiv` (which divides by it): panic `0x12` when the product of the two
+  `amountIn`s fits 256 bits, `MathOverflowedMulDiv` otherwise (OpenZeppelin 5.0.2 checks
+  `denominator <= prod1` before it divides);
 * `matchAmounts_succeeds`: with `uint128` amounts and a positive resting `amountOutMin` no
   `mulDiv` reverts, so the run returns the spec's amounts.
 -/
@@ -24,15 +26,42 @@ namespace AsyncSwap.Swarm.MatchAmounts
 
 variable {σ : Type} (ext : Ext σ)
 
+/-- The two thresholds of OpenZeppelin 5.0.2's `mulDiv` agree for a nonzero `d`:
+`d ≤ ⌊x·y / 2^256⌋` exactly when the quotient `⌊x·y / d⌋` doesn't fit 256 bits. -/
+theorem floor_cases (x y d : Nat) :
+    d = 0 ∨ (d ≤ x * y / 2 ^ 256 ∧ 2 ^ 256 ≤ x * y / d)
+      ∨ (x * y / 2 ^ 256 < d ∧ x * y / d < 2 ^ 256) := by
+  have hW : 0 < 2 ^ 256 := Nat.two_pow_pos 256
+  rcases Nat.eq_zero_or_pos d with hd | hd
+  · exact Or.inl hd
+  · right
+    by_cases h : d ≤ x * y / 2 ^ 256
+    · left; refine ⟨h, ?_⟩
+      rw [Nat.le_div_iff_mul_le hW] at h
+      rw [Nat.le_div_iff_mul_le hd, Nat.mul_comm (2 ^ 256) d]; exact h
+    · right; refine ⟨Nat.lt_of_not_le h, ?_⟩
+      rw [Nat.le_div_iff_mul_le hW] at h
+      rw [Nat.div_lt_iff_lt_mul hd, Nat.mul_comm (2 ^ 256) d]; exact Nat.lt_of_not_le h
+
+/-- `mulDivFloor` run: a zero `d` panics `0x12` when the product fits one word and reverts
+`MathOverflowedMulDiv` otherwise (OpenZeppelin 5.0.2 checks `d ≤ prod1` before dividing); a
+nonzero `d` returns the floor when it fits 256 bits and reverts `MathOverflowedMulDiv` when not. -/
 theorem floor_run (x y d : Nat) (env : Env) (s : σ) :
     (mulDivFloor x y d : M σ Nat) env s =
-      (if d = 0 then .error (panic "0x12")
+      (if d = 0 then .error (if x * y < 2 ^ 256 then panic "0x12" else ⟨"MathOverflowedMulDiv"⟩)
        else if x * y / d < 2 ^ 256 then .ok (x * y / d, s) else .error ⟨"MathOverflowedMulDiv"⟩) := by
-  unfold mulDivFloor; split_ifs <;> rfl
+  have k := floor_cases x y d
+  have hle := Nat.div_le_self (x * y) d
+  unfold mulDivFloor
+  generalize x * y / 2 ^ 256 = H at *
+  generalize x * y / d = Q at *
+  generalize x * y = P at *
+  generalize (2 : Nat) ^ 256 = W at *
+  split_ifs <;> first | rfl | (exfalso; omega)
 
 theorem ceil_run (x y d : Nat) (env : Env) (s : σ) :
     (mulDivRnd x y d 1 : M σ Nat) env s =
-      (if d = 0 then .error (panic "0x12")
+      (if d = 0 then .error (if x * y < 2 ^ 256 then panic "0x12" else ⟨"MathOverflowedMulDiv"⟩)
        else if x * y / d < 2 ^ 256 then
          (if x * y % d = 0 then .ok (x * y / d, s)
           else if x * y / d + 1 < 2 ^ 256 then .ok (x * y / d + 1, s) else .error (panic "0x11"))
@@ -171,20 +200,26 @@ theorem matchAmounts_ok_sound
 
 /-! ## Reverts -/
 
-/-- When the buyer rests and its `amountOutMin` is zero, the first `mulDiv` divides by zero. -/
+/-- When the buyer rests and its `amountOutMin` is zero, the first `mulDiv`
+(`sell.amountIn * buy.amountIn / 0`) reverts: panic `0x12` when the product fits 256 bits,
+`MathOverflowedMulDiv` otherwise. -/
 theorem matchAmounts_reverts_restingBuy
     (hs : ∀ e t, sell_get e t = .ok (sell, t)) (hb : ∀ e t, buy_get e t = .ok (buy, t))
     (h0 : buy.amountOutMin = 0) (env : Env) (st : σ) :
     AsyncMatching.«_matchAmounts» ext sell_get sell_set buy_get buy_set true env st
-      = .error (panic "0x12") := by
+      = .error (if sell.amountIn * buy.amountIn < 2 ^ 256 then panic "0x12"
+                else ⟨"MathOverflowedMulDiv"⟩) := by
   simp [AsyncMatching.«_matchAmounts», run_bind, hs, hb, floor_run, h0]
 
-/-- When the seller rests and its `amountOutMin` is zero, the first `mulDiv` divides by zero. -/
+/-- When the seller rests and its `amountOutMin` is zero, the first `mulDiv`
+(`buy.amountIn * sell.amountIn / 0`) reverts: panic `0x12` when the product fits 256 bits,
+`MathOverflowedMulDiv` otherwise. -/
 theorem matchAmounts_reverts_restingSell
     (hs : ∀ e t, sell_get e t = .ok (sell, t)) (hb : ∀ e t, buy_get e t = .ok (buy, t))
     (h0 : sell.amountOutMin = 0) (env : Env) (st : σ) :
     AsyncMatching.«_matchAmounts» ext sell_get sell_set buy_get buy_set false env st
-      = .error (panic "0x12") := by
+      = .error (if buy.amountIn * sell.amountIn < 2 ^ 256 then panic "0x12"
+                else ⟨"MathOverflowedMulDiv"⟩) := by
   simp [AsyncMatching.«_matchAmounts», run_bind, hs, hb, floor_run, h0]
 
 set_option maxHeartbeats 4000000 in

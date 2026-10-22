@@ -357,19 +357,28 @@ theorem matchPair_error
       · rw [h3] at h; cases h
 
 /-- **Guard (division by zero).** For a non-skipped pair whose resting order (the older one) has
-`amountOutMin = 0`, the call reverts with panic `0x12` before any write or external call. -/
+`amountOutMin = 0`, the call reverts before any write or external call: in the first `mulDiv`, with
+panic `0x12` when the product of the two orders' `amountIn` fits 256 bits, and with
+`MathOverflowedMulDiv` otherwise (OpenZeppelin 5.0.2 checks `denominator <= prod1` before it
+divides). -/
 theorem matchPair_reverts_restingZero
     (L : Lawful self_get self_set book_get book_set g ss bg bs)
     (key : PoolKey) (f s hook : Nat) (env : Env) (w : σ) (hns : ¬ skip (g w) f s)
     (hz : if makerBuy (g w) f s then ((g w).orders (buyId (g w) f s)).amountOutMin = 0
           else ((g w).orders (sellId (g w) f s)).amountOutMin = 0) :
     AsyncMatching.«_matchPair» ext self_get self_set book_get book_set key f s hook env w
-      = .error (FormalAst.panic "0x12") := by
+      = .error (if ((g w).orders (sellId (g w) f s)).amountIn
+                    * ((g w).orders (buyId (g w) f s)).amountIn < 2 ^ 256
+                then FormalAst.panic "0x12" else ⟨"MathOverflowedMulDiv"⟩) := by
   rw [matchPair_eq ext L key f s hook env w hns]
-  have : matchRun ext (g w) f s env w = .error (FormalAst.panic "0x12") := by
+  have : matchRun ext (g w) f s env w
+      = .error (if ((g w).orders (sellId (g w) f s)).amountIn
+                    * ((g w).orders (buyId (g w) f s)).amountIn < 2 ^ 256
+                then FormalAst.panic "0x12" else ⟨"MathOverflowedMulDiv"⟩) := by
     unfold matchRun
     cases hmb : makerBuy (g w) f s
     · rw [hmb] at hz
+      rw [Nat.mul_comm]
       exact AsyncSwap.Swarm.MatchAmounts.matchAmounts_reverts_restingSell ext _ _ _ _ _ _
         (fun _ _ => rfl) (fun _ _ => rfl) (by simpa using hz) env w
     · rw [hmb] at hz

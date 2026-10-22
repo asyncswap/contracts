@@ -63,7 +63,7 @@ jobs:
     permissions:
       contents: read
     env:
-      FORMALMIND_VERSION: "0.1.0"
+      FORMALMIND_VERSION: "0.1.1"
       SOLC_VERSION: "0.8.26"
     steps:
       - uses: actions/checkout@v5

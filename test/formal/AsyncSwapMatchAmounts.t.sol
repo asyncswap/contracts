@@ -48,7 +48,10 @@ contract AsyncSwapMatchAmountsFormalTest is FormalMatchD {
         uint256 rem = mulmod(x, y, d);
         (uint256 hi2, uint256 lo2) = _mul512(r, d);
         uint256 borrow = lo < rem ? 1 : 0;
-        assertEq(lo2, lo - rem, "floor: low word");
+        // 512-bit subtraction (hi, lo) - rem: the low word wraps, the borrow comes off the high word.
+        unchecked {
+            assertEq(lo2, lo - rem, "floor: low word");
+        }
         assertEq(hi2, hi - borrow, "floor: high word");
     }
 
@@ -59,12 +62,22 @@ contract AsyncSwapMatchAmountsFormalTest is FormalMatchD {
         return d;
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean:27 — `mulDivFloor x y d` (OZ `Math.mulDiv`) is panic 0x12 when d = 0, `MathOverflowedMulDiv` when x·y/d ≥ 2^256, else `x·y/d`.
-    function testFuzz_finding_floor_run(uint256 x, uint256 y, uint256 d, uint8 sel) public {
+    /// @dev Biases `x`, `y` so the 512-bit product fits one word (bit 2 of `sel`), which is the only case
+    ///      where a zero `d` panics rather than reverting `MathOverflowedMulDiv`.
+    function _small(uint256 x, uint256 y, uint8 sel) internal pure returns (uint256, uint256) {
+        if (sel & 4 != 0) return (x % 2 ** 128, y % 2 ** 128);
+        return (x, y);
+    }
+
+    /// @notice formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean:49 — `mulDivFloor x y d` (OZ `Math.mulDiv`) with d = 0 is panic 0x12 when x·y < 2^256 and `MathOverflowedMulDiv` otherwise; with d != 0 it is `MathOverflowedMulDiv` when x·y/d ≥ 2^256, else `x·y/d`.
+    function testFuzz_floor_run(uint256 x, uint256 y, uint256 d, uint8 sel) public {
         d = _den(d, sel);
+        (x, y) = _small(x, y, sel);
         (uint256 hi,) = _mul512(x, y);
         if (d == 0) {
-            vm.expectRevert(stdError.divisionError);
+            // x·y < 2^256  ⇔  hi = 0
+            if (hi == 0) vm.expectRevert(stdError.divisionError);
+            else vm.expectRevert(Math.MathOverflowedMulDiv.selector);
             mh.floor(x, y, d);
         } else if (hi >= d) {
             // x·y/d ≥ 2^256  ⇔  x·y ≥ d·2^256  ⇔  hi ≥ d
@@ -75,12 +88,14 @@ contract AsyncSwapMatchAmountsFormalTest is FormalMatchD {
         }
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean:33 — `mulDivRnd x y d 1` (OZ `Math.mulDiv(.., Ceil)`) is panic 0x12 when d = 0, `MathOverflowedMulDiv` when x·y/d ≥ 2^256, the floor when exact, else floor + 1 (panic 0x11 if that overflows).
-    function testFuzz_finding_ceil_run(uint256 x, uint256 y, uint256 d, uint8 sel) public {
+    /// @notice formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean:62 — `mulDivRnd x y d 1` (OZ `Math.mulDiv(.., Ceil)`) with d = 0 is panic 0x12 when x·y < 2^256 and `MathOverflowedMulDiv` otherwise; with d != 0 it is `MathOverflowedMulDiv` when x·y/d ≥ 2^256, the floor when exact, else floor + 1 (panic 0x11 if that overflows).
+    function testFuzz_ceil_run(uint256 x, uint256 y, uint256 d, uint8 sel) public {
         d = _den(d, sel);
+        (x, y) = _small(x, y, sel);
         (uint256 hi,) = _mul512(x, y);
         if (d == 0) {
-            vm.expectRevert(stdError.divisionError);
+            if (hi == 0) vm.expectRevert(stdError.divisionError);
+            else vm.expectRevert(Math.MathOverflowedMulDiv.selector);
             mh.ceil(x, y, d);
         } else if (hi >= d) {
             vm.expectRevert(Math.MathOverflowedMulDiv.selector);
@@ -127,22 +142,22 @@ contract AsyncSwapMatchAmountsFormalTest is FormalMatchD {
         }
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean:98 — resting buy: a successful `_matchAmounts` leaves the world unchanged and returns `AsyncSwap.matchAmounts sell buy true`.
+    /// @notice formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean:127 — resting buy: a successful `_matchAmounts` leaves the world unchanged and returns `AsyncSwap.matchAmounts sell buy true`.
     function testFuzz_ok_restingBuy(uint256[6] memory s, uint8 flags) public {
         _checkSpec(s, true, flags);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean:116 — resting sell: a successful `_matchAmounts` leaves the world unchanged and returns `AsyncSwap.matchAmounts sell buy false`.
+    /// @notice formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean:145 — resting sell: a successful `_matchAmounts` leaves the world unchanged and returns `AsyncSwap.matchAmounts sell buy false`.
     function testFuzz_ok_restingSell(uint256[6] memory s, uint8 flags) public {
         _checkSpec(s, false, flags);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean:138 — every successful `_matchAmounts` run leaves the world unchanged and returns exactly the spec `AsyncSwap.matchAmounts` amounts.
+    /// @notice formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean:167 — every successful `_matchAmounts` run leaves the world unchanged and returns exactly the spec `AsyncSwap.matchAmounts` amounts.
     function testFuzz_matchAmounts_ok(uint256[6] memory s, bool rb, uint8 flags) public {
         _checkSpec(s, rb, flags);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean:157 — a non-zero result spends at most each escrow and honours both limit prices.
+    /// @notice formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean:186 — a non-zero result spends at most each escrow and honours both limit prices.
     function testFuzz_matchAmounts_ok_sound(uint256[6] memory s, bool rb, uint8 flags) public {
         Run memory r = _checkSpec(s, rb, flags);
         if (r.matched == 0) return;
@@ -155,51 +170,62 @@ contract AsyncSwapMatchAmountsFormalTest is FormalMatchD {
 
     /// @dev Crossed pair with strictly ordered keys (bid > ask), so `_crosses` returns without
     ///      arithmetic and `_matchPair` → `_matchAmounts` runs; then the stored amounts are replaced.
-    function _zeroRestingMin(uint256[6] memory s, bool rb, uint256 sellIn, uint256 buyIn)
+    ///      With `small`, both `amountIn`s are below 2^128 so their product fits one word.
+    ///      Returns the revert data `_matchAmounts` must produce: the first `mulDiv` divides
+    ///      `sell.amountIn * buy.amountIn` by zero, so panic 0x12 when that product fits 256 bits and
+    ///      `MathOverflowedMulDiv` otherwise.
+    function _zeroRestingMin(uint256[6] memory s, bool rb, uint256 sellIn, uint256 buyIn, bool small)
         internal
-        returns (Case memory c, bool reached)
+        returns (Case memory c, bool reached, bytes memory err)
     {
         c = _mkCase(s, rb ? 1 : 0);
         AsyncFiller.OrderInfo memory b = _info(c.pid, c.buyId);
         AsyncFiller.OrderInfo memory sl = _info(c.pid, c.sellId);
-        if (b.price <= sl.price) return (c, false);
-        _storeWord(c.pid, c.sellId, 1, bound(sellIn, 1, type(uint256).max));
-        _storeWord(c.pid, c.buyId, 1, bound(buyIn, 1, type(uint256).max));
+        if (b.price <= sl.price) return (c, false, err);
+        uint256 maxIn = small ? type(uint128).max : type(uint256).max;
+        sellIn = bound(sellIn, 1, maxIn);
+        buyIn = bound(buyIn, 1, maxIn);
+        _storeWord(c.pid, c.sellId, 1, sellIn);
+        _storeWord(c.pid, c.buyId, 1, buyIn);
         _storeWord(c.pid, rb ? c.buyId : c.sellId, 2, 0);
+        (uint256 hi,) = _mul512(sellIn, buyIn);
+        err = hi == 0
+            ? abi.encodeWithSignature("Panic(uint256)", 0x12)
+            : abi.encodeWithSelector(Math.MathOverflowedMulDiv.selector);
         reached = true;
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean:175 — with the buyer resting and `buy.amountOutMin = 0` (any amounts), `_matchAmounts` reverts with panic 0x12.
-    function testFuzz_finding_matchAmounts_reverts_restingBuy(uint256[6] memory s, uint256 sellIn, uint256 buyIn)
+    /// @notice formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean:206 — with the buyer resting and `buy.amountOutMin = 0`, `_matchAmounts` reverts with panic 0x12 when `sell.amountIn * buy.amountIn < 2^256` and with `MathOverflowedMulDiv` otherwise.
+    function testFuzz_matchAmounts_reverts_restingBuy(uint256[6] memory s, uint256 sellIn, uint256 buyIn, bool small)
         public
     {
-        (Case memory c, bool reached) = _zeroRestingMin(s, true, sellIn, buyIn);
+        (Case memory c, bool reached, bytes memory err) = _zeroRestingMin(s, true, sellIn, buyIn, small);
         if (!reached) return;
-        vm.expectRevert(stdError.divisionError);
+        vm.expectRevert(err);
         _run(_matchCalls(c.k));
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean:183 — with the seller resting and `sell.amountOutMin = 0` (any amounts), `_matchAmounts` reverts with panic 0x12.
-    function testFuzz_finding_matchAmounts_reverts_restingSell(uint256[6] memory s, uint256 sellIn, uint256 buyIn)
+    /// @notice formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean:217 — with the seller resting and `sell.amountOutMin = 0`, `_matchAmounts` reverts with panic 0x12 when `buy.amountIn * sell.amountIn < 2^256` and with `MathOverflowedMulDiv` otherwise.
+    function testFuzz_matchAmounts_reverts_restingSell(uint256[6] memory s, uint256 sellIn, uint256 buyIn, bool small)
         public
     {
-        (Case memory c, bool reached) = _zeroRestingMin(s, false, sellIn, buyIn);
+        (Case memory c, bool reached, bytes memory err) = _zeroRestingMin(s, false, sellIn, buyIn, small);
         if (!reached) return;
-        vm.expectRevert(stdError.divisionError);
+        vm.expectRevert(err);
         _run(_matchCalls(c.k));
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean:191 — resting buy, uint128 amounts, `buy.amountOutMin > 0`: `_matchAmounts` never reverts.
+    /// @notice formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean:226 — resting buy, uint128 amounts, `buy.amountOutMin > 0`: `_matchAmounts` never reverts.
     function testFuzz_noerr_restingBuy(uint256[6] memory s, uint8 flags) public {
         _checkSpec(s, true, flags);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean:228 — resting sell, uint128 amounts, `sell.amountOutMin > 0`: `_matchAmounts` never reverts.
+    /// @notice formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean:263 — resting sell, uint128 amounts, `sell.amountOutMin > 0`: `_matchAmounts` never reverts.
     function testFuzz_noerr_restingSell(uint256[6] memory s, uint8 flags) public {
         _checkSpec(s, false, flags);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean:268 — uint128 amounts and a positive resting `amountOutMin`: `_matchAmounts` succeeds with the spec amounts and an unchanged world.
+    /// @notice formal/Refinement/Swarm/AsyncSwapMatchAmounts.lean:303 — uint128 amounts and a positive resting `amountOutMin`: `_matchAmounts` succeeds with the spec amounts and an unchanged world.
     function testFuzz_matchAmounts_succeeds(uint256[6] memory s, bool rb, uint8 flags) public {
         _checkSpec(s, rb, flags);
     }

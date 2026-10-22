@@ -27,7 +27,7 @@ contract AsyncSwapReduceAfterMatchFormalTest is FormalMatchD {
         }
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapReduceAfterMatch.lean:136 — closed order (no input or no minimum left): matched fee share settled, `_remove`, `orders[id]` deleted, the unfilled share settled for the owner, then (if input remains) exactly remIn refunded to the owner.
+    /// @notice formal/Refinement/Swarm/AsyncSwapReduceAfterMatch.lean:149 — closed order (no input or no minimum left): matched fee share settled, `_remove`, `orders[id]` deleted, the unfilled share settled for the owner, then (if input remains) exactly remIn refunded to the owner.
     function testFuzz_reduceAfterMatch_ok_close(uint256[6] memory s, uint8 flags) public {
         Case memory c = _mkCase(s, flags);
         Run memory r = _exec(c);
@@ -63,7 +63,7 @@ contract AsyncSwapReduceAfterMatchFormalTest is FormalMatchD {
         assertEq(fees.length, k, "no other fee settlement");
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapReduceAfterMatch.lean:245 — partial (input and minimum left): amountIn := remIn, amountOutMin := remainingMinimum, priorityFee := unfilled; re-keyed (`_remove`, new price, fresh sequence iff the price moved, `_append`) exactly when the price moved or, in PriorityFee mode, the fee changed.
+    /// @notice formal/Refinement/Swarm/AsyncSwapReduceAfterMatch.lean:258 — partial (input and minimum left): amountIn := remIn, amountOutMin := remainingMinimum, priorityFee := unfilled; re-keyed (`_remove`, new price, fresh sequence iff the price moved, `_append`) exactly when the price moved or, in PriorityFee mode, the fee changed.
     function testFuzz_reduceAfterMatch_ok_partial(uint256[6] memory s, uint8 flags) public {
         Case memory c = _mkCase(s, flags);
         Run memory r = _exec(c);

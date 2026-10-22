@@ -9,18 +9,27 @@ import {PoolManager} from "v4-core/PoolManager.sol";
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {Currency} from "v4-core/types/Currency.sol";
 
-/// @dev Bypasses hook-address mining only, so the real constructor runs at an arbitrary address.
+/// @dev Bypasses hook-address mining only, so the real constructor runs at an arbitrary address, and
+///      exposes the internal `_domainSeparatorV4`.
 contract CtorHarness is AsyncSwap {
     constructor(IPoolManager manager, Currency quote, address owner_) AsyncSwap(manager, quote, owner_) {}
 
     function validateHookAddress(BaseHook) internal pure override {}
+
+    function domainSeparatorV4() external view returns (bytes32) {
+        return _domainSeparatorV4();
+    }
 }
 
-/// @notice Discharges the assumptions `CtorStorageSpec` and `Immutables` stated in
-///         formal/Refinement/Swarm/AsyncSwapConstructor.lean for the opaque `AsyncSwap.constructor`.
-contract AsyncSwapConstructorTest is Test {
+/// @notice Bytecode checks of `formal/Refinement/Swarm/AsyncSwapConstructor.lean`. They also discharge the
+///         file's two assumptions about the opaque constructor: `CtorStorageSpec` (the guards, and
+///         `owner := _owner` as the only storage write) and `Immutables` (poolManager, numeraire, cached
+///         address / chain id / separator).
+contract AsyncSwapConstructorFormalTest is Test {
     bytes32 constant TYPE_HASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+    uint256 constant OWNER_SLOT = 4;
+    uint256 constant PENDING_OWNER_SLOT = 5;
 
     IPoolManager manager;
     MockERC20 usdc;
@@ -34,49 +43,172 @@ contract AsyncSwapConstructorTest is Test {
         return keccak256(abi.encode(TYPE_HASH, keccak256("AsyncSwap"), keccak256("1"), block.chainid, self));
     }
 
-    /// CtorStorageSpec, guard 1: numeraire without code reverts InvalidNumeraire (even with owner 0).
-    function testFuzz_ctor_invalidNumeraire(address num, address owner_) public {
+    /// @dev A numeraire with code: one of the contracts deployed here.
+    function _withCode(uint8 which) internal view returns (address) {
+        which %= 3;
+        if (which == 0) return address(usdc);
+        if (which == 1) return address(manager);
+        return address(this);
+    }
+
+    function _deploy(address pm, address num, address owner_) internal returns (bool ok, address a) {
+        try new CtorHarness(IPoolManager(pm), Currency.wrap(num), owner_) returns (CtorHarness h) {
+            return (true, address(h));
+        } catch {
+            return (false, address(0));
+        }
+    }
+
+    function _newHook(address owner_) internal returns (CtorHarness) {
+        return new CtorHarness(manager, Currency.wrap(address(usdc)), owner_);
+    }
+
+    /// @notice formal/Refinement/Swarm/AsyncSwapConstructor.lean:76 — a numeraire without code reverts
+    ///         `InvalidNumeraire` (checked first, whatever the owner and pool manager).
+    function testFuzz_ctor_invalidNumeraire(address pm, address num, address owner_) public {
         vm.assume(num.code.length == 0);
         vm.expectRevert(AsyncSwap.InvalidNumeraire.selector);
-        new CtorHarness(manager, Currency.wrap(num), owner_);
+        new CtorHarness(IPoolManager(pm), Currency.wrap(num), owner_);
     }
 
-    /// CtorStorageSpec, guard 2: numeraire with code, zero owner reverts ZeroAddress.
-    function test_ctor_zeroOwner() public {
+    /// @notice formal/Refinement/Swarm/AsyncSwapConstructor.lean:82 — a numeraire with code and a zero owner
+    ///         reverts `ZeroAddress`.
+    function testFuzz_ctor_zeroOwner(address pm, uint8 which) public {
         vm.expectRevert(AsyncSwap.ZeroAddress.selector);
-        new CtorHarness(manager, Currency.wrap(address(usdc)), address(0));
+        new CtorHarness(IPoolManager(pm), Currency.wrap(_withCode(which)), address(0));
     }
 
-    /// CtorStorageSpec success + Immutables.
-    function testFuzz_ctor_success(address owner_) public {
+    /// @notice formal/Refinement/Swarm/AsyncSwapConstructor.lean:88 — reverts iff the numeraire has no code or
+    ///         the owner is zero.
+    function testFuzz_ctor_reverts_iff(
+        address pm,
+        address num,
+        bool hasCode,
+        uint8 which,
+        address owner_,
+        bool zeroOwner
+    ) public {
+        if (hasCode) num = _withCode(which);
+        if (zeroOwner) owner_ = address(0);
+        (bool ok,) = _deploy(pm, num, owner_);
+        assertEq(!ok, num.code.length == 0 || owner_ == address(0));
+    }
+
+    /// @notice formal/Refinement/Swarm/AsyncSwapConstructor.lean:95 — succeeds iff both guards pass, and then
+    ///         the only storage write is `owner := _owner`.
+    function testFuzz_ctor_ok_iff(address pm, address num, bool hasCode, uint8 which, address owner_, bool zeroOwner)
+        public
+    {
+        if (hasCode) num = _withCode(which);
+        if (zeroOwner) owner_ = address(0);
+        address predicted = vm.computeCreateAddress(address(this), vm.getNonce(address(this)));
+        vm.record();
+        (bool ok, address a) = _deploy(pm, num, owner_);
+        assertEq(ok, num.code.length != 0 && owner_ != address(0), "ok iff guards pass");
+        if (!ok) return;
+        assertEq(a, predicted);
+        (, bytes32[] memory writes) = vm.accesses(a);
+        assertGt(writes.length, 0, "owner is written");
+        for (uint256 i; i < writes.length; i++) {
+            assertEq(writes[i], bytes32(OWNER_SLOT), "only owner is written");
+        }
+        assertEq(vm.load(a, bytes32(OWNER_SLOT)), bytes32(uint256(uint160(owner_))), "owner := _owner");
+    }
+
+    /// @notice formal/Refinement/Swarm/AsyncSwapConstructor.lean:104 — from fresh storage, the deployed state is
+    ///         all zero except `owner = _owner != 0`; `pendingOwner = 0`; the numeraire has code.
+    function testFuzz_ctor_fresh_state(address pm, uint8 which, address owner_) public {
         vm.assume(owner_ != address(0));
-        CtorHarness h = new CtorHarness(manager, Currency.wrap(address(usdc)), owner_);
-        address a = address(h);
-        // storage: only `owner` (slot 4) written
-        assertEq(vm.load(a, bytes32(uint256(0))), bytes32(0), "_nameFallback");
-        assertEq(vm.load(a, bytes32(uint256(1))), bytes32(0), "_versionFallback");
-        assertEq(vm.load(a, bytes32(uint256(2))), bytes32(0));
-        assertEq(vm.load(a, bytes32(uint256(3))), bytes32(0));
-        assertEq(vm.load(a, bytes32(uint256(4))), bytes32(uint256(uint160(owner_))), "owner slot");
-        assertEq(vm.load(a, bytes32(uint256(5))), bytes32(0), "pendingOwner");
-        assertEq(vm.load(a, bytes32(uint256(6))), bytes32(0));
-        assertEq(h.owner(), owner_);
-        // immutables
-        assertEq(address(h.poolManager()), address(manager));
-        assertEq(Currency.unwrap(h.numeraire()), address(usdc));
-        assertGt(address(h.feeVault()).code.length, 0);
-        (, string memory name, string memory version, uint256 chainId, address verifying,,) = h.eip712Domain();
-        assertEq(name, "AsyncSwap");
-        assertEq(version, "1");
-        assertEq(chainId, block.chainid);
-        assertEq(verifying, a);
-        assertEq(h.DOMAIN_SEPARATOR(), _built(a), "cached separator = built");
+        address num = _withCode(which);
+        (bool ok, address a) = _deploy(pm, num, owner_);
+        assertTrue(ok);
+        for (uint256 s; s <= 6; s++) {
+            bytes32 expected = s == OWNER_SLOT ? bytes32(uint256(uint160(owner_))) : bytes32(0);
+            assertEq(vm.load(a, bytes32(s)), expected, "deployed slot");
+        }
+        assertEq(AsyncSwap(payable(a)).owner(), owner_);
+        assertEq(AsyncSwap(payable(a)).pendingOwner(), address(0));
+        assertGt(num.code.length, 0);
     }
 
-    /// DOMAIN_SEPARATOR_eq_built after a chain id change.
-    function test_domainSeparator_rebuiltAfterFork() public {
-        CtorHarness h = new CtorHarness(manager, Currency.wrap(address(usdc)), address(this));
-        vm.chainId(block.chainid + 7);
-        assertEq(h.DOMAIN_SEPARATOR(), _built(address(h)));
+    /// @notice formal/Refinement/Swarm/AsyncSwapConstructor.lean:115 — a successful deployment fixes
+    ///         `poolManager = _poolManager`, `numeraire = _numeraire` (a contract) and `owner = _owner != 0`.
+    function testFuzz_ctor_deployed(address pm, uint8 which, address owner_) public {
+        vm.assume(owner_ != address(0));
+        address num = _withCode(which);
+        (bool ok, address a) = _deploy(pm, num, owner_);
+        assertTrue(ok);
+        CtorHarness h = CtorHarness(payable(a));
+        assertEq(address(h.poolManager()), pm, "poolManager");
+        assertEq(Currency.unwrap(h.numeraire()), num, "numeraire");
+        assertGt(Currency.unwrap(h.numeraire()).code.length, 0, "numeraire has code");
+        assertEq(h.owner(), owner_, "owner");
+        assertGt(address(h.feeVault()).code.length, 0, "FeeVault deployed");
+    }
+
+    /// @notice formal/Refinement/Swarm/AsyncSwapConstructor.lean:126 — a successful `transferOwnership` keeps
+    ///         `owner != 0`.
+    function testFuzz_owner_nonzero_transferOwnership(
+        address owner_,
+        address pending,
+        address sender,
+        bool asOwner,
+        address newOwner
+    ) public {
+        vm.assume(owner_ != address(0));
+        CtorHarness h = _newHook(owner_);
+        vm.store(address(h), bytes32(PENDING_OWNER_SLOT), bytes32(uint256(uint160(pending))));
+        if (asOwner) sender = owner_;
+        vm.prank(sender);
+        (bool ok,) = address(h).call(abi.encodeCall(AsyncSwap.transferOwnership, (newOwner)));
+        if (ok) assertTrue(h.owner() != address(0), "owner != 0");
+        assertEq(h.owner(), owner_);
+    }
+
+    /// @notice formal/Refinement/Swarm/AsyncSwapConstructor.lean:134 — a successful `acceptOwnership` by a
+    ///         nonzero sender keeps `owner != 0`.
+    function testFuzz_owner_nonzero_acceptOwnership(address owner_, address pending, address sender, bool asPending)
+        public
+    {
+        vm.assume(owner_ != address(0));
+        CtorHarness h = _newHook(owner_);
+        vm.store(address(h), bytes32(PENDING_OWNER_SLOT), bytes32(uint256(uint160(pending))));
+        if (asPending) sender = pending;
+        vm.assume(sender != address(0));
+        vm.prank(sender);
+        (bool ok,) = address(h).call(abi.encodeCall(AsyncSwap.acceptOwnership, ()));
+        if (ok) assertTrue(h.owner() != address(0), "owner != 0");
+    }
+
+    /// @dev Optionally move the deployed code (immutables included) to `at`, and change the chain id.
+    function _env(CtorHarness h, address at, bool moved, uint64 chainId) internal returns (address) {
+        vm.chainId(chainId);
+        if (!moved) return address(h);
+        vm.assume(at.code.length == 0 && uint160(at) > 0x11 && at != address(vm));
+        vm.assume(at != 0x000000000000000000636F6e736F6c652e6c6f67);
+        vm.etch(at, address(h).code);
+        return at;
+    }
+
+    /// @notice formal/Refinement/Swarm/AsyncSwapConstructor.lean:146 — `_domainSeparatorV4` writes nothing and
+    ///         returns the separator built from the current `block.chainid` and `address(this)`.
+    function testFuzz_domainSeparatorV4_eq_built(uint64 chainId, address at, bool moved) public {
+        address self = _env(_newHook(address(this)), at, moved, chainId);
+        vm.record();
+        bytes32 sep = CtorHarness(payable(self)).domainSeparatorV4();
+        (, bytes32[] memory writes) = vm.accesses(self);
+        assertEq(writes.length, 0, "no writes");
+        assertEq(sep, _built(self));
+    }
+
+    /// @notice formal/Refinement/Swarm/AsyncSwapConstructor.lean:159 — `DOMAIN_SEPARATOR()` returns the separator
+    ///         rebuilt from the current chain id and address, in every environment (after a fork, too).
+    function testFuzz_DOMAIN_SEPARATOR_eq_built(uint64 chainId, address at, bool moved) public {
+        address self = _env(_newHook(address(this)), at, moved, chainId);
+        vm.record();
+        bytes32 sep = AsyncSwap(payable(self)).DOMAIN_SEPARATOR();
+        (, bytes32[] memory writes) = vm.accesses(self);
+        assertEq(writes.length, 0, "no writes");
+        assertEq(sep, _built(self));
     }
 }

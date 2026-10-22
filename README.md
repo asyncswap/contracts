@@ -21,7 +21,7 @@ Install dependencies and run the contract suite with:
 
 ```sh
 forge soldeer install
-forge test
+FOUNDRY_INVARIANT_RUNS=64 FOUNDRY_INVARIANT_DEPTH=64 forge test
 ```
 
 Run the local block-packing and adversarial gas benchmark with:

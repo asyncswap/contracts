@@ -19,13 +19,11 @@ With `pid = order.key.toId()`, `id = keccak(chainid, pid, owner, zeroForOne, sal
   `nextSequence := nextSequence + 1` (checked uint64), `sequence := nextSequence`), then
   `_append` (opaque).
 
-For the maintainer's "self-fill / sweep" concern: `updatePrice` makes no external call and moves
-no tokens. Between `_remove` and `_append` it writes only `orders[id].amountOutMin/price/sequence`
-and `priceBooks[pid].nextSequence`; the escrowed `amountIn`, `owner`, `isBuy`, `zeroForOne` and
-the priority-fee fields of the order, every other order, every other pool and all other storage
-are unchanged (`mid_ok`, `mid_amountIn`, `mid_other_order`, `mid_other_pool`). Only the order's
-owner can call it, and `id` hashes `msg.sender`'s address, so nobody can reprice another user's
-order.
+`updatePrice` makes no external call and moves no tokens. Between `_remove` and `_append` it
+writes only `orders[id].amountOutMin/price/sequence` and `priceBooks[pid].nextSequence`; the
+escrowed `amountIn`, `owner`, `isBuy`, `zeroForOne` and the priority-fee fields of the order,
+every other order, every other pool and all other storage are unchanged. Only the order's owner
+can call it, and `id` hashes `msg.sender`'s address, so nobody can reprice another user's order.
 -/
 
 open FormalAst Refinement
@@ -203,7 +201,7 @@ theorem midState_other_order (G : AsyncSwap.State) (pid id n p seq j : Nat) (hj 
     ((midState G pid id n p seq).asyncOrders pid).orders j = (G.asyncOrders pid).orders j := by
   simp [midState, upd, hj]
 
-/-- Every other pool (orders and book) is untouched, and so is the rest of the pool's state. -/
+/-- Every other pool (orders and book) is untouched. -/
 theorem midState_other_pool (G : AsyncSwap.State) (pid id n p seq q : Nat) (hq : q ≠ pid) :
     (midState G pid id n p seq).asyncOrders q = G.asyncOrders q ∧
       (midState G pid id n p seq).priceBooks q = G.priceBooks q := by

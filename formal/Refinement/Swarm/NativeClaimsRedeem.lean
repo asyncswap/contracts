@@ -42,7 +42,7 @@ theorem redeem_run (env : Env) (w : σ) (recipient amount : Nat) :
     · rcases hg with hg | hg <;> simp [h, hg]
     · have h1 : recipient ≠ 0 := fun e => hg (Or.inl e)
       have h2 : amount ≠ 0 := fun e => hg (Or.inr e)
-      simp only [h, hg, h1, h2, Bool.false_eq_true, ite_false, run_bind, run_get, run_modify,
+      simp only [h, h1, h2, Bool.false_eq_true, ite_false, run_bind, run_get, run_modify,
         run_read, run_pure, run_ite, run_throw, beq_iff_eq, Bool.or_eq_true, or_self]
       cases ext.call_IPoolManager_unlock ext.poolManager (abiEncode [env.sender, recipient, amount])
           env (ext.set w { ext.get w with «_redeeming» := true }) with

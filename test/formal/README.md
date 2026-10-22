@@ -12,12 +12,13 @@ forge test --match-path 'test/formal/*'   # every test except the findings
 FOUNDRY_PROFILE=findings forge test       # only the findings: these fail
 ```
 
-**Status:** `formal/Refinement` has 701 theorems, none with `sorry`. 514 have a test and 187 are left
-out (reasons below).
-- 526 tests pass on Forge 1.5.1 and 1.8.6.
-- 9 tests are **findings**: they fail on the bytecode, which disproves 8 theorems, all because of one
-  translation error (see [Findings](#findings)). Their names contain `_finding_`, and `foundry.toml`
-  leaves them out of a plain `forge test` (`no_match_test`), so CI stays green while they're kept.
+**Status:** `formal/Refinement` has 858 theorems, none with `sorry`. 570 have a test and 288 are left
+out (reasons below). The functions formal-ast leaves opaque each have a named spec that is checked on the
+bytecode (see [Named specs](#named-specs-for-the-opaque-functions)).
+- 625 tests in `test/formal/` pass on Forge 1.5.1 and 1.8.6.
+- 10 tests are **findings**: they fail on the bytecode by design (see [Findings](#findings)). Their names
+  contain `_finding_`, and `foundry.toml` leaves them out of a plain `forge test` (`no_match_test`), so
+  CI stays green while they're kept.
 
 The spec libraries (`formal/AsyncSwapSpec`, `formal/AsyncSwapProtocol`) are not mapped here. Their
 theorems are about the abstract `World` / `step` models, not a generated def, and reach the code only
@@ -73,7 +74,89 @@ Shared fixtures:
     `matchBook(key, 1)`, and `_priorityKey` through the stored price key.
   - No test copies a function's source.
 
+## Named specs for the opaque functions
+
+formal-ast can't translate some functions (assembly, strings and bytes, hex literals), so the model
+leaves them as opaque `ext.fn_*` fields. Each one now has a single named spec, a Lean `structure` whose
+fields state its reverts, its result, and what it writes:
+
+| Spec | Module | Functions |
+|---|---|---|
+| `RemoveSpec`, `AppendSpec`, `BestAtPriceSpec`, `LevelSpec` | `SpecBook.lean` | `AsyncFiller._remove`, `_append`, `bestAtPrice`, `level` |
+| `CreateOrderSpec`, `TransferSpec`, `PoolStateSlotSpec` | `SpecCoreAsyncSwap.lean`, `SpecCoreRouter.lean` | `_createOrder`, `CurrencyLibrary.transfer`, `StateLibrary._getPoolStateSlot` |
+| `CtorSpec`, `ShortStringsSpec`, `Eip712DomainSpec` | `AsyncSwapConstructor.lean`, `RouterConstructor.lean`, `SpecEip712*.lean`, `Assumptions.lean` | both constructors, `ShortStrings.toString` / `toStringWithFallback`, `EIP712.eip712Domain` |
+| `ERC1271Spec`, `TypedDataHashSpec`, `HashSetExecutorSpec`, `HashPoolKeySpec` | `SpecSigAsyncSwap.lean`, `SpecSigRouter.lean` | `SignatureChecker.isValidERC1271SignatureNow`, `MessageHashUtils.toTypedDataHash`, `OrderSignatures.hashSetExecutor` / `hashPoolKey` |
+
+For each spec:
+- **Callers:** every theorem that used to take a one-off hypothesis about the function has a `_of_spec`
+  version that takes the spec instead (in `SpecBookCallers.lean` and the `Spec*` modules). The original
+  theorems are unchanged.
+- **Bytecode:** every field of every spec is checked by a Foundry test. Internal functions run on the
+  real library code through a harness, and private ones through the entry point that reaches them. If
+  a spec field fails on the bytecode, that's a finding.
+
+<details><summary>Spec field → test</summary>
+
+| Spec | Lean | Test |
+|---|---|---|
+| RemoveSpec.reverts (field) | [SpecBook.lean:344](../../formal/Refinement/Swarm/SpecBook.lean#L344) | SpecBook.t.sol: testFuzz_RemoveSpec_reverts |
+| RemoveSpec.progress (field) | [SpecBook.lean:350](../../formal/Refinement/Swarm/SpecBook.lean#L350) | SpecBook.t.sol: testFuzz_RemoveSpec_progress |
+| RemoveSpec.post (field) | [SpecBook.lean:356](../../formal/Refinement/Swarm/SpecBook.lean#L356) | SpecBook.t.sol: testFuzz_RemoveSpec_post |
+| AppendSpec.post (field) | [SpecBook.lean:417](../../formal/Refinement/Swarm/SpecBook.lean#L417) | SpecBook.t.sol: testFuzz_AppendSpec_post, testFuzz_AppendSpec_post_guards |
+| AppendSpec.progress (field) | [SpecBook.lean:435](../../formal/Refinement/Swarm/SpecBook.lean#L435) | SpecBook.t.sol: testFuzz_AppendSpec_progress |
+| BestAtPriceSpec.fifo (field) | [SpecBook.lean:208](../../formal/Refinement/Swarm/SpecBook.lean#L208) | SpecBook.t.sol: testFuzz_BestAtPriceSpec_fifo |
+| BestAtPriceSpec.priority (field) | [SpecBook.lean:213](../../formal/Refinement/Swarm/SpecBook.lean#L213) | SpecBook.t.sol: testFuzz_BestAtPriceSpec_priority |
+| BestAtPriceSpec.badMode (field) | [SpecBook.lean:220](../../formal/Refinement/Swarm/SpecBook.lean#L220) | SpecBook.t.sol: testFuzz_BestAtPriceSpec_badMode |
+| LevelSpec.fifo (field) | [SpecBook.lean:227](../../formal/Refinement/Swarm/SpecBook.lean#L227) | SpecBook.t.sol: testFuzz_LevelSpec_fifo |
+| LevelSpec.priority (field) | [SpecBook.lean:233](../../formal/Refinement/Swarm/SpecBook.lean#L233) | SpecBook.t.sol: testFuzz_LevelSpec_priority |
+| LevelSpec.badMode (field) | [SpecBook.lean:238](../../formal/Refinement/Swarm/SpecBook.lean#L238) | SpecBook.t.sol: testFuzz_LevelSpec_badMode |
+| CreateOrderSpec.notAuthorised (spec field) | [SpecCoreAsyncSwap.lean:111](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L111) | SpecCore.t.sol: testFuzz_CreateOrderSpec_notAuthorised |
+| CreateOrderSpec.zeroAmount (spec field) | [SpecCoreAsyncSwap.lean:115](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L115) | SpecCore.t.sol: testFuzz_CreateOrderSpec_zeroAmount |
+| CreateOrderSpec.run (spec field) | [SpecCoreAsyncSwap.lean:119](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L119) | SpecCore.t.sol: testFuzz_CreateOrderSpec_run, testFuzz_CreateOrderSpec_run_repeat, testFuzz_CreateOrderSpec_run_addOrderGuards |
+| TransferSpec.native (spec field) | [SpecCoreAsyncSwap.lean:331](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L331) | SpecCore.t.sol: testFuzz_TransferSpec_native, testFuzz_TransferSpec_viaSweep |
+| TransferSpec.erc20 (spec field) | [SpecCoreAsyncSwap.lean:342](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L342) | SpecCore.t.sol: testFuzz_TransferSpec_erc20, testFuzz_TransferSpec_erc20_noCode, testFuzz_TransferSpec_viaSweep |
+| PoolStateSlotSpec.pure_ok (spec field) | [SpecCoreAsyncSwap.lean:402](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L402) | SpecCore.t.sol: testFuzz_PoolStateSlotSpec_pure_ok |
+| PoolStateSlotSpec.value (spec field) | [SpecCoreAsyncSwap.lean:404](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L404) | SpecCore.t.sol: testFuzz_PoolStateSlotSpec_value |
+| TransferSpec.native, Router (spec field) | [SpecCoreRouter.lean:52](../../formal/Refinement/Swarm/SpecCoreRouter.lean#L52) | SpecCore.t.sol: testFuzz_Router_TransferSpec_native |
+| TransferSpec.erc20, Router (spec field) | [SpecCoreRouter.lean:62](../../formal/Refinement/Swarm/SpecCoreRouter.lean#L62) | SpecCore.t.sol: testFuzz_Router_TransferSpec_erc20 |
+| CtorSpec (AsyncSwap; all fields) | [SpecEip712AsyncSwap.lean:50](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L50) | SpecEip712.t.sol: testFuzz_CtorSpec (AsyncSwapCtorSpecFormalTest); guards also AsyncSwapConstructor.t.sol |
+| ShortStringsSpec (AsyncSwap; toString_reverts) | [SpecEip712AsyncSwap.lean:138](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L138) | SpecEip712.t.sol: testFuzz_ShortStringsSpec_toString_reverts |
+| ShortStringsSpec (AsyncSwap; toString_ok) | [SpecEip712AsyncSwap.lean:138](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L138) | SpecEip712.t.sol: testFuzz_ShortStringsSpec_toString_ok |
+| ShortStringsSpec (AsyncSwap; withFallback) | [SpecEip712AsyncSwap.lean:138](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L138) | SpecEip712.t.sol: testFuzz_ShortStringsSpec_withFallback |
+| Eip712DomainSpec (AsyncSwap; body) | [SpecEip712AsyncSwap.lean:155](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L155) | SpecEip712.t.sol: testFuzz_Eip712DomainSpec_body (AsyncSwapSpecEip712FormalTest) |
+| CtorSpec (Router; all fields) | [RouterConstructor.lean:51](../../formal/Refinement/Swarm/RouterConstructor.lean#L51) | RouterConstructor.t.sol: testFuzz_CtorSpec |
+| ShortStringsSpec (Router; 3 fields) | [SpecEip712Router.lean:36](../../formal/Refinement/Swarm/SpecEip712Router.lean#L36) | SpecEip712.t.sol: testFuzz_ShortStringsSpec_toString_reverts / _toString_ok / _withFallback (same library code) |
+| Eip712DomainSpec (Router; body) | [SpecEip712Router.lean:53](../../formal/Refinement/Swarm/SpecEip712Router.lean#L53) | SpecEip712.t.sol: testFuzz_Eip712DomainSpec_body (RouterSpecEip712FormalTest) |
+| `ERC1271Spec.total` (AsyncSwap `_2280`) | [SpecSigAsyncSwap.lean:101](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L101) | SpecSig.t.sol: testFuzz_ERC1271Spec_total, testFuzz_ERC1271Spec_onHook |
+| `ERC1271Spec.readOnly` (AsyncSwap) | [SpecSigAsyncSwap.lean:104](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L104) | SpecSig.t.sol: testFuzz_ERC1271Spec_readOnly, testFuzz_ERC1271Spec_onHook |
+| `ERC1271Spec.result` (AsyncSwap) | [SpecSigAsyncSwap.lean:106](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L106) | SpecSig.t.sol: testFuzz_ERC1271Spec_result, testFuzz_ERC1271Spec_result_calldata, testFuzz_ERC1271Spec_result_noCode_precompile, testFuzz_ERC1271Spec_onHook |
+| `ERC1271Spec.total` / `.readOnly` / `.result` (Router `_1883`) | [SpecSigRouter.lean:80](../../formal/Refinement/Swarm/SpecSigRouter.lean#L80) | SpecSig.t.sol: testFuzz_ERC1271Spec_onRouter (plus the library tests above) |
+| `TypedDataHashSpec.total` (AsyncSwap `_9732`) | [SpecSigAsyncSwap.lean:114](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L114) | SpecSig.t.sol: testFuzz_TypedDataHashSpec_total |
+| `TypedDataHashSpec.readOnly` (AsyncSwap) | [SpecSigAsyncSwap.lean:116](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L116) | SpecSig.t.sol: testFuzz_TypedDataHashSpec_readOnly |
+| `TypedDataHashSpec.result` (AsyncSwap) | [SpecSigAsyncSwap.lean:119](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L119) | SpecSig.t.sol: testFuzz_TypedDataHashSpec_result, testFuzz_HashSetExecutorSpec_onHook, testFuzz_hashTypedDataV4_run |
+| `TypedDataHashSpec.total` / `.readOnly` / `.result` (Router `_5799`) | [SpecSigRouter.lean:93](../../formal/Refinement/Swarm/SpecSigRouter.lean#L93) | SpecSig.t.sol: testFuzz_hashTypedDataV4_run_router (plus the library tests above) |
+| `HashSetExecutorSpec.total` / `.readOnly` | [SpecSigAsyncSwap.lean:125](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L125) | SpecSig.t.sol: testFuzz_HashSetExecutorSpec_total_readOnly |
+| `HashSetExecutorSpec.result` | [SpecSigAsyncSwap.lean:129](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L129) | SpecSig.t.sol: testFuzz_HashSetExecutorSpec_result, testFuzz_HashSetExecutorSpec_onHook |
+| `HashPoolKeySpec.total` / `.readOnly` (AsyncSwap `_9171`, Router `_4949`) | [SpecSigAsyncSwap.lean:135](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L135), [SpecSigRouter.lean:104](../../formal/Refinement/Swarm/SpecSigRouter.lean#L104) | SpecSig.t.sol: testFuzz_HashPoolKeySpec_total_readOnly |
+| `HashPoolKeySpec.result` (both) | [SpecSigAsyncSwap.lean:139](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L139), [SpecSigRouter.lean:108](../../formal/Refinement/Swarm/SpecSigRouter.lean#L108) | SpecSig.t.sol: testFuzz_HashPoolKeySpec_result, testFuzz_HashSetExecutorSpec_onHook (inlined in the hook) |
+| The Lean words `POOL_KEY_TYPEHASH`, `SET_EXECUTOR_TYPEHASH`, `ERC1271_SELECTOR`, `ERC1271_MAGIC` | [SpecSigAsyncSwap.lean:52](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L52), [SpecSigRouter.lean:39](../../formal/Refinement/Swarm/SpecSigRouter.lean#L39) | SpecSig.t.sol: test_SpecSig_typehash_words |
+
+</details>
+
 ## Findings
+
+### `ShortStringSpec.toString` is false
+
+`AsyncSwapEip712Domain.lean` and `RouterEip712Domain.lean` assume `ShortStringSpec`, which says
+`ShortStrings.toString` succeeds on every word. OpenZeppelin's `toString` reverts with
+`InvalidShortString()` when the length byte is over 31. `test_finding_ShortStringSpec_toString_every_word`
+(`SpecEip712.t.sol`) fails on `toString(0x20)`.
+- **Contracts:** unaffected, because the deployed names ("AsyncSwap", "1", "AsyncSwap Router") are short.
+- **The theorems built on it:** they rest on a hypothesis the real code doesn't satisfy.
+- **The fix:** `ShortStringsSpec` (`SpecEip712*.lean`) states the behaviour correctly, and the
+  `eip712Domain_*_of_spec` theorems recover the old results from it.
+
+### `mulDiv` with a zero denominator
 
 The bytecode disproves 8 theorems. All 8 follow from one translation error: formal-ast models
 OpenZeppelin's `Math.mulDiv` with its prelude's `mulDivFloor` (`formal/Generated/*.lean`), which
@@ -100,6 +183,14 @@ states OpenZeppelin's behaviour correctly and passes. The fix belongs in formal-
 `_finding_` tests should pass, so drop the prefix.
 
 ## Where the model and the bytecode differ
+
+- **Hypotheses no real callee can meet.** These theorems still hold, but nothing on chain satisfies
+  their assumptions, so they say nothing about the deployed contract. Each has an `_of_spec`
+  replacement that is checked on the bytecode:
+  - `beforeSwap_frame` assumes `_createOrder` leaves the hook's storage unchanged, but the real
+    function stores the order (`test_note_beforeSwap_frame_hcreate_false`).
+  - `orderBookLevel_view` and `orderBookLevel_congr` assume `level` never reverts, but it can: with a
+    bad mode byte, or on an unbounded tree walk.
 
 No theorem fails on the bytecode. A few statements are looser than the EVM, though none of these
 differences is reachable through a well-formed call:
@@ -146,7 +237,7 @@ symbolically. The other 29 stopped on cheatcodes Halmos doesn't support (`vm.exp
 `vm.record` / `vm.accesses`).
 
 The `Halmos` column predicts which tests would run as they are:
-- **yes (150 theorems):** plain inputs, no setup Halmos can't handle.
+- **yes (163 theorems):** plain inputs, no setup Halmos can't handle.
 - **with edits (85 theorems):** the `vm.record` / `vm.accesses` write-set check needs to become
   before/after `vm.load` comparisons, and `vm.expectRevert` needs to become a low-level call that
   checks the revert data.
@@ -237,6 +328,19 @@ Left out:
 | `Binds.isNative_output` | [Router.lean:298](../../formal/Refinement/Router.lean#L298) | model-only helper (spec `isNative` vs `outputCurrency` abstraction) |
 | `run_view` | [Router.lean:355](../../formal/Refinement/Router.lean#L355) | model-only helper (simp lemma about the Lean monad / ABI encoding) |
 | `view_ok_iff` | [Router.lean:360](../../formal/Refinement/Router.lean#L360) | model-only helper (`Except` match on `view`) |
+
+### `Refinement/Swarm/Assumptions.lean`
+
+| Theorem | Lean | Test | Halmos |
+|---|---|---|---|
+| `asyncSwap_short` | [Assumptions.lean:88](../../formal/Refinement/Swarm/Assumptions.lean#L88) | [`SpecEip712.t.sol`](SpecEip712.t.sol) `test_asyncSwap_short` | yes |
+| `one_short` | [Assumptions.lean:91](../../formal/Refinement/Swarm/Assumptions.lean#L91) | [`SpecEip712.t.sol`](SpecEip712.t.sol) `test_one_short` | yes |
+| `asyncSwapRouter_short` | [Assumptions.lean:94](../../formal/Refinement/Swarm/Assumptions.lean#L94) | [`SpecEip712.t.sol`](SpecEip712.t.sol) `test_asyncSwapRouter_short` | yes |
+| `fallbackStore_none` | [Assumptions.lean:98](../../formal/Refinement/Swarm/Assumptions.lean#L98) | [`SpecEip712.t.sol`](SpecEip712.t.sol) `test_fallbackStore_none` | no |
+| `decode_asyncSwap` | [Assumptions.lean:103](../../formal/Refinement/Swarm/Assumptions.lean#L103) | [`SpecEip712.t.sol`](SpecEip712.t.sol) `test_decode_asyncSwap` | yes |
+| `decode_one` | [Assumptions.lean:107](../../formal/Refinement/Swarm/Assumptions.lean#L107) | [`SpecEip712.t.sol`](SpecEip712.t.sol) `test_decode_one` | yes |
+| `decode_asyncSwapRouter` | [Assumptions.lean:110](../../formal/Refinement/Swarm/Assumptions.lean#L110) | [`SpecEip712.t.sol`](SpecEip712.t.sol) `test_decode_asyncSwapRouter` | yes |
+| `deployed_short` | [Assumptions.lean:116](../../formal/Refinement/Swarm/Assumptions.lean#L116) | [`SpecEip712.t.sol`](SpecEip712.t.sol) `test_deployed_short` | yes |
 
 ### `Refinement/Swarm/AsyncFillerRemove.lean`
 
@@ -464,13 +568,13 @@ Left out:
 | `beforeSwap_ok_inv` | [AsyncSwapBeforeSwap.lean:178](../../formal/Refinement/Swarm/AsyncSwapBeforeSwap.lean#L178) | [`AsyncSwapBeforeSwap.t.sol`](AsyncSwapBeforeSwap.t.sol) `testFuzz_beforeSwap_ok_inv` | no |
 | `beforeSwap_ok_returns` | [AsyncSwapBeforeSwap.lean:200](../../formal/Refinement/Swarm/AsyncSwapBeforeSwap.lean#L200) | [`AsyncSwapBeforeSwap.t.sol`](AsyncSwapBeforeSwap.t.sol) `testFuzz_beforeSwap_ok_returns` | no |
 | `beforeSwap_succeeds_iff` | [AsyncSwapBeforeSwap.lean:213](../../formal/Refinement/Swarm/AsyncSwapBeforeSwap.lean#L213) | [`AsyncSwapBeforeSwap.t.sol`](AsyncSwapBeforeSwap.t.sol) `testFuzz_beforeSwap_succeeds_iff` | no |
+| `beforeSwap_frame` | [AsyncSwapBeforeSwap.lean:227](../../formal/Refinement/Swarm/AsyncSwapBeforeSwap.lean#L227) | [`SpecCore.t.sol`](SpecCore.t.sol) `test_note_beforeSwap_frame_hcreate_false` | no |
 | `beforeSwap_ok_delta` | [AsyncSwapBeforeSwap.lean:288](../../formal/Refinement/Swarm/AsyncSwapBeforeSwap.lean#L288) | [`AsyncSwapBeforeSwap.t.sol`](AsyncSwapBeforeSwap.t.sol) `testFuzz_beforeSwap_ok_delta` | no |
 
 Left out:
 
 | Theorem | Lean | Reason |
 |---|---|---|
-| `beforeSwap_frame` | [AsyncSwapBeforeSwap.lean:227](../../formal/Refinement/Swarm/AsyncSwapBeforeSwap.lean#L227) | hypothesis on opaque ext calls (`fn_AsyncSwap_createOrder_1681` leaving the hook's storage unchanged); the real `_createOrder` always writes `asyncOrders`/`priceBooks` on success, so the hypothesis cannot be set up concretely (vacuous on the bytecode) |
 | `amountTaken_eq` | [AsyncSwapBeforeSwap.lean:247](../../formal/Refinement/Swarm/AsyncSwapBeforeSwap.lean#L247) | model-only helper (Lean arithmetic lemma about `amountTaken`/`toUnsigned`; observable content tested via `beforeSwap_run_ok` claims-balance check) |
 | `delta_eq` | [AsyncSwapBeforeSwap.lean:260](../../formal/Refinement/Swarm/AsyncSwapBeforeSwap.lean#L260) | model-only helper (Lean bit-arithmetic lemma about `delta`/`wrapI`/`yshl`; observable content tested via `beforeSwap_ok_delta`) |
 
@@ -1409,6 +1513,20 @@ Left out:
 | `cancelWithSig_eq_prefix` | [RouterCancelWithSig.lean:127](../../formal/Refinement/Swarm/RouterCancelWithSig.lean#L127) | `*_run`-style unfolding into a Lean expression (observable content tested by _invalid_sig / _ok / _ok_inv) |
 | `burn_frame` | [RouterCancelWithSig.lean:239](../../formal/Refinement/Swarm/RouterCancelWithSig.lean#L239) | model-only helper (about the Lean `burn` def; its EVM content is checked in cancelWithSig_ok_state) |
 
+### `Refinement/Swarm/RouterConstructor.lean`
+
+| Theorem | Lean | Test | Halmos |
+|---|---|---|---|
+| `typeHash_eq` | [RouterConstructor.lean:66](../../formal/Refinement/Swarm/RouterConstructor.lean#L66) | [`RouterConstructor.t.sol`](RouterConstructor.t.sol) `test_typeHash_eq` | yes |
+| `CtorSpec.name_word` | [RouterConstructor.lean:69](../../formal/Refinement/Swarm/RouterConstructor.lean#L69) | [`RouterConstructor.t.sol`](RouterConstructor.t.sol) `testFuzz_CtorSpec_name_word` | no |
+| `CtorSpec.version_word` | [RouterConstructor.lean:74](../../formal/Refinement/Swarm/RouterConstructor.lean#L74) | [`RouterConstructor.t.sol`](RouterConstructor.t.sol) `testFuzz_CtorSpec_version_word` | no |
+| `ctor_never_reverts` | [RouterConstructor.lean:79](../../formal/Refinement/Swarm/RouterConstructor.lean#L79) | [`RouterConstructor.t.sol`](RouterConstructor.t.sol) `testFuzz_ctor_never_reverts` | yes |
+| `ctor_ok` | [RouterConstructor.lean:85](../../formal/Refinement/Swarm/RouterConstructor.lean#L85) | [`RouterConstructor.t.sol`](RouterConstructor.t.sol) `testFuzz_ctor_ok` | no |
+| `ctor_deployed` | [RouterConstructor.lean:91](../../formal/Refinement/Swarm/RouterConstructor.lean#L91) | [`RouterConstructor.t.sol`](RouterConstructor.t.sol) `testFuzz_ctor_deployed` | no |
+| `domainSeparatorV4_eq_built` | [RouterConstructor.lean:98](../../formal/Refinement/Swarm/RouterConstructor.lean#L98) | [`RouterConstructor.t.sol`](RouterConstructor.t.sol) `testFuzz_domainSeparatorV4_eq_built` | no |
+| `DOMAIN_SEPARATOR_eq_built` | [RouterConstructor.lean:112](../../formal/Refinement/Swarm/RouterConstructor.lean#L112) | [`RouterConstructor.t.sol`](RouterConstructor.t.sol) `testFuzz_DOMAIN_SEPARATOR_eq_built` | no |
+| `DOMAIN_SEPARATOR_deployed` | [RouterConstructor.lean:126](../../formal/Refinement/Swarm/RouterConstructor.lean#L126) | [`RouterConstructor.t.sol`](RouterConstructor.t.sol) `testFuzz_DOMAIN_SEPARATOR_deployed` | no |
+
 ### `Refinement/Swarm/RouterDOMAIN_SEPARATOR.lean`
 
 | Theorem | Lean | Test | Halmos |
@@ -1497,3 +1615,223 @@ Left out:
 | `swapWithSigPre_get` | [RouterSwapWithSig.lean:116](../../formal/Refinement/Swarm/RouterSwapWithSig.lean#L116) | [`RouterSwapWithSig.t.sol`](RouterSwapWithSig.t.sol) `testFuzz_swapWithSigPre_get` | no |
 | `swapWithSigPre_user` | [RouterSwapWithSig.lean:124](../../formal/Refinement/Swarm/RouterSwapWithSig.lean#L124) | [`RouterSwapWithSig.t.sol`](RouterSwapWithSig.t.sol) `testFuzz_swapWithSigPre_user` | no |
 | `swapWithSigPre_filler` | [RouterSwapWithSig.lean:130](../../formal/Refinement/Swarm/RouterSwapWithSig.lean#L130) | [`RouterSwapWithSig.t.sol`](RouterSwapWithSig.t.sol) `testFuzz_swapWithSigPre_filler` | no |
+
+### `Refinement/Swarm/SpecBook.lean`
+
+| Theorem | Lean | Test | Halmos |
+|---|---|---|---|
+| `remove_queue` | [SpecBook.lean:516](../../formal/Refinement/Swarm/SpecBook.lean#L516) | [`SpecBook.t.sol`](SpecBook.t.sol) `testFuzz_remove_queue` | no |
+| `queue_append` | [SpecBook.lean:560](../../formal/Refinement/Swarm/SpecBook.lean#L560) | [`SpecBook.t.sol`](SpecBook.t.sol) `testFuzz_append_queue` | no |
+| `append_queue` | [SpecBook.lean:640](../../formal/Refinement/Swarm/SpecBook.lean#L640) | [`SpecBook.t.sol`](SpecBook.t.sol) `testFuzz_append_queue` | no |
+
+Left out:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `levels_setLevel` | [SpecBook.lean:76](../../formal/Refinement/Swarm/SpecBook.lean#L76) | model-only simp lemma about the spec's own defs |
+| `levels_setSide` | [SpecBook.lean:80](../../formal/Refinement/Swarm/SpecBook.lean#L80) | model-only simp lemma |
+| `levels_openOrderCount` | [SpecBook.lean:84](../../formal/Refinement/Swarm/SpecBook.lean#L84) | model-only simp lemma |
+| `liftR_ok` | [SpecBook.lean:108](../../formal/Refinement/Swarm/SpecBook.lean#L108) | model-only helper (`Except` plumbing) |
+| `lawful_canonical` | [SpecBook.lean:126](../../formal/Refinement/Swarm/SpecBook.lean#L126) | model-only: the canonical pointers satisfy the lens laws, given `ext.get ∘ ext.set = id` |
+| `writes_frame` | [SpecBook.lean:145](../../formal/Refinement/Swarm/SpecBook.lean#L145) | model-only consequence of `Writes`; on the bytecode, the frame is the write-set check in testFuzz_RemoveSpec_post / testFuzz_AppendSpec_post |
+| `BestAtPriceSpec.run` | [SpecBook.lean:248](../../formal/Refinement/Swarm/SpecBook.lean#L248) | derived from the spec's fields; its content is testFuzz_BestAtPriceSpec_{fifo,priority,badMode} |
+| `BestAtPriceSpec.readOnly` | [SpecBook.lean:259](../../formal/Refinement/Swarm/SpecBook.lean#L259) | derived from the fields; the no-writes check is in testFuzz_BestAtPriceSpec_{fifo,priority} |
+| `LevelSpec.run` | [SpecBook.lean:266](../../formal/Refinement/Swarm/SpecBook.lean#L266) | derived from the fields; its content is testFuzz_LevelSpec_* |
+| `LevelSpec.readOnly` | [SpecBook.lean:277](../../formal/Refinement/Swarm/SpecBook.lean#L277) | derived from the fields; the no-writes check is in testFuzz_LevelSpec_{fifo,priority} |
+| `RemoveSpec.ok_iff` | [SpecBook.lean:455](../../formal/Refinement/Swarm/SpecBook.lean#L455) | derived from `reverts` + `progress` (both tested) |
+| `removeState_prio` | [SpecBook.lean:466](../../formal/Refinement/Swarm/SpecBook.lean#L466) | property of the spec's def; on the bytecode it is checked in testFuzz_RemoveSpec_post (every order compared) |
+| `removeState_linksOnly` | [SpecBook.lean:470](../../formal/Refinement/Swarm/SpecBook.lean#L470) | property of the spec's def; covered by testFuzz_RemoveSpec_post (whole records compared) |
+| `appendOrders_linksOnly` | [SpecBook.lean:481](../../formal/Refinement/Swarm/SpecBook.lean#L481) | property of the spec's def; covered by testFuzz_AppendSpec_post |
+| `appendState_keeps` | [SpecBook.lean:491](../../formal/Refinement/Swarm/SpecBook.lean#L491) | property of the spec's def; covered by testFuzz_AppendSpec_post |
+| `seg_upd_out` | [SpecBook.lean:544](../../formal/Refinement/Swarm/SpecBook.lean#L544) | model-only list lemma |
+| `queue_upd_out` | [SpecBook.lean:554](../../formal/Refinement/Swarm/SpecBook.lean#L554) | model-only list lemma |
+
+### `Refinement/Swarm/SpecBookCallers.lean`
+
+| Theorem | Lean | Test | Halmos |
+|---|---|---|---|
+| `addOrder_queue_of_spec` | [SpecBookCallers.lean:253](../../formal/Refinement/Swarm/SpecBookCallers.lean#L253) | [`SpecBook.t.sol`](SpecBook.t.sol) `testFuzz_addOrder_queue_of_spec` | no |
+
+Left out:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `remove_canonical` | [SpecBookCallers.lean:38](../../formal/Refinement/Swarm/SpecBookCallers.lean#L38) | `RemoveSpec` at the canonical pointers; its content is the spec's tests |
+| `append_canonical` | [SpecBookCallers.lean:57](../../formal/Refinement/Swarm/SpecBookCallers.lean#L57) | `AppendSpec` at the canonical pointers; its content is the spec's tests |
+| `bestOrder_readOnly_of_spec` | [SpecBookCallers.lean:84](../../formal/Refinement/Swarm/SpecBookCallers.lean#L84) | wrapper; its content is the spec's test plus bestOrder_readOnly's test |
+| `bestOrder_ok_of_spec` | [SpecBookCallers.lean:95](../../formal/Refinement/Swarm/SpecBookCallers.lean#L95) | wrapper (bestOrder_ok + BestAtPriceSpec.run) |
+| `orderBookLevel_readOnly_of_spec` | [SpecBookCallers.lean:121](../../formal/Refinement/Swarm/SpecBookCallers.lean#L121) | wrapper |
+| `orderBookLevel_run_of_spec` | [SpecBookCallers.lean:131](../../formal/Refinement/Swarm/SpecBookCallers.lean#L131) | wrapper (orderBookLevel_run + LevelSpec.run); replaces orderBookLevel_view, whose `hlevel` ("never reverts") the bytecode doesn't meet (see Notes) |
+| `orderBookLevel_fifo_of_spec` | [SpecBookCallers.lean:139](../../formal/Refinement/Swarm/SpecBookCallers.lean#L139) | wrapper; orderBookLevel_view's FIFO case |
+| `liftR_map_fst` | [SpecBookCallers.lean:145](../../formal/Refinement/Swarm/SpecBookCallers.lean#L145) | model-only helper |
+| `orderBookLevel_congr_of_spec` | [SpecBookCallers.lean:151](../../formal/Refinement/Swarm/SpecBookCallers.lean#L151) | wrapper |
+| `keepsNonces_remove` | [SpecBookCallers.lean:160](../../formal/Refinement/Swarm/SpecBookCallers.lean#L160) | bridge: the old `hrem` hypothesis derived from `RemoveSpec.post`; its content is the spec's write-set test |
+| `keepsNonces_append` | [SpecBookCallers.lean:168](../../formal/Refinement/Swarm/SpecBookCallers.lean#L168) | bridge: the old `happ` hypothesis derived from `AppendSpec.post` |
+| `updatePriceWithSig_burns_nonce_of_spec` | [SpecBookCallers.lean:177](../../formal/Refinement/Swarm/SpecBookCallers.lean#L177) | wrapper |
+| `levels_nextSequence` | [SpecBookCallers.lean:191](../../formal/Refinement/Swarm/SpecBookCallers.lean#L191) | model-only simp lemma |
+| `addOrder_ok_of_spec` | [SpecBookCallers.lean:201](../../formal/Refinement/Swarm/SpecBookCallers.lean#L201) | wrapper (addOrder_ok + AppendSpec.post) |
+| `updatePrice_ok_of_spec` | [SpecBookCallers.lean:306](../../formal/Refinement/Swarm/SpecBookCallers.lean#L306) | wrapper (updatePrice_ok + both specs) |
+| `cancelOrder_ok_of_spec` | [SpecBookCallers.lean:360](../../formal/Refinement/Swarm/SpecBookCallers.lean#L360) | wrapper (cancelOrder_ok + RemoveSpec) |
+| `cancelOrder_queue_of_spec` | [SpecBookCallers.lean:398](../../formal/Refinement/Swarm/SpecBookCallers.lean#L398) | wrapper (cancelOrder_ok + remove_queue, which is tested) |
+| `recordPriorityFee_escrowed_of_spec` | [SpecBookCallers.lean:429](../../formal/Refinement/Swarm/SpecBookCallers.lean#L429) | wrapper (recordPriorityFee_ok + both specs + recordPriorityFee_escrowed_reverts) |
+
+### `Refinement/Swarm/SpecCoreAsyncSwap.lean`
+
+| Theorem | Lean | Test | Halmos |
+|---|---|---|---|
+| `createBody_frame` | [SpecCoreAsyncSwap.lean:167](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L167) | [`SpecCore.t.sol`](SpecCore.t.sol) `testFuzz_createBody_frame` | no |
+| `beforeSwap_frame_of_spec` | [SpecCoreAsyncSwap.lean:262](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L262) | [`SpecCore.t.sol`](SpecCore.t.sol) `testFuzz_beforeSwap_frame_of_spec` | no |
+| `TransferSpec.ok_iff` | [SpecCoreAsyncSwap.lean:357](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L357) | [`SpecCore.t.sol`](SpecCore.t.sol) `testFuzz_TransferSpec_ok_iff` | no |
+| `TransferSpec.frame` | [SpecCoreAsyncSwap.lean:376](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L376) | [`SpecCore.t.sol`](SpecCore.t.sol) `testFuzz_TransferSpec_frame` | no |
+| `getLiquidity_of_spec` | [SpecCoreAsyncSwap.lean:414](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L414) | [`SpecCore.t.sol`](SpecCore.t.sol) `testFuzz_getLiquidity_of_spec` | no |
+| `getSlot0_of_spec` | [SpecCoreAsyncSwap.lean:439](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L439) | [`SpecCore.t.sol`](SpecCore.t.sol) `testFuzz_getSlot0_of_spec` | no |
+| `getLiquidity_zero_of_spec` | [SpecCoreAsyncSwap.lean:453](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L453) | [`SpecCore.t.sol`](SpecCore.t.sol) `testFuzz_getLiquidity_zero_of_spec` | no |
+
+Left out:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `StopsAt.unique` | [SpecCoreAsyncSwap.lean:125](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L125) | model-only helper (logic over the spec's `StopsAt`) |
+| `PoolFrame.trans` | [SpecCoreAsyncSwap.lean:142](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L142) | model-only helper |
+| `PoolFrame.of_eq` | [SpecCoreAsyncSwap.lean:152](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L152) | model-only helper |
+| `beforeSwap_notAuthorised_of_spec` | [SpecCoreAsyncSwap.lean:210](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L210) | wrapper; its content is the spec's test (`testFuzz_CreateOrderSpec_notAuthorised`, which runs through `beforeSwap`) + `beforeSwap_run_ok`'s test |
+| `beforeSwap_zeroAmount_of_spec` | [SpecCoreAsyncSwap.lean:221](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L221) | wrapper; its content is the spec's test + `beforeSwap_run_ok`'s test |
+| `beforeSwap_run_of_spec` | [SpecCoreAsyncSwap.lean:236](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L236) | wrapper; its content is the spec's test (`testFuzz_CreateOrderSpec_run`) + `beforeSwap_run_ok`'s test |
+| `bubbleUp_error` | [SpecCoreAsyncSwap.lean:351](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L351) | model-only helper (the generated `bubbleUpAndRevertWith` always throws); the bytecode revert data is checked in every failing-transfer test and in `AsyncSwapBubbleUpAndRevertWith.t.sol` |
+| `sweep_storage_unchanged_of_spec` | [SpecCoreAsyncSwap.lean:386](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L386) | wrapper; its content is the spec's test (`testFuzz_TransferSpec_viaSweep` asserts no hook SSTORE) + `sweep_storage_unchanged`'s test |
+| `PoolStateSlotSpec.eq` | [SpecCoreAsyncSwap.lean:407](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L407) | corollary of the two spec fields; its content is their tests |
+| `swapAgainstPool_noLiquidity_of_spec` | [SpecCoreAsyncSwap.lean:465](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L465) | wrapper; its content is `getLiquidity_zero_of_spec`'s test + `swapAgainstPool_noLiquidity`'s test |
+| `fillOrderFromPoolLiquidity_noLiquidity_of_spec` | [SpecCoreAsyncSwap.lean:478](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L478) | wrapper; its content is `getLiquidity_zero_of_spec`'s test + `fillOrderFromPoolLiquidity_noLiquidity`'s test |
+| `swapAgainstPool_spec_of_spec` | [SpecCoreAsyncSwap.lean:494](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L494) | wrapper; its content is the `getLiquidity_of_spec` / `getSlot0_of_spec` tests + `swapAgainstPool_spec`'s test |
+
+### `Refinement/Swarm/SpecCoreRouter.lean`
+
+| Theorem | Lean | Test | Halmos |
+|---|---|---|---|
+| `TransferSpec.ok_iff` | [SpecCoreRouter.lean:77](../../formal/Refinement/Swarm/SpecCoreRouter.lean#L77) | [`SpecCore.t.sol`](SpecCore.t.sol) `testFuzz_Router_TransferSpec_ok_iff` | no |
+| `TransferSpec.frame` | [SpecCoreRouter.lean:97](../../formal/Refinement/Swarm/SpecCoreRouter.lean#L97) | [`SpecCore.t.sol`](SpecCore.t.sol) `testFuzz_Router_TransferSpec_frame` | no |
+
+Left out:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `bubbleUp_error` | [SpecCoreRouter.lean:71](../../formal/Refinement/Swarm/SpecCoreRouter.lean#L71) | model-only helper |
+| `settle_selfPay_ok_iff_of_spec` | [SpecCoreRouter.lean:110](../../formal/Refinement/Swarm/SpecCoreRouter.lean#L110) | bridge from the spec through the generated `CurrencySettler.settle`. The Router calls `settle` only with `payer = user` (src/Router.sol), so this branch runs only if the user is the Router itself. Its content is the Router `TransferSpec` tests |
+
+### `Refinement/Swarm/SpecEip712AsyncSwap.lean`
+
+| Theorem | Lean | Test | Halmos |
+|---|---|---|---|
+| `CtorSpec.name_word` | [SpecEip712AsyncSwap.lean:61](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L61) | [`SpecEip712.t.sol`](SpecEip712.t.sol) `testFuzz_CtorSpec_name_word` | no |
+| `CtorSpec.version_word` | [SpecEip712AsyncSwap.lean:66](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L66) | [`SpecEip712.t.sol`](SpecEip712.t.sol) `testFuzz_CtorSpec_version_word` | no |
+| `DOMAIN_SEPARATOR_deployed` | [SpecEip712AsyncSwap.lean:72](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L72) | [`SpecEip712.t.sol`](SpecEip712.t.sol) `testFuzz_DOMAIN_SEPARATOR_deployed` | no |
+| `Eip712DomainSpec.domainSpec` | [SpecEip712AsyncSwap.lean:161](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L161) | [`SpecEip712.t.sol`](SpecEip712.t.sol) `testFuzz_Eip712DomainSpec_body (AsyncSwapSpecEip712FormalTest)` | no |
+| `byteLength_eq` | [SpecEip712AsyncSwap.lean:165](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L165) | [`SpecEip712.t.sol`](SpecEip712.t.sol) `testFuzz_byteLength_eq` | yes |
+| `toString_reverts_iff_byteLength` | [SpecEip712AsyncSwap.lean:176](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L176) | [`SpecEip712.t.sol`](SpecEip712.t.sol) `testFuzz_toString_reverts_iff_byteLength` | yes |
+| `toString_eq` | [SpecEip712AsyncSwap.lean:186](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L186) | [`SpecEip712.t.sol`](SpecEip712.t.sol) `testFuzz_toString_eq` | no |
+| `toString_name` | [SpecEip712AsyncSwap.lean:197](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L197) | [`SpecEip712.t.sol`](SpecEip712.t.sol) `testFuzz_toString_name (AsyncSwapSpecEip712FormalTest)` | no |
+| `toString_version` | [SpecEip712AsyncSwap.lean:204](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L204) | [`SpecEip712.t.sol`](SpecEip712.t.sol) `testFuzz_toString_version (AsyncSwapSpecEip712FormalTest)` | no |
+| `name_ne_sentinel` | [SpecEip712AsyncSwap.lean:210](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L210) | [`SpecEip712.t.sol`](SpecEip712.t.sol) `testFuzz_name_ne_sentinel (AsyncSwapSpecEip712FormalTest)` | no |
+| `version_ne_sentinel` | [SpecEip712AsyncSwap.lean:214](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L214) | [`SpecEip712.t.sol`](SpecEip712.t.sol) `testFuzz_version_ne_sentinel (AsyncSwapSpecEip712FormalTest)` | no |
+
+Left out:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `ctor_invalidNumeraire_of_spec` | [SpecEip712AsyncSwap.lean:81](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L81) | wrapper; its content is CtorSpec's test plus AsyncSwapConstructor.t.sol: testFuzz_ctor_invalidNumeraire |
+| `ctor_zeroOwner_of_spec` | [SpecEip712AsyncSwap.lean:86](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L86) | wrapper; CtorSpec's test plus testFuzz_ctor_zeroOwner |
+| `ctor_reverts_iff_of_spec` | [SpecEip712AsyncSwap.lean:91](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L91) | wrapper; CtorSpec's test plus testFuzz_ctor_reverts_iff |
+| `ctor_ok_iff_of_spec` | [SpecEip712AsyncSwap.lean:97](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L97) | wrapper; CtorSpec's test plus testFuzz_ctor_ok_iff |
+| `ctor_fresh_state_of_spec` | [SpecEip712AsyncSwap.lean:103](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L103) | wrapper; CtorSpec's test plus testFuzz_ctor_fresh_state |
+| `ctor_deployed_of_spec` | [SpecEip712AsyncSwap.lean:112](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L112) | wrapper; CtorSpec's test plus testFuzz_ctor_deployed |
+| `domainSeparatorV4_eq_built_of_spec` | [SpecEip712AsyncSwap.lean:119](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L119) | wrapper; CtorSpec's test plus testFuzz_domainSeparatorV4_eq_built |
+| `DOMAIN_SEPARATOR_eq_built_of_spec` | [SpecEip712AsyncSwap.lean:124](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L124) | wrapper; CtorSpec's test plus testFuzz_DOMAIN_SEPARATOR_eq_built |
+| `EIP712Name_of_spec` | [SpecEip712AsyncSwap.lean:220](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L220) | wrapper of `EIP712Name_spec`, concrete name; its content is the specs' tests plus Eip712Domain.t.sol: testFuzz_EIP712Name_spec |
+| `EIP712Version_of_spec` | [SpecEip712AsyncSwap.lean:225](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L225) | wrapper; specs' tests plus testFuzz_EIP712Version_spec |
+| `eip712Domain_spec_of_spec` | [SpecEip712AsyncSwap.lean:230](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L230) | wrapper; specs' tests plus testFuzz_eip712Domain_spec |
+| `eip712Domain_never_reverts_of_spec` | [SpecEip712AsyncSwap.lean:237](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L237) | wrapper; specs' tests plus testFuzz_eip712Domain_never_reverts |
+| `eip712Domain_ok_of_spec` | [SpecEip712AsyncSwap.lean:242](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L242) | wrapper; specs' tests plus testFuzz_eip712Domain_ok |
+| `eip712Domain_matches_DOMAIN_SEPARATOR_of_spec` | [SpecEip712AsyncSwap.lean:254](../../formal/Refinement/Swarm/SpecEip712AsyncSwap.lean#L254) | wrapper; specs' tests plus testFuzz_eip712Domain_matches_DOMAIN_SEPARATOR |
+
+### `Refinement/Swarm/SpecEip712Router.lean`
+
+| Theorem | Lean | Test | Halmos |
+|---|---|---|---|
+| `Eip712DomainSpec.domainSpec` | [SpecEip712Router.lean:59](../../formal/Refinement/Swarm/SpecEip712Router.lean#L59) | [`SpecEip712.t.sol`](SpecEip712.t.sol) `testFuzz_Eip712DomainSpec_body (RouterSpecEip712FormalTest)` | no |
+| `byteLength_eq` | [SpecEip712Router.lean:63](../../formal/Refinement/Swarm/SpecEip712Router.lean#L63) | [`SpecEip712.t.sol`](SpecEip712.t.sol) `testFuzz_byteLength_eq` | yes |
+| `toString_reverts_iff_byteLength` | [SpecEip712Router.lean:74](../../formal/Refinement/Swarm/SpecEip712Router.lean#L74) | [`SpecEip712.t.sol`](SpecEip712.t.sol) `testFuzz_toString_reverts_iff_byteLength` | yes |
+| `toString_eq` | [SpecEip712Router.lean:84](../../formal/Refinement/Swarm/SpecEip712Router.lean#L84) | [`SpecEip712.t.sol`](SpecEip712.t.sol) `testFuzz_toString_eq` | no |
+| `toString_name` | [SpecEip712Router.lean:95](../../formal/Refinement/Swarm/SpecEip712Router.lean#L95) | [`SpecEip712.t.sol`](SpecEip712.t.sol) `testFuzz_toString_name (RouterSpecEip712FormalTest)` | no |
+| `toString_version` | [SpecEip712Router.lean:102](../../formal/Refinement/Swarm/SpecEip712Router.lean#L102) | [`SpecEip712.t.sol`](SpecEip712.t.sol) `testFuzz_toString_version (RouterSpecEip712FormalTest)` | no |
+| `name_ne_sentinel` | [SpecEip712Router.lean:108](../../formal/Refinement/Swarm/SpecEip712Router.lean#L108) | [`SpecEip712.t.sol`](SpecEip712.t.sol) `testFuzz_name_ne_sentinel (RouterSpecEip712FormalTest)` | no |
+| `version_ne_sentinel` | [SpecEip712Router.lean:112](../../formal/Refinement/Swarm/SpecEip712Router.lean#L112) | [`SpecEip712.t.sol`](SpecEip712.t.sol) `testFuzz_version_ne_sentinel (RouterSpecEip712FormalTest)` | no |
+
+Left out:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `EIP712Name_of_spec` | [SpecEip712Router.lean:118](../../formal/Refinement/Swarm/SpecEip712Router.lean#L118) | wrapper of `EIP712Name_spec`, concrete name; its content is the specs' tests plus Eip712Domain.t.sol: testFuzz_EIP712Name_spec |
+| `EIP712Version_of_spec` | [SpecEip712Router.lean:123](../../formal/Refinement/Swarm/SpecEip712Router.lean#L123) | wrapper; specs' tests plus testFuzz_EIP712Version_spec |
+| `eip712Domain_spec_of_spec` | [SpecEip712Router.lean:128](../../formal/Refinement/Swarm/SpecEip712Router.lean#L128) | wrapper; specs' tests plus testFuzz_eip712Domain_spec |
+| `eip712Domain_never_reverts_of_spec` | [SpecEip712Router.lean:135](../../formal/Refinement/Swarm/SpecEip712Router.lean#L135) | wrapper; specs' tests plus testFuzz_eip712Domain_never_reverts |
+| `eip712Domain_ok_of_spec` | [SpecEip712Router.lean:140](../../formal/Refinement/Swarm/SpecEip712Router.lean#L140) | wrapper; specs' tests plus testFuzz_eip712Domain_ok |
+| `eip712Domain_matches_DOMAIN_SEPARATOR_of_spec` | [SpecEip712Router.lean:152](../../formal/Refinement/Swarm/SpecEip712Router.lean#L152) | wrapper; specs' tests plus testFuzz_eip712Domain_matches_DOMAIN_SEPARATOR |
+
+### `Refinement/Swarm/SpecSigAsyncSwap.lean`
+
+| Theorem | Lean | Test | Halmos |
+|---|---|---|---|
+| `hashTypedDataV4_run` | [SpecSigAsyncSwap.lean:214](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L214) | [`SpecSig.t.sol`](SpecSig.t.sol) `testFuzz_hashTypedDataV4_run` | no |
+| `tryRecover_9821_ok` | [SpecSigAsyncSwap.lean:223](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L223) | [`SpecSig.t.sol`](SpecSig.t.sol) `testFuzz_tryRecover_9821_ok` | no |
+| `isValidSignatureNow_run` | [SpecSigAsyncSwap.lean:240](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L240) | [`SpecSig.t.sol`](SpecSig.t.sol) `testFuzz_isValidSignatureNow_run` | no |
+
+Left out:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `ERC1271Spec.run` | [SpecSigAsyncSwap.lean:146](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L146) | model-only helper: the conjunction of the spec's three fields, each tested above |
+| `TypedDataHashSpec.run` | [SpecSigAsyncSwap.lean:156](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L156) | model-only helper (as above) |
+| `HashSetExecutorSpec.run` | [SpecSigAsyncSwap.lean:165](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L165) | model-only helper (as above) |
+| `HashPoolKeySpec.run` | [SpecSigAsyncSwap.lean:174](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L174) | model-only helper (as above) |
+| `poolKeyHash_eq_hashing` | [SpecSigAsyncSwap.lean:198](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L198) | model-only helper: relates two Lean hash models under `HashingCompat`; its bytecode content is `HashPoolKeySpec.result` |
+| `setExecutorHash_eq_hashing` | [SpecSigAsyncSwap.lean:202](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L202) | model-only helper: as above; its bytecode content is `HashSetExecutorSpec.result` |
+| `isValidSignatureNow_preserves_of_spec` | [SpecSigAsyncSwap.lean:260](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L260) | wrapper; its content is the spec's test + the original theorem's (itself model-only) |
+| `hashTypedDataV4_preserves_of_spec` | [SpecSigAsyncSwap.lean:265](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L265) | wrapper (as above) |
+| `pureCallees_of_spec` | [SpecSigAsyncSwap.lean:273](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L273) | wrapper: derives the old `PureCallees` bundle from the specs (`readOnly` fields, tested) |
+| `setExecutorWithSig_expired_of_spec` | [SpecSigAsyncSwap.lean:279](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L279) | wrapper; its content is the spec's test + `testFuzz_setExecutorWithSig_expired` |
+| `setExecutorWithSig_nonce_used_of_spec` | [SpecSigAsyncSwap.lean:285](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L285) | wrapper; spec's test + `testFuzz_setExecutorWithSig_nonce_used` |
+| `setExecutorWithSig_invalid_sig_of_spec` | [SpecSigAsyncSwap.lean:292](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L292) | wrapper; spec's test + `testFuzz_setExecutorWithSig_invalid_sig` |
+| `setExecutorWithSig_ok_of_spec` | [SpecSigAsyncSwap.lean:303](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L303) | wrapper; spec's test + `testFuzz_setExecutorWithSig_ok` |
+| `setExecutorWithSig_ok_state_of_spec` | [SpecSigAsyncSwap.lean:314](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L314) | wrapper; spec's test + `testFuzz_setExecutorWithSig_ok_state` |
+| `setExecutorWithSig_frame_of_spec` | [SpecSigAsyncSwap.lean:323](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L323) | wrapper; spec's test + `testFuzz_setExecutorWithSig_frame` |
+| `setExecutorWithSig_no_replay_of_spec` | [SpecSigAsyncSwap.lean:343](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L343) | wrapper; spec's test + `testFuzz_setExecutorWithSig_no_replay` |
+| `updatePrice_pureCallees_of_spec` | [SpecSigAsyncSwap.lean:367](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L367) | wrapper (derives `UpdatePriceWithSig.PureCallees`) |
+| `updatePriceWithSig_invalidSig_of_spec` | [SpecSigAsyncSwap.lean:372](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L372) | wrapper; spec's test + the original theorem's test in `AsyncSwapUpdatePriceWithSig.t.sol` |
+| `verify_ok_inv_of_spec` | [SpecSigAsyncSwap.lean:383](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L383) | wrapper (as above) |
+| `updatePriceWithSig_missing_reverts_of_spec` | [SpecSigAsyncSwap.lean:395](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L395) | wrapper (as above) |
+| `updatePriceWithSig_ok_of_spec` | [SpecSigAsyncSwap.lean:404](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L404) | wrapper (as above) |
+| `updatePriceWithSig_burns_nonce_of_spec` | [SpecSigAsyncSwap.lean:426](../../formal/Refinement/Swarm/SpecSigAsyncSwap.lean#L426) | wrapper (as above; still takes `KeepsNonces` for `_remove`/`_append`, another group's spec) |
+
+### `Refinement/Swarm/SpecSigRouter.lean`
+
+| Theorem | Lean | Test | Halmos |
+|---|---|---|---|
+| `hashTypedDataV4_run` | [SpecSigRouter.lean:165](../../formal/Refinement/Swarm/SpecSigRouter.lean#L165) | [`SpecSig.t.sol`](SpecSig.t.sol) `testFuzz_hashTypedDataV4_run_router` | no |
+| `tryRecover_5888_ok` | [SpecSigRouter.lean:174](../../formal/Refinement/Swarm/SpecSigRouter.lean#L174) | [`SpecSig.t.sol`](SpecSig.t.sol) `testFuzz_tryRecover_5888_ok` | no |
+| `isValidSignatureNow_run` | [SpecSigRouter.lean:191](../../formal/Refinement/Swarm/SpecSigRouter.lean#L191) | [`SpecSig.t.sol`](SpecSig.t.sol) `testFuzz_isValidSignatureNow_run_router` | no |
+
+Left out:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `ERC1271Spec.run` | [SpecSigRouter.lean:115](../../formal/Refinement/Swarm/SpecSigRouter.lean#L115) | model-only helper: the conjunction of the spec's three fields, each tested above |
+| `TypedDataHashSpec.run` | [SpecSigRouter.lean:125](../../formal/Refinement/Swarm/SpecSigRouter.lean#L125) | model-only helper (as above) |
+| `HashPoolKeySpec.run` | [SpecSigRouter.lean:134](../../formal/Refinement/Swarm/SpecSigRouter.lean#L134) | model-only helper (as above) |
+| `poolKeyHash_eq_hashing` | [SpecSigRouter.lean:157](../../formal/Refinement/Swarm/SpecSigRouter.lean#L157) | model-only helper: relates two Lean hash models under `HashingCompat`; its bytecode content is `HashPoolKeySpec.result` |
+| `isValidSignatureNow_preserves_of_spec` | [SpecSigRouter.lean:211](../../formal/Refinement/Swarm/SpecSigRouter.lean#L211) | wrapper; its content is the spec's test + the original theorem's (itself model-only) |
+| `hashTypedDataV4_preserves_of_spec` | [SpecSigRouter.lean:216](../../formal/Refinement/Swarm/SpecSigRouter.lean#L216) | wrapper (as above) |
+| `pureCallees_of_spec` | [SpecSigRouter.lean:223](../../formal/Refinement/Swarm/SpecSigRouter.lean#L223) | wrapper: derives the old `PureCallees` bundle from the specs (`readOnly` fields, tested) |
+| `cancelWithSig_invalid_sig_of_spec` | [SpecSigRouter.lean:227](../../formal/Refinement/Swarm/SpecSigRouter.lean#L227) | wrapper; spec's test + `testFuzz_cancelWithSig_invalid_sig` |
+| `cancelWithSig_ok_of_spec` | [SpecSigRouter.lean:239](../../formal/Refinement/Swarm/SpecSigRouter.lean#L239) | wrapper; spec's test + `testFuzz_cancelWithSig_ok` |
+| `cancelWithSig_ok_state_of_spec` | [SpecSigRouter.lean:251](../../formal/Refinement/Swarm/SpecSigRouter.lean#L251) | wrapper; spec's test + `testFuzz_cancelWithSig_ok_state` |
+| `cancelWithSig_no_replay_of_spec` | [SpecSigRouter.lean:260](../../formal/Refinement/Swarm/SpecSigRouter.lean#L260) | wrapper; spec's test + the original theorem's test (still takes `hmono` for `unlock`) |

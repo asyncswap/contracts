@@ -98,6 +98,7 @@ contract UnpaidBidHandler is MatchingHandler {
 /// @notice Invariants for unpaid priority bids (asyncswap/v2#9), on top of every PriorityFee-mode matching
 ///         invariant (escrow, asset conservation, best price): an unpaid bid buys no priority and can never
 ///         stop the book from matching or an order from being cancelled.
+/// forge-config: default.invariant.runs = 128
 contract UnpaidBidInvariantTest is PriorityMatchingInvariantTest {
     using PoolIdLibrary for PoolKey;
 

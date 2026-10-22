@@ -37,9 +37,7 @@ jobs:
       - name: Run Forge build (with contract sizes)
         run: forge build --sizes
 
-      # The invariant suites run at the depth MAINNET_READINESS.md records, failing on any unexpected revert.
+      # The invariant suites run at the depth MAINNET_READINESS.md records (foundry.toml), failing on any
+      # unexpected revert.
       - name: Run Forge tests
-        env:
-          FOUNDRY_INVARIANT_RUNS: "64"
-          FOUNDRY_INVARIANT_DEPTH: "64"
         run: forge test -vvv

@@ -11,7 +11,7 @@ import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 contract RouterFillFromPoolLiquidityFormalTest is FormalProbesA {
     /// @notice formal/Refinement/Swarm/RouterFillFromPoolLiquidity.lean:28 — the call is two transient stores
     ///         (USER := caller, FILLER := router) then exactly `unlock(abi.encode(SwapCallback(PoolLiquidityFill, order, 0)))`.
-    function testFuzz_fillFromPoolLiquidity_eq(address caller, AsyncOrder memory o, bytes memory ret) public {
+    function testFuzz_fillFromPoolLiquidity_eq(address caller, AsyncOrder memory o, bytes memory ret) public oneTx {
         vm.mockCall(address(manager), abi.encodeWithSelector(IPoolManager.unlock.selector), abi.encode(ret));
         vm.expectCall(address(manager), 0, abi.encodeCall(IPoolManager.unlock, (_cb(5, o, 0))), 1);
         vm.prank(caller);
@@ -53,7 +53,7 @@ contract RouterFillFromPoolLiquidityFormalTest is FormalProbesA {
 
     /// @notice formal/Refinement/Swarm/RouterFillFromPoolLiquidity.lean:58 — the two writes before `unlock`
     ///         touch only transient storage: USER := caller, FILLER := router, persistent storage unchanged.
-    function testFuzz_fillFromPoolLiquidityPre_get(address caller, address seed, AsyncOrder memory o) public {
+    function testFuzz_fillFromPoolLiquidityPre_get(address caller, address seed, AsyncOrder memory o) public oneTx {
         _seedTransient(seed);
         _mockUnlockOk();
         vm.record();

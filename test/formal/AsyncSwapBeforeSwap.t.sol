@@ -158,6 +158,12 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
 
     function _build(In memory x) internal returns (Call memory c) {
         c.caller = x.fromManager ? address(manager) : x.caller;
+        if (!x.fixtureKey) {
+            // Forge's own addresses (the cheatcode contract, console, CREATE2 factory) aren't tokens:
+            // a `balanceOf` sent to `address(vm)` is rejected as an unknown cheatcode.
+            assumeNotForgeAddress(x.c0);
+            assumeNotForgeAddress(x.c1);
+        }
         c.key = x.fixtureKey ? key : _rawKey(x.c0, x.c1, x.fee, x.ts);
         int256 a = x.amountSpecified;
         if (x.steerAmount) a = -int256(bound(uint256(a < 0 ? -(a + 1) : a), 0, 2 ** 127 - 1));

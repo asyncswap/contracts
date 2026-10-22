@@ -21,6 +21,7 @@ contract RouterMatchBookFormalTest is FormalProbesA {
     ///         `unlock(matchBookData(key, maxMatches))` call, with no transient or persistent write of its own.
     function testFuzz_matchBook_eq(address caller, address seed, PoolKey memory k, uint8 maxMatches, bytes memory ret)
         public
+        oneTx
     {
         _seedTransient(seed);
         vm.mockCall(address(manager), abi.encodeWithSelector(IPoolManager.unlock.selector), abi.encode(ret));

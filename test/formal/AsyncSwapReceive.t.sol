@@ -19,7 +19,7 @@ contract AsyncSwapReceiveFormalTest is FormalSlotsB {
         }
     }
 
-    function test_probe_roundTrip() public {
+    function test_probe_roundTrip() public oneTx {
         _tstore(address(hook), PENDING_NATIVE_DEPOSIT, 42);
         assertEq(_tload(address(hook), PENDING_NATIVE_DEPOSIT), 42);
         assertEq(hook.owner(), address(this), "code restored");
@@ -27,7 +27,7 @@ contract AsyncSwapReceiveFormalTest is FormalSlotsB {
 
     /// @notice formal/Refinement/Swarm/AsyncSwapReceive.lean:32 — always succeeds, returns (), ledger := pending + value
     ///         (mod 2^256).
-    function testFuzz_receive_run(address sender, uint256 pending, uint256 value) public {
+    function testFuzz_receive_run(address sender, uint256 pending, uint256 value) public oneTx {
         _tstore(address(hook), PENDING_NATIVE_DEPOSIT, pending);
         (bool ok, bytes memory ret) = _send(sender, value);
         assertTrue(ok);
@@ -44,7 +44,7 @@ contract AsyncSwapReceiveFormalTest is FormalSlotsB {
 
     /// @notice formal/Refinement/Swarm/AsyncSwapReceive.lean:42 — any success is exactly the ledger bump (two in a row
     ///         accumulate).
-    function testFuzz_receive_ok(address sender, uint256 pending, uint256 v1, uint256 v2) public {
+    function testFuzz_receive_ok(address sender, uint256 pending, uint256 v1, uint256 v2) public oneTx {
         _tstore(address(hook), PENDING_NATIVE_DEPOSIT, pending);
         (bool ok,) = _send(sender, v1);
         if (ok) assertEq(_tload(address(hook), PENDING_NATIVE_DEPOSIT), _yadd(pending, v1));
@@ -54,7 +54,10 @@ contract AsyncSwapReceiveFormalTest is FormalSlotsB {
 
     /// @notice formal/Refinement/Swarm/AsyncSwapReceive.lean:50 — ledger := (pending + value) mod 2^256; every storage
     ///         field and every other transient slot unchanged.
-    function testFuzz_receive_frame(address sender, uint256 pending, uint256 value, bytes32 k, uint256 kv) public {
+    function testFuzz_receive_frame(address sender, uint256 pending, uint256 value, bytes32 k, uint256 kv)
+        public
+        oneTx
+    {
         vm.assume(k != PENDING_NATIVE_DEPOSIT);
         _placeOrder(alice, true, 1 ether, 0.9 ether); // non-trivial asyncOrders / priceBooks
         _tstore(address(hook), PENDING_NATIVE_DEPOSIT, pending);

@@ -91,7 +91,7 @@ contract RefinementRouterFormalTest is FormalProbesA {
     /// @notice formal/Refinement/Router.lean:168 — when the Router's guard holds, `swap` stores the caller
     ///         (USER) and the Router (FILLER) in transient storage and is exactly
     ///         `unlock(abi.encode(SwapCallback(Swap, order, 0)))`.
-    function testFuzz_swap_complete(SwapIn memory s) public {
+    function testFuzz_swap_complete(SwapIn memory s) public oneTx {
         s.owner_ = s.sender;
         AsyncOrder memory o = _swapOrder(s);
         bool nativeIn = o.zeroForOne && Currency.unwrap(o.key.currency0) == address(0);
@@ -125,7 +125,7 @@ contract RefinementRouterFormalTest is FormalProbesA {
 
     /// @notice formal/Refinement/Router.lean:206 — from the owner, `cancelOrder` stores only USER := caller
     ///         and is exactly `unlock(abi.encode(SwapCallback(Cancel, order, 0)))`.
-    function testFuzz_cancelOrder_complete(AsyncOrder memory o) public {
+    function testFuzz_cancelOrder_complete(AsyncOrder memory o) public oneTx {
         _mockUnlockOk();
         vm.expectCall(address(manager), 0, abi.encodeCall(IPoolManager.unlock, (_cb(2, o, 0))), 1);
         vm.prank(o.owner);
@@ -237,6 +237,7 @@ contract RefinementRouterFormalTest is FormalProbesA {
     ///         `unlock(abi.encode(SwapCallback(FillOrder, order, 0)))` with `tload(MAX_PRICE) == maxPrice`.
     function testFuzz_fillOrder_forwards(address sender, AsyncOrder memory o, bool native0, uint256 p, uint256 maxPrice)
         public
+        oneTx
     {
         o.key = key;
         if (native0) o.key.currency0 = Currency.wrap(address(0));

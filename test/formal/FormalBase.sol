@@ -4,6 +4,7 @@ pragma solidity ^0.8.26;
 import {SetupHook} from "../SetupHook.t.sol";
 import {AsyncSwap} from "@async-swap/AsyncSwap.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
+import {Hooks} from "v4-core/libraries/Hooks.sol";
 import {PoolModifyLiquidityTest} from "v4-core/test/PoolModifyLiquidityTest.sol";
 import {ModifyLiquidityParams} from "v4-core/types/PoolOperation.sol";
 
@@ -22,8 +23,38 @@ contract FormalBase is SetupHook {
     uint256 constant PENDING_OWNER_SLOT = 5;
     uint256 constant NONCE_USED_SLOT = 6;
 
+    bool private _inOneTx;
+
+    /// @dev Run the test body as one nested call, so it is a single transaction for transient storage.
+    ///      With `isolate` (Foundry's default since 1.8) each top-level call a test makes is its own
+    ///      transaction, which clears transient storage between, say, a `receive` deposit and the
+    ///      `executeOrder` that spends it. On chain those happen inside one transaction. The test is
+    ///      re-entered once through `msg.data`; a revert, failed assertion or `vm.assume` comes back up
+    ///      unchanged.
+    modifier oneTx() {
+        if (_inOneTx) {
+            _;
+        } else {
+            _inOneTx = true;
+            (bool ok, bytes memory ret) = address(this).call(msg.data);
+            _inOneTx = false;
+            if (!ok) {
+                assembly ("memory-safe") {
+                    revert(add(ret, 0x20), mload(ret))
+                }
+            }
+        }
+    }
+
+    /// @dev `SetupHook.setUp`, except that the hook is deployed by `_deployHookLinked`.
     function setUp() public virtual override {
-        super.setUp();
+        _deployManager();
+        _deployTokens();
+        _deployHookLinked();
+        _deployRouter();
+        _createKey();
+        _initializePool();
+        _mintToOwner();
         topUp(alice, 100 ether);
         topUp(bob, 100 ether);
         vm.prank(alice);
@@ -34,6 +65,24 @@ contract FormalBase is SetupHook {
         token0.approve(address(router), type(uint256).max);
         vm.prank(bob);
         token1.approve(address(router), type(uint256).max);
+    }
+
+    /// @dev `SetupHook._deployHook` without `vm.getCode`: run `AsyncSwap`'s creation code at the hook's
+    ///      flag address, as `deployCodeTo` does. The creation code is embedded in this test contract,
+    ///      so its `AsyncMatching` link is resolved by whichever runner deployed it: Forge or Halmos
+    ///      (Halmos's `getCode` can't read an artifact with link placeholders).
+    function _deployHookLinked() internal {
+        address flags = address(
+            uint160(
+                Hooks.BEFORE_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG
+                    | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
+            )
+        );
+        vm.etch(flags, abi.encodePacked(type(AsyncSwap).creationCode, abi.encode(manager, currency1, address(this))));
+        (bool ok, bytes memory runtime) = flags.call("");
+        require(ok, "AsyncSwap constructor reverted");
+        vm.etch(flags, runtime);
+        hook = AsyncSwap(payable(flags));
     }
 
     /// @dev The fixture's hook owner (`SetupHook` deploys the hook with `address(this)` as owner).

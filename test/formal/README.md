@@ -46,6 +46,10 @@ through `Refinement/`.
     ([`FormalProbesA.sol`](FormalProbesA.sol)).
   - Reading or writing the hook's transient storage directly swaps in a small `tload`/`tstore` probe
     with `vm.etch` and puts the original code back afterwards ([`FormalSlotsB.sol`](FormalSlotsB.sol)).
+  - A test whose steps share transient state carries `oneTx`, which runs its body as one nested call.
+    With `isolate` (Foundry's default since 1.8), each top-level call a test makes is its own
+    transaction and transient storage is cleared between them; on chain those steps happen inside
+    one transaction.
 
 Shared fixtures:
 - [`FormalBase.sol`](FormalBase.sol): `SetupHook` plus two funded makers, `_placeOrder`, and AsyncSwap's
@@ -86,11 +90,24 @@ differences is reachable through a well-formed call:
 
 ## Halmos
 
-Halmos isn't installed here. The `Halmos` column says whether a test could run symbolically:
-- **yes (57 theorems):** it takes plain inputs and has no setup Halmos can't handle.
-- **with edits (67 theorems):** it needs its `vm.record` / `vm.accesses` write-set check replaced by
-  before/after `vm.load` comparisons.
-- **no:** it uses mocks, signatures, real order books, unlock flows or gas exhaustion.
+`FormalBase` deploys the hook from `type(AsyncSwap).creationCode`, not `vm.getCode`, so Halmos links
+the `AsyncMatching` library itself, and the same fixture runs under both Forge and Halmos:
+
+```sh
+FOUNDRY_OUT=out-halmos FOUNDRY_CACHE_PATH=cache-halmos \
+  halmos --forge-build-out out-halmos --match-contract 'FormalTest$' --function test
+```
+
+A partial run with Halmos 0.3.3 (15 of the 50 suites) found no counterexamples. 40 tests passed
+symbolically. The other 29 stopped on cheatcodes Halmos doesn't support (`vm.expectRevert(bytes4)`,
+`vm.record` / `vm.accesses`).
+
+The `Halmos` column predicts which tests would run as they are:
+- **yes (57 theorems):** plain inputs, no setup Halmos can't handle.
+- **with edits (67 theorems):** the `vm.record` / `vm.accesses` write-set check needs to become
+  before/after `vm.load` comparisons, and `vm.expectRevert` needs to become a low-level call that
+  checks the revert data.
+- **no:** mocks, signatures, real order books, unlock flows or gas exhaustion.
 
 ## Theorem → test map
 

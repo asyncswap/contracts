@@ -55,7 +55,7 @@ contract RouterSwapWithSigFormalTest is FormalProbesA {
         AsyncOrder memory o,
         Router.PermitData memory p,
         Router.ExecutorGrant memory g
-    ) public {
+    ) public oneTx {
         vm.assume(_input(o) != address(0));
         g.signature = "";
         _mockUnlockOk();
@@ -74,7 +74,7 @@ contract RouterSwapWithSigFormalTest is FormalProbesA {
         AsyncOrder memory o,
         Router.PermitData memory p,
         Router.ExecutorGrant memory g
-    ) public {
+    ) public oneTx {
         vm.assume(_input(o) != address(0) && g.signature.length != 0);
         vm.mockCall(address(hook), _isExecCall(o), abi.encode(true));
         _mockUnlockOk();
@@ -112,7 +112,7 @@ contract RouterSwapWithSigFormalTest is FormalProbesA {
         Router.ExecutorGrant memory g,
         bool grantReverts,
         bytes memory err
-    ) public {
+    ) public oneTx {
         vm.assume(_input(o) != address(0) && g.signature.length != 0);
         vm.mockCall(address(hook), _isExecCall(o), abi.encode(false));
         _mockUnlockOk();
@@ -161,7 +161,7 @@ contract RouterSwapWithSigFormalTest is FormalProbesA {
         Router.PermitData memory p,
         Router.ExecutorGrant memory g,
         bool isExec
-    ) public {
+    ) public oneTx {
         vm.assume(_input(o) != address(0));
         vm.mockCall(address(hook), abi.encodeWithSelector(AsyncSwap.isExecutor.selector), abi.encode(isExec));
         vm.mockCall(address(hook), abi.encodeWithSelector(AsyncSwap.setExecutorWithSig.selector), "");
@@ -175,7 +175,10 @@ contract RouterSwapWithSigFormalTest is FormalProbesA {
 
     /// @notice formal/Refinement/Swarm/RouterSwapWithSig.lean:124 — the USER slot `unlock` sees is the order's
     ///         owner, never the caller.
-    function testFuzz_swapWithSigPre_user(address caller, AsyncOrder memory o, Router.PermitData memory p) public {
+    function testFuzz_swapWithSigPre_user(address caller, AsyncOrder memory o, Router.PermitData memory p)
+        public
+        oneTx
+    {
         vm.assume(_input(o) != address(0));
         _mockUnlockOk();
         _seedTransient(caller); // USER := caller beforehand, so a missing write would show
@@ -186,7 +189,10 @@ contract RouterSwapWithSigFormalTest is FormalProbesA {
     }
 
     /// @notice formal/Refinement/Swarm/RouterSwapWithSig.lean:130 — the FILLER slot `unlock` sees is the Router.
-    function testFuzz_swapWithSigPre_filler(address caller, AsyncOrder memory o, Router.PermitData memory p) public {
+    function testFuzz_swapWithSigPre_filler(address caller, AsyncOrder memory o, Router.PermitData memory p)
+        public
+        oneTx
+    {
         vm.assume(_input(o) != address(0));
         _mockUnlockOk();
         vm.prank(caller);

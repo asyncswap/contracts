@@ -256,7 +256,7 @@ contract AsyncSwapExecuteOrderFormalTest is HookUnlockBase {
     }
 
     /// @notice formal/Refinement/Swarm/AsyncSwapExecuteOrder.lean:323 — success (native output): the ledger is decremented by exactly m + pf(m); maker gets m and feeVault pf(m) as native claims; the filler gets the ERC20 input.
-    function testFuzz_executeOrder_ok_native(uint256 m1, uint256 m2, bool short) public {
+    function testFuzz_executeOrder_ok_native(uint256 m1, uint256 m2, bool short) public oneTx {
         m1 = bound(m1, 1, 100 ether);
         m2 = bound(m2, 1, 100 ether);
         (AsyncOrder memory o1, bytes32 id1) = _nativeOrder(1 ether, m1);

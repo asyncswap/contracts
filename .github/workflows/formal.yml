@@ -3,7 +3,9 @@ name: Lean proofs
 permissions: {}
 
 on:
+  # Pull requests run on pull_request; push runs only for main, so a PR branch isn't checked twice.
   push:
+    branches: [main]
     paths: ["formal/**", "src/**", "foundry.toml", "remappings.txt", "soldeer.lock", ".github/workflows/formal.yml"]
   pull_request:
     paths: ["formal/**", "src/**", "foundry.toml", "remappings.txt", "soldeer.lock", ".github/workflows/formal.yml"]

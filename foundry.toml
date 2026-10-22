@@ -13,6 +13,19 @@ solc_version = "0.8.26"
 optimizer = true
 optimizer_runs = 1_000
 
+# The invariant campaign MAINNET_READINESS.md records (UnpaidBidInvariantTest sets 128 runs inline).
+# Foundry's own default, 256 runs x depth 500, takes about half an hour here: the invariants scan
+# every order placed so far after each call. For a longer campaign: FOUNDRY_PROFILE=deep forge test.
+[profile.default.invariant]
+runs = 64
+depth = 64
+fail_on_revert = true
+
+[profile.deep.invariant]
+runs = 256
+depth = 500
+fail_on_revert = true
+
 [dependencies]
 forge-std = "1.16.0"
 uniswap-v4-core = "4"

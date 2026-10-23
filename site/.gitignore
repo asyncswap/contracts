@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.vocs/
+
+# Written by scripts/sync.mjs on every dev/build run
+src/generated/
+src/pages/protocol/
+src/pages/audit/
+src/pages/reference/src/
+public/assets/
+src/pages.gen.ts

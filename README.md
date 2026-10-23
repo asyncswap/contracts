@@ -8,6 +8,10 @@ Book matching prioritizes price, with higher escrowed USDC bids breaking same-pr
 
 ## Documentation
 
+Published at **[docs.asyncswap.org](https://docs.asyncswap.org)**: these guides, the audit status and a contract
+reference generated from the NatSpec in `src/`. The site (`site/`, built with [vocs](https://vocs.dev)) rebuilds on
+every push to `main` that touches them; preview it locally with `cd site && bun install && bun run dev`.
+
 - [Protocol overview](docs/protocol.md): components, custody, order placement, authorization, and deployment.
 - [Order lifecycle and priority bids](docs/order-lifecycle.md): matching, fills, cancellation, and bid settlement.
 - [Contract call sequences](docs/contract-call-sequences.md): calls, callbacks, responses, and withdrawals.

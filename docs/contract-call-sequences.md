@@ -71,12 +71,13 @@ sequenceDiagram
     Router->>Hook: matchNewOrder(order)
     Hook->>Match: matchIncoming(...)
     loop Up to 8 executable crossing pairs
-        Match->>Match: Best opposing price, configured same-price tie-break
-        Match->>PM: Burn input claims and settle both order legs
-        PM-->>Wallet: ERC-20 proceeds or native claims
-        PM-->>Counterparty: ERC-20 proceeds or native claims
-        Match->>PM: Donate filled bid shares if active liquidity exists
-        Note over Match,Vault: With no active liquidity, bid claims go to FeeVault instead.<br/>Reduce and re-rank remainders, settle residual bids on termination.
+        Match->>Match: Best bid and best ask across the whole book (price, then bid, then time)
+        Match->>Match: Reduce both orders before any payout
+        Match->>PM: Settle filled bid shares to FeeVault
+        Match->>PM: Burn input claims and credit both order legs as claims
+        PM-->>Wallet: Proceeds as claims (any currency)
+        PM-->>Counterparty: Proceeds as claims (any currency)
+        Note over Match,Vault: Re-rank remainders; a remainder below the pool minimum is returned as claims<br/>and its residual bid goes to FeeVault.
     end
     Match-->>Hook: Matched pair count
     opt Incoming order still has a remainder
@@ -88,7 +89,7 @@ sequenceDiagram
         PM-->>Match: Actual input and output deltas
         Match->>PM: Restore previous LP fee
         alt Full remaining input consumed and minimum output met
-            Match->>PM: Pay output, settle remaining bid
+            Match->>PM: Pay output, settle remaining bid to FeeVault
             PM-->>Wallet: ERC-20 proceeds or native claims
             Match-->>Hook: Order removed, liquidity fill event
         else Insufficient liquidity, partial execution, or limit not met
@@ -103,7 +104,7 @@ sequenceDiagram
     Note over Wallet,Relayer: For signed submission, the transaction result returns to the submitter instead.
 ```
 
-The LP fee accrues through PoolManager's position accounting. A priority donation is separate: it rewards liquidity active at the current tick when `donate` runs. LPs do not receive an external callback on every fill.
+The LP fee accrues through PoolManager's position accounting. Priority bids are not paid to LPs: every settled bid goes to the FeeVault. LPs do not receive an external callback on every fill.
 
 ### Private fillers, continuation, repricing, and cancellation
 
@@ -145,7 +146,7 @@ sequenceDiagram
         Note over PM,Vault: Claims are credited inside PoolManager, FeeVault is not called during a fill.
         Match->>PM: Burn input escrow, pay filler remaining input
         PM-->>Caller: ERC-20 input or native claims
-        Match->>PM: Settle remaining bid to active LPs or FeeVault
+        Match->>PM: Settle remaining bid to FeeVault
         Match-->>Hook: Order closed, AsyncOrderFilled event
         Hook-->>Router: Fill complete
         Router-->>PM: Callback complete
@@ -196,7 +197,7 @@ sequenceDiagram
     end
 ```
 
-Signed alternatives are `Hook.updatePriceWithSig` and `Router.cancelWithSig`; a relayer can submit the maker's signature. Signature checks precede the corresponding state change or cancellation unlock. Any uncaught revert rolls back the whole transaction, including transfers and donations.
+Signed alternatives are `Hook.updatePriceWithSig` and `Router.cancelWithSig`; a relayer can submit the maker's signature. Signature checks precede the corresponding state change or cancellation unlock. Any uncaught revert rolls back the whole transaction, including transfers and bid settlements.
 
 ### Pool setup, liquidity providers, and withdrawals
 
@@ -208,11 +209,12 @@ sequenceDiagram
     actor Operator as Pool initializer
     actor Admin as Protocol owner
     actor LP as Liquidity provider
-    actor Holder as Native-claim holder
+    actor Holder as Claim holder
     participant LM as v4 liquidity manager
     participant Hook as AsyncSwap hook
     participant PM as PoolManager
     participant Native as NativeClaims
+    participant Tokens as TokenClaims
     participant Vault as FeeVault
     actor Recipient
 
@@ -236,7 +238,7 @@ sequenceDiagram
     LM-->>PM: Callback complete
     PM-->>LM: Unlock complete
     LM-->>LP: Position updated
-    Note over LP,PM: Eligible positions accrue swap fees and donations in PoolManager accounting.<br/>LPs collect through their chosen liquidity manager, no per-fill LP callback.
+    Note over LP,PM: Eligible positions accrue swap fees in PoolManager accounting.<br/>LPs collect through their chosen liquidity manager, no per-fill LP callback.
 
     Holder->>PM: approve(NativeClaims, claim ID 0, amount)
     PM-->>Holder: Claim allowance recorded
@@ -249,6 +251,18 @@ sequenceDiagram
     Native-->>PM: Callback complete, NativeRedeemed event
     PM-->>Native: Unlock complete
     Native-->>Holder: Redemption complete
+
+    Holder->>PM: approve(TokenClaims, currency claim ID, amount)
+    PM-->>Holder: Claim allowance recorded
+    Holder->>Tokens: redeem(currency, recipient, amount)
+    Tokens->>PM: unlock(redemption)
+    PM->>Tokens: unlockCallback(data)
+    Tokens->>PM: burn(holder, currency claim ID, amount)
+    Tokens->>PM: take(currency, recipient, amount)
+    PM-->>Recipient: ERC-20 payment
+    Tokens-->>PM: Callback complete, ClaimsRedeemed event
+    PM-->>Tokens: Unlock complete
+    Tokens-->>Holder: Redemption complete
 
     Admin->>Vault: collect(currency, recipient)
     Vault->>Hook: owner()
@@ -263,7 +277,7 @@ sequenceDiagram
     Vault-->>Admin: Collection complete
 ```
 
-Native redemption requires a positive amount and claim allowance; failed ETH delivery reverts the redemption and restores the claims. Fee collection only redeems FeeVault's balances and is restricted to the current hook owner. It cannot redeem maker escrow.
+Native and ERC-20 redemption require a positive amount, a nonzero recipient and a claim allowance; a failed delivery (ETH rejected, or a token refusing the recipient) reverts the redemption and restores the claims and allowance, and the holder can redeem to another recipient. Fee collection only redeems FeeVault's balances and is restricted to the current hook owner. It cannot redeem maker escrow.
 
-Sources: [Router](../src/Router.sol), [AsyncSwap](../src/AsyncSwap.sol), [AsyncMatching](../src/libraries/AsyncMatching.sol), [AsyncFiller](../src/libraries/AsyncFiller.sol), [NativeClaims](../src/NativeClaims.sol), and [FeeVault](../src/FeeVault.sol).
+Sources: [Router](../src/Router.sol), [AsyncSwap](../src/AsyncSwap.sol), [AsyncMatching](../src/libraries/AsyncMatching.sol), [AsyncFiller](../src/libraries/AsyncFiller.sol), [NativeClaims](../src/NativeClaims.sol), [TokenClaims](../src/TokenClaims.sol), and [FeeVault](../src/FeeVault.sol).
 

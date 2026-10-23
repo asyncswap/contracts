@@ -33,7 +33,7 @@ flowchart TD
     R --> Z
 ```
 
-If no executable crossing pair exists, the initial matching pass leaves the order unchanged before the LP attempt. `Router.matchBook` accepts a bound of 1–8 pairs and does not itself retry LP liquidity. An LP retry does not require the order to be first in the book. Private fills require a maker-authorized executor (normally the Router); the filler supplies the live minimum plus the protocol fee in the same transaction. That protocol fee is separate from the LP fee on pool-liquidity fills. Native proceeds and refunds are redeemable claims rather than direct ETH transfers.
+If no executable crossing pair exists, the initial matching pass leaves the order unchanged before the LP attempt. `Router.matchBook` accepts a bound of 1–8 pairs and does not itself retry LP liquidity. An LP retry does not require the order to be first in the book. Private fills require a maker-authorized executor (normally the Router); the filler supplies the live minimum plus the protocol fee in the same transaction. That protocol fee is separate from the LP fee on pool-liquidity fills. Book-match proceeds, and input returned below the pool minimum, are credited as PoolManager claims in every currency, redeemable through `TokenClaims` (ERC-20) or `NativeClaims` (ETH); native fill proceeds and refunds are claims too. Filler and LP fills pay ERC-20 output directly.
 
 Sources: [Router](../src/Router.sol), [AsyncSwap](../src/AsyncSwap.sol), [AsyncMatching](../src/libraries/AsyncMatching.sol), and [AsyncFiller](../src/libraries/AsyncFiller.sol).
 
@@ -55,18 +55,15 @@ flowchart TD
     C --> G{"Bid amount to settle is nonzero?"}
     F --> G
     G -- "No" --> H["No bid transfer"]
-    G -- "Yes" --> I{"Active liquidity at current tick?"}
-    I -- "Yes" --> J["PoolManager.donate to currently in-range LPs"]
-    I -- "No" --> K["Transfer bid claims to protocol FeeVault"]
-    J --> L["Commit with the order operation in the same unlock"]
-    K --> L
+    G -- "Yes" --> K["Transfer bid claims to protocol FeeVault"]
+    K --> L["Commit with the order operation in the same unlock"]
     H --> L
     L -. "Any later revert" .-> M["Roll back operation and bid settlement together"]
 ```
 
 For each book match, the settled share is `floor(remainingBid * inputUsed / remainingInputBeforeFill)`. If the order terminates, any residual bid is settled too; it is never returned to the maker. A partial fill can leave a bid below the creation minimum. Its remaining bid determines its new same-price rank. If the remaining price key changes, it also receives a fresh sequence number. Maker repricing always assigns fresh time priority without refunding the bid.
 
-Donations go to LPs active at the tick when `donate` executes, which need not be every position traversed during a pool swap. A failed LP self-call rolls back that attempt, including its fee and bid changes, while preserving prior successful book matches in the surrounding transaction. A revert of the surrounding transaction rolls everything back.
+Bids always go to the FeeVault, whatever liquidity is in range, so liquidity added for the moment of settlement captures none of them. A failed LP self-call rolls back that attempt, including its fee and bid changes, while preserving prior successful book matches in the surrounding transaction. A revert of the surrounding transaction rolls everything back.
 
 Sources: [`_reduceAfterMatch` and `_settleMatchedPriorityFee`](../src/libraries/AsyncMatching.sol), [`settlePriorityFee`, `fill`, and `cancel`](../src/libraries/AsyncFiller.sol). The [original chat diagrams](historical-matching-diagrams.md) are retained as historical references.
 

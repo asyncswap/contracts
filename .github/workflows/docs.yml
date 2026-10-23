@@ -1,0 +1,81 @@
+name: Docs
+
+permissions: {}
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "docs/**"
+      - "audit/**"
+      - "site/**"
+      - "README.md"
+      - "foundry.toml"
+      - ".github/workflows/docs.yml"
+  # Pull requests build the site as a check; only main publishes.
+  pull_request:
+    paths:
+      - "src/**"
+      - "docs/**"
+      - "audit/**"
+      - "site/**"
+      - "README.md"
+      - "foundry.toml"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build docs.asyncswap.org
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push gh-pages
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      # Same pinned version as CI; `forge doc` generates the contract reference.
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.8.6
+
+      - name: Install Soldeer dependencies
+        run: forge soldeer install
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install site dependencies
+        working-directory: site
+        run: bun install --frozen-lockfile
+
+      - name: Build the site
+        working-directory: site
+        env:
+          DOCS_BASE_URL: https://docs.asyncswap.org
+        run: |
+          bun run build
+          test -f dist/public/index.html
+          test -f dist/public/reference/src/AsyncSwap/index.html
+
+      - name: Publish to GitHub Pages
+        if: github.event_name != 'pull_request'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: site/dist/public
+          cname: docs.asyncswap.org
+          # vocs writes `_root.d/`; .nojekyll keeps Pages from dropping underscore paths.
+          enable_jekyll: false

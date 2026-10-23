@@ -22,10 +22,11 @@ flowchart LR
         Router["Router.sol<br/>swap · swapWithSig · fillOrder<br/>cancelOrder · cancelWithSig<br/>matchBook · fillFromPoolLiquidity"]
         Permit2["Permit2<br/>permitWitnessTransferFrom"]
         NativeClaims["NativeClaims.sol<br/>redeem native claims (ID 0)"]
+        TokenClaims["TokenClaims.sol<br/>redeem ERC-20 claims"]
     end
 
     subgraph Core
-        PM["Uniswap v4 PoolManager<br/>unlock · swap · donate<br/>ERC-6909 claims"]
+        PM["Uniswap v4 PoolManager<br/>unlock · swap<br/>ERC-6909 claims"]
         Hook["AsyncSwap.sol (hook)<br/>beforeInitialize · beforeSwap<br/>beforeAddLiquidity<br/>matchNewOrder · executeOrder<br/>updatePrice · cancelOrder<br/>setExecutor(WithSig)"]
         Matching["AsyncMatching.sol<br/>external library, delegatecall<br/>addOrder · match · fill · cancel<br/>updatePrice · fillFromPool"]
         Filler_["AsyncFiller.sol<br/>State: orders, isExecutor<br/>Book: bids, asks, levels"]
@@ -53,11 +54,13 @@ flowchart LR
     Filler_ --> Radix
     Hook --> Sigs
     Router --> Sigs
-    Hook -->|mint / take / burn / settle / donate| PM
+    Hook -->|mint / take / burn / settle| PM
     PM -.->|accounting credit, not a contract call| Vault
     Vault -->|burn + take| PM
     Maker -->|redeem| NativeClaims
     NativeClaims -->|burn ID 0, send ETH| PM
+    Maker -->|redeem| TokenClaims
+    TokenClaims -->|burn claim, send ERC-20| PM
 ```
 
 Every pool that uses the hook must contain the chain's USDC (`numeraire`) and use the dynamic-fee flag
@@ -75,26 +78,33 @@ FeeVault owns claims recorded in PoolManager. Crediting those claims does not ca
 flowchart TB
     subgraph PoolManager["PoolManager (custody)"]
         Escrow["ERC-6909 claims owned by the hook<br/>one balance per currency<br/>= Σ open orders' remaining input<br/>+ escrowed priority bids"]
-        Fees["ERC-6909 claims owned by FeeVault<br/>= accrued 30 bps fill fees<br/>+ forfeited priority bids"]
-        User["ERC-6909 claims owned by makers / fillers<br/>native proceeds (claim ID 0)"]
-        Reserves["Pool reserves<br/>v4 LP positions + donations"]
+        Fees["ERC-6909 claims owned by FeeVault<br/>= accrued 30 bps fill fees<br/>+ settled priority bids"]
+        User["ERC-6909 claims owned by makers / fillers<br/>match proceeds and dust refunds (any currency),<br/>native fill proceeds (claim ID 0)"]
+        Reserves["Pool reserves<br/>v4 LP positions"]
     end
     MakerW["Maker wallet"] -->|input on swap| Escrow
     Escrow -->|cancel: full remainder| MakerW
-    Escrow -->|match or fill: input| CounterW["Counterparty wallet"]
-    CounterW -->|output| MakerW
+    Escrow -->|match: input as claims| User
+    Escrow -->|fill: input| CounterW["Filler wallet"]
+    CounterW -->|fill: output| MakerW
     FillerW["Filler wallet"] -->|protocol fee from gross output payment| Fees
-    Escrow -->|priority bid share| Reserves
-    Escrow -->|bid with no active LP| Fees
+    Escrow -->|priority bids| Fees
     Fees -->|collect| OwnerW["Owner-chosen recipient"]
-    User -->|NativeClaims.redeem| MakerW
+    User -->|TokenClaims.redeem /<br/>NativeClaims.redeem| MakerW
 ```
 
 Fees, by path: an order-to-order match charges nothing; a filler fill (`Router.fillOrder`) pays
 the maker's live minimum plus 30 bps of gross output, and that fee lands in the FeeVault as claims;
 an LP fill charges the 30 bps dynamic LP fee to the active v4 positions. `calculateHookFee` is zero.
-Priority bids are escrowed as hook claims by `addOrder`, donated proportionally to active LPs as
-input fills, and forfeited to the FeeVault when no liquidity is active at settlement. Minting bid
+Priority bids are escrowed as hook claims by `addOrder` and settle to the FeeVault: the filled share
+as input fills, the rest when the order closes. They never go to LPs, so liquidity added just before
+a settlement earns none of them.
+
+An order-to-order match pays both sides, and returns any remainder left below the pool minimum, as
+PoolManager claims rather than token transfers, so a recipient a token refuses cannot block matching.
+Holders redeem ERC-20 claims through `TokenClaims` and native claims through `NativeClaims`, to any
+recipient, after approving the redeemer for that claim id. Filler fills and LP fills pay the maker's
+ERC-20 output directly. Minting bid
 claims creates hook debt immediately; the PoolManager unlock must settle that debt, including for
 custom executors. The Router pays it with `settleFor(hook)`. All pools rank equal prices by remaining
 bid, then sequence. There is no FIFO mode or mode switch.
@@ -102,7 +112,7 @@ bid, then sequence. There is no FIFO mode or mode switch.
 The accounting invariant is fuzzed by the matching invariant suites: the hook's claim balance for
 each currency equals the sum of remaining inputs of open orders plus escrowed bids, and nothing is
 created or destroyed by a match. The hook's own token balance is zero between transactions, so
-`sweep` can only move stranded ETH or donations, never escrow.
+`sweep` can only move stranded ETH or tokens sent to the hook by mistake, never escrow.
 
 ## 3. Placing an order
 
@@ -215,6 +225,7 @@ flowchart LR
     Owner["Deployer / owner"] -->|CREATE| Router["Router(PoolManager, hook, Permit2)"]
     Lib -.->|linked into bytecode| Hook
     Owner -->|CREATE, separate script| NC["NativeClaims(PoolManager)"]
+    Owner -->|CREATE, separate script| TC["TokenClaims(PoolManager)"]
     Hook -->|initialize| Pool["Pool: USDC × asset<br/>dynamic fee flag, hook address"]
 ```
 

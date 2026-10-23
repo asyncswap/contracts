@@ -1,4 +1,4 @@
-![AsyncSwap](/assets/async-swap-banner.png)
+![AsyncSwap: limit order book protocol on Ethereum](/brand/banner.png)
 
 # AsyncSwap
 

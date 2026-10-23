@@ -39,7 +39,7 @@ The fork fixture installs hook code for tests. It is not a rehearsal of the comp
 
 ## Release work remaining
 
-Complete callback safety review beyond native settlement. Stress the integrated custody path at 100 transactions per block with adversarial dust, cancellation, and priority cases. Existing standalone matching benchmarks do not establish integrated throughput. Complete a pinned deployment-script fork rehearsal, final-bytecode verification, and independent security review. Confirm the production indexer/frontend understand all v2 events and order states. The local matching lab uses a separate SQLite indexer.
+Complete callback safety review beyond native settlement. Stress the integrated custody path at 100 transactions per block with adversarial dust, cancellation, and priority cases. Existing standalone matching benchmarks do not establish integrated throughput. Complete a pinned deployment-script fork rehearsal, final-bytecode verification, and independent security review. Confirm the production indexer/frontend understand all events and order states. The local matching lab uses a separate SQLite indexer.
 
 `script/check-mainnet-readiness.sh` runs the native rejecting-recipient test and deliberately keeps release blocked pending independent review and the remaining deployment/stress work.
 

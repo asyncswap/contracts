@@ -3,7 +3,7 @@ import { defineConfig } from 'vocs/config'
 import { sidebar as referenceSidebar } from './src/generated/reference-sidebar.ts'
 
 export default defineConfig({
-  title: 'AsyncSwap',
+  title: 'Async Swap',
   description:
     'An on-chain order book and matching engine built as a Uniswap v4 hook: limit orders against USDC, matched by price, priority bid and time.',
   // vocs emits <base href={baseUrl}>, so it is set only for the published build (the docs workflow);

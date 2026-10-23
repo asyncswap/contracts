@@ -632,7 +632,7 @@ contract AsyncSwapTest is SetupHook {
         );
     }
 
-    function test_filledPriorityBidIsDonatedToActiveLpsInsideFill() public {
+    function test_filledPriorityBidGoesToFeeVaultNotActiveLps() public {
         _addPoolLiquidity(1e24);
         uint256 bidAmount = 1 ether;
         AsyncOrder memory ask = _withPriorityFee(_orderFromMaker(alice, true, 1 ether, 0.95 ether), bidAmount);
@@ -653,12 +653,11 @@ contract AsyncSwapTest is SetupHook {
         vm.stopPrank();
 
         (uint256 growth0After, uint256 growth1After) = manager.getFeeGrowthGlobals(poolId);
-        assertTrue(
-            growth0After > growth0Before || growth1After > growth1Before,
-            "successful fill donates to active LP fee growth"
-        );
+        assertGt(growth0After, growth0Before, "active LPs earn the 30 bps fill fee in the input token");
+        assertEq(growth1After, growth1Before, "the bid is not donated to LPs");
+        assertEq(manager.balanceOf(address(hook), currency1.toId()), 0, "priority bid claims leave the hook");
         assertEq(
-            manager.balanceOf(address(hook), currency1.toId()), 0, "priority bid claims are consumed by the donation"
+            manager.balanceOf(address(hook.feeVault()), currency1.toId()), bidAmount, "the bid goes to the FeeVault"
         );
     }
 

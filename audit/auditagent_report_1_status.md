@@ -16,21 +16,25 @@ while fixing it.
 | --- | --- | --- | --- |
 | 1 | High | `fill` pays out while the order is still live | **Fixed** |
 | 2 | High | `fillFromPoolLiquidity` pays before removing the order | **Fixed** |
-| 3 | Medium | Coarse `_priceKey` buckets: a non-crossing head blocks its level | **Fixed locally** |
-| 4 | Medium | Temporary LPs capture priority bids / divert `FeeVault` forfeits | **Not fixed** |
+| 3 | Medium | Coarse `_priceKey` buckets: a non-crossing head blocks its level | **Fixed** |
+| 4 | Medium | Temporary LPs capture priority bids / divert `FeeVault` forfeits | **Fixed** |
 | 5 | Medium | Filler `maxPrice` caps payment, not the input received | **Fixed** |
 | 6 | Medium | Favorable partial fills weaken the remaining limit | **Fixed** |
 | 7 | Medium | Custom executors can skip the priority bid | **Fixed** |
-| 8 | Medium | New orders bypass a crossed backlog left by the 8-match cap | **Acknowledged** (harness) / **Not fixed** (live) |
-| 9 | Medium | An unreceivable ERC-20 payout blocks matching | **Not fixed** |
-| 10 | Medium | `updatePrice` resets `sequence`, flipping maker/taker of a crossed pair | **Not fixed** |
+| 8 | Medium | New orders bypass a crossed backlog left by the 8-match cap | **Acknowledged** (harness) / **Fixed** (live) |
+| 9 | Medium | An unreceivable ERC-20 payout blocks matching | **Fixed** |
+| 10 | Medium | `updatePrice` resets `sequence`, flipping maker/taker of a crossed pair | **Fixed** |
 | 11 | Low | Deleting an emptied level costs gas in its historical peak | **Fixed** |
 | 12 | Low | One dust order blocks `setOrderingMode` | **Fixed** |
 | R-1 | — | Router fill checks the order, pulls ERC-20, then executes | **Fixed** |
 | R-2 | — | A new order is matchable before its input is settled | **Fixed** |
 
-Policy changes made alongside: a [minimum order and tiered priority bid](#minimum-order-and-tiered-bid),
-and [priority-fee-only pools](#priority-fee-only-pools) (closes 7 and 12).
+Every finding is now fixed or acknowledged; none is open. Policy changes made alongside: a
+[minimum order and tiered priority bid](#minimum-order-and-tiered-bid), and
+[priority-fee-only pools](#priority-fee-only-pools) (closes 7 and 12).
+
+The fixes are on `main`; no deployment has been made. Storage layout and public ABI changed, so they
+ship as fresh contracts, not as an upgrade.
 
 ## Fixed
 
@@ -44,12 +48,13 @@ are callable from there. The order must already be closed or reduced when that c
 - `AsyncMatching.fillFromPoolLiquidity`: the order is removed and deleted before the pool swap and the
   maker's payout.
 - `AsyncMatching._matchPair`: recipients are read first (`_payouts`), both orders are reduced, then
-  the two escrow legs pay out (`_settleTransfers`).
+  the two escrow legs pay out (`_settleTransfers`). Since the fix for 9, those legs credit PoolManager
+  claims and run no token code at all.
 
 Tests: `test/nethermind_auditagent/NethermindAuditAgent.t.sol`
-`test_H1_fill_orderClosedBeforeMakerPayout`, `test_H1_match_orderReducedBeforeMakerPayout`,
-`test_H2_poolLiquidityFill_orderClosedBeforeMakerPayout`. A token notifies the paid maker, which
-only reads the order's record.
+`test_H1_fill_orderClosedBeforeMakerPayout`, `test_H2_poolLiquidityFill_orderClosedBeforeMakerPayout`
+(a token notifies the paid maker, which only reads the order's record) and
+`test_H1_match_orderReducedBeforeMakerPayout` (the match credits claims and the token's code never runs).
 
 ### 3: exact eligibility inside coarse price buckets
 
@@ -65,10 +70,18 @@ The original approximately 2-USDC blocker no longer stalls 20,000 USDC of execut
 both clamps, two-sided blockers, mutations, selected IDs, remainders, fees, and maker balances.
 `EligiblePriceTest` checks subtree invariants, randomized mutations, full depth, and node reuse.
 
-This is a local fix, not a deployed upgrade. The index bound is independent of blocker count;
-external token execution can still revert or consume gas (finding 9). Incoming-vs-backlog priority
-(finding 8), LP fee capture (4), and repricing age policy (10) remain separate issues. See
-`docs/price-key-crossing.md` and the revised whitepaper for the argument and proof boundaries.
+The index bound is independent of blocker count. Matching runs no token code (finding 9), so a
+blocker cannot make it revert or burn gas through a payout. See `docs/price-key-crossing.md` and the
+revised whitepaper for the argument.
+
+### 4: priority bids always go to the `FeeVault`
+`AsyncFiller.settlePriorityFee` no longer checks in-range liquidity: every settled bid (the filled
+share on a match, the rest on close, cancel, fill or pool fill) is burned from the hook's claims and
+minted to the `FeeVault`. Liquidity added for the moment of settlement receives none of it. (Active
+LPs still earn the 30 bps fill fee on a pool fill, as on any Uniswap swap; that fee is not a bid.)
+
+Tests: `test_M4_liquidityAddedBeforeFillGetsNoBid` (on the audited code the bid shows up as LP fee
+growth), `test_filledPriorityBidGoesToFeeVaultNotActiveLps`, `test_lpCollectsFillFeeOnWithdraw`.
 
 ### 5: `order.amountIn` bounds what the filler receives
 `Router.unlockCallback` (fill) reverts with `"Input below order.amountIn"` when the order's live input
@@ -88,6 +101,40 @@ input on the book at its own limit, where it used to be refunded. Three existing
 
 Tests: `test_M6_favorablePartialFill_keepsRemainderLimit`, `test_M6_favorablePartialFill_keepsBuyerRemainderLimit`,
 `test_M6_partialFillMeetingWholeMinimum_keepsRemainderResting`.
+
+### 8 (live): one book-wide priority for arrivals and backlog
+`AsyncMatching.matchIncoming` now runs `matchBook` on the whole book, within the same 8-match budget,
+instead of matching only the new order against the best opposing level. A crossed backlog left by
+the cap clears first, by price, then bid, then time; the new order takes its place in that queue.
+
+Test: `test_M8_crossedBacklogClearsBeforeNewerOrder` (on the audited code a newer, worse-priced ask
+fills while the older crossed ask stays on the book).
+
+### 9: match payouts are claims
+`AsyncMatching._transferEscrow` credits ERC-6909 claims in every currency, for both escrow legs and
+for a remainder returned below the pool minimum. Holders redeem with the new `TokenClaims`
+(`redeem(currency, recipient, amount)`, after approving it on the PoolManager), to any recipient the
+token accepts. A recipient the token refuses therefore cannot revert a match.
+
+Fills by a filler and pool-liquidity fills still pay the maker in ERC-20. A refused maker can only
+fail its own order there: the pool fill runs behind a caught self-call and leaves the order resting,
+and a filler fill reverts for that one order.
+
+Tests: `test_M9_blockedRecipientDoesNotBlockMatch` (on the audited code the refused transfer reverts
+the whole match), `test/TokenClaims.t.sol` (redemption, approvals, a refused transfer restoring claims
+and allowance, re-entry).
+
+### 10: the maker role survives a reprice
+Each order now records an immutable `createdSequence`. `_matchPair` makes the order with the smaller
+`createdSequence` the maker, whose limit sets the price. `updatePrice` still takes a fresh `sequence`,
+which only sets queue position among equal-price, equal-bid orders.
+
+Test: `test_M10_repriceKeepsMakerRole` (on the audited code the older buy's reprice flips the maker,
+and the seller receives 11 instead of 12).
+
+The regression tests for 4, 8, 9 and 10 were run against the audited commit `e04668e` with the current
+`SetupHook` and its pools switched to priority-fee mode: each fails there on its own assertion and
+passes on `main`.
 
 ### 11: an emptied price level is left in place
 `AsyncFiller._remove` no longer deletes the `PriceLevel` when its last order leaves. Its FIFO links
@@ -128,11 +175,12 @@ numeraire (USDC) base units:
   The pool price is an estimate: an empty pool still shows its creation price, so this is an admission
   gate, not an oracle.
 - **Remainders.** A partial match that leaves an order worth less than the minimum, by its own terms
-  (no pool price), closes it and returns the remaining input after both orders are reduced.
-- **Tiered bid.** In PriorityFee mode the least bid is `min($0.10, 0.1% of the order)`: $0.10 from $100
-  up, down to $0.01 at the $10 minimum.
+  (no pool price), closes it and returns the remaining input as claims after both orders are reduced.
+- **Tiered bid.** The least bid is `min($0.10, 0.1% of the order)`: $0.10 from $100 up, down to $0.01
+  at the $10 minimum.
 
-Tests: `test/security/MinimumOrder.t.sol`. Formal tests updated: the `addOrder` and `CreateOrderSpec`
+Tests: `test/security/MinimumOrder.t.sol`, including a sell and a buy remainder refunded below the
+minimum, and the value check on a pool whose numeraire is `currency0`. Formal tests updated: the `addOrder` and `CreateOrderSpec`
 fee guards, and `beforeInitialize`'s write set (now also `priceBooks[id].minOrder`).
 
 Hook size: `updatePriceWithSig` called the internal `AsyncFiller.updatePrice`, inlining it into the
@@ -165,30 +213,6 @@ a migration of existing orders or deployed contracts.
 ### 8 (harness): `MatchingEngine`
 `src/MatchingEngine.sol` is a standalone matching harness and gas benchmark; it holds no tokens.
 
-## Not fixed (decision needed)
-
-### 4: priority bids follow instantaneous liquidity
-The donate-or-forfeit decision and the recipients depend only on in-range liquidity at settlement, so
-liquidity added for that moment receives the bid. Options: always route bids to `FeeVault`, or pay
-only liquidity older than the settlement (needs per-position tracking).
-
-### 8 (live): crossed backlog after the 8-match cap
-`AsyncMatching.matchIncoming` matches a new order against the best opposing order and ignores an
-existing crossed backlog on its own side. Option: clear the crossed book (`matchBook`) before matching
-the incoming order, within the same match budget.
-
-### 9: unreceivable ERC-20 payouts block matching
-ERC-20 payouts are direct, so a recipient that cannot receive (e.g. a USDC-blacklisted maker) reverts
-the whole match. The maker can still cancel while its input refund is receivable. Options: pay ERC-20
-proceeds as PoolManager claims (pull), as native already is; or skip or evict an order whose payout
-fails.
-
-### 10: `updatePrice` resets `sequence`
-The older order of a crossed pair is the maker, and `updatePrice` always assigns a fresh sequence,
-even for an unchanged price, so either side can flip who sets the price. The amount moved is bounded
-by the spread of the two limits. Options: keep the sequence when the price key does not change, or
-decide maker/taker by something a reprice cannot reset.
-
 ## Running the tests
 
 ```sh
@@ -197,11 +221,13 @@ forge test --match-contract RouterOrderWindowTest
 forge test                                   # everything
 ```
 
-## Priority-only validation
+## Validation
 
-- Clean rebuild: `forge test --force` — **783 passed, 0 failed, 1 skipped**, across 123 suites.
-  The Unichain fork fixture skips without `UNICHAIN_FORK_RPC_URL`; no fork validation is claimed.
-- All six `PriorityFeeOnlyTest` regressions pass, along with the matching invariant campaigns.
-- `forge build --sizes`: runtime sizes are 19,237 bytes (`AsyncSwap`), 18,120 bytes
-  (`AsyncMatching`), and 17,580 bytes (`Router`), each below the 24,576-byte EIP-170 limit.
+- `forge test`: **833 passed, 0 failed, 1 skipped** across 139 suites. The Unichain fork fixture skips
+  without `UNICHAIN_FORK_RPC_URL`; no fork validation is claimed.
+- `forge build --sizes`: runtime sizes are 19,237 bytes (`AsyncSwap`), 19,064 bytes (`AsyncMatching`)
+  and 17,580 bytes (`Router`), each below the 24,576-byte EIP-170 limit.
+- `forge coverage` of `src/`: 99.9% of lines, 99.4% of statements, 98.8% of branches, 100% of
+  functions. The uncovered branches are unreachable guards (a matched amount above the order's input,
+  `MatchingEngine`'s reentrancy check, a sell-only lookup).
 - No deployment was performed.

@@ -11,6 +11,8 @@ import {PoolId} from "v4-core/types/PoolId.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 import {PoolModifyLiquidityTest} from "v4-core/test/PoolModifyLiquidityTest.sol";
 import {ModifyLiquidityParams} from "v4-core/types/PoolOperation.sol";
+import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
+import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
 
 interface ITransferObserver {
     function onTokenReceived() external;
@@ -22,9 +24,15 @@ contract NotifyingERC20 {
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
     address public observer;
+    mapping(address => bool) public blocked;
 
     function setObserver(address _observer) external {
         observer = _observer;
+    }
+
+    /// @dev Refuse transfers to `who`, the way a token with a blocklist (e.g. USDC) does.
+    function setBlocked(address who, bool isBlocked) external {
+        blocked[who] = isBlocked;
     }
 
     function mint(address to, uint256 amount) external {
@@ -37,6 +45,7 @@ contract NotifyingERC20 {
     }
 
     function transfer(address to, uint256 amount) external returns (bool) {
+        require(!blocked[to], "blocked");
         balanceOf[msg.sender] -= amount;
         balanceOf[to] += amount;
         if (to == observer) ITransferObserver(to).onTokenReceived();
@@ -81,6 +90,7 @@ contract OrderStateObserver is ITransferObserver {
 ///         the behaviour a fix must produce, so it fails on the unfixed code.
 contract NethermindAuditAgentTest is SetupHook {
     using PoolIdLibrary for PoolKey;
+    using StateLibrary for IPoolManager;
 
     address alice = makeAddr("alice");
     address bob = makeAddr("bob");
@@ -350,6 +360,105 @@ contract NethermindAuditAgentTest is SetupHook {
         assertEq(amountIn, 50 ether, "unfilled input stays on the book");
         assertEq(amountOutMin, 50 ether, "remainder keeps the seller's 1:1 limit");
         assertEq(token0.balanceOf(seller), sellerToken0Before - 100 ether, "no unrequested refund");
+    }
+
+    /* ------------------------------------------------------------------------------------------ *
+     *  Finding 4: priority bids go to the FeeVault, so liquidity added just before a fill        *
+     *  captures none of them.                                                                    *
+     * ------------------------------------------------------------------------------------------ */
+
+    function test_M4_liquidityAddedBeforeFillGetsNoBid() public {
+        // Liquidity arrives right before the order, as a just-in-time LP would place it.
+        PoolModifyLiquidityTest lp = new PoolModifyLiquidityTest(manager);
+        vm.startPrank(owner);
+        token0.transfer(address(this), 10_000 ether);
+        token1.transfer(address(this), 10_000 ether);
+        vm.stopPrank();
+        token0.approve(address(lp), type(uint256).max);
+        token1.approve(address(lp), type(uint256).max);
+        lp.modifyLiquidity(
+            key, ModifyLiquidityParams({tickLower: -60, tickUpper: 60, liquidityDelta: 1e24, salt: 0}), ""
+        );
+        (, uint256 growth1Before) = manager.getFeeGrowthGlobals(poolId);
+
+        AsyncOrder memory ask = _order(alice, true, 1 ether, 0.95 ether);
+        _submit(ask);
+
+        assertEq(hook.asyncOrder(poolId, _id(ask)), 0, "filled from the pool");
+        (, uint256 growth1After) = manager.getFeeGrowthGlobals(poolId);
+        assertEq(growth1After, growth1Before, "no numeraire fee growth: the bid is not donated");
+        assertEq(manager.balanceOf(address(hook.feeVault()), currency1.toId()), 100_000, "the bid goes to the FeeVault");
+    }
+
+    /* ------------------------------------------------------------------------------------------ *
+     *  Finding 8: a new order joins the book-wide priority. A crossed backlog left by the        *
+     *  8-match cap clears before a newer, worse-priced order on the same side.                   *
+     * ------------------------------------------------------------------------------------------ */
+
+    function test_M8_crossedBacklogClearsBeforeNewerOrder() public {
+        address lastMaker;
+        for (uint160 i = 1; i <= 9; ++i) {
+            lastMaker = address(2000 + i);
+            topUp(lastMaker, 2 ether);
+            _submit(_order(lastMaker, true, 1 ether, 0.9 ether));
+        }
+        _submit(_order(bob, false, 20 ether, 20 ether));
+        bytes32 backlogAsk = _id(_order(lastMaker, true, 1 ether, 0.9 ether));
+        assertEq(hook.asyncOrder(poolId, backlogAsk), 1 ether, "precondition: the cap left a crossed ask");
+
+        // A newer ask at a worse price (0.95) arrives.
+        AsyncOrder memory newer = _order(carol, true, 1 ether, 0.95 ether);
+        _submit(newer);
+
+        assertEq(hook.asyncOrder(poolId, backlogAsk), 0, "the older, better-priced ask filled first");
+        assertEq(hook.asyncOrder(poolId, _id(newer)), 0, "then the newer ask");
+    }
+
+    /* ------------------------------------------------------------------------------------------ *
+     *  Finding 9: match proceeds are credited as claims, so a recipient the token refuses        *
+     *  cannot block the match.                                                                   *
+     * ------------------------------------------------------------------------------------------ */
+
+    function test_M9_blockedRecipientDoesNotBlockMatch() public {
+        AsyncOrder memory resting = _buy(address(maker), 100 ether, 100 ether);
+        _submitMaker(resting);
+        asset.setBlocked(address(maker), true);
+
+        _submitBob(_sell(bob, 40 ether, 40 ether));
+
+        assertEq(hook.asyncOrder(assetPoolId, _assetId(resting)), 60 ether, "the match went through");
+        assertEq(
+            manager.balanceOf(address(maker), Currency.wrap(address(asset)).toId()),
+            40 ether,
+            "the blocked maker is credited claims"
+        );
+    }
+
+    /* ------------------------------------------------------------------------------------------ *
+     *  Finding 10: the maker of a crossed pair is the order created first. A reprice resets      *
+     *  queue position but not that.                                                              *
+     * ------------------------------------------------------------------------------------------ */
+
+    function test_M10_repriceKeepsMakerRole() public {
+        // The buy rests first at 1:1; the sell rests above it at 1.1, so they do not cross.
+        AsyncOrder memory bid = _order(buyer, false, 12 ether, 12 ether);
+        _submit(bid);
+        _submit(_order(seller, true, 10 ether, 11 ether));
+        uint256 sellerQuoteBefore = _quoteOf(seller);
+
+        // The older buy reprices to 1.2, crossing the sell, and the book is cleared.
+        vm.prank(buyer);
+        hook.updatePrice(bid, 10 ether);
+        router.matchBook(key, 1);
+
+        // The buy is still the maker, so the trade is at its 1.2: 10 asset for 12 quote.
+        // With the maker flipped to the sell it would be 1.1: 10 asset for 11 quote.
+        assertEq(_quoteOf(seller) - sellerQuoteBefore, 12 ether, "price set by the older order");
+    }
+
+    /// @dev Quote received in any form: ERC-20 balance plus PoolManager claims.
+    function _quoteOf(address who) internal view returns (uint256) {
+        return token1.balanceOf(who) + manager.balanceOf(who, currency1.toId());
     }
 
     /// Buyer side: a cheap partial fill does not loosen the buyer's maximum price for the rest.

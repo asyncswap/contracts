@@ -29,6 +29,10 @@ contract MatchingHandler is Test {
     PoolKey public key;
     address[4] public actors;
     AsyncOrder[] internal orders;
+    /// @dev `id(orders[i])` and `orders[i].zeroForOne`, recorded at placement so the invariants read
+    ///      the whole book in one call instead of three per order.
+    bytes32[] internal ids;
+    bool[] internal sells;
     bool public priority;
     uint256 public submissions;
     uint256 public cancellations;
@@ -70,7 +74,7 @@ contract MatchingHandler is Test {
         order.salt = keccak256(
             abi.encode(block.timestamp, block.number, address(hook.poolManager()), actor, amount, minimum, bid)
         );
-        orders.push(order);
+        _record(order);
         ++submissions;
     }
 
@@ -119,6 +123,17 @@ contract MatchingHandler is Test {
         if (hook.asyncOrder(key.toId(), orderId) == 0) return;
         router.fillFromPoolLiquidity(order);
         if (hook.asyncOrder(key.toId(), orderId) == 0) ++lpFills;
+    }
+
+    function _record(AsyncOrder memory order) internal {
+        orders.push(order);
+        ids.push(id(order));
+        sells.push(order.zeroForOne);
+    }
+
+    /// @notice Every order placed so far: its id and whether it sells the asset (`zeroForOne`).
+    function book() external view returns (bytes32[] memory, bool[] memory) {
+        return (ids, sells);
     }
 
     function id(AsyncOrder memory order) public view returns (bytes32) {
@@ -184,12 +199,11 @@ contract MatchingInvariantTest is StdInvariant, Test {
     function invariant_escrowEqualsOutstandingObligations() public view {
         uint256 ethOwed;
         uint256 usdcOwed;
-        uint256 count = handler.orderCount();
-        for (uint256 i; i < count; ++i) {
-            AsyncOrder memory order = handler.orderAt(i);
-            bytes32 orderId = handler.id(order);
+        (bytes32[] memory ids, bool[] memory sells) = handler.book();
+        for (uint256 i; i < ids.length; ++i) {
+            bytes32 orderId = ids[i];
             uint256 remaining = hook.asyncOrder(key.toId(), orderId);
-            if (order.zeroForOne) ethOwed += remaining;
+            if (sells[i]) ethOwed += remaining;
             else usdcOwed += remaining;
             usdcOwed += hook.asyncOrderPriorityFee(key.toId(), orderId);
         }
@@ -219,9 +233,9 @@ contract MatchingInvariantTest is StdInvariant, Test {
         uint128 bestAsk = type(uint128).max;
         bool hasBid;
         bool hasAsk;
-        for (uint256 i; i < handler.orderCount(); ++i) {
-            AsyncOrder memory order = handler.orderAt(i);
-            (, uint256 amount,, uint128 price, bool buy,,) = hook.orderBookOrder(key.toId(), handler.id(order));
+        (bytes32[] memory ids,) = handler.book();
+        for (uint256 i; i < ids.length; ++i) {
+            (, uint256 amount,, uint128 price, bool buy,,) = hook.orderBookOrder(key.toId(), ids[i]);
             if (amount == 0) continue;
             if (buy) {
                 hasBid = true;
@@ -329,10 +343,10 @@ contract LpMatchingInvariantTest is MatchingInvariantTest {
     ///      (ERC20 transfer, or native claims in the maker's own name).
     function invariant_hookHoldsNoUsdcBeyondEscrow() public view {
         uint256 usdcOwed;
-        for (uint256 i; i < handler.orderCount(); ++i) {
-            AsyncOrder memory order = handler.orderAt(i);
-            bytes32 orderId = handler.id(order);
-            if (!order.zeroForOne) usdcOwed += hook.asyncOrder(key.toId(), orderId);
+        (bytes32[] memory ids, bool[] memory sells) = handler.book();
+        for (uint256 i; i < ids.length; ++i) {
+            bytes32 orderId = ids[i];
+            if (!sells[i]) usdcOwed += hook.asyncOrder(key.toId(), orderId);
             usdcOwed += hook.asyncOrderPriorityFee(key.toId(), orderId);
         }
         assertEq(manager.balanceOf(address(hook), uint160(address(usdc))), usdcOwed);

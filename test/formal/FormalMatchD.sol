@@ -579,12 +579,11 @@ abstract contract FormalMatchD is HookUnlockBase {
 
     /// @dev Make the pair a `_matchPair` skip: 0 buy empty, 1 sell empty, 2 sell marked as a buy,
     ///      3 buy marked as a sell.
+    /// @dev Empty one order of the pair. Same-side pairs are not a skip case: `_matchPair` takes the
+    ///      buy from the bid tree and the sell from the ask tree, so their sides are fixed.
     function _makeSkip(Case memory c, uint256 mode) internal {
-        mode %= 4;
-        if (mode == 0) _storeWord(c.pid, c.buyId, 1, 0);
-        else if (mode == 1) _storeWord(c.pid, c.sellId, 1, 0);
-        else if (mode == 2) _storeIsBuy(c.pid, c.sellId, true);
-        else _storeIsBuy(c.pid, c.buyId, false);
+        if (mode % 2 == 0) _storeWord(c.pid, c.buyId, 1, 0);
+        else _storeWord(c.pid, c.sellId, 1, 0);
     }
 
     /// @dev Strictly ordered keys (bid > ask): `_crosses` returns without reading the amounts, so

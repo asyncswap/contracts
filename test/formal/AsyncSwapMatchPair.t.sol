@@ -10,10 +10,10 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 ///         `matchBook(key, 1)` runs it exactly once, as `_matchPair(bidId, askId)`, on a crossed book of
 ///         one resting sell and one resting buy (`FormalMatchD`). Its result is `matchBook`'s return
 ///         value (1 for `true`), its effects are the decoded PoolManager / hook event trace and the two
-///         orders' storage. Skipped pairs are written with `vm.store` (an emptied order, or both orders
-///         on one side) while the book keys still cross, so `matchBook` reaches `_matchPair`.
+///         orders' storage. Skipped pairs are written with `vm.store` (an emptied order) while the book
+///         keys still cross, so `matchBook` reaches `_matchPair`.
 contract AsyncSwapMatchPairFormalTest is FormalMatchD {
-    /// @notice formal/Refinement/Swarm/AsyncSwapMatchPair.lean:143 — an empty order or two orders on the same side: `_matchPair` returns false and leaves the world unchanged.
+    /// @notice formal/Refinement/Swarm/AsyncSwapMatchPair.lean:143 — an empty order: `_matchPair` returns false and leaves the world unchanged.
     function testFuzz_matchPair_skip(uint256[6] memory s, uint8 flags, uint8 mode) public {
         Case memory c = _mkCase(s, flags);
         if (!_strictCross(c)) return;

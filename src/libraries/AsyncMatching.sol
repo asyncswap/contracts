@@ -253,28 +253,28 @@ library AsyncMatching {
         return uint256(uint128(outputDelta));
     }
 
+    /// @dev `buyId` comes from the bid tree and `sellId` from the ask tree (`_bookPair`), so their
+    ///      sides are fixed by construction.
     function _matchPair(
         AsyncFiller.State storage self,
         AsyncFiller.Book storage book,
         PoolKey calldata key,
-        bytes32 firstId,
-        bytes32 secondId,
+        bytes32 buyId,
+        bytes32 sellId,
         address hook
     ) private returns (bool) {
-        AsyncFiller.OrderInfo storage first = self.orders[firstId];
-        AsyncFiller.OrderInfo storage second = self.orders[secondId];
-        if (first.amountIn == 0 || second.amountIn == 0 || first.isBuy == second.isBuy) return false;
-        bytes32 sellId = first.isBuy ? secondId : firstId;
-        bytes32 buyId = first.isBuy ? firstId : secondId;
-        bool makerBuy = first.createdSequence < second.createdSequence ? first.isBuy : second.isBuy;
-        AsyncFiller.MatchAmounts memory amounts = _matchAmounts(self.orders[sellId], self.orders[buyId], makerBuy);
+        AsyncFiller.OrderInfo storage buy = self.orders[buyId];
+        AsyncFiller.OrderInfo storage sell = self.orders[sellId];
+        if (buy.amountIn == 0 || sell.amountIn == 0) return false;
+        // The older order is the maker and sets the price.
+        bool makerBuy = buy.createdSequence < sell.createdSequence;
+        AsyncFiller.MatchAmounts memory amounts = _matchAmounts(sell, buy, makerBuy);
         if (amounts.assetAmount == 0 || amounts.quoteAmount == 0) return false;
 
         // Read who is paid, then reduce both orders before any payout: an ERC20 transfer can run
         // recipient code, which must find both records already settled.
-        Payouts memory payouts = _payouts(self, key, firstId, secondId);
-        (payouts.sellRefund, payouts.buyRefund) =
-            _reduceMatchedOrders(self, book, key, firstId, secondId, amounts, hook);
+        Payouts memory payouts = _payouts(self, key, buyId, sellId);
+        (payouts.sellRefund, payouts.buyRefund) = _reduceMatchedOrders(self, book, key, buyId, sellId, amounts, hook);
         _settleTransfers(self.poolManager, payouts, amounts, hook);
         emit AsyncOrdersMatched(key.toId(), sellId, buyId, amounts.assetAmount, amounts.quoteAmount);
         return true;
@@ -305,19 +305,17 @@ library AsyncMatching {
         }
     }
 
-    function _payouts(AsyncFiller.State storage self, PoolKey calldata key, bytes32 firstId, bytes32 secondId)
+    function _payouts(AsyncFiller.State storage self, PoolKey calldata key, bytes32 buyId, bytes32 sellId)
         private
         view
         returns (Payouts memory payouts)
     {
-        AsyncFiller.OrderInfo storage first = self.orders[firstId];
-        AsyncFiller.OrderInfo storage second = self.orders[secondId];
-        Currency firstInput = first.zeroForOne ? key.currency0 : key.currency1;
-        Currency secondInput = second.zeroForOne ? key.currency0 : key.currency1;
-        payouts.sellInput = first.isBuy ? secondInput : firstInput;
-        payouts.buyInput = first.isBuy ? firstInput : secondInput;
-        payouts.sellOwner = first.isBuy ? second.owner : first.owner;
-        payouts.buyOwner = first.isBuy ? first.owner : second.owner;
+        AsyncFiller.OrderInfo storage buy = self.orders[buyId];
+        AsyncFiller.OrderInfo storage sell = self.orders[sellId];
+        payouts.sellInput = sell.zeroForOne ? key.currency0 : key.currency1;
+        payouts.buyInput = buy.zeroForOne ? key.currency0 : key.currency1;
+        payouts.sellOwner = sell.owner;
+        payouts.buyOwner = buy.owner;
     }
 
     function _settleTransfers(
@@ -340,16 +338,14 @@ library AsyncMatching {
         AsyncFiller.State storage self,
         AsyncFiller.Book storage book,
         PoolKey calldata key,
-        bytes32 firstId,
-        bytes32 secondId,
+        bytes32 buyId,
+        bytes32 sellId,
         AsyncFiller.MatchAmounts memory amounts,
         address hook
     ) private returns (uint256 sellRefund, uint256 buyRefund) {
-        bool firstBuy = self.orders[firstId].isBuy;
-        bytes32 sellId = firstBuy ? secondId : firstId;
-        bytes32 buyId = firstBuy ? firstId : secondId;
-        sellRefund =
-            _reduceAfterMatch(self, book, key, ReductionParams(sellId, amounts.assetAmount, amounts.quoteAmount), hook);
+        sellRefund = _reduceAfterMatch(
+            self, book, key, ReductionParams(sellId, amounts.assetAmount, amounts.quoteAmount), hook
+        );
         buyRefund =
             _reduceAfterMatch(self, book, key, ReductionParams(buyId, amounts.quoteAmount, amounts.assetAmount), hook);
     }

@@ -11,13 +11,9 @@ solc_version = "0.8.26"
 # Keep linked continuous matching deployable under EIP-170 while retaining more optimization than
 # the minimum-size setting.
 optimizer = true
-optimizer_runs = 1_000
-# Tests named `*_finding_*` are counterexamples the bytecode gives to a Formal Mind theorem (see
-# test/formal/README.md, "Findings"). They fail by design until the model is fixed, so the default run
-# skips them; `FOUNDRY_PROFILE=findings forge test` runs exactly those.
-no_match_test = "_finding_"
+optimizer_runs = 0xaaaa
 
-# The invariant campaign MAINNET_READINESS.md records (UnpaidBidInvariantTest sets 128 runs inline).
+# The invariant campaign MAINNET_READINESS.md records.
 # Foundry's own default, 256 runs x depth 500, takes about half an hour here: the invariants scan
 # every order placed so far after each call. For a longer campaign: FOUNDRY_PROFILE=deep forge test.
 [profile.default.invariant]
@@ -29,10 +25,6 @@ fail_on_revert = true
 runs = 256
 depth = 500
 fail_on_revert = true
-
-[profile.findings]
-match_test = "_finding_"
-no_match_test = "^$"
 
 [dependencies]
 forge-std = "1.16.0"

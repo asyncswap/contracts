@@ -38,15 +38,18 @@ contract SelfExecutingMaker {
             SwapParams(true, -1, 4295128740),
             abi.encode(
                 AsyncSwap.UserParams({
-                    user: address(this), executor: address(this), amountOutMin: amountOutMin, priorityFee: 0
+                    user: address(this), executor: address(this), amountOutMin: amountOutMin, priorityFee: 100_000
                 })
             )
         );
         key.currency0.settle(pm, address(this), 1, false);
+        pm.sync(key.currency1);
+        MockERC20(Currency.unwrap(key.currency1)).transfer(address(pm), 100_000);
+        pm.settleFor(address(hook));
         bytes32 salt = keccak256(
-            abi.encode(block.timestamp, block.number, address(pm), address(this), uint256(1), amountOutMin, 0)
+            abi.encode(block.timestamp, block.number, address(pm), address(this), uint256(1), amountOutMin, 100_000)
         );
-        AsyncOrder memory o = AsyncOrder(key, address(this), true, 1, amountOutMin, 0, 0, salt);
+        AsyncOrder memory o = AsyncOrder(key, address(this), true, 1, amountOutMin, 100_000, 0, salt);
         // Without pre-settling output, the hook must not pay it from its own token balance.
         hook.executeOrder(o, abi.encode(address(this)));
         return "";
@@ -74,11 +77,13 @@ contract HookBalanceIsolationTest is Test {
         t1.mint(address(hook), 500 ether); // stranded / mistakenly sent tokens
         SelfExecutingMaker d = new SelfExecutingMaker(manager, hook, key);
         t0.mint(address(d), 1);
+        t1.mint(address(d), 100_000);
+        t1.mint(address(manager), 500 ether); // reserves allow payout; unpaid output must fail unlock accounting
 
-        vm.expectRevert();
+        vm.expectRevert(IPoolManager.CurrencyNotSettled.selector);
         d.go(499 ether);
 
         assertEq(t1.balanceOf(address(hook)), 500 ether, "stranded balance untouched");
-        assertEq(t1.balanceOf(address(d)), 0, "caller gained nothing");
+        assertEq(t1.balanceOf(address(d)), 100_000, "caller gained nothing");
     }
 }

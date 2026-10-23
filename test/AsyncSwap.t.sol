@@ -22,7 +22,7 @@ contract AsyncSwapTest is SetupHook {
     function setUp() public override {
         super.setUp();
         topUp(alice, 100 ether);
-        topUp(bob, 100 ether);
+        topUp(bob, 100 ether + 100_000);
     }
 
     function _orderFromMaker(address maker, bool zeroForOne, uint256 amountIn, uint256 amountOutMin)
@@ -37,7 +37,7 @@ contract AsyncSwapTest is SetupHook {
             zeroForOne: zeroForOne,
             amountIn: amountIn,
             amountOutMin: amountOutMin,
-            priorityFee: 0,
+            priorityFee: 100_000,
             sqrtPrice: 2 ** 96,
             salt: bytes32(0)
         });
@@ -88,7 +88,7 @@ contract AsyncSwapTest is SetupHook {
             order,
             abi.encode(
                 AsyncSwap.UserParams({
-                    user: alice, executor: address(router), amountOutMin: order.amountOutMin, priorityFee: 0
+                    user: alice, executor: address(router), amountOutMin: order.amountOutMin, priorityFee: 100_000
                 })
             )
         );
@@ -114,7 +114,7 @@ contract AsyncSwapTest is SetupHook {
             order,
             abi.encode(
                 AsyncSwap.UserParams({
-                    user: alice, executor: address(router), amountOutMin: order.amountOutMin, priorityFee: 0
+                    user: alice, executor: address(router), amountOutMin: order.amountOutMin, priorityFee: 100_000
                 })
             )
         );
@@ -133,7 +133,7 @@ contract AsyncSwapTest is SetupHook {
             order,
             abi.encode(
                 AsyncSwap.UserParams({
-                    user: alice, executor: address(router), amountOutMin: order.amountOutMin, priorityFee: 0
+                    user: alice, executor: address(router), amountOutMin: order.amountOutMin, priorityFee: 100_000
                 })
             )
         );
@@ -194,7 +194,7 @@ contract AsyncSwapTest is SetupHook {
             order,
             abi.encode(
                 AsyncSwap.UserParams({
-                    user: alice, executor: address(router), amountOutMin: amountOutMin, priorityFee: 0
+                    user: alice, executor: address(router), amountOutMin: amountOutMin, priorityFee: 100_000
                 })
             )
         );
@@ -217,19 +217,25 @@ contract AsyncSwapTest is SetupHook {
         router.swap(
             first,
             abi.encode(
-                AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 0.9 ether, priorityFee: 0})
+                AsyncSwap.UserParams({
+                    user: alice, executor: address(router), amountOutMin: 0.9 ether, priorityFee: 100_000
+                })
             )
         );
         router.swap(
             second,
             abi.encode(
-                AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 1.8 ether, priorityFee: 0})
+                AsyncSwap.UserParams({
+                    user: alice, executor: address(router), amountOutMin: 1.8 ether, priorityFee: 100_000
+                })
             )
         );
         router.swap(
             lowerBid,
             abi.encode(
-                AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 0.95 ether, priorityFee: 0})
+                AsyncSwap.UserParams({
+                    user: alice, executor: address(router), amountOutMin: 0.95 ether, priorityFee: 100_000
+                })
             )
         );
         vm.stopPrank();
@@ -243,14 +249,14 @@ contract AsyncSwapTest is SetupHook {
         assertEq(head, firstId, "FIFO head");
         assertEq(tail, secondId, "FIFO tail");
         assertEq(count, 2, "two orders at best price");
-        (address maker, uint256 amountIn, uint256 amountOutMin,, bool isBuy, bytes32 previous, bytes32 next) =
+        (address maker, uint256 amountIn, uint256 amountOutMin,, bool isBuy, uint64 sequence, uint64 bid) =
             hook.orderBookOrder(poolId, head);
         assertEq(maker, alice, "maker is readable");
         assertEq(amountIn, 1 ether, "input amount is readable");
         assertEq(amountOutMin, 0.9 ether, "limit output is readable");
         assertFalse(isBuy, "side is readable");
-        assertEq(previous, bytes32(0), "head has no previous order");
-        assertEq(next, tail, "head links to next FIFO order");
+        assertEq(sequence, 1, "first sequence");
+        assertEq(bid, 100_000, "stored bid");
     }
 
     function test_priceBookReturnsHighestNumeraireBid() public {
@@ -261,13 +267,17 @@ contract AsyncSwapTest is SetupHook {
         router.swap(
             lowerBid,
             abi.encode(
-                AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 1 ether, priorityFee: 0})
+                AsyncSwap.UserParams({
+                    user: alice, executor: address(router), amountOutMin: 1 ether, priorityFee: 100_000
+                })
             )
         );
         router.swap(
             higherBid,
             abi.encode(
-                AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 1 ether, priorityFee: 0})
+                AsyncSwap.UserParams({
+                    user: alice, executor: address(router), amountOutMin: 1 ether, priorityFee: 100_000
+                })
             )
         );
         vm.stopPrank();
@@ -287,13 +297,17 @@ contract AsyncSwapTest is SetupHook {
         router.swap(
             first,
             abi.encode(
-                AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 0.9 ether, priorityFee: 0})
+                AsyncSwap.UserParams({
+                    user: alice, executor: address(router), amountOutMin: 0.9 ether, priorityFee: 100_000
+                })
             )
         );
         router.swap(
             second,
             abi.encode(
-                AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 0.95 ether, priorityFee: 0})
+                AsyncSwap.UserParams({
+                    user: alice, executor: address(router), amountOutMin: 0.95 ether, priorityFee: 100_000
+                })
             )
         );
         vm.stopPrank();
@@ -328,7 +342,7 @@ contract AsyncSwapTest is SetupHook {
             order,
             abi.encode(
                 AsyncSwap.UserParams({
-                    user: alice, executor: address(router), amountOutMin: amountOutMin, priorityFee: 0
+                    user: alice, executor: address(router), amountOutMin: amountOutMin, priorityFee: 100_000
                 })
             )
         );
@@ -383,17 +397,21 @@ contract AsyncSwapTest is SetupHook {
         router.swap(
             ask,
             abi.encode(
-                AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: askMinimum, priorityFee: 0})
+                AsyncSwap.UserParams({
+                    user: alice, executor: address(router), amountOutMin: askMinimum, priorityFee: 100_000
+                })
             )
         );
         vm.stopPrank();
 
         vm.startPrank(bob);
-        token1.approve(address(router), quoteAmount);
+        token1.approve(address(router), quoteAmount + 100_000);
         router.swap(
             bid,
             abi.encode(
-                AsyncSwap.UserParams({user: bob, executor: address(router), amountOutMin: bidMinimum, priorityFee: 0})
+                AsyncSwap.UserParams({
+                    user: bob, executor: address(router), amountOutMin: bidMinimum, priorityFee: 100_000
+                })
             )
         );
         vm.stopPrank();
@@ -403,12 +421,21 @@ contract AsyncSwapTest is SetupHook {
         (uint256 askLeft,) = hook.asyncOrderInfo(poolId, askId);
         (uint256 bidLeft,) = hook.asyncOrderInfo(poolId, bidId);
         assertEq(askLeft, 0, "ask completed");
-        assertEq(bidLeft, 0, "bid completed");
-        assertEq(token1.balanceOf(alice) - aliceQuoteBefore, askMinimum, "seller receives ask minimum");
-        assertEq(token0.balanceOf(bob) - bobAssetBefore, assetAmount, "buyer receives matched asset");
-        assertEq(bobQuoteBefore - token1.balanceOf(bob), askMinimum, "buyer pays resting ask price");
+        // The bid paid the ask's better price for all 100 asset; its unspent 10 quote rests at the
+        // bid's own limit rather than being refunded.
+        assertEq(bidLeft, quoteAmount - askMinimum, "bid remainder rests");
+        // Match proceeds are credited as PoolManager claims; only the seller's bid left in ERC20.
+        assertEq(aliceQuoteBefore - token1.balanceOf(alice), 100_000, "seller paid only the bid in ERC20");
+        assertEq(manager.balanceOf(alice, currency1.toId()), askMinimum, "seller receives ask minimum as claims");
+        assertEq(token0.balanceOf(bob), bobAssetBefore, "buyer receives no ERC20 asset from the match");
+        assertEq(manager.balanceOf(bob, currency0.toId()), assetAmount, "buyer receives matched asset as claims");
+        assertEq(bobQuoteBefore - token1.balanceOf(bob), quoteAmount + 100_000, "buyer pays input and bid");
         assertEq(manager.balanceOf(address(hook), currency0.toId()), 0, "asset escrow claims consumed");
-        assertEq(manager.balanceOf(address(hook), currency1.toId()), 0, "quote escrow claims consumed");
+        assertEq(
+            manager.balanceOf(address(hook), currency1.toId()),
+            quoteAmount - askMinimum + 10_000,
+            "quote escrow backs the resting remainder"
+        );
     }
 
     function test_crossingOrdersPartiallyFillAndKeepResidualOnBook() public {
@@ -424,17 +451,21 @@ contract AsyncSwapTest is SetupHook {
         router.swap(
             ask,
             abi.encode(
-                AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: askMinimum, priorityFee: 0})
+                AsyncSwap.UserParams({
+                    user: alice, executor: address(router), amountOutMin: askMinimum, priorityFee: 100_000
+                })
             )
         );
         vm.stopPrank();
 
         vm.startPrank(bob);
-        token1.approve(address(router), quoteAmount);
+        token1.approve(address(router), quoteAmount + 100_000);
         router.swap(
             bid,
             abi.encode(
-                AsyncSwap.UserParams({user: bob, executor: address(router), amountOutMin: bidMinimum, priorityFee: 0})
+                AsyncSwap.UserParams({
+                    user: bob, executor: address(router), amountOutMin: bidMinimum, priorityFee: 100_000
+                })
             )
         );
         vm.stopPrank();
@@ -454,7 +485,6 @@ contract AsyncSwapTest is SetupHook {
     }
 
     function test_priorityFeeBreaksEqualPriceTiesAfterPricePriority() public {
-        hook.setOrderingMode(key, AsyncFiller.OrderingMode.PriorityFee);
         AsyncOrder memory earlierLowBid = _withPriorityFee(_orderFromMaker(alice, true, 1 ether, 0.9 ether), 1 ether);
         AsyncOrder memory laterHighBid = _withPriorityFee(_orderFromMaker(bob, true, 1 ether, 0.9 ether), 2 ether);
         uint256 bobNumeraireBefore = token1.balanceOf(bob);
@@ -511,7 +541,12 @@ contract AsyncSwapTest is SetupHook {
         vm.stopPrank();
 
         assertEq(hook.asyncOrder(poolId, highId), 0, "higher-bid order is matched first");
-        assertEq(hook.asyncOrder(poolId, lowId), 1 ether, "lower-bid equal-price order remains open");
+        // The taker's unspent 0.1 keeps its 1:1 limit and partly fills the lower-bid ask at 0.9.
+        assertEq(
+            hook.asyncOrder(poolId, lowId),
+            1 ether - uint256(0.1 ether) * 1 ether / 0.9 ether,
+            "lower-bid order matched second"
+        );
         assertLt(token1.balanceOf(bob), bobNumeraireBefore, "the non-refundable bid is charged");
         assertGt(
             manager.balanceOf(address(hook.feeVault()), currency1.toId()),
@@ -521,7 +556,6 @@ contract AsyncSwapTest is SetupHook {
     }
 
     function test_priorityFeeBelowTenCentsReverts() public {
-        hook.setOrderingMode(key, AsyncFiller.OrderingMode.PriorityFee);
         AsyncOrder memory order = _withPriorityFee(_orderFromMaker(alice, true, 1 ether, 0.9 ether), 99_999);
 
         vm.startPrank(alice);
@@ -543,7 +577,6 @@ contract AsyncSwapTest is SetupHook {
     }
 
     function test_partialMatchAndCancelForfeitTheEntirePriorityBid() public {
-        hook.setOrderingMode(key, AsyncFiller.OrderingMode.PriorityFee);
         uint256 bidAmount = 2 ether;
         AsyncOrder memory ask = _withPriorityFee(_orderFromMaker(alice, true, 100 ether, 90 ether), bidAmount);
         uint256 buyPriorityFee = 100_000;
@@ -580,7 +613,12 @@ contract AsyncSwapTest is SetupHook {
         assertLt(remainingBid, bidAmount, "only the filled proportion is settled");
         vm.prank(alice);
         router.cancelOrder(ask);
-        assertEq(token1.balanceOf(alice) - usdcBefore, 48 ether, "the full bid remains charged after cancellation");
+        // Match proceeds arrive as claims; the bid was paid in ERC20.
+        assertEq(
+            token1.balanceOf(alice) + manager.balanceOf(alice, currency1.toId()) - usdcBefore,
+            48 ether,
+            "the full bid remains charged after cancellation"
+        );
         assertEq(
             manager.balanceOf(address(hook.feeVault()), currency1.toId()),
             bidAmount + buyPriorityFee,
@@ -589,7 +627,6 @@ contract AsyncSwapTest is SetupHook {
     }
 
     function test_filledPriorityBidIsDonatedToActiveLpsInsideFill() public {
-        hook.setOrderingMode(key, AsyncFiller.OrderingMode.PriorityFee);
         _addPoolLiquidity(1e24);
         uint256 bidAmount = 1 ether;
         AsyncOrder memory ask = _withPriorityFee(_orderFromMaker(alice, true, 1 ether, 0.95 ether), bidAmount);
@@ -632,7 +669,7 @@ contract AsyncSwapTest is SetupHook {
                 ask,
                 abi.encode(
                     AsyncSwap.UserParams({
-                        user: maker, executor: address(router), amountOutMin: askMinimum, priorityFee: 0
+                        user: maker, executor: address(router), amountOutMin: askMinimum, priorityFee: 100_000
                     })
                 )
             );
@@ -641,12 +678,12 @@ contract AsyncSwapTest is SetupHook {
 
         AsyncOrder memory bid = _orderFromMaker(bob, false, 20 ether, 20 ether);
         vm.startPrank(bob);
-        token1.approve(address(router), bid.amountIn);
+        token1.approve(address(router), bid.amountIn + bid.priorityFee);
         router.swap(
             bid,
             abi.encode(
                 AsyncSwap.UserParams({
-                    user: bob, executor: address(router), amountOutMin: bid.amountOutMin, priorityFee: 0
+                    user: bob, executor: address(router), amountOutMin: bid.amountOutMin, priorityFee: 100_000
                 })
             )
         );
@@ -687,7 +724,9 @@ contract AsyncSwapTest is SetupHook {
         router.swap(
             order,
             abi.encode(
-                AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 0.9 ether, priorityFee: 0})
+                AsyncSwap.UserParams({
+                    user: alice, executor: address(router), amountOutMin: 0.9 ether, priorityFee: 100_000
+                })
             )
         );
         // Patch salt before updatePrice.
@@ -710,7 +749,9 @@ contract AsyncSwapTest is SetupHook {
         router.swap(
             order,
             abi.encode(
-                AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 0.9 ether, priorityFee: 0})
+                AsyncSwap.UserParams({
+                    user: alice, executor: address(router), amountOutMin: 0.9 ether, priorityFee: 100_000
+                })
             )
         );
         vm.stopPrank();
@@ -735,7 +776,9 @@ contract AsyncSwapTest is SetupHook {
         router.swap(
             order,
             abi.encode(
-                AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 0.9 ether, priorityFee: 0})
+                AsyncSwap.UserParams({
+                    user: alice, executor: address(router), amountOutMin: 0.9 ether, priorityFee: 100_000
+                })
             )
         );
         order = _withAssignedSalt(order);
@@ -771,7 +814,7 @@ contract AsyncSwapTest is SetupHook {
             order,
             abi.encode(
                 AsyncSwap.UserParams({
-                    user: alice, executor: address(router), amountOutMin: amountOutMin, priorityFee: 0
+                    user: alice, executor: address(router), amountOutMin: amountOutMin, priorityFee: 100_000
                 })
             )
         );
@@ -811,14 +854,18 @@ contract AsyncSwapTest is SetupHook {
         router.swap(
             o1,
             abi.encode(
-                AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 0.9 ether, priorityFee: 0})
+                AsyncSwap.UserParams({
+                    user: alice, executor: address(router), amountOutMin: 0.9 ether, priorityFee: 100_000
+                })
             )
         );
         token0.approve(address(router), type(uint256).max);
         router.swap(
             o2,
             abi.encode(
-                AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 0.45 ether, priorityFee: 0})
+                AsyncSwap.UserParams({
+                    user: alice, executor: address(router), amountOutMin: 0.45 ether, priorityFee: 100_000
+                })
             )
         );
         vm.stopPrank();
@@ -842,14 +889,18 @@ contract AsyncSwapTest is SetupHook {
         router.swap(
             order,
             abi.encode(
-                AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 0.9 ether, priorityFee: 0})
+                AsyncSwap.UserParams({
+                    user: alice, executor: address(router), amountOutMin: 0.9 ether, priorityFee: 100_000
+                })
             )
         );
         token0.approve(address(router), type(uint256).max);
         router.swap(
             order,
             abi.encode(
-                AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 0.9 ether, priorityFee: 0})
+                AsyncSwap.UserParams({
+                    user: alice, executor: address(router), amountOutMin: 0.9 ether, priorityFee: 100_000
+                })
             )
         );
         vm.stopPrank();
@@ -877,7 +928,9 @@ contract AsyncSwapTest is SetupHook {
         router.swap(
             order,
             abi.encode(
-                AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 0.8 ether, priorityFee: 0})
+                AsyncSwap.UserParams({
+                    user: alice, executor: address(router), amountOutMin: 0.8 ether, priorityFee: 100_000
+                })
             )
         );
         order = _withAssignedSalt(order);
@@ -912,7 +965,9 @@ contract AsyncSwapTest is SetupHook {
         router.swap(
             order,
             abi.encode(
-                AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 0.9 ether, priorityFee: 0})
+                AsyncSwap.UserParams({
+                    user: alice, executor: address(router), amountOutMin: 0.9 ether, priorityFee: 100_000
+                })
             )
         );
         order = _withAssignedSalt(order);
@@ -936,7 +991,9 @@ contract AsyncSwapTest is SetupHook {
         router.swap(
             order,
             abi.encode(
-                AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 0.9 ether, priorityFee: 0})
+                AsyncSwap.UserParams({
+                    user: alice, executor: address(router), amountOutMin: 0.9 ether, priorityFee: 100_000
+                })
             )
         );
         vm.stopPrank();

@@ -50,7 +50,7 @@ contract ReenteringRecipient {
             o,
             abi.encode(
                 AsyncSwap.UserParams({
-                    user: address(this), executor: address(router), amountOutMin: amountOutMin, priorityFee: 0
+                    user: address(this), executor: address(router), amountOutMin: amountOutMin, priorityFee: 100_000
                 })
             )
         );
@@ -63,7 +63,7 @@ contract ReenteringRecipient {
             o,
             abi.encode(
                 AsyncSwap.UserParams({
-                    user: address(this), executor: address(router), amountOutMin: amountOutMin, priorityFee: 0
+                    user: address(this), executor: address(router), amountOutMin: amountOutMin, priorityFee: 100_000
                 })
             )
         );
@@ -85,7 +85,7 @@ contract ReenteringRecipient {
             zeroForOne: zeroForOne,
             amountIn: amountIn,
             amountOutMin: amountOutMin,
-            priorityFee: 0,
+            priorityFee: 100_000,
             sqrtPrice: 2 ** 96,
             salt: bytes32(0)
         });
@@ -161,7 +161,10 @@ contract NativeSettlementReentrancyTest is Test {
     }
 
     function _expectedSalt(address user, uint256 amountIn, uint256 amountOutMin) internal view returns (bytes32) {
-        return keccak256(abi.encode(block.timestamp, block.number, address(manager), user, amountIn, amountOutMin, 0));
+        return
+            keccak256(
+                abi.encode(block.timestamp, block.number, address(manager), user, amountIn, amountOutMin, 100_000)
+            );
     }
 
     /* ------------------------------------------------------------------ *
@@ -186,7 +189,7 @@ contract NativeSettlementReentrancyTest is Test {
             zeroForOne: false,
             amountIn: amountIn,
             amountOutMin: amountOutMin,
-            priorityFee: 0,
+            priorityFee: 100_000,
             sqrtPrice: 2 ** 96,
             salt: _expectedSalt(address(maker), amountIn, amountOutMin)
         });
@@ -226,6 +229,9 @@ contract NativeSettlementReentrancyTest is Test {
         ReenteringRecipient maker = new ReenteringRecipient(router, hook, key, erc20);
         vm.deal(address(maker), 5 ether);
 
+        erc20.mint(address(maker), 100_000);
+        maker.approveRouter(100_000);
+
         uint256 amountIn = 1 ether; // ETH in
         uint256 amountOutMin = 0.9 ether; // TST out (unused; we cancel)
 
@@ -238,7 +244,7 @@ contract NativeSettlementReentrancyTest is Test {
             zeroForOne: true,
             amountIn: amountIn,
             amountOutMin: amountOutMin,
-            priorityFee: 0,
+            priorityFee: 100_000,
             sqrtPrice: 2 ** 96,
             salt: _expectedSalt(address(maker), amountIn, amountOutMin)
         });
@@ -287,7 +293,7 @@ contract NativeSettlementReentrancyTest is Test {
             zeroForOne: false,
             amountIn: amountIn,
             amountOutMin: amountOutMin,
-            priorityFee: 0,
+            priorityFee: 100_000,
             sqrtPrice: 2 ** 96,
             salt: bytes32(0)
         });
@@ -298,7 +304,7 @@ contract NativeSettlementReentrancyTest is Test {
             order,
             abi.encode(
                 AsyncSwap.UserParams({
-                    user: alice, executor: address(router), amountOutMin: amountOutMin, priorityFee: 0
+                    user: alice, executor: address(router), amountOutMin: amountOutMin, priorityFee: 100_000
                 })
             )
         );

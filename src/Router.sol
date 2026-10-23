@@ -143,6 +143,8 @@ contract Router is EIP712 {
     ///         `maxPrice` caps total output paid, including the fee —
     ///         it protects fillers from a maker who front-runs them with `updatePrice` to
     ///         bump the order's stored price. Pass `type(uint256).max` to disable the check.
+    ///         `order.amountIn` is the least input the filler accepts: the fill reverts if the
+    ///         order's live input has dropped below it (e.g. after a partial match).
     function fillOrder(AsyncOrder calldata order, uint256 maxPrice, bytes calldata) external payable {
         address onBehalf = address(this);
         assembly ("memory-safe") {
@@ -294,21 +296,27 @@ contract Router is EIP712 {
             // stale if the maker called updatePrice after submitting.
             Currency output = orderData.order.zeroForOne ? orderData.order.key.currency1 : orderData.order.key.currency0;
             bytes32 id = _orderId(orderData.order);
-            (, uint256 livePrice) = HOOK.asyncOrderInfo(orderData.order.key.toId(), id);
-            livePrice += HOOK.calculatePoolFee(orderData.order.key.fee, livePrice);
+            (uint256 liveAmountIn, uint256 livePrice) = HOOK.asyncOrderInfo(orderData.order.key.toId(), id);
+            // `maxPrice` bounds what the filler pays and `order.amountIn` what they receive, so a
+            // partial match before the fill cannot leave them paying a full price for a remainder.
+            // A missing order (live input 0) is left for the hook to reject with `OrderNotFound`.
+            require(liveAmountIn == 0 || liveAmountIn >= orderData.order.amountIn, "Input below order.amountIn");
+            uint256 gross = livePrice + HOOK.calculatePoolFee(orderData.order.key.fee, livePrice);
             uint256 maxPrice;
             assembly ("memory-safe") {
                 maxPrice := tload(MAX_PRICE_LOCATION)
             }
-            require(livePrice <= maxPrice, "Price exceeds maxPrice");
+            require(gross <= maxPrice, "Price exceeds maxPrice");
             // For ERC20 output, pay `livePrice` from the filler straight into the PM and credit
             // it to the hook (filler must have approved this router for that amount); the hook
             // never spends its own token balance. For native output the ETH was already
             // forwarded in fillOrder() above.
             if (!output.isAddressZero()) {
                 POOLMANAGER.sync(output);
-                IERC20(Currency.unwrap(output)).safeTransferFrom(user, address(POOLMANAGER), livePrice);
+                IERC20(Currency.unwrap(output)).safeTransferFrom(user, address(POOLMANAGER), gross);
                 POOLMANAGER.settleFor(address(HOOK));
+                // The pull ran the token's code: fill only the order as it was checked above.
+                _requireUnchanged(orderData.order, id, liveAmountIn, livePrice);
             }
             HOOK.executeOrder(orderData.order, abi.encode(user));
         } else if (action == uint8(ActionType.Cancel)) {
@@ -320,6 +328,15 @@ contract Router is EIP712 {
         }
 
         return "";
+    }
+
+    /// @dev Reverts unless the order still reads `(amountIn, amountOutMin)` in the hook.
+    function _requireUnchanged(AsyncOrder memory order, bytes32 id, uint256 amountIn, uint256 amountOutMin)
+        private
+        view
+    {
+        (uint256 nowIn, uint256 nowOut) = HOOK.asyncOrderInfo(order.key.toId(), id);
+        require(nowIn == amountIn && nowOut == amountOutMin, "Order changed during fill");
     }
 
     /// @dev Pays the maker's input into the PoolManager via Permit2. Permit2 verifies the maker's
@@ -341,8 +358,9 @@ contract Router is EIP712 {
         POOLMANAGER.settle();
     }
 
-    /// @dev Priority bids use the pool's USDC numeraire. Signed orders also require an ERC-20
-    ///      approval for the bid; the signed order commits to its amount.
+    /// @dev Pays the order's bid, which the hook escrowed as claims when it created the order, in the
+    ///      pool's USDC numeraire. Signed orders also require an ERC-20 approval for the bid; the
+    ///      signed order commits to its amount.
     function _settlePriorityFee(AsyncOrder memory order) private {
         uint256 amount = order.priorityFee;
         if (amount == 0) return;
@@ -350,7 +368,6 @@ contract Router is EIP712 {
         POOLMANAGER.sync(numeraire);
         IERC20(Currency.unwrap(numeraire)).safeTransferFrom(order.owner, address(POOLMANAGER), amount);
         POOLMANAGER.settleFor(address(HOOK));
-        HOOK.recordPriorityFee(order.key, order.owner, amount);
     }
 
     /// @dev MUST match AsyncOrderLibrary.orderId exactly: (chainId, poolId, owner, zeroForOne, salt).

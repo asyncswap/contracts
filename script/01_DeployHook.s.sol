@@ -6,6 +6,7 @@ import {UniswapAddresses} from "./config/UniswapAddresses.sol";
 import {FFIHelper} from "./FFIHelper.sol";
 import {AsyncSwap} from "@async-swap/AsyncSwap.sol";
 import {Router} from "@async-swap/Router.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {console} from "forge-std/Script.sol";
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {Currency} from "v4-core/types/Currency.sol";
@@ -61,6 +62,9 @@ contract DeployHookScript is FFIHelper {
         hook = new AsyncSwap{salt: salt}(manager, numeraire, OWNER);
         require(address(hook) == predicted, "deployed hook address mismatch");
         require(hook.owner() == OWNER, "hook owner mismatch");
+        // Pools start with a $10 minimum order (DEPLOY_MIN_ORDER_USD), in the numeraire's base units.
+        uint256 minOrderUsd = vm.envOr("DEPLOY_MIN_ORDER_USD", uint256(10));
+        hook.setDefaultMinOrder(minOrderUsd * 10 ** IERC20Metadata(Currency.unwrap(numeraire)).decimals());
         router = new Router(manager, hook, ISignatureTransfer(PERMIT2));
         vm.stopBroadcast();
 

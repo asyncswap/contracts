@@ -50,8 +50,8 @@ contract NativeClaimsTest is NativeAsyncSwapTest {
         AsyncOrder memory order = _order(alice, false, 1 ether, 0.95 ether);
         uint256 beforeEth = alice.balance;
         vm.startPrank(alice);
-        erc20.approve(address(router), 1 ether);
-        router.swap(order, abi.encode(AsyncSwap.UserParams(alice, address(router), 0.95 ether, 0)));
+        erc20.approve(address(router), 1 ether + 100_000);
+        router.swap(order, abi.encode(AsyncSwap.UserParams(alice, address(router), 0.95 ether, 100_000)));
         vm.stopPrank();
         assertEq(alice.balance, beforeEth);
         assertGe(manager.balanceOf(alice, 0), 0.95 ether);
@@ -62,7 +62,7 @@ contract NativeClaimsTest is NativeAsyncSwapTest {
         claims = new NativeClaims(manager);
         AsyncOrder memory order = _order(alice, true, 1 ether, 1 ether);
         vm.startPrank(alice);
-        router.swap{value: 1 ether}(order, abi.encode(AsyncSwap.UserParams(alice, address(router), 1 ether, 0)));
+        router.swap{value: 1 ether}(order, abi.encode(AsyncSwap.UserParams(alice, address(router), 1 ether, 100_000)));
         router.cancelOrder(_withAssignedSalt(order));
         vm.stopPrank();
         assertEq(manager.balanceOf(alice, 0), 1 ether);

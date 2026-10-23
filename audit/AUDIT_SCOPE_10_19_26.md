@@ -109,5 +109,4 @@ and has a regression test in `test/security/`.
 `UNICHAIN_FORK_BLOCK=61279110`). Includes matching invariants (escrow, asset conservation, best price), the unpaid-bid invariants
 (`test/UnpaidBidInvariant.t.sol`: matching never reverts, crossing takers always trade, every order is cancellable,
 unpaid bids buy no priority) and 17 security regression suites in `test/security/`. Hook runtime: 24,428 bytes
-(148 under EIP-170). Lean 4 specifications of the protocol are in
-<https://github.com/asyncswap/contracts-proofs>.
+(148 under EIP-170).

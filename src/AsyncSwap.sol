@@ -54,6 +54,9 @@ contract AsyncSwap is BaseHook, EIP712 {
     /// @notice Unordered nonces consumed by signed maker actions (`setExecutorWithSig`, `updatePriceWithSig`).
     mapping(address maker => mapping(uint256 nonce => bool)) public nonceUsed;
 
+    /// @notice Minimum order, in numeraire base units, that pools initialized from now on start with.
+    uint256 public defaultMinOrder;
+
     /// @notice Pool-level swap-event mirror; bytes32 poolId for indexer compatibility.
     /// @dev    See https://github.com/OpenZeppelin/uniswap-hooks BaseAsyncSwap for the source pattern.
     event HookSwap(
@@ -186,6 +189,7 @@ contract AsyncSwap is BaseHook, EIP712 {
         asyncOrders[key.toId()].poolManager = poolManager;
         asyncOrders[key.toId()].numeraire = numeraire;
         asyncOrders[key.toId()].feeVault = address(feeVault);
+        priceBooks[key.toId()].minOrder = defaultMinOrder;
         return this.beforeInitialize.selector;
     }
 
@@ -235,39 +239,25 @@ contract AsyncSwap is BaseHook, EIP712 {
         return (info.amountIn, info.amountOutMin);
     }
 
-    /// @notice The priority bid an order has escrowed; a bid that was never paid reads as 0.
+    /// @notice The priority bid an order escrowed when it was created.
     function asyncOrderPriorityFee(PoolId poolId, bytes32 orderId) external view returns (uint256) {
-        return AsyncFiller.paidPriorityFee(asyncOrders[poolId].orders[orderId]);
+        return asyncOrders[poolId].orders[orderId].priorityFee;
     }
 
-    function orderingMode(PoolId poolId) external view returns (AsyncFiller.OrderingMode) {
-        return priceBooks[poolId].orderingMode;
+    /// @notice Set a pool's minimum order, in numeraire base units (0: none).
+    function setMinOrder(PoolKey calldata key, uint256 minimum) external onlyOwner {
+        AsyncMatching.setMinOrder(priceBooks[key.toId()], key.toId(), minimum);
     }
 
-    function setOrderingMode(PoolKey calldata key, AsyncFiller.OrderingMode mode) external onlyOwner {
-        PoolId poolId = key.toId();
-        AsyncMatching.setOrderingMode(priceBooks[poolId], poolId, mode);
-    }
-
-    /// @notice Convert the just-settled USDC bid into an ERC-6909 claim owned by the hook.
-    /// @dev Called by the order's authorized executor inside the Router's PoolManager unlock.
-    function recordPriorityFee(PoolKey calldata key, address maker, uint256 amount) external {
-        bytes32 id;
-        address executor;
-        assembly ("memory-safe") {
-            id := tload(PENDING_MATCH_ID_SLOT)
-            executor := tload(PENDING_MATCH_EXECUTOR_SLOT)
-        }
-        if (id == bytes32(0) || msg.sender != executor) revert AsyncFiller.NotAuthorizedExecutor();
-        AsyncFiller.State storage state = asyncOrders[key.toId()];
-        if (state.orders[id].owner != maker) revert AsyncFiller.OrderNotFound();
-        AsyncMatching.recordPriorityFee(state, priceBooks[key.toId()], id, amount, numeraire);
+    /// @notice Set the minimum order new pools start with.
+    function setDefaultMinOrder(uint256 minimum) external onlyOwner {
+        defaultMinOrder = minimum;
     }
 
     /// @notice Return the best live limit order for a pool side. `isBuy` is true
     ///         when the maker escrows the pool numeraire to buy the other asset.
     ///         `priceKey` is a WAD-scaled raw-amount ratio for sorting within this pool,
-    ///         not a human-readable price. Equal-price orders follow submission order.
+    ///         not a human-readable price. Equal-price orders queue by bid, then submission order.
     function bestOrder(PoolId poolId, bool isBuy)
         external
         view
@@ -285,7 +275,7 @@ contract AsyncSwap is BaseHook, EIP712 {
         return AsyncMatching.level(priceBooks[poolId], isBuy, priceKey);
     }
 
-    /// @notice Read one live order and its FIFO neighbor when the pool uses FIFO ordering.
+    /// @notice Read one live order: its terms, price key, queue position (`sequence`) and bid.
     function orderBookOrder(PoolId poolId, bytes32 orderId)
         external
         view
@@ -295,12 +285,12 @@ contract AsyncSwap is BaseHook, EIP712 {
             uint256 amountOutMin,
             uint128 priceKey,
             bool isBuy,
-            bytes32 previousOrderId,
-            bytes32 nextOrderId
+            uint64 sequence,
+            uint64 priorityFee
         )
     {
         AsyncFiller.OrderInfo storage info = asyncOrders[poolId].orders[orderId];
-        return (info.owner, info.amountIn, info.amountOutMin, info.price, info.isBuy, info.previous, info.next);
+        return (info.owner, info.amountIn, info.amountOutMin, info.price, info.isBuy, info.sequence, info.priorityFee);
     }
 
     function isExecutor(PoolId poolId, address maker, address executor) external view returns (bool) {
@@ -410,6 +400,13 @@ contract AsyncSwap is BaseHook, EIP712 {
     /// @notice Permissionlessly continue a crossed book inside a PoolManager unlock.
     /// @dev The Router exposes the unlock wrapper; each call processes at most eight pairs.
     function matchBook(PoolKey calldata key, uint8 maxMatches) external returns (uint8 matched) {
+        // An order created in this unlock is on the book before its maker's input is settled; the
+        // book waits until the Router hands it to `matchNewOrder`.
+        bytes32 pending;
+        assembly ("memory-safe") {
+            pending := tload(PENDING_MATCH_ID_SLOT)
+        }
+        if (pending != bytes32(0) && asyncOrders[key.toId()].orders[pending].amountIn != 0) return 0;
         return AsyncMatching.matchBook(asyncOrders[key.toId()], priceBooks[key.toId()], key, maxMatches, address(this));
     }
 
@@ -510,7 +507,8 @@ contract AsyncSwap is BaseHook, EIP712 {
                 amountOutMin: hookData.amountOutMin,
                 isBuy: isBuy,
                 zeroForOne: zeroForOne,
-                priorityFee: hookData.priorityFee
+                priorityFee: hookData.priorityFee,
+                poolId: poolId
             })
         );
         assembly ("memory-safe") {
@@ -569,7 +567,11 @@ contract AsyncSwap is BaseHook, EIP712 {
             deadline,
             signature
         );
-        asyncOrders[poolId].updatePrice(priceBooks[poolId], order, id, newAmountOutMin, order.owner);
+        AsyncMatching.updatePrice(
+            asyncOrders[poolId],
+            priceBooks[poolId],
+            AsyncMatching.UpdateParams({order: order, id: id, newAmountOutMin: newAmountOutMin, caller: order.owner})
+        );
     }
 
     /// @notice Revoke a signed action before a relayer submits it.

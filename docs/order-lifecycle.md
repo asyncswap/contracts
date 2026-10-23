@@ -4,17 +4,14 @@ Current V2 behavior, checked against the contract source. See also [contract cal
 
 ## Order lifecycle
 
-These diagrams describe the current V2 source, not a deployment or mainnet-readiness guarantee. Book matching ranks the best opposing price first; the pool's ordering mode breaks ties at that price. Private fills and explicit LP retries target a specific order and do not enforce the book's global priority queue.
+These diagrams describe the current V2 source, not a deployment or mainnet-readiness guarantee. Book matching ranks the best opposing price first; higher escrowed USDC bids break ties at that price, followed by earlier submission. Private fills and explicit LP retries target a specific order and do not enforce the book's global priority queue.
 
 ```mermaid
 flowchart TD
-    A["Submit order: input amount, minimum output, USDC bid"] --> B{"Pool ordering mode"}
-    B -- "FIFO" --> C["Require zero bid"]
-    B -- "Priority bid" --> D["Require at least 0.10 USDC"]
-    C --> E["Validate order and executor; escrow input and bid"]
-    D --> E
+    A["Submit order: input amount, minimum output, USDC bid"] --> D["Require pool minimum and tiered bid"]
+    D --> E["Validate executor; escrow input and bid at creation"]
     E --> F["Match best opposing prices first; up to 8 pairs"]
-    F --> G["Same-price ties: FIFO or highest remaining bid; equal bids use FIFO"]
+    F --> G["Same-price ties: highest remaining bid, then earliest sequence"]
     G --> H["Settle executable crossing pairs; reduce orders and settle bid shares"]
     H --> I{"Incoming order still open?"}
     I -- "No" --> Z["Order closed; return unused input if any"]
@@ -25,7 +22,7 @@ flowchart TD
     K -- "No / attempt reverts" --> M["Roll back LP attempt only; keep remaining order open"]
     M -- "New crossing order or Router.matchBook" --> N["Bounded book matching; partial fills can remain open"]
     N -- "Remainder" --> M
-    N -- "Input exhausted or minimum satisfied" --> Z
+    N -- "Input exhausted or remainder below pool minimum" --> Z
     M -- "Router.fillFromPoolLiquidity" --> J
     M -- "Private filler chooses order" --> O["Check live minimum plus protocol fee against filler maxPrice"]
     O --> P["Filler funds output; settle full remainder and bid; close order"]
@@ -42,13 +39,13 @@ Sources: [Router](../src/Router.sol), [AsyncSwap](../src/AsyncSwap.sol), [AsyncM
 
 ## Priority-bid settlement
 
-Priority bids are escrowed in USDC and are **non-refundable**. They rank same-price orders within the book; they do not purchase block inclusion or transaction ordering from the chain.
+Priority bids are escrowed in USDC and are **non-refundable**. The creation minimum is `min(0.10 USDC, 0.1% of the order’s USDC notional)`, rounded down to base units. An unlock cannot finish with an unpaid bid debt. They rank same-price orders within the book; they do not purchase block inclusion or transaction ordering from the chain.
 
 ```mermaid
 flowchart TD
     A["Escrow USDC bid as PoolManager claims"] --> B{"Order event"}
     B -- "Book match" --> C["Settle proportional bid share for each order's consumed input"]
-    C --> D{"Order has remaining input and minimum output?"}
+    C --> D{"Remaining order meets pool minimum?"}
     D -- "Yes" --> E["Keep unspent bid escrowed; update remaining order and rank"]
     E --> B
     D -- "No" --> F["Settle all remaining bid; return unused input; close order"]

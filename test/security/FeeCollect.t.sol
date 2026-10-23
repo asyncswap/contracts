@@ -50,15 +50,19 @@ contract SelfExecutor {
             SwapParams(zfo, -int256(amountIn), 2 ** 96),
             abi.encode(
                 AsyncSwap.UserParams({
-                    user: address(this), executor: address(this), amountOutMin: amountOutMin, priorityFee: 0
+                    user: address(this), executor: address(this), amountOutMin: amountOutMin, priorityFee: 100_000
                 })
             )
         );
         input.settle(pm, address(this), amountIn, false);
+        pm.sync(key.currency1);
+        MockERC20(Currency.unwrap(key.currency1)).transfer(address(pm), 100_000);
+        pm.settleFor(address(hook));
 
-        bytes32 salt =
-            keccak256(abi.encode(block.timestamp, block.number, address(pm), address(this), amountIn, amountOutMin, 0));
-        AsyncOrder memory o = AsyncOrder(key, address(this), zfo, amountIn, amountOutMin, 0, 0, salt);
+        bytes32 salt = keccak256(
+            abi.encode(block.timestamp, block.number, address(pm), address(this), amountIn, amountOutMin, 100_000)
+        );
+        AsyncOrder memory o = AsyncOrder(key, address(this), zfo, amountIn, amountOutMin, 100_000, 0, salt);
 
         if (output.isAddressZero()) {
             (bool ok,) = address(hook).call{value: pay}("");
@@ -124,12 +128,13 @@ contract ReenteringMaker {
     }
 
     function submit(uint256 amountIn, uint256 amountOutMin) external {
-        AsyncOrder memory o = AsyncOrder(key, address(this), false, amountIn, amountOutMin, 0, 2 ** 96, bytes32(0));
+        AsyncOrder memory o =
+            AsyncOrder(key, address(this), false, amountIn, amountOutMin, 100_000, 2 ** 96, bytes32(0));
         router.swap(
             o,
             abi.encode(
                 AsyncSwap.UserParams({
-                    user: address(this), executor: address(router), amountOutMin: amountOutMin, priorityFee: 0
+                    user: address(this), executor: address(router), amountOutMin: amountOutMin, priorityFee: 100_000
                 })
             )
         );
@@ -187,7 +192,10 @@ contract FeeCollectTest is Test {
     }
 
     function _salt(address user, uint256 amountIn, uint256 amountOutMin) internal view returns (bytes32) {
-        return keccak256(abi.encode(block.timestamp, block.number, address(manager), user, amountIn, amountOutMin, 0));
+        return
+            keccak256(
+                abi.encode(block.timestamp, block.number, address(manager), user, amountIn, amountOutMin, 100_000)
+            );
     }
 
     /* ---------------- fee is enforced by the hook, not just the Router ---------------- */
@@ -210,14 +218,14 @@ contract FeeCollectTest is Test {
 
         // Exact gross works and the fee lands in the vault.
         s.run(true, 1 ether, amountOutMin, amountOutMin + fee);
-        assertEq(manager.balanceOf(address(vault), tok.toId()), fee);
-        assertEq(erc20.balanceOf(address(s)), 10 ether - fee); // paid gross, got net back
+        assertEq(manager.balanceOf(address(vault), tok.toId()), fee + 100_000);
+        assertEq(erc20.balanceOf(address(s)), 10 ether - fee - 100_000); // paid gross, got net back
     }
 
     function test_customExecutor_underpayingFee_nativeOutput_reverts() public {
         SelfExecutor s = new SelfExecutor(manager, hook, key);
         vm.deal(address(s), 10 ether);
-        erc20.mint(address(s), 1 ether);
+        erc20.mint(address(s), 1 ether + 100_000);
         uint256 amountOutMin = 1 ether;
         uint256 fee = hook.calculatePoolFee(key.fee, amountOutMin);
 
@@ -240,8 +248,8 @@ contract FeeCollectTest is Test {
         vm.startPrank(bob);
         hook.setExecutor(poolId, address(router), true);
         erc20.approve(address(router), type(uint256).max);
-        AsyncOrder memory o = AsyncOrder(key, bob, false, 1 ether, 1 ether, 0, 2 ** 96, bytes32(0));
-        router.swap(o, abi.encode(AsyncSwap.UserParams(bob, address(router), 1 ether, 0)));
+        AsyncOrder memory o = AsyncOrder(key, bob, false, 1 ether, 1 ether, 100_000, 2 ** 96, bytes32(0));
+        router.swap(o, abi.encode(AsyncSwap.UserParams(bob, address(router), 1 ether, 100_000)));
         o.salt = _salt(bob, 1 ether, 1 ether);
         fee = hook.calculatePoolFee(key.fee, 1 ether);
         router.fillOrder{value: 1 ether + fee}(o, type(uint256).max, "");
@@ -271,8 +279,8 @@ contract FeeCollectTest is Test {
         vm.startPrank(bob);
         hook.setExecutor(poolId, address(router), true);
         erc20.approve(address(router), type(uint256).max);
-        AsyncOrder memory o = AsyncOrder(key, bob, false, 5 ether, 1 ether, 0, 2 ** 96, bytes32(0));
-        router.swap(o, abi.encode(AsyncSwap.UserParams(bob, address(router), 1 ether, 0)));
+        AsyncOrder memory o = AsyncOrder(key, bob, false, 5 ether, 1 ether, 100_000, 2 ** 96, bytes32(0));
+        router.swap(o, abi.encode(AsyncSwap.UserParams(bob, address(router), 1 ether, 100_000)));
         vm.stopPrank();
         uint256 fee = _fillOneNativeOutputOrder();
 
@@ -282,8 +290,8 @@ contract FeeCollectTest is Test {
         hook.sweep(eth, treasury);
 
         assertEq(treasury.balance, fee, "owner got exactly the fee");
-        assertEq(erc20.balanceOf(treasury), 0, "owner got none of the escrow");
-        assertEq(manager.balanceOf(address(hook), tok.toId()), 5 ether, "escrow intact");
+        assertEq(erc20.balanceOf(treasury), 100_000, "owner receives forfeited bid only");
+        assertEq(manager.balanceOf(address(hook), tok.toId()), 5 ether + 100_000, "input and bid escrow intact");
     }
 
     /* ---------------- mid-fill reentrancy cannot capture the unminted fee credit ---------------- */
@@ -299,9 +307,9 @@ contract FeeCollectTest is Test {
         m.submit(1 ether, outA);
         m.submit(1 ether, outB);
         AsyncOrder memory a =
-            AsyncOrder(key, address(m), false, 1 ether, outA, 0, 2 ** 96, _salt(address(m), 1 ether, outA));
+            AsyncOrder(key, address(m), false, 1 ether, outA, 100_000, 2 ** 96, _salt(address(m), 1 ether, outA));
         AsyncOrder memory b =
-            AsyncOrder(key, address(m), false, 1 ether, outB, 0, 2 ** 96, _salt(address(m), 1 ether, outB));
+            AsyncOrder(key, address(m), false, 1 ether, outB, 100_000, 2 ** 96, _salt(address(m), 1 ether, outB));
         m.arm(b);
 
         uint256 mBefore = address(m).balance;

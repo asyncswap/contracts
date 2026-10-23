@@ -55,7 +55,7 @@ contract PoolLiquidityFillTest is SetupHook {
             zeroForOne: zeroForOne,
             amountIn: amountIn,
             amountOutMin: amountOutMin,
-            priorityFee: 0,
+            priorityFee: 100_000,
             sqrtPrice: 2 ** 96,
             salt: bytes32(0)
         });
@@ -90,7 +90,7 @@ contract PoolLiquidityFillTest is SetupHook {
     function _submit(AsyncOrder memory order) internal returns (AsyncOrder memory) {
         MockERC20 input = order.zeroForOne ? token0 : token1;
         vm.startPrank(order.owner);
-        input.approve(address(router), order.amountIn);
+        input.approve(address(router), order.amountIn + order.priorityFee);
         router.swap(
             order,
             abi.encode(
@@ -103,7 +103,7 @@ contract PoolLiquidityFillTest is SetupHook {
             )
         );
         vm.stopPrank();
-        return order.priorityFee == 0 ? _withAssignedSalt(order) : order;
+        return _withPriorityFee(order, order.priorityFee);
     }
 
     /// @dev Concentrated position around the 1:1 pool price. 1e24 liquidity over [-60, 60] holds
@@ -216,7 +216,6 @@ contract PoolLiquidityFillTest is SetupHook {
     /// In priority-fee mode a failed pool fill must not touch the maker's escrowed bid: it is
     /// neither donated nor forfeited until the order actually fills or terminates.
     function test_failedPoolFillKeepsPriorityBidEscrowed() public {
-        hook.setOrderingMode(key, AsyncFiller.OrderingMode.PriorityFee);
         uint256 bid = 1 ether;
         AsyncOrder memory order = _withPriorityFee(_order(alice, true, 1 ether, 0.95 ether), bid);
 
@@ -245,7 +244,7 @@ contract PoolLiquidityFillTest is SetupHook {
         AsyncOrder memory order = _submit(_order(alice, true, amountIn, 1.9 ether));
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        uint256 received = token1.balanceOf(alice) - makerOutBefore;
+        uint256 received = token1.balanceOf(alice) + 100_000 - makerOutBefore;
         assertGe(received, 1.9 ether, "maker paid at least the limit");
         assertLt(received, amountIn, "pool fee and impact reduce output below 1:1");
         assertEq(hook.asyncOrder(poolId, _id(order)), 0, "order removed");
@@ -274,7 +273,7 @@ contract PoolLiquidityFillTest is SetupHook {
         _addPoolLiquidity(1e24);
         // Bob bids 0.5 token1 for at least 0.5 token0 (1:1).
         _submit(_order(bob, false, 0.5 ether, 0.5 ether));
-        assertEq(_escrow(currency1), 0.5 ether, "bob's bid rests (pool is 1:1 minus fee, below his limit)");
+        assertEq(_escrow(currency1), 0.5 ether + 100_000, "bob's bid rests (pool is 1:1 minus fee, below his limit)");
 
         uint256 aliceOutBefore = token1.balanceOf(alice);
         vm.recordLogs();
@@ -291,7 +290,9 @@ contract PoolLiquidityFillTest is SetupHook {
         assertEq(hook.asyncOrder(poolId, _id(ask)), 0, "ask fully executed");
         assertEq(_escrow(currency0), 0, "no token0 escrow left");
         assertEq(_escrow(currency1), 0, "bob's bid fully consumed");
-        uint256 received = token1.balanceOf(alice) - aliceOutBefore;
+        // The book leg pays claims, the pool leg pays ERC20; alice's 100_000 bid was paid in ERC20.
+        uint256 received =
+            token1.balanceOf(alice) + 100_000 + manager.balanceOf(alice, currency1.toId()) - aliceOutBefore;
         assertGe(received, 0.95 ether, "maker limit respected across both legs");
         assertGt(received, 0.5 ether + 0.49 ether, "0.5 from bob plus ~0.5 from the pool");
     }
@@ -304,7 +305,7 @@ contract PoolLiquidityFillTest is SetupHook {
         bytes32 id = _id(ask);
         (uint256 remaining, uint256 remainingMin) = hook.asyncOrderInfo(poolId, id);
         assertEq(remaining, 0.5 ether, "half matched against bob");
-        assertEq(remainingMin, 0.45 ether, "minimum reduced by what bob already paid");
+        assertEq(remainingMin, 0.475 ether, "remainder keeps the ask's 0.95 limit");
 
         _addPoolLiquidity(1e24);
         vm.prank(bob);
@@ -332,7 +333,8 @@ contract PoolLiquidityFillTest is SetupHook {
         (uint256 feeGrowth0, uint256 feeGrowth1) = manager.getFeeGrowthGlobals(poolId);
         uint256 expectedGrowth0 = (amountIn * 3 / 1000) * (2 ** 128) / 1e24; // fee * Q128 / liquidity
         assertApproxEqRel(feeGrowth0, expectedGrowth0, 0.01e18, "30 bps of the input accrues as token0 fee growth");
-        assertEq(feeGrowth1, 0, "no fee charged on the output side");
+        assertEq(feeGrowth1, 0, "the bid is not donated to LPs");
+        assertEq(manager.balanceOf(address(hook.feeVault()), currency1.toId()), 100_000, "the bid goes to the FeeVault");
 
         lp.modifyLiquidity(key, ModifyLiquidityParams(-60, 60, -1e24, 0), "");
         uint256 t0Net = token0.balanceOf(address(this)) - t0Before; // > 0: LP absorbed the input
@@ -404,7 +406,7 @@ contract PoolLiquidityFillTest is SetupHook {
 
         AsyncOrder memory order = _submit(_order(alice, zeroForOne, amountIn, amountOutMin));
         uint256 remaining = hook.asyncOrder(poolId, _id(order));
-        uint256 received = output.balanceOf(alice) - outBefore;
+        uint256 received = output.balanceOf(alice) + (zeroForOne ? 100_000 : 0) - outBefore;
 
         if (remaining == 0) {
             assertGe(received, amountOutMin, "filled: limit honored");
@@ -415,7 +417,7 @@ contract PoolLiquidityFillTest is SetupHook {
         } else {
             assertEq(remaining, amountIn, "rest: nothing partially consumed");
             assertEq(received, 0, "rest: maker paid nothing");
-            assertEq(_escrow(input), amountIn, "rest: full escrow");
+            assertEq(_escrow(input), amountIn + (zeroForOne ? 0 : 100_000), "rest: input and bid escrow");
             _assertPoolUntouched(2 ** 96);
         }
     }
@@ -481,11 +483,13 @@ contract PoolLiquidityFillSixDecimalTest is Test {
     }
 
     function _submit(bool zeroForOne, uint256 amountIn, uint256 amountOutMin) internal returns (bytes32 id) {
-        AsyncOrder memory order = AsyncOrder(key, maker, zeroForOne, amountIn, amountOutMin, 0, SQRT_PRICE_2000, 0);
+        AsyncOrder memory order =
+            AsyncOrder(key, maker, zeroForOne, amountIn, amountOutMin, 100_000, SQRT_PRICE_2000, 0);
         vm.prank(maker);
-        router.swap(order, abi.encode(AsyncSwap.UserParams(maker, address(router), amountOutMin, 0)));
-        bytes32 salt =
-            keccak256(abi.encode(block.timestamp, block.number, address(manager), maker, amountIn, amountOutMin, 0));
+        router.swap(order, abi.encode(AsyncSwap.UserParams(maker, address(router), amountOutMin, 100_000)));
+        bytes32 salt = keccak256(
+            abi.encode(block.timestamp, block.number, address(manager), maker, amountIn, amountOutMin, 100_000)
+        );
         return keccak256(abi.encode(block.chainid, poolId, maker, zeroForOne, salt));
     }
 
@@ -513,7 +517,11 @@ contract PoolLiquidityFillSixDecimalTest is Test {
         bytes32 bid = _submit(false, 2_000e6, 1.001 ether);
         assertEq(hook.asyncOrder(poolId, bid), 2_000e6, "bid above spot rests");
         assertEq(manager.balanceOf(address(hook), key.currency0.toId()), 1 ether, "asset escrow");
-        assertEq(manager.balanceOf(address(hook), key.currency1.toId()), 2_000e6, "USDC escrow");
+        assertEq(
+            manager.balanceOf(address(hook), key.currency1.toId()),
+            2_000e6 + 200_000,
+            "USDC input and both bids escrowed"
+        );
         (uint160 sqrtPrice,,, uint24 fee) = manager.getSlot0(poolId);
         assertEq(sqrtPrice, SQRT_PRICE_2000, "resting orders leave the pool price untouched");
         assertEq(fee, 0, "fee restored after both failed attempts");

@@ -62,7 +62,7 @@ contract MatchingHandler is Test {
         address actor = actors[who % 4];
         uint256 quantity = bound(size, 1e12, 1 ether);
         uint256 quote = quantity * bound(price, 1_000e6, 4_000e6) / 1 ether;
-        uint256 bid = priority ? bound(fee, 100_000, 10e6) : 0;
+        uint256 bid = priority ? bound(fee, 100_000, 10e6) : 100_000;
         uint256 amount = sell ? quantity : quote;
         uint256 minimum = sell ? quote : quantity;
         vm.roll(block.number + 1); // unique salt, including repeated actor/amount combinations
@@ -189,7 +189,6 @@ contract MatchingInvariantTest is StdInvariant, Test {
         Router router = new Router(manager, hook, ISignatureTransfer(address(0)));
         key = PoolKey(Currency.wrap(address(0)), Currency.wrap(address(usdc)), LPFeeLibrary.DYNAMIC_FEE_FLAG, 1, hook);
         manager.initialize(key, initialSqrtPrice());
-        if (priorityMode()) hook.setOrderingMode(key, AsyncFiller.OrderingMode.PriorityFee);
         _seedLiquidity();
         handler = new MatchingHandler(hook, router, usdc, key, priorityMode());
         targetSelector(FuzzSelector(address(handler), _selectors()));

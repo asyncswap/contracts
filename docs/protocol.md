@@ -3,8 +3,7 @@
 Async Swap v2 is a Uniswap v4 hook that turns exact-input swaps into resting limit orders. This page
 describes the whole protocol in diagrams: which contracts exist, where funds sit, how an order is
 created, matched, filled, repriced and cancelled, and who is allowed to do what. Every box names a
-contract, library or function in `src/`, so the diagrams can be checked against the code. The formal
-model of the same machine lives in [`asyncswap/v2-proofs`](https://github.com/asyncswap/v2-proofs).
+contract, library or function in `src/`, so the diagrams can be checked against the code.
 
 ## 1. Components
 
@@ -16,7 +15,7 @@ flowchart LR
         Relayer["Relayer<br/>(submits signed orders)"]
         Keeper["Anyone<br/>(matchBook, fillFromPoolLiquidity)"]
         LP["v4 LP<br/>(adds range liquidity)"]
-        Owner["Protocol owner<br/>(FeeVault.collect, sweep, ordering mode)"]
+        Owner["Protocol owner<br/>(FeeVault.collect, sweep, minimum order size)"]
     end
 
     subgraph Periphery
@@ -42,7 +41,7 @@ flowchart LR
     Keeper -->|matchBook, fillFromPoolLiquidity| Router
     LP -->|modifyLiquidity| PM
     Owner -->|collect| Vault
-    Owner -->|sweep, setOrderingMode| Hook
+    Owner -->|sweep, setMinOrder| Hook
 
     Router -->|unlock → unlockCallback| PM
     Router -->|signed input| Permit2
@@ -94,14 +93,13 @@ flowchart TB
 Fees, by path: an order-to-order match charges nothing; a filler fill (`Router.fillOrder`) pays
 the maker's live minimum plus 30 bps of gross output, and that fee lands in the FeeVault as claims;
 an LP fill charges the 30 bps dynamic LP fee to the active v4 positions. `calculateHookFee` is zero.
-Priority bids are escrowed as hook claims when the order is created (`recordPriorityFee`), donated
-proportionally to active LPs as input fills, and forfeited to the FeeVault only when the pool has no
-active liquidity at that moment. A bid counts only once it is escrowed: an order whose bid was never
-paid (placed straight through the PoolManager, not the Router) queues as if its bid were 0, and
-fills, matches and cancels settle only the paid bid, so an unpaid bid can never block the book
-(`test/UnpaidBidInvariant.t.sol`).
+Priority bids are escrowed as hook claims by `addOrder`, donated proportionally to active LPs as
+input fills, and forfeited to the FeeVault when no liquidity is active at settlement. Minting bid
+claims creates hook debt immediately; the PoolManager unlock must settle that debt, including for
+custom executors. The Router pays it with `settleFor(hook)`. All pools rank equal prices by remaining
+bid, then sequence. There is no FIFO mode or mode switch.
 
-Invariant proved in `v2-proofs` and fuzzed by `MatchingInvariantTest` and `UnpaidBidInvariantTest`: the hook's claim balance for
+The accounting invariant is fuzzed by the matching invariant suites: the hook's claim balance for
 each currency equals the sum of remaining inputs of open orders plus escrowed bids, and nothing is
 created or destroyed by a match. The hook's own token balance is zero between transactions, so
 `sweep` can only move stranded ETH or donations, never escrow.
@@ -126,12 +124,12 @@ sequenceDiagram
     PM->>H: beforeSwap(sender = Router, params, hookData)
     H->>PM: take(input, hook, amountIn, claims = true)
     H->>AM: addOrder(id, owner, amountIn, amountOutMin, isBuy, priorityFee)
+    AM->>PM: mint numeraire bid claims to hook; hook owes bid
     Note over AM: salt assigned by the hook, priceKey = WAD ratio,<br/>order linked into the bid or ask level
     H-->>PM: BeforeSwapDelta consumes the whole input
     R->>PM: settle input from maker (ERC-20 transferFrom or forwarded ETH)
     opt priorityFee > 0
         R->>PM: settleFor(hook) with USDC bid
-        R->>H: recordPriorityFee(key, maker, bid)
     end
     R->>H: matchNewOrder(order)
     H->>AM: match up to 8 crossing resting orders
@@ -165,7 +163,7 @@ are in [`order-lifecycle.md`](order-lifecycle.md). Three facts to keep in mind w
   is zero.
 - `updatePrice` only re-ranks the order in the book. It needs no PoolManager unlock and triggers no
   matching; a later crossing order, `matchBook`, a filler or an LP retry has to execute it.
-- `matchNewOrder` and `recordPriorityFee` are gated by a transient slot that `beforeSwap` writes for
+- `matchNewOrder` is gated by a transient slot that `beforeSwap` writes for
   the current transaction. `executeOrder`, `cancelOrder` and `tryFillOrderFromPoolLiquidity` check
   `isExecutor[maker][caller]` instead.
 
@@ -186,12 +184,12 @@ flowchart LR
     subgraph ExecutorRights["Registered executor (the Router)"]
         e1["beforeSwap sender must equal hookData.executor<br/>and be authorised by the maker"]
         e2["executeOrder, cancelOrder, tryFillOrderFromPoolLiquidity<br/>require isExecutor[maker][caller], inside the unlock"]
-        e3["matchNewOrder, recordPriorityFee: only the executor<br/>recorded by beforeSwap in the same tx (transient slot)"]
+        e3["matchNewOrder: only the executor<br/>recorded by beforeSwap in the same tx (transient slot)"]
     end
     subgraph OwnerRights["Protocol owner (two-step transfer)"]
         o1["FeeVault.collect(currency, recipient)"]
         o2["sweep(currency, to) — hook's raw balance only"]
-        o3["setOrderingMode(key, FIFO | PriorityFee)<br/>only while the book is empty"]
+        o3["setMinOrder(key, minimum), setDefaultMinOrder(minimum)"]
         o4["no pause, no upgrade, no access to escrow"]
     end
     subgraph Public["Anyone"]

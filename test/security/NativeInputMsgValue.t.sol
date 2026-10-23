@@ -76,7 +76,7 @@ contract NativeInputMsgValueTest is Test {
             zeroForOne: zeroForOne,
             amountIn: amountIn,
             amountOutMin: amountOutMin,
-            priorityFee: 0,
+            priorityFee: 100_000,
             sqrtPrice: 2 ** 96,
             salt: bytes32(0)
         });
@@ -89,7 +89,7 @@ contract NativeInputMsgValueTest is Test {
         router.swap{value: 0}(
             order,
             abi.encode(
-                AsyncSwap.UserParams({user: bob, executor: address(router), amountOutMin: 1 wei, priorityFee: 0})
+                AsyncSwap.UserParams({user: bob, executor: address(router), amountOutMin: 1 wei, priorityFee: 100_000})
             )
         );
         vm.stopPrank();

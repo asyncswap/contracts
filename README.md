@@ -4,7 +4,7 @@
 
 Async Swap is an on-chain order book and matching engine built as a Uniswap v4 hook. Traders set a limit price for assets paired with USDC. Orders can match with other traders or available pool liquidity. Anyone can permissionlessly fill orders.
 
-Book matching prioritizes price, with FIFO or USDC bids breaking same-price ties. Liquidity providers earn a 0.30% fee on fills against their active positions. Unfilled amounts remain open for later execution, repricing, or cancellation; fills depend on available liquidity and counterparties.
+Book matching prioritizes price, with higher escrowed USDC bids breaking same-price ties and earlier submissions breaking equal-bid ties. Liquidity providers earn a 0.30% fee on fills against their active positions. Unfilled amounts remain open for later execution, repricing, or cancellation; fills depend on available liquidity and counterparties.
 
 ## Documentation
 

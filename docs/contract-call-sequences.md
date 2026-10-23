@@ -47,6 +47,7 @@ sequenceDiagram
     PM->>Hook: beforeSwap(...)
     Hook->>PM: mint input escrow claims to hook
     Hook->>Match: Validate and add order to price book
+    Match->>PM: mint bid escrow claims to hook; hook owes bid
     Match-->>Hook: Order recorded
     Note over Hook,Match: AsyncOrderCreated event, order is not matched until input and bid funding finish.
     Hook-->>PM: beforeSwap selector and custom accounting delta
@@ -66,11 +67,6 @@ sequenceDiagram
         Router->>Token: transferFrom(maker, PoolManager, bid)
         Token-->>Router: Transfer succeeds
         Router->>PM: settleFor(hook)
-        Router->>Hook: recordPriorityFee(key, maker, bid)
-        Hook->>Match: Record funded bid and mint escrow claims
-        Match->>PM: mint USDC claims to hook
-        Match-->>Hook: Bid escrowed
-        Hook-->>Router: Bid funding recorded
     end
     Router->>Hook: matchNewOrder(order)
     Hook->>Match: matchIncoming(...)
@@ -225,9 +221,9 @@ sequenceDiagram
     Hook->>Hook: Require configured USDC and dynamic-fee pool
     Hook-->>PM: beforeInitialize selector
     PM-->>Operator: Initialized tick, Initialize event
-    opt Configure ordering mode while book is empty
-        Admin->>Hook: setOrderingMode(key, FIFO or PriorityFee)
-        Hook-->>Admin: Mode recorded
+    opt Configure minimum order size
+        Admin->>Hook: setMinOrder(key, minimum)
+        Hook-->>Admin: Minimum recorded
     end
     LP->>LM: Add funded liquidity in a chosen tick range
     LM->>PM: unlock(liquidity operation)

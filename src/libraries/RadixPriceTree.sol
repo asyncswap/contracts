@@ -32,8 +32,8 @@ library RadixPriceTree {
     function insert(Tree storage self, uint128 price) internal returns (bool created) {
         if (self.leaves[price] != 0) return false;
         uint32 leafId = _newNode(self);
-        self.nodes[leafId].price = price;
-        self.nodes[leafId].leaf = true;
+        // Recycled nodes may retain old data. Initialize the entire packed record.
+        self.nodes[leafId] = Node(0, 0, 0, price, 0, true);
         self.leaves[price] = leafId;
 
         if (self.root == 0) {
@@ -58,16 +58,9 @@ library RadixPriceTree {
         }
 
         uint32 branchId = _newNode(self);
-        Node storage addedBranch = self.nodes[branchId];
-        addedBranch.parent = parentId;
-        addedBranch.bit = splitBit;
-        if (_bitSet(price, splitBit)) {
-            addedBranch.left = cursor;
-            addedBranch.right = leafId;
-        } else {
-            addedBranch.left = leafId;
-            addedBranch.right = cursor;
-        }
+        bool goesRight = _bitSet(price, splitBit);
+        self.nodes[branchId] =
+            Node(parentId, goesRight ? cursor : leafId, goesRight ? leafId : cursor, 0, splitBit, false);
         self.nodes[cursor].parent = branchId;
         self.nodes[leafId].parent = branchId;
 
@@ -135,7 +128,8 @@ library RadixPriceTree {
     }
 
     function _freeNode(Tree storage self, uint32 id) private {
-        delete self.nodes[id];
+        // The node is unreachable after remove rewires the tree and clears leaves.
+        // Reinitialize it on reuse instead of clearing it only to write it again.
         self.freeIds.push(id);
     }
 

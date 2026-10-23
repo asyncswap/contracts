@@ -66,7 +66,10 @@ contract NativeFillExactPaymentTest is Test {
     }
 
     function _expectedSalt(address user, uint256 amountIn, uint256 amountOutMin) internal view returns (bytes32) {
-        return keccak256(abi.encode(block.timestamp, block.number, address(manager), user, amountIn, amountOutMin, 0));
+        return
+            keccak256(
+                abi.encode(block.timestamp, block.number, address(manager), user, amountIn, amountOutMin, 100_000)
+            );
     }
 
     function _orderIdFor(address maker, bool zeroForOne, bytes32 salt) internal view returns (bytes32) {
@@ -84,7 +87,7 @@ contract NativeFillExactPaymentTest is Test {
             zeroForOne: zeroForOne,
             amountIn: amountIn,
             amountOutMin: amountOutMin,
-            priorityFee: 0,
+            priorityFee: 100_000,
             sqrtPrice: 2 ** 96,
             salt: bytes32(0)
         });
@@ -103,7 +106,7 @@ contract NativeFillExactPaymentTest is Test {
             order,
             abi.encode(
                 AsyncSwap.UserParams({
-                    user: alice, executor: address(router), amountOutMin: amountOutMin, priorityFee: 0
+                    user: alice, executor: address(router), amountOutMin: amountOutMin, priorityFee: 100_000
                 })
             )
         );
@@ -227,7 +230,9 @@ contract NativeFillExactPaymentTest is Test {
         router.swap{value: 1 ether}(
             order,
             abi.encode(
-                AsyncSwap.UserParams({user: alice, executor: address(router), amountOutMin: 0.9 ether, priorityFee: 0})
+                AsyncSwap.UserParams({
+                    user: alice, executor: address(router), amountOutMin: 0.9 ether, priorityFee: 100_000
+                })
             )
         );
         assertEq(alice.balance, makerBefore);

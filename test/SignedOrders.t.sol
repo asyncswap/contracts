@@ -35,6 +35,9 @@ contract SignedOrdersTest is SetupHook {
         maker = vm.addr(makerPk);
         vm.prank(owner);
         token0.transfer(maker, 10 ether);
+        token1.mint(maker, 1 ether);
+        vm.prank(maker);
+        token1.approve(address(router), type(uint256).max);
         // One-time on-chain step: approve Permit2 for the input token. No setExecutor call.
         vm.prank(maker);
         token0.approve(Permit2Bytecode.PERMIT2, type(uint256).max);
@@ -50,7 +53,7 @@ contract SignedOrdersTest is SetupHook {
             zeroForOne: true,
             amountIn: AMOUNT_IN,
             amountOutMin: amountOutMin,
-            priorityFee: 0,
+            priorityFee: 100_000,
             sqrtPrice: 2 ** 96,
             salt: bytes32(0)
         });

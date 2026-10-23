@@ -2,6 +2,10 @@
 out/
 cache/
 
+# forge coverage reports
+lcov.info
+coverage/
+
 # Local environment and deployment secrets
 .env
 .env.*

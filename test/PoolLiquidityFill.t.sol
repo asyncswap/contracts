@@ -446,8 +446,8 @@ contract PoolLiquidityFillSixDecimalTest is Test {
     function setUp() public {
         manager = new PoolManager(address(this));
         // Fixed addresses pin the currency ordering: asset is currency0, USDC is currency1.
-        deployCodeTo("MockERC20.sol:MockERC20", abi.encode("Asset", "ASSET", uint8(18)), address(0x10000));
-        deployCodeTo("MockERC20.sol:MockERC20", abi.encode("USD Coin", "USDC", uint8(6)), address(0x20000));
+        deployCodeTo("test/utils/MockERC20.sol:MockERC20", abi.encode("Asset", "ASSET", uint8(18)), address(0x10000));
+        deployCodeTo("test/utils/MockERC20.sol:MockERC20", abi.encode("USD Coin", "USDC", uint8(6)), address(0x20000));
         asset = MockERC20(address(0x10000));
         usdc = MockERC20(address(0x20000));
 

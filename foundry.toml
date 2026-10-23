@@ -11,7 +11,7 @@ solc_version = "0.8.26"
 # Keep linked continuous matching deployable under EIP-170 while retaining more optimization than
 # the minimum-size setting.
 optimizer = true
-optimizer_runs = 0xaaaa
+optimizer_runs = 1_000
 # Tests named `*_finding_*` are counterexamples the bytecode gives to a Formal Mind theorem (see
 # test/formal/README.md, "Findings"). They fail by design until the model is fixed, so the default run
 # skips them; `FOUNDRY_PROFILE=findings forge test` runs exactly those.

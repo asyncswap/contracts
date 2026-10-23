@@ -16,8 +16,10 @@ contract CoarsePriceBlockingTest is SetupHook {
     function setUp() public override {
         _deployManager();
         vm.startPrank(owner);
-        deployCodeTo("MockERC20.sol", abi.encode("Asset", "ASSET", uint8(18)), address(0x100000));
-        deployCodeTo("MockERC20.sol", abi.encode("USD Coin fixture", "USDC", uint8(6)), address(0x200000));
+        deployCodeTo("test/utils/MockERC20.sol:MockERC20", abi.encode("Asset", "ASSET", uint8(18)), address(0x100000));
+        deployCodeTo(
+            "test/utils/MockERC20.sol:MockERC20", abi.encode("USD Coin fixture", "USDC", uint8(6)), address(0x200000)
+        );
         vm.stopPrank();
         token0 = MockERC20(address(0x100000));
         token1 = MockERC20(address(0x200000));

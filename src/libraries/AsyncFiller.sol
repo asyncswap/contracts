@@ -250,18 +250,6 @@ library AsyncFiller {
         return priceLevel.priorityOrderIds[priorityKey];
     }
 
-    /// @notice Remove an order after a successful full fill against PoolManager liquidity.
-    function clearLiquidityFilledOrder(State storage self, Book storage book, bytes32 id) internal {
-        OrderInfo storage info = self.orders[id];
-        if (info.amountIn == 0) revert OrderNotFound();
-        _remove(self, book, id);
-        delete self.orders[id];
-    }
-
-    function isExecutor(AsyncOrder calldata order, State storage self, address executor) internal view returns (bool) {
-        return self.isExecutor[order.owner][executor];
-    }
-
     /// @notice Maker-only price update. The executor (router) is required to be authorized by
     ///         the maker, AND `caller` must equal `order.owner` — both checked here.
     function updatePrice(

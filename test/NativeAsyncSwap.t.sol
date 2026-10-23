@@ -175,6 +175,24 @@ contract NativeAsyncSwapTest is Test {
         assertEq(erc20.balanceOf(alice) - aliceErc20Before, 0.95 ether, "maker received real TST");
     }
 
+    /// If the hook refuses the filler's ETH, the Router reverts before any settlement.
+    function test_RevertWhen_NativeOutputForwardFails() public {
+        AsyncOrder memory order = _order(alice, false, 1 ether, 0.9 ether);
+        vm.prank(alice);
+        router.swap(order, abi.encode(AsyncSwap.UserParams(alice, address(router), 0.9 ether, 100_000)));
+        order = _withAssignedSalt(order);
+
+        uint256 gross = 0.9 ether + hook.calculatePoolFee(order.key.fee, 0.9 ether);
+        // Only the Router's value-carrying forward matches: the hook's view calls carry no value.
+        vm.mockCallRevert(address(hook), gross, bytes(""), bytes("refused"));
+        vm.prank(bob);
+        vm.expectRevert("Native output transfer to hook failed");
+        router.fillOrder{value: gross}(order, type(uint256).max, "");
+        vm.clearMockedCalls();
+
+        assertEq(hook.asyncOrder(poolId, _orderIdFor(alice, false, order.salt)), 1 ether, "order untouched");
+    }
+
     /* --------------------------- maker submit native output --------------------------- */
 
     /// Maker sells 1 TST for ≥ 0.9 ETH (zeroForOne=false; input=currency1, output=currency0=ETH).

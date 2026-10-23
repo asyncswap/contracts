@@ -7,6 +7,7 @@ import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {MockERC20} from "../utils/MockERC20.sol";
 import {LPFeeLibrary} from "v4-core/libraries/LPFeeLibrary.sol";
+import {Currency} from "v4-core/types/Currency.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 
 /// @notice Every order is worth at least the pool's minimum, in numeraire (token1) base units: a buy's
@@ -130,6 +131,68 @@ contract MinimumOrderTest is SetupHook {
         assertEq(hook.asyncOrder(poolId, _id(ask)), 0, "remainder below the minimum closes the order");
         assertEq(token0.balanceOf(alice), aliceToken0Before - 15 ether, "the full input was escrowed");
         assertEq(manager.balanceOf(alice, currency0.toId()), 5 ether, "the unmatched 5 are refunded as claims");
+    }
+
+    /// The resting bid is matched down to 5 of numeraire, below the minimum: it closes and the 5 return to bob.
+    function test_partialMatchBuyRemainderBelowMinimum_refunded() public {
+        hook.setMinOrder(key, MIN);
+        AsyncOrder memory bid = _order(bob, false, 15 ether, 15 ether, 100_000);
+        uint256 bobToken1Before = token1.balanceOf(bob);
+        _submit(bid);
+        _submit(_order(alice, true, MIN, MIN, 100_000));
+
+        assertEq(hook.asyncOrder(poolId, _id(bid)), 0, "remainder below the minimum closes the order");
+        assertEq(bobToken1Before - token1.balanceOf(bob), 15 ether + 100_000, "full input and bid were paid");
+        assertEq(manager.balanceOf(bob, currency1.toId()), 5 ether, "the unmatched 5 are refunded as claims");
+        assertEq(manager.balanceOf(bob, currency0.toId()), MIN, "the matched 10 asset arrive as claims");
+    }
+
+    /* --------------------------------------------- numeraire as currency0 */
+
+    /// @dev A pool whose numeraire (token1 here) sorts first: selling the asset is `zeroForOne = false`,
+    ///      so the sell's value is its input divided by the price.
+    function _numeraireFirstPool() internal returns (PoolKey memory k, MockERC20 asset) {
+        address high = address(type(uint160).max - 0xff);
+        deployCodeTo("test/utils/MockERC20.sol:MockERC20", abi.encode("High", "HI", uint8(18)), high);
+        asset = MockERC20(high);
+        k = PoolKey({
+            currency0: currency1,
+            currency1: Currency.wrap(high),
+            fee: LPFeeLibrary.DYNAMIC_FEE_FLAG,
+            tickSpacing: 1,
+            hooks: hook
+        });
+        manager.initialize(k, 2 ** 96);
+        hook.setMinOrder(k, MIN);
+        asset.mint(alice, 100 ether);
+        vm.startPrank(alice);
+        hook.setExecutor(k.toId(), address(router), true);
+        asset.approve(address(router), type(uint256).max);
+        vm.stopPrank();
+    }
+
+    function submitSellExternal(PoolKey memory k, uint256 amountIn, uint256 amountOutMin) external {
+        _submitSell(k, amountIn, amountOutMin);
+    }
+
+    function _submitSell(PoolKey memory k, uint256 amountIn, uint256 amountOutMin) internal {
+        AsyncOrder memory order = AsyncOrder(k, alice, false, amountIn, amountOutMin, 100_000, 2 ** 96, 0);
+        vm.prank(alice);
+        router.swap(order, abi.encode(AsyncSwap.UserParams(alice, address(router), amountOutMin, 100_000)));
+    }
+
+    function test_RevertWhen_SellInputWorthLessThanMinimum_numeraireIsCurrency0() public {
+        (PoolKey memory k,) = _numeraireFirstPool();
+        vm.expectRevert();
+        this.submitSellExternal(k, 1, 100 ether);
+    }
+
+    function test_sellAtMinimum_rests_numeraireIsCurrency0() public {
+        (PoolKey memory k, MockERC20 asset) = _numeraireFirstPool();
+        uint256 before = asset.balanceOf(alice);
+        _submitSell(k, MIN, MIN);
+        assertEq(before - asset.balanceOf(alice), MIN, "the asset is escrowed: the order rests");
+        assertEq(manager.balanceOf(address(hook), k.currency1.toId()), MIN);
     }
 
     /* ------------------------------------------------------------------ configuration */

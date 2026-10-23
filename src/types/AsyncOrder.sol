@@ -52,10 +52,4 @@ library AsyncOrderLibrary {
     function orderId(AsyncOrder calldata order) internal view returns (bytes32) {
         return keccak256(abi.encode(block.chainid, order.key.toId(), order.owner, order.zeroForOne, order.salt));
     }
-
-    /// @notice The maker's limit price expressed as 1e18-scaled output per input.
-    /// @dev    Reverts on `amountIn == 0`; callers should guard before constructing an order.
-    function priceWad(AsyncOrder calldata order) internal pure returns (uint256) {
-        return (order.amountOutMin * 1e18) / order.amountIn;
-    }
 }

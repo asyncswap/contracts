@@ -102,6 +102,65 @@ contract MatchingEngineTest is Test {
         engine.matchBook(MARKET, 0);
     }
 
+    function testRevertWhenAmountOrPriceIsZero() public {
+        vm.expectRevert(MatchingEngine.ZeroAmount.selector);
+        engine.placeOrder(MARKET, true, 0, WAD);
+        vm.expectRevert(MatchingEngine.ZeroPrice.selector);
+        engine.placeOrder(MARKET, false, WAD, 0);
+    }
+
+    function testRevertWhenCancellingMissingOrAnotherOwnersOrder() public {
+        vm.expectRevert(MatchingEngine.OrderNotFound.selector);
+        engine.cancelOrder(MARKET, 1);
+
+        uint64 ask = _ask(2 * WAD, WAD);
+        vm.prank(makeAddr("stranger"));
+        vm.expectRevert(MatchingEngine.NotOrderOwner.selector);
+        engine.cancelOrder(MARKET, ask);
+        assertTrue(engine.getOrder(MARKET, ask).active, "order untouched");
+    }
+
+    /// An incoming ask fills resting bids from the highest price down, at each bid's price.
+    function testIncomingAskFillsBestBidAtTheBidPrice() public {
+        _bid(WAD, WAD);
+        uint64 bestBid = _bid(3 * WAD, WAD);
+
+        vm.recordLogs();
+        uint64 ask = _ask(2 * WAD, 2 * WAD);
+        (uint64 maker, uint64 taker, uint128 quantity, uint128 price) = _firstFill(vm.getRecordedLogs());
+
+        assertEq(maker, bestBid);
+        assertEq(taker, ask);
+        assertEq(quantity, WAD);
+        assertEq(price, 3 * WAD, "fills at the resting bid's price");
+        // The 1e18 bid at price 1 is below the ask's limit of 2, so the rest of the ask rests.
+        assertEq(engine.getOrder(MARKET, ask).remaining, WAD);
+        (bool hasBid, uint128 bid) = engine.bestPrice(MARKET, true);
+        assertTrue(hasBid);
+        assertEq(bid, WAD);
+    }
+
+    /// When a crossed book is cleared and the bid is older, the bid is the maker and sets the price.
+    function testMatchBookUsesTheOlderBidAsMaker() public {
+        uint64[9] memory bids;
+        for (uint256 i; i < bids.length; ++i) {
+            bids[i] = _bid(3 * WAD, WAD);
+        }
+        // Eight fills exhaust the per-call cap; two units of the ask stay crossed with the ninth bid.
+        uint64 ask = _ask(2 * WAD, 10 * WAD);
+        assertEq(engine.getOrder(MARKET, ask).remaining, 2 * WAD);
+
+        vm.recordLogs();
+        assertEq(engine.matchBook(MARKET, 1), 1);
+        (uint64 maker, uint64 taker, uint128 quantity, uint128 price) = _firstFill(vm.getRecordedLogs());
+        assertEq(maker, bids[8], "older bid is the maker");
+        assertEq(taker, ask);
+        assertEq(quantity, WAD, "the smaller bid sets the quantity");
+        assertEq(price, 3 * WAD, "at the maker's price");
+        assertEq(engine.getOrder(MARKET, ask).remaining, WAD, "ask keeps its remainder");
+        assertFalse(engine.getOrder(MARKET, bids[8]).active, "filled bid removed");
+    }
+
     function testFuzzBestAskMatchesMinimum(uint128[16] memory prices) public {
         uint128 expected = type(uint128).max;
         for (uint256 i; i < prices.length; ++i) {

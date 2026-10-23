@@ -11,6 +11,12 @@ import {PoolModifyLiquidityTest} from "v4-core/test/PoolModifyLiquidityTest.sol"
 import {ModifyLiquidityParams} from "v4-core/types/PoolOperation.sol";
 import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
+import {IHooks} from "v4-core/interfaces/IHooks.sol";
+import {PoolSwapTest} from "v4-core/test/PoolSwapTest.sol";
+import {SwapParams} from "v4-core/types/PoolOperation.sol";
+import {CustomRevert} from "v4-core/libraries/CustomRevert.sol";
+import {Hooks} from "v4-core/libraries/Hooks.sol";
+import {TickMath} from "v4-core/libraries/TickMath.sol";
 
 contract AsyncSwapTest is SetupHook {
     using CurrencyLibrary for Currency;
@@ -700,6 +706,38 @@ contract AsyncSwapTest is SetupHook {
         router.matchBook(key, 1);
         (found,,,) = hook.bestOrder(poolId, false);
         assertFalse(found, "permissionless continuation clears the last crossed ask");
+    }
+
+    /// Orders are exact-input only: an exact-output swap (positive amountSpecified) is rejected by the hook.
+    function test_RevertWhen_ExactOutputSwap() public {
+        PoolSwapTest swapper = new PoolSwapTest(manager);
+        token0.mint(address(this), 1 ether);
+        token0.approve(address(swapper), type(uint256).max);
+        bytes memory hookData = abi.encode(
+            AsyncSwap.UserParams({
+                user: address(this), executor: address(swapper), amountOutMin: 1 ether, priorityFee: 100_000
+            })
+        );
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CustomRevert.WrappedError.selector,
+                address(hook),
+                IHooks.beforeSwap.selector,
+                abi.encodeWithSelector(AsyncSwap.ExactInputOnly.selector),
+                abi.encodeWithSelector(Hooks.HookCallFailed.selector)
+            )
+        );
+        swapper.swap(
+            key,
+            SwapParams({zeroForOne: true, amountSpecified: 1 ether, sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1}),
+            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
+            hookData
+        );
+    }
+
+    function test_RevertWhen_RouterCallbackNotFromPoolManager() public {
+        vm.expectRevert("Caller is not PoolManager");
+        router.unlockCallback("");
     }
 
     function test_fill_revertsWhenOrderMissing() public {

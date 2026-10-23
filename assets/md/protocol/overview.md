@@ -134,7 +134,7 @@ sequenceDiagram
     PM->>H: beforeSwap(sender = Router, params, hookData)
     H->>PM: take(input, hook, amountIn, claims = true)
     H->>AM: addOrder(id, owner, amountIn, amountOutMin, isBuy, priorityFee)
-    AM->>PM: mint numeraire bid claims to hook; hook owes bid
+    AM->>PM: mint numeraire bid claims to hook, hook owes bid
     Note over AM: salt assigned by the hook, priceKey = WAD ratio,<br/>order linked into the bid or ask level
     H-->>PM: BeforeSwapDelta consumes the whole input
     R->>PM: settle input from maker (ERC-20 transferFrom or forwarded ETH)

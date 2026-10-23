@@ -47,7 +47,7 @@ sequenceDiagram
     PM->>Hook: beforeSwap(...)
     Hook->>PM: mint input escrow claims to hook
     Hook->>Match: Validate and add order to price book
-    Match->>PM: mint bid escrow claims to hook; hook owes bid
+    Match->>PM: mint bid escrow claims to hook, hook owes bid
     Match-->>Hook: Order recorded
     Note over Hook,Match: AsyncOrderCreated event, order is not matched until input and bid funding finish.
     Hook-->>PM: beforeSwap selector and custom accounting delta
@@ -77,7 +77,7 @@ sequenceDiagram
         Match->>PM: Burn input claims and credit both order legs as claims
         PM-->>Wallet: Proceeds as claims (any currency)
         PM-->>Counterparty: Proceeds as claims (any currency)
-        Note over Match,Vault: Re-rank remainders; a remainder below the pool minimum is returned as claims<br/>and its residual bid goes to FeeVault.
+        Note over Match,Vault: Re-rank remainders. A remainder below the pool minimum is returned as claims<br/>and its residual bid goes to FeeVault.
     end
     Match-->>Hook: Matched pair count
     opt Incoming order still has a remainder

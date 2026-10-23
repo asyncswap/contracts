@@ -75,15 +75,18 @@ contract DeployHookScript is FFIHelper {
 
     function _recordDeployments() internal {
         uint256 deployBlock = block.number;
-        _upsertEntry(
-            block.chainid,
-            Entry({
-                name: "PoolManager",
-                addr: address(manager),
-                startBlock: UniswapAddresses.poolManagerStartBlock(block.chainid),
-                txHash: bytes32(0)
-            })
-        );
+        // Elsewhere 00_DeployPoolManager has already recorded the PoolManager it deployed.
+        if (UniswapAddresses.hasCanonicalPoolManager(block.chainid)) {
+            _upsertEntry(
+                block.chainid,
+                Entry({
+                    name: "PoolManager",
+                    addr: address(manager),
+                    startBlock: UniswapAddresses.poolManagerStartBlock(block.chainid),
+                    txHash: bytes32(0)
+                })
+            );
+        }
         _upsertEntry(
             block.chainid, Entry({name: "AsyncSwap", addr: address(hook), startBlock: deployBlock, txHash: bytes32(0)})
         );

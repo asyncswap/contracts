@@ -7,7 +7,6 @@ import {Router} from "@async-swap/Router.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {console} from "forge-std/Script.sol";
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
-import {IERC20Minimal} from "v4-core/interfaces/external/IERC20Minimal.sol";
 import {LPFeeLibrary} from "v4-core/libraries/LPFeeLibrary.sol";
 import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
 import {Currency} from "v4-core/types/Currency.sol";
@@ -26,6 +25,7 @@ import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 ///
 ///         Optional env:
 ///           SLIPPAGE_BPS     default 100 (1%)
+///           PRIORITY_FEE     USDC base units; default is the hook's minimum, min($0.10, 0.1% of notional)
 ///           PRICE            tokenOut/tokenIn rate; bypasses Coinbase lookup in price.ts
 ///           POOL_FEE         default LPFeeLibrary.DYNAMIC_FEE_FLAG
 ///           POOL_TICK_SPACING default 60
@@ -73,32 +73,33 @@ contract TradeScript is FFIHelper {
             console.log("Authorized router as executor for OWNER");
         }
 
+        Currency input = zeroForOne ? key.currency0 : key.currency1;
+        Currency numeraire = hook.numeraire();
+        uint256 bid = _priorityFee(numeraire, input, amountIn, amountOutMin);
+
         AsyncOrder memory order = AsyncOrder({
             key: key,
             owner: OWNER,
             zeroForOne: zeroForOne,
             amountIn: amountIn,
             amountOutMin: amountOutMin,
-            priorityFee: 0,
+            priorityFee: bid,
             sqrtPrice: 2 ** 96,
             // Hook auto-assigns the real salt on create; placeholder here.
             salt: bytes32(0)
         });
         bytes memory userData = abi.encode(
-            AsyncSwap.UserParams({user: OWNER, executor: address(router), amountOutMin: amountOutMin, priorityFee: 0})
+            AsyncSwap.UserParams({user: OWNER, executor: address(router), amountOutMin: amountOutMin, priorityFee: bid})
         );
 
         console.log("amountIn:    ", amountIn);
         console.log("amountOutMin:", amountOutMin);
         console.log("zeroForOne:  ", zeroForOne);
+        console.log("priority bid (USDC base units):", bid);
 
         vm.startBroadcast(OWNER);
-        if (inAddr == address(0)) {
-            router.swap{value: amountIn}(order, userData);
-        } else {
-            IERC20Minimal(inAddr).approve(address(router), amountIn);
-            router.swap(order, userData);
-        }
+        _approveOrderFunds(address(router), numeraire, input, amountIn, bid);
+        router.swap{value: inAddr == address(0) ? amountIn : 0}(order, userData);
         vm.stopBroadcast();
 
         console.log("submitted (salt auto-assigned by hook; see AsyncOrderCreated event)");

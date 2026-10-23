@@ -8,15 +8,16 @@ import {Router} from "@async-swap/Router.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {console} from "forge-std/Script.sol";
 import {Vm} from "forge-std/Vm.sol";
-import {IERC20Minimal} from "v4-core/interfaces/external/IERC20Minimal.sol";
 import {Currency} from "v4-core/types/Currency.sol";
-import {PoolKey} from "v4-core/types/PoolKey.sol";
+import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 
-/// @notice Submits an async swap order via the Router. The hook assigns the salt on create, so
-///         the script passes `order.salt = bytes32(0)`, reads the assigned salt from the
-///         `AsyncOrderCreated` event after the broadcast, and persists it for 04_Cancel and
-///         05_Execute.
+/// @notice Submits an async swap order via the Router, authorizing the Router first if needed and
+///         paying the hook's minimum priority bid (or `PRIORITY_FEE`). The hook assigns the salt
+///         from the block the order lands in, so the script saves the order and the block it was
+///         submitted from; 04_Cancel and 05_Execute read the real salt from the chain.
 contract SwapScript is FFIHelper {
+    using PoolIdLibrary for PoolKey;
+
     Router router;
     PoolKey key;
 
@@ -31,30 +32,46 @@ contract SwapScript is FFIHelper {
 
     function run() public {
         uint160 sqrtPrice = 2 ** 96;
+        bool zeroForOne = vm.envOr("ZERO_FOR_ONE", true);
+        uint256 amountIn = vm.envUint("AMOUNT_IN");
+        uint256 amountOutMin = vm.envUint("AMOUNT_OUT_MIN");
+        Currency input = zeroForOne ? key.currency0 : key.currency1;
+        Currency numeraire = AsyncSwap(payable(address(key.hooks))).numeraire();
+        uint256 bid = _priorityFee(numeraire, input, amountIn, amountOutMin);
 
         AsyncOrder memory order = AsyncOrder({
             key: key,
             owner: OWNER,
-            zeroForOne: vm.envOr("ZERO_FOR_ONE", true),
-            amountIn: vm.envUint("AMOUNT_IN"),
-            amountOutMin: vm.envUint("AMOUNT_OUT_MIN"),
-            priorityFee: 0,
+            zeroForOne: zeroForOne,
+            amountIn: amountIn,
+            amountOutMin: amountOutMin,
+            priorityFee: bid,
             sqrtPrice: sqrtPrice,
             // Initial submit: ignored by the hook, which assigns its own salt.
             salt: bytes32(0)
         });
 
-        Currency input = order.zeroForOne ? key.currency0 : key.currency1;
+        // The hook rejects orders whose executor the maker has not authorized
+        // (NotAuthorizedExecutor). Grant the Router on first use.
+        AsyncSwap hook = AsyncSwap(payable(address(key.hooks)));
+        if (!hook.isExecutor(key.toId(), OWNER, address(router))) {
+            vm.startBroadcast(OWNER);
+            hook.setExecutor(key.toId(), address(router), true);
+            vm.stopBroadcast();
+            console.log("Authorized the Router as executor for OWNER");
+        }
 
-        // Record logs to read the assigned salt from AsyncOrderCreated after the broadcast.
+        // The salt in these logs is the simulated one; 04/05 read the real one from the chain,
+        // starting at this block.
+        uint256 fromBlock = block.number;
         vm.recordLogs();
         vm.startBroadcast(OWNER);
-        IERC20Minimal(Currency.unwrap(input)).approve(address(router), order.amountIn);
-        router.swap(
+        _approveOrderFunds(address(router), numeraire, input, amountIn, bid);
+        router.swap{value: input.isAddressZero() ? amountIn : 0}(
             order,
             abi.encode(
                 AsyncSwap.UserParams({
-                    user: OWNER, executor: address(router), amountOutMin: order.amountOutMin, priorityFee: 0
+                    user: OWNER, executor: address(router), amountOutMin: amountOutMin, priorityFee: bid
                 })
             )
         );
@@ -69,12 +86,12 @@ contract SwapScript is FFIHelper {
                 amountIn: order.amountIn,
                 amountOutMin: order.amountOutMin,
                 sqrtPrice: sqrtPrice,
-                salt: salt
+                salt: salt,
+                fromBlock: fromBlock
             })
         );
 
-        console.log("Async order submitted.");
-        console.logBytes32(salt);
+        console.log("Async order submitted. Priority bid (USDC base units):", bid);
     }
 
     /// @dev Find the `AsyncOrderCreated` log in the broadcast and return the salt

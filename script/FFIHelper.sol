@@ -5,16 +5,20 @@ import {UniswapAddresses} from "./config/UniswapAddresses.sol";
 import {DeploymentsRegistry} from "./lib/Deployments.sol";
 import {AsyncSwap} from "@async-swap/AsyncSwap.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
+import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
+import {Vm} from "forge-std/Vm.sol";
+import {PoolId} from "v4-core/types/PoolId.sol";
 import {Script} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/Test.sol";
 import {Currency} from "v4-core/types/Currency.sol";
-import {PoolKey} from "v4-core/types/PoolKey.sol";
+import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 
 /// @notice Shared helpers for deploy/runtime scripts in protocol/.
 /// @dev Mirrors contracts/script/FFIHelper.sol but adapted to the new AsyncOrder shape
 ///      (amountOutMin + nonce) and the protocol/ source layout.
 contract FFIHelper is Script, DeploymentsRegistry {
     using stdJson for string;
+    using PoolIdLibrary for PoolKey;
 
     address internal constant OWNER_DEFAULT = 0xb1F0982E02f9F71E60512fd47471d76610CcB556;
     address internal constant OWNER_ANVIL = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
@@ -80,7 +84,11 @@ contract FFIHelper is Script, DeploymentsRegistry {
         uint256 amountIn;
         uint256 amountOutMin;
         uint160 sqrtPrice;
+        /// @dev Salt seen when the script simulated the order. The hook derives the real salt from
+        ///      the block it lands in, so `_loadOrder` reads that from the chain instead.
         bytes32 salt;
+        /// @dev Block the order was submitted from; the real `AsyncOrderCreated` event is at or after it.
+        uint256 fromBlock;
     }
 
     function _orderPath() internal view returns (string memory) {
@@ -103,14 +111,15 @@ contract FFIHelper is Script, DeploymentsRegistry {
         vm.serializeUint(k, "amountIn", r.amountIn);
         vm.serializeUint(k, "amountOutMin", r.amountOutMin);
         vm.serializeUint(k, "sqrtPrice", uint256(r.sqrtPrice));
+        vm.serializeUint(k, "fromBlock", r.fromBlock);
         string memory j = vm.serializeBytes32(k, "salt", r.salt);
         vm.writeJson(j, _orderPath());
     }
 
-    function _loadOrder() internal view returns (AsyncOrder memory) {
+    function _loadOrder() internal view returns (AsyncOrder memory order) {
         PoolKey memory key = _loadPoolKey();
         string memory json = vm.readFile(_orderPath());
-        return AsyncOrder({
+        order = AsyncOrder({
             key: key,
             owner: json.readAddress(".owner"),
             zeroForOne: json.readBool(".zeroForOne"),
@@ -120,5 +129,59 @@ contract FFIHelper is Script, DeploymentsRegistry {
             sqrtPrice: uint160(json.readUint(".sqrtPrice")),
             salt: json.readBytes32(".salt")
         });
+        if (vm.keyExistsJson(json, ".fromBlock")) {
+            order.salt = _onchainSalt(order, json.readUint(".fromBlock"));
+        }
     }
+
+    /// @notice The salt the hook assigned to `order`, read from the newest matching
+    ///         `AsyncOrderCreated` event (same pool, owner, side and amounts) since `fromBlock`.
+    function _onchainSalt(AsyncOrder memory order, uint256 fromBlock) internal view returns (bytes32) {
+        bytes32[] memory topics = new bytes32[](2);
+        topics[0] = AsyncFiller.AsyncOrderCreated.selector;
+        topics[1] = PoolId.unwrap(order.key.toId());
+        Vm.EthGetLogs[] memory logs = vm.eth_getLogs(fromBlock, block.number, address(order.key.hooks), topics);
+        for (uint256 i = logs.length; i > 0; i--) {
+            Vm.EthGetLogs memory log = logs[i - 1];
+            if (log.topics.length < 4 || address(uint160(uint256(log.topics[3]))) != order.owner) continue;
+            (bool zeroForOne, uint256 amountIn, uint256 amountOutMin, bytes32 salt) =
+                abi.decode(log.data, (bool, uint256, uint256, bytes32));
+            if (zeroForOne == order.zeroForOne && amountIn == order.amountIn && amountOutMin == order.amountOutMin) {
+                return salt;
+            }
+        }
+        revert("AsyncOrderCreated for the saved order not found on chain");
+    }
+
+    /// @notice The priority bid an order pays, in numeraire (USDC) base units: `PRIORITY_FEE` if
+    ///         set, otherwise the least bid the hook accepts. Mirrors `AsyncFiller.minPriorityFee`:
+    ///         min($0.10, 0.1% of the order's USDC notional), where the notional is a buy's input
+    ///         or a sell's minimum output.
+    function _priorityFee(Currency numeraire, Currency input, uint256 amountIn, uint256 amountOutMin)
+        internal
+        view
+        returns (uint256)
+    {
+        uint256 notional = input == numeraire ? amountIn : amountOutMin;
+        uint256 tiered = notional * 10 / 10_000;
+        return vm.envOr("PRIORITY_FEE", tiered < 100_000 ? tiered : 100_000);
+    }
+
+    /// @notice Approve the Router for an order's input and its priority bid. The bid is pulled in
+    ///         the numeraire; when that is also the input, one approval covers both. Native input is
+    ///         sent as `msg.value` and needs no approval.
+    function _approveOrderFunds(address router, Currency numeraire, Currency input, uint256 amountIn, uint256 bid)
+        internal
+    {
+        if (input == numeraire) {
+            IERC20Like(Currency.unwrap(numeraire)).approve(router, amountIn + bid);
+            return;
+        }
+        if (!input.isAddressZero()) IERC20Like(Currency.unwrap(input)).approve(router, amountIn);
+        if (bid != 0) IERC20Like(Currency.unwrap(numeraire)).approve(router, bid);
+    }
+}
+
+interface IERC20Like {
+    function approve(address spender, uint256 amount) external returns (bool);
 }

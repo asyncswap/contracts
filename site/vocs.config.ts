@@ -11,9 +11,17 @@ export default defineConfig({
   baseUrl: process.env.DOCS_BASE_URL,
   // Static HTML for every page, so the site is served from GitHub Pages.
   renderStrategy: 'full-static',
-  iconUrl: '/favicon.svg',
+  // Brand kit: three-bar mark lockups, monochrome palette (Carbon #111111 / Paper #F2F2F2).
+  iconUrl: '/favicon.ico',
   logoUrl: { light: '/logo-light.svg', dark: '/logo-dark.svg' },
-  accentColor: 'light-dark(#ff7819, #ff9038)',
+  accentColor: 'light-dark(#111111, #F2F2F2)',
+  ogImageUrl: `${process.env.DOCS_BASE_URL ?? ''}/brand/og.png`,
+  head: {
+    link: [
+      { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/brand/icon-32.png' },
+      { rel: 'apple-touch-icon', href: '/brand/apple-touch-icon.png' },
+    ],
+  },
   topNav: [
     { text: 'Protocol', link: '/protocol/overview' },
     { text: 'Contracts', link: '/reference' },

@@ -1,0 +1,29 @@
+/* AsyncSwap brand kit type: Manrope for headlines, Instrument Sans for interface and body,
+   SF Mono for numbers, code and labels. Fonts are self-hosted (SIL OFL 1.1, see /fonts/LICENSE.txt). */
+
+@font-face {
+  font-family: "Instrument Sans";
+  src: url("/fonts/InstrumentSans-Variable.ttf") format("truetype");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Manrope";
+  src: url("/fonts/Manrope-Variable.ttf") format("truetype");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --vocs-font-family: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --vocs-font-family-mono: "SF Mono", SFMono-Regular, ui-monospace, Menlo, Monaco, Consolas, monospace;
+}
+
+h1[data-v],
+h2[data-v],
+h3[data-v] {
+  font-family: "Manrope", var(--vocs-font-family);
+}

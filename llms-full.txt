@@ -1,0 +1,6812 @@
+# AsyncSwap
+
+An on-chain order book and matching engine built as a Uniswap v4 hook: limit orders against USDC, matched by price, priority bid and time.
+
+<!--
+Sitemap:
+- [AsyncSwap](/index): An on-chain order book and matching engine built as a Uniswap v4 hook.
+- [Async Swap v2 protocol map](/protocol/overview)
+- [Order lifecycle and priority bids](/protocol/order-lifecycle)
+- [Contract call sequences](/protocol/contract-call-sequences)
+- [Price keys and crossing](/protocol/price-key-crossing)
+- [AuditAgent report 1: status](/audit/status)
+- [Contract reference](/reference/): Contracts, libraries, interfaces and types, generated from the NatSpec in src/.
+- [AsyncSwap](/reference/src/AsyncSwap): Uniswap v4 hook that converts an exact-input swap into an open async order: the maker deposits their input via `_beforeSwap`. Crossing orders settle directly at the resting limit; fillers settle unmatched orders.
+- [FeeVault](/reference/src/FeeVault): Holds and redeems protocol fee claims, never maker escrow.
+- [ImmutableState](/reference/src/ImmutableState): A collection of immutable state variables, commonly used across multiple contracts
+- [MatchingEngine](/reference/src/MatchingEngine): Standalone price-time matching harness. It maintains a radix-indexed limit book and emits deterministic fill instructions.
+- [NativeClaims](/reference/src/NativeClaims): Redeems the caller's PoolManager native ETH claims to a chosen recipient.
+- [Router](/reference/src/Router): Thin entrypoint for makers (`swap`), fillers (`fillOrder`), and makers cancelling orders (`cancelOrder`). All three actions go through `IPoolManager.unlock` so the hook can operate on PM debts. Native payouts/refunds are PoolManager claims (ID 0), redeemable through NativeClaims after approval; ERC20 payouts remain direct.
+- [TokenClaims](/reference/src/TokenClaims): Redeems the caller's PoolManager currency claims to a chosen recipient.
+- [BaseHook](/reference/src/BaseHook): abstract contract for hook implementations
+- [IFeeOwner](/reference/src/IFeeOwner)
+- [ISignatureTransfer](/reference/src/interfaces/ISignatureTransfer): Minimal subset of Uniswap Permit2's SignatureTransfer interface used by the Router. Canonical Permit2 lives at 0x000000000022D473030F116dDEE9F6B43aC78BA3 on every chain.
+- [AsyncFiller](/reference/src/libraries/AsyncFiller): Stores open async orders and settles fills against them.
+- [AsyncMatching](/reference/src/libraries/AsyncMatching): Linked matching module operating on the hook's order and radix-book storage.
+- [CurrencySettler](/reference/src/libraries/CurrencySettler): Production copy of v4-core's test-only `CurrencySettler`, using safe transfers so tokens that return no data from `transfer` / `transferFrom` (e.g. USDT) settle correctly.
+- [EligiblePrice](/reference/src/libraries/EligiblePrice): Exact-price summaries on a priority-key radix tree.
+- [OrderSignatures](/reference/src/libraries/OrderSignatures): EIP-712 types for signed AsyncSwap actions. Every type spells out the maker, both tokens and the amounts so wallets render a readable message instead of opaque calldata.
+- [RadixPriceTree](/reference/src/libraries/RadixPriceTree): Patricia radix index for uint128 price levels. Inserts and removals traverse at most 128 branch bits; each distinct price creates one leaf and at most one branch node. Node ids released by `remove` are recycled by later inserts, so the id counter only grows with the peak number of simultaneously stored prices and can never be exhausted in practice (2^31 simultaneous levels).
+- [AsyncOrderLibrary](/reference/src/types/AsyncOrderLibrary): Helpers attached to AsyncOrder for identity and pricing.
+- [AsyncOrder](/reference/src/types/AsyncOrder): Represents an async order for a swap in the Uniswap V4 pool.
+-->
+
+![AsyncSwap](/assets/async-swap-banner.png)
+
+# AsyncSwap
+
+AsyncSwap is an on-chain order book and matching engine built as a Uniswap v4 hook. Traders set a
+limit price for assets paired with USDC. Orders match with other traders or with the pool's active
+liquidity, and anyone can permissionlessly fill a resting order.
+
+* **Price, then bid, then time.** Book matching ranks orders by price. Among orders at the same
+  price, a higher escrowed USDC priority bid goes first, and earlier orders break equal bids.
+* **Orders rest until they execute.** Unfilled amounts stay open for later matching, a pool fill,
+  a filler, repricing or cancellation.
+* **No swap touches the curve directly.** Every swap becomes an order. The only AMM swaps are the
+  ones the hook makes to fill a resting order from pool liquidity, and those pay active LPs a
+  0.30% fee.
+* **Proceeds you can always claim.** A book match credits both sides as PoolManager claims, which
+  you redeem to any address through `TokenClaims` (ERC-20) or `NativeClaims` (ETH). A recipient a
+  token refuses cannot block matching.
+
+## Where to start
+
+| If you want to | Read |
+| --- | --- |
+| Understand the contracts, custody and fees | [Protocol overview](/protocol/overview) |
+| Follow an order from placement to settlement, and how priority bids are paid | [Order lifecycle and priority bids](/protocol/order-lifecycle) |
+| See every call, callback and withdrawal step | [Contract call sequences](/protocol/contract-call-sequences) |
+| Check how prices are compared and rounded | [Price keys and crossing](/protocol/price-key-crossing) |
+| Review audit findings and their fixes | [Audit status](/audit/status) |
+| Look up a contract, function or event | [Contract reference](/reference) |
+
+## Status
+
+The contracts are on [`asyncswap/contracts`](https://github.com/asyncswap/contracts) `main`. Every
+finding of the Nethermind AuditAgent report is fixed or acknowledged; see the
+[audit status](/audit/status). These docs rebuild from that repository on every change to its
+sources, guides or audit notes.
+
+# Async Swap v2 protocol map
+
+Async Swap v2 is a Uniswap v4 hook that turns exact-input swaps into resting limit orders. This page
+describes the whole protocol in diagrams: which contracts exist, where funds sit, how an order is
+created, matched, filled, repriced and cancelled, and who is allowed to do what. Every box names a
+contract, library or function in `src/`, so the diagrams can be checked against the code.
+
+## 1. Components
+
+```mermaid
+flowchart LR
+    subgraph Actors
+        Maker["Maker<br/>(places, reprices, cancels)"]
+        Filler["Filler<br/>(fills a resting order)"]
+        Relayer["Relayer<br/>(submits signed orders)"]
+        Keeper["Anyone<br/>(matchBook, fillFromPoolLiquidity)"]
+        LP["v4 LP<br/>(adds range liquidity)"]
+        Owner["Protocol owner<br/>(FeeVault.collect, sweep, minimum order size)"]
+    end
+
+    subgraph Periphery
+        Router["Router.sol<br/>swap · swapWithSig · fillOrder<br/>cancelOrder · cancelWithSig<br/>matchBook · fillFromPoolLiquidity"]
+        Permit2["Permit2<br/>permitWitnessTransferFrom"]
+        NativeClaims["NativeClaims.sol<br/>redeem native claims (ID 0)"]
+        TokenClaims["TokenClaims.sol<br/>redeem ERC-20 claims"]
+    end
+
+    subgraph Core
+        PM["Uniswap v4 PoolManager<br/>unlock · swap<br/>ERC-6909 claims"]
+        Hook["AsyncSwap.sol (hook)<br/>beforeInitialize · beforeSwap<br/>beforeAddLiquidity<br/>matchNewOrder · executeOrder<br/>updatePrice · cancelOrder<br/>setExecutor(WithSig)"]
+        Matching["AsyncMatching.sol<br/>external library, delegatecall<br/>addOrder · match · fill · cancel<br/>updatePrice · fillFromPool"]
+        Filler_["AsyncFiller.sol<br/>State: orders, isExecutor<br/>Book: bids, asks, levels"]
+        Radix["RadixPriceTree.sol<br/>best bid / best ask<br/>priority tree per level"]
+        Sigs["OrderSignatures.sol<br/>EIP-712 types · Permit2 witness"]
+        Vault["FeeVault.sol<br/>owns protocol fee claims in PoolManager<br/>collect(currency, recipient)"]
+    end
+
+    Maker -->|swap, cancelOrder| Router
+    Maker -->|setExecutor, updatePrice| Hook
+    Relayer -->|swapWithSig, cancelWithSig| Router
+    Filler -->|fillOrder maxPrice| Router
+    Keeper -->|matchBook, fillFromPoolLiquidity| Router
+    LP -->|modifyLiquidity| PM
+    Owner -->|collect| Vault
+    Owner -->|sweep, setMinOrder| Hook
+
+    Router -->|unlock → unlockCallback| PM
+    Router -->|signed input| Permit2
+    Permit2 -->|transfer input| PM
+    PM -->|beforeSwap hookData| Hook
+    Router -->|matchNewOrder, executeOrder,<br/>cancelOrder, matchBook,<br/>tryFillOrderFromPoolLiquidity| Hook
+    Hook -.->|delegatecall| Matching
+    Matching --> Filler_
+    Filler_ --> Radix
+    Hook --> Sigs
+    Router --> Sigs
+    Hook -->|mint / take / burn / settle| PM
+    PM -.->|accounting credit, not a contract call| Vault
+    Vault -->|burn + take| PM
+    Maker -->|redeem| NativeClaims
+    NativeClaims -->|burn ID 0, send ETH| PM
+    Maker -->|redeem| TokenClaims
+    TokenClaims -->|burn claim, send ERC-20| PM
+```
+
+Every pool that uses the hook must contain the chain's USDC (`numeraire`) and use the dynamic-fee flag
+(`beforeInitialize`). `beforeAddLiquidity` is a pass-through: anyone may add ordinary v4 range
+positions, and they are the inventory for the LP-fill path. No swap ever reaches the AMM curve
+directly, because `beforeSwap` consumes the whole input as an order; the only AMM swaps are the ones
+the hook itself performs when it fills a resting order from pool liquidity. The standalone
+`MatchingEngine.sol` is a benchmark harness and is not deployed.
+
+FeeVault owns claims recorded in PoolManager. Crediting those claims does not call FeeVault.
+
+## 2. Where funds live
+
+```mermaid
+flowchart TB
+    subgraph PoolManager["PoolManager (custody)"]
+        Escrow["ERC-6909 claims owned by the hook<br/>one balance per currency<br/>= Σ open orders' remaining input<br/>+ escrowed priority bids"]
+        Fees["ERC-6909 claims owned by FeeVault<br/>= accrued 30 bps fill fees<br/>+ settled priority bids"]
+        User["ERC-6909 claims owned by makers / fillers<br/>match proceeds and dust refunds (any currency),<br/>native fill proceeds (claim ID 0)"]
+        Reserves["Pool reserves<br/>v4 LP positions"]
+    end
+    MakerW["Maker wallet"] -->|input on swap| Escrow
+    Escrow -->|cancel: full remainder| MakerW
+    Escrow -->|match: input as claims| User
+    Escrow -->|fill: input| CounterW["Filler wallet"]
+    CounterW -->|fill: output| MakerW
+    FillerW["Filler wallet"] -->|protocol fee from gross output payment| Fees
+    Escrow -->|priority bids| Fees
+    Fees -->|collect| OwnerW["Owner-chosen recipient"]
+    User -->|TokenClaims.redeem /<br/>NativeClaims.redeem| MakerW
+```
+
+Fees, by path: an order-to-order match charges nothing; a filler fill (`Router.fillOrder`) pays
+the maker's live minimum plus 30 bps of gross output, and that fee lands in the FeeVault as claims;
+an LP fill charges the 30 bps dynamic LP fee to the active v4 positions. `calculateHookFee` is zero.
+Priority bids are escrowed as hook claims by `addOrder` and settle to the FeeVault: the filled share
+as input fills, the rest when the order closes. They never go to LPs, so liquidity added just before
+a settlement earns none of them.
+
+An order-to-order match pays both sides, and returns any remainder left below the pool minimum, as
+PoolManager claims rather than token transfers, so a recipient a token refuses cannot block matching.
+Holders redeem ERC-20 claims through `TokenClaims` and native claims through `NativeClaims`, to any
+recipient, after approving the redeemer for that claim id. Filler fills and LP fills pay the maker's
+ERC-20 output directly. Minting bid
+claims creates hook debt immediately; the PoolManager unlock must settle that debt, including for
+custom executors. The Router pays it with `settleFor(hook)`. All pools rank equal prices by remaining
+bid, then sequence. There is no FIFO mode or mode switch.
+
+The accounting invariant is fuzzed by the matching invariant suites: the hook's claim balance for
+each currency equals the sum of remaining inputs of open orders plus escrowed bids, and nothing is
+created or destroyed by a match. The hook's own token balance is zero between transactions, so
+`sweep` can only move stranded ETH or tokens sent to the hook by mistake, never escrow.
+
+## 3. Placing an order
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant M as Maker
+    participant R as Router
+    participant PM as PoolManager
+    participant H as AsyncSwap hook
+    participant AM as AsyncMatching (delegatecall)
+
+    M->>H: setExecutor(poolId, Router, true) — once per pool
+    M->>R: swap(order, UserParams)
+    Note over R: checks owner == msg.sender, executor == Router,<br/>amountOutMin and priorityFee match the order
+    R->>PM: unlock(Swap)
+    PM->>R: unlockCallback
+    R->>PM: swap(key, exactInput = -amountIn, hookData)
+    PM->>H: beforeSwap(sender = Router, params, hookData)
+    H->>PM: take(input, hook, amountIn, claims = true)
+    H->>AM: addOrder(id, owner, amountIn, amountOutMin, isBuy, priorityFee)
+    AM->>PM: mint numeraire bid claims to hook; hook owes bid
+    Note over AM: salt assigned by the hook, priceKey = WAD ratio,<br/>order linked into the bid or ask level
+    H-->>PM: BeforeSwapDelta consumes the whole input
+    R->>PM: settle input from maker (ERC-20 transferFrom or forwarded ETH)
+    opt priorityFee > 0
+        R->>PM: settleFor(hook) with USDC bid
+    end
+    R->>H: matchNewOrder(order)
+    H->>AM: match up to 8 crossing resting orders
+    opt Incoming order still open
+        H->>H: guarded self-call for LP fill
+        H->>AM: try full remainder against active LP liquidity
+        AM-->>H: Fill succeeds or LP attempt rolls back
+    end
+    H-->>R: Matched pair count
+    R-->>PM: Callback complete
+    PM-->>R: Unlock complete with settled deltas
+    R-->>M: Transaction succeeds
+    Note over H: emits AsyncOrderCreated, AsyncOrdersMatched / AsyncOrderLiquidityFilled
+```
+
+Signed orders follow the same path through `swapWithSig`. The maker signs one Permit2
+`PermitWitnessTransferFrom` whose witness is `OrderSignatures.hashOrder(order)`, so the signature
+both moves the input and commits to the order. A relayer can also attach a signed `SetExecutor` grant
+for the maker's first order on a pool.
+
+## 4. Everything after placement
+
+Filler fills, book continuation, LP retries, repricing, cancellation, pool setup, native-claim
+redemption and fee collection are drawn step by step in
+[`contract-call-sequences.md`](/protocol/contract-call-sequences); the lifecycle and priority-bid flowcharts
+are in [`order-lifecycle.md`](/protocol/order-lifecycle). Three facts to keep in mind while reading them:
+
+* An order-to-order match charges no fee. The 30 bps protocol fee is paid by the filler on top of the
+  maker's live minimum and is credited to the FeeVault as ERC-6909 claims inside the PoolManager; the
+  LP-fill path instead charges the 30 bps dynamic LP fee to active v4 positions. `calculateHookFee`
+  is zero.
+* `updatePrice` only re-ranks the order in the book. It needs no PoolManager unlock and triggers no
+  matching; a later crossing order, `matchBook`, a filler or an LP retry has to execute it.
+* `matchNewOrder` is gated by a transient slot that `beforeSwap` writes for
+  the current transaction. `executeOrder`, `cancelOrder` and `tryFillOrderFromPoolLiquidity` check
+  `isExecutor[maker][caller]` instead.
+
+An order's identity is `keccak(chainId, poolId, owner, zeroForOne, salt)`. The hook assigns the
+salt at creation and emits it in `AsyncOrderCreated`; later calls recompute the id from the maker's
+struct, so a maker needs the event or an indexer to cancel or reprice.
+
+## 5. Authorization
+
+```mermaid
+flowchart LR
+    subgraph MakerRights["Maker (order.owner)"]
+        m1["swap / cancelOrder via Router<br/>(msg.sender must be owner)"]
+        m2["updatePrice (msg.sender must be owner)"]
+        m3["setExecutor / revoke"]
+        m4["sign: Permit2 order witness,<br/>SetExecutor, UpdatePrice, CancelOrder (EIP-712)"]
+    end
+    subgraph ExecutorRights["Registered executor (the Router)"]
+        e1["beforeSwap sender must equal hookData.executor<br/>and be authorised by the maker"]
+        e2["executeOrder, cancelOrder, tryFillOrderFromPoolLiquidity<br/>require isExecutor[maker][caller], inside the unlock"]
+        e3["matchNewOrder: only the executor<br/>recorded by beforeSwap in the same tx (transient slot)"]
+    end
+    subgraph OwnerRights["Protocol owner (two-step transfer)"]
+        o1["FeeVault.collect(currency, recipient)"]
+        o2["sweep(currency, to) — hook's raw balance only"]
+        o3["setMinOrder(key, minimum), setDefaultMinOrder(minimum)"]
+        o4["no pause, no upgrade, no access to escrow"]
+    end
+    subgraph Public["Anyone"]
+        p1["matchBook(key, 1..8)"]
+        p2["fillFromPoolLiquidity(order)"]
+        p3["fillOrder(order, maxPrice) — pays the maker"]
+        p4["submit a maker's signed order or cancel"]
+    end
+```
+
+Signed maker actions use unordered nonces: `AsyncSwap.nonceUsed` for `SetExecutor` and
+`UpdatePrice`, `Router.cancelNonceUsed` for `CancelOrder`, and Permit2's own nonces for order
+witnesses. The Permit2 witness binds maker, both tokens, amounts, bid and pool; it leaves out
+`sqrtPrice` (never read, the hook consumes the whole swap) and `salt` (assigned by the hook).
+
+## 6. Deployment shape
+
+```mermaid
+flowchart LR
+    D["CREATE2 deployer<br/>0x4e59…956C"] -->|fixed salt| Lib["AsyncMatching library<br/>same address on every chain"]
+    D -->|mined salt: flags + 0x91 prefix| Hook["AsyncSwap hook<br/>constructor(PoolManager, USDC, owner)"]
+    Hook -->|constructor| Vault["FeeVault"]
+    Owner["Deployer / owner"] -->|CREATE| Router["Router(PoolManager, hook, Permit2)"]
+    Lib -.->|linked into bytecode| Hook
+    Owner -->|CREATE, separate script| NC["NativeClaims(PoolManager)"]
+    Owner -->|CREATE, separate script| TC["TokenClaims(PoolManager)"]
+    Hook -->|initialize| Pool["Pool: USDC × asset<br/>dynamic fee flag, hook address"]
+```
+
+`script/deploy.sh <chain-key> [dry-run|broadcast|verify]` runs this sequence against
+`script/config/chains.json`. On chains whose gas token has an ERC-20 twin (Arc: native USDC and
+`0x3600…0000` are one balance) never initialize a native-currency pool; pair the ERC-20 USDC with a
+normal ERC-20 asset.
+
+See also [`price-key-crossing.md`](/protocol/price-key-crossing) for how truncated price keys decide
+whether two orders cross, and [mainnet readiness](https://github.com/asyncswap/contracts/blob/main/MAINNET_READINESS.md) for the release gate.
+
+# Order lifecycle and priority bids
+
+Current V2 behavior, checked against the contract source. See also [contract call sequences](/protocol/contract-call-sequences) and the [V2 README](/).
+
+## Order lifecycle
+
+These diagrams describe the current V2 source, not a deployment or mainnet-readiness guarantee. Book matching ranks the best opposing price first; higher escrowed USDC bids break ties at that price, followed by earlier submission. Private fills and explicit LP retries target a specific order and do not enforce the book's global priority queue.
+
+```mermaid
+flowchart TD
+    A["Submit order: input amount, minimum output, USDC bid"] --> D["Require pool minimum and tiered bid"]
+    D --> E["Validate executor; escrow input and bid at creation"]
+    E --> F["Match best opposing prices first; up to 8 pairs"]
+    F --> G["Same-price ties: highest remaining bid, then earliest sequence"]
+    G --> H["Settle executable crossing pairs; reduce orders and settle bid shares"]
+    H --> I{"Incoming order still open?"}
+    I -- "No" --> Z["Order closed; return unused input if any"]
+    I -- "Yes" --> J["Try remaining input against pool liquidity"]
+    J --> K{"Full remaining input consumed and minimum output met?"}
+    K -- "Yes" --> L["Settle pool fill; 30 bps LP fee; settle remaining bid"]
+    L --> Z
+    K -- "No / attempt reverts" --> M["Roll back LP attempt only; keep remaining order open"]
+    M -- "New crossing order or Router.matchBook" --> N["Bounded book matching; partial fills can remain open"]
+    N -- "Remainder" --> M
+    N -- "Input exhausted or remainder below pool minimum" --> Z
+    M -- "Router.fillFromPoolLiquidity" --> J
+    M -- "Private filler chooses order" --> O["Check live minimum plus protocol fee against filler maxPrice"]
+    O --> P["Filler funds output; settle full remainder and bid; close order"]
+    P --> Z
+    M -- "Maker reprices" --> Q["Update minimum; re-enter book with fresh time priority"]
+    Q --> M
+    M -- "Authorized cancellation" --> R["Return remaining input; settle remaining bid; close order"]
+    R --> Z
+```
+
+If no executable crossing pair exists, the initial matching pass leaves the order unchanged before the LP attempt. `Router.matchBook` accepts a bound of 1–8 pairs and does not itself retry LP liquidity. An LP retry does not require the order to be first in the book. Private fills require a maker-authorized executor (normally the Router); the filler supplies the live minimum plus the protocol fee in the same transaction. That protocol fee is separate from the LP fee on pool-liquidity fills. Book-match proceeds, and input returned below the pool minimum, are credited as PoolManager claims in every currency, redeemable through `TokenClaims` (ERC-20) or `NativeClaims` (ETH); native fill proceeds and refunds are claims too. Filler and LP fills pay ERC-20 output directly.
+
+Sources: [Router](https://github.com/asyncswap/contracts/blob/main/src/Router.sol), [AsyncSwap](https://github.com/asyncswap/contracts/blob/main/src/AsyncSwap.sol), [AsyncMatching](https://github.com/asyncswap/contracts/blob/main/src/libraries/AsyncMatching.sol), and [AsyncFiller](https://github.com/asyncswap/contracts/blob/main/src/libraries/AsyncFiller.sol).
+
+## Priority-bid settlement
+
+Priority bids are escrowed in USDC and are **non-refundable**. The creation minimum is `min(0.10 USDC, 0.1% of the order’s USDC notional)`, rounded down to base units. An unlock cannot finish with an unpaid bid debt. They rank same-price orders within the book; they do not purchase block inclusion or transaction ordering from the chain.
+
+```mermaid
+flowchart TD
+    A["Escrow USDC bid as PoolManager claims"] --> B{"Order event"}
+    B -- "Book match" --> C["Settle proportional bid share for each order's consumed input"]
+    C --> D{"Remaining order meets pool minimum?"}
+    D -- "Yes" --> E["Keep unspent bid escrowed; update remaining order and rank"]
+    E --> B
+    D -- "No" --> F["Settle all remaining bid; return unused input; close order"]
+    B -- "Successful LP or private fill" --> F
+    B -- "Authorized cancellation" --> F
+    B -- "Reprice" --> E
+    C --> G{"Bid amount to settle is nonzero?"}
+    F --> G
+    G -- "No" --> H["No bid transfer"]
+    G -- "Yes" --> K["Transfer bid claims to protocol FeeVault"]
+    K --> L["Commit with the order operation in the same unlock"]
+    H --> L
+    L -. "Any later revert" .-> M["Roll back operation and bid settlement together"]
+```
+
+For each book match, the settled share is `floor(remainingBid * inputUsed / remainingInputBeforeFill)`. If the order terminates, any residual bid is settled too; it is never returned to the maker. A partial fill can leave a bid below the creation minimum. Its remaining bid determines its new same-price rank. If the remaining price key changes, it also receives a fresh sequence number. Maker repricing always assigns fresh time priority without refunding the bid.
+
+Bids always go to the FeeVault, whatever liquidity is in range, so liquidity added for the moment of settlement captures none of them. A failed LP self-call rolls back that attempt, including its fee and bid changes, while preserving prior successful book matches in the surrounding transaction. A revert of the surrounding transaction rolls everything back.
+
+Sources: [`_reduceAfterMatch` and `_settleMatchedPriorityFee`](https://github.com/asyncswap/contracts/blob/main/src/libraries/AsyncMatching.sol), [`settlePriorityFee`, `fill`, and `cancel`](https://github.com/asyncswap/contracts/blob/main/src/libraries/AsyncFiller.sol). The [original chat diagrams](https://github.com/asyncswap/contracts/blob/main/docs/historical-matching-diagrams.md) are retained as historical references.
+
+# Contract call sequences
+
+The [protocol overview](/protocol/overview#3-placing-an-order) contains the short order sequence; this page contains the detailed sequences. See [order lifecycle and priority bids](/protocol/order-lifecycle) for the flowcharts.
+
+Solid arrows are calls or actions; dashed arrows are returns or delivered results. Each sequence groups related transactions; it is not one transaction from top to bottom. The app and wallet represent the user interface, not trusted settlement components. An indexer may observe emitted events for discovery, but neither an API nor an indexer is required by the contracts.
+
+`AsyncMatching` is a linked external library called in the hook's context. `AsyncFiller`, the price tree, and currency-settlement helpers operate on that same context; they are not independent custodians. Arrows from the matching library to PoolManager therefore execute as the hook. ERC-6909 claims and LP fee accounting live inside PoolManager.
+
+### User order, book matching, and LP fallback
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Maker
+    participant App as App
+    participant Wallet as Maker wallet
+    actor Relayer
+    participant Router
+    participant Hook as AsyncSwap hook
+    participant Match as AsyncMatching / AsyncFiller
+    participant Permit as Permit2
+    participant Token as ERC-20 / USDC
+    participant PM as PoolManager
+    actor Counterparty as Resting maker
+    participant Vault as FeeVault
+
+    User->>App: Choose asset, input amount, minimum output, and bid
+    App->>Wallet: Request approval, authorization, and order confirmation
+    opt Router not yet authorized for this maker and pool
+        Wallet->>Hook: setExecutor(poolId, Router, true)
+        Hook-->>Wallet: Authorization recorded
+    end
+    Note over Wallet,Token: Direct ERC-20 input needs Router approval, signed input needs Permit2 approval.<br/>A nonzero USDC bid separately needs Router approval.
+    alt Direct order, including native ETH input
+        Wallet->>Router: swap(order, userData), exact ETH value if native
+    else Signed ERC-20 order
+        Wallet-->>Relayer: Permit2 order-witness signature and optional executor grant
+        Relayer->>Router: swapWithSig(order, permit, grant)
+        opt Signed executor grant needed
+            Router->>Hook: setExecutorWithSig(...)
+            Hook-->>Router: Grant validated and recorded
+        end
+    end
+    Router->>PM: unlock(create action)
+    PM->>Router: unlockCallback(data)
+    Router->>PM: swap(exact input, hook data)
+    PM->>Hook: beforeSwap(...)
+    Hook->>PM: mint input escrow claims to hook
+    Hook->>Match: Validate and add order to price book
+    Match->>PM: mint bid escrow claims to hook; hook owes bid
+    Match-->>Hook: Order recorded
+    Note over Hook,Match: AsyncOrderCreated event, order is not matched until input and bid funding finish.
+    Hook-->>PM: beforeSwap selector and custom accounting delta
+    PM-->>Router: Swap delta
+    alt Direct input funding
+        Router->>PM: Settle input using ERC-20 transfer or forwarded ETH
+    else Permit2 input funding
+        Router->>PM: sync(input token)
+        Router->>Permit: permitWitnessTransferFrom(order witness)
+        Permit->>Token: transferFrom(maker, PoolManager, input)
+        Token-->>Permit: Transfer succeeds
+        Permit-->>Router: Signature and transfer accepted
+        Router->>PM: settle()
+    end
+    opt Nonzero priority bid
+        Router->>PM: sync(USDC)
+        Router->>Token: transferFrom(maker, PoolManager, bid)
+        Token-->>Router: Transfer succeeds
+        Router->>PM: settleFor(hook)
+    end
+    Router->>Hook: matchNewOrder(order)
+    Hook->>Match: matchIncoming(...)
+    loop Up to 8 executable crossing pairs
+        Match->>Match: Best bid and best ask across the whole book (price, then bid, then time)
+        Match->>Match: Reduce both orders before any payout
+        Match->>PM: Settle filled bid shares to FeeVault
+        Match->>PM: Burn input claims and credit both order legs as claims
+        PM-->>Wallet: Proceeds as claims (any currency)
+        PM-->>Counterparty: Proceeds as claims (any currency)
+        Note over Match,Vault: Re-rank remainders; a remainder below the pool minimum is returned as claims<br/>and its residual bid goes to FeeVault.
+    end
+    Match-->>Hook: Matched pair count
+    opt Incoming order still has a remainder
+        Hook->>Hook: External self-call fillOrderFromPoolLiquidity(order, id)
+        Hook->>Match: fillFromPoolLiquidity(...)
+        Match->>PM: Burn remaining input claims, temporarily set 30 bps LP fee
+        Match->>PM: swap(remaining exact input)
+        Note over Hook,PM: Hook-originated swap skips this hook's callbacks, it does not create another order.
+        PM-->>Match: Actual input and output deltas
+        Match->>PM: Restore previous LP fee
+        alt Full remaining input consumed and minimum output met
+            Match->>PM: Pay output, settle remaining bid to FeeVault
+            PM-->>Wallet: ERC-20 proceeds or native claims
+            Match-->>Hook: Order removed, liquidity fill event
+        else Insufficient liquidity, partial execution, or limit not met
+            Match-->>Hook: Self-call reverts, caught by matchNewOrder
+            Note over Hook,PM: Only LP attempt rolls back, prior book fills and open remainder survive.
+        end
+    end
+    Hook-->>Router: Matched pair count
+    Router-->>PM: Callback complete
+    PM-->>Router: Unlock completes if all currency deltas are settled
+    Router-->>Wallet: Direct transaction succeeds
+    Note over Wallet,Relayer: For signed submission, the transaction result returns to the submitter instead.
+```
+
+The LP fee accrues through PoolManager's position accounting. Priority bids are not paid to LPs: every settled bid goes to the FeeVault. LPs do not receive an external callback on every fill.
+
+### Private fillers, continuation, repricing, and cancellation
+
+These are alternative actions on open orders. Private fills and LP retries require the Router to remain authorized by the maker. Book continuation is permissionless and processes at most eight pairs per call.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Maker as Maker / wallet
+    actor Caller as Filler or public caller
+    participant Router
+    participant Hook as AsyncSwap hook
+    participant Match as AsyncMatching / AsyncFiller
+    participant Token as Output ERC-20
+    participant PM as PoolManager
+    participant Vault as FeeVault
+
+    alt Private filler settles a specific order
+        Caller->>Hook: asyncOrderInfo(poolId, orderId)
+        Hook-->>Caller: Live remaining input and minimum output
+        Caller->>Router: fillOrder(order, maxPrice, data)
+        Note over Caller,Hook: Native output requires exact gross ETH, forwarded by Router to hook before unlock.<br/>ERC-20 output requires filler approval to Router.
+        Router->>PM: unlock(fill action)
+        PM->>Router: unlockCallback(data)
+        Router->>Hook: Read live minimum and calculate protocol fee
+        Hook-->>Router: Net minimum and fee
+        Router->>Router: Require gross output no greater than maxPrice
+        opt ERC-20 output
+            Router->>PM: sync(output token)
+            Router->>Token: transferFrom(filler, PoolManager, gross output)
+            Token-->>Router: Transfer succeeds
+            Router->>PM: settleFor(hook)
+        end
+        Router->>Hook: executeOrder(order, filler)
+        Hook->>Match: fill(...), validate executor and open order
+        Match->>PM: Settle output, pay maker net minimum
+        PM-->>Maker: ERC-20 output or native claims
+        Match->>PM: mint protocol-fee claims to FeeVault
+        Note over PM,Vault: Claims are credited inside PoolManager, FeeVault is not called during a fill.
+        Match->>PM: Burn input escrow, pay filler remaining input
+        PM-->>Caller: ERC-20 input or native claims
+        Match->>PM: Settle remaining bid to FeeVault
+        Match-->>Hook: Order closed, AsyncOrderFilled event
+        Hook-->>Router: Fill complete
+        Router-->>PM: Callback complete
+        PM-->>Router: Unlock complete
+        Router-->>Caller: Transaction succeeds
+    else Continue a crossed book
+        Caller->>Router: matchBook(key, maxMatches from 1 to 8)
+        Router->>PM: unlock(match action)
+        PM->>Router: unlockCallback(data)
+        Router->>Hook: matchBook(key, maxMatches)
+        Hook->>Match: Match best bid and ask, settle pairs and bids
+        Match->>PM: Burn claims, pay counterparties, settle bid shares
+        Match-->>Hook: Matched pair count
+        Hook-->>Router: Matched pair count
+        Router-->>PM: Callback complete
+        PM-->>Router: Unlock complete
+        Router-->>Caller: Transaction succeeds
+    else Retry a specific order against LP liquidity
+        Caller->>Router: fillFromPoolLiquidity(order)
+        Router->>PM: unlock(pool fill action)
+        PM->>Router: unlockCallback(data)
+        Router->>Hook: tryFillOrderFromPoolLiquidity(order)
+        Note over Hook,PM: Same guarded LP self-call as above, no book-priority check.
+        Hook-->>Router: true if filled, false if LP attempt rolled back
+        Router-->>PM: Callback complete
+        PM-->>Router: Unlock complete
+        Router-->>Caller: Transaction succeeds, inspect events for actual fill
+    else Maker reprices
+        Maker->>Hook: updatePrice(order, newAmountOutMin)
+        Hook->>Match: Update minimum, re-enter with fresh sequence
+        Match-->>Hook: New price and rank
+        Hook-->>Maker: AsyncOrderPriceUpdated event
+        Note over Maker,PM: No Router or PoolManager unlock, this does not trigger matching by itself.
+    else Maker cancels
+        Maker->>Router: cancelOrder(order)
+        Router->>PM: unlock(cancel action)
+        PM->>Router: unlockCallback(data)
+        Router->>Hook: cancelOrder(order)
+        Hook->>Match: Validate executor, remove open order
+        Match->>PM: Burn input claims and return remaining input
+        PM-->>Maker: ERC-20 refund or native claims
+        Match->>PM: Settle non-refundable remaining bid to LPs or FeeVault
+        Match-->>Hook: AsyncOrderCancelled event
+        Hook-->>Router: Cancellation complete
+        Router-->>PM: Callback complete
+        PM-->>Router: Unlock complete
+        Router-->>Maker: Transaction succeeds
+    end
+```
+
+Signed alternatives are `Hook.updatePriceWithSig` and `Router.cancelWithSig`; a relayer can submit the maker's signature. Signature checks precede the corresponding state change or cancellation unlock. Any uncaught revert rolls back the whole transaction, including transfers and bid settlements.
+
+### Pool setup, liquidity providers, and withdrawals
+
+The liquidity manager below is a compatible Uniswap v4 periphery contract, not Async Swap's order Router. Its precise user-facing methods depend on the chosen periphery; the PoolManager calls shown are the common execution path. Setup and withdrawals are separate transactions from order execution.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Operator as Pool initializer
+    actor Admin as Protocol owner
+    actor LP as Liquidity provider
+    actor Holder as Claim holder
+    participant LM as v4 liquidity manager
+    participant Hook as AsyncSwap hook
+    participant PM as PoolManager
+    participant Native as NativeClaims
+    participant Tokens as TokenClaims
+    participant Vault as FeeVault
+    actor Recipient
+
+    Operator->>PM: initialize(key, sqrtPriceX96)
+    PM->>Hook: beforeInitialize(...)
+    Hook->>Hook: Require configured USDC and dynamic-fee pool
+    Hook-->>PM: beforeInitialize selector
+    PM-->>Operator: Initialized tick, Initialize event
+    opt Configure minimum order size
+        Admin->>Hook: setMinOrder(key, minimum)
+        Hook-->>Admin: Minimum recorded
+    end
+    LP->>LM: Add funded liquidity in a chosen tick range
+    LM->>PM: unlock(liquidity operation)
+    PM->>LM: unlockCallback(data)
+    LM->>PM: modifyLiquidity(key, params, hookData)
+    PM->>Hook: beforeAddLiquidity(...)
+    Hook-->>PM: beforeAddLiquidity selector
+    PM-->>LM: Liquidity and fee deltas
+    LM->>PM: Settle required token amounts
+    LM-->>PM: Callback complete
+    PM-->>LM: Unlock complete
+    LM-->>LP: Position updated
+    Note over LP,PM: Eligible positions accrue swap fees in PoolManager accounting.<br/>LPs collect through their chosen liquidity manager, no per-fill LP callback.
+
+    Holder->>PM: approve(NativeClaims, claim ID 0, amount)
+    PM-->>Holder: Claim allowance recorded
+    Holder->>Native: redeem(recipient, amount)
+    Native->>PM: unlock(redemption)
+    PM->>Native: unlockCallback(data)
+    Native->>PM: burn(holder, native claim ID 0, amount)
+    Native->>PM: take(native ETH, recipient, amount)
+    PM-->>Recipient: ETH payment
+    Native-->>PM: Callback complete, NativeRedeemed event
+    PM-->>Native: Unlock complete
+    Native-->>Holder: Redemption complete
+
+    Holder->>PM: approve(TokenClaims, currency claim ID, amount)
+    PM-->>Holder: Claim allowance recorded
+    Holder->>Tokens: redeem(currency, recipient, amount)
+    Tokens->>PM: unlock(redemption)
+    PM->>Tokens: unlockCallback(data)
+    Tokens->>PM: burn(holder, currency claim ID, amount)
+    Tokens->>PM: take(currency, recipient, amount)
+    PM-->>Recipient: ERC-20 payment
+    Tokens-->>PM: Callback complete, ClaimsRedeemed event
+    PM-->>Tokens: Unlock complete
+    Tokens-->>Holder: Redemption complete
+
+    Admin->>Vault: collect(currency, recipient)
+    Vault->>Hook: owner()
+    Hook-->>Vault: Current protocol owner
+    Vault->>PM: unlock(fee collection)
+    PM->>Vault: unlockCallback(data)
+    Vault->>PM: Read and burn FeeVault's currency claims
+    Vault->>PM: take(currency, recipient, amount)
+    PM-->>Recipient: Collected fees
+    Vault-->>PM: Callback complete, FeesCollected event
+    PM-->>Vault: Unlock complete
+    Vault-->>Admin: Collection complete
+```
+
+Native and ERC-20 redemption require a positive amount, a nonzero recipient and a claim allowance; a failed delivery (ETH rejected, or a token refusing the recipient) reverts the redemption and restores the claims and allowance, and the holder can redeem to another recipient. Fee collection only redeems FeeVault's balances and is restricted to the current hook owner. It cannot redeem maker escrow.
+
+Sources: [Router](https://github.com/asyncswap/contracts/blob/main/src/Router.sol), [AsyncSwap](https://github.com/asyncswap/contracts/blob/main/src/AsyncSwap.sol), [AsyncMatching](https://github.com/asyncswap/contracts/blob/main/src/libraries/AsyncMatching.sol), [AsyncFiller](https://github.com/asyncswap/contracts/blob/main/src/libraries/AsyncFiller.sol), [NativeClaims](https://github.com/asyncswap/contracts/blob/main/src/NativeClaims.sol), [TokenClaims](https://github.com/asyncswap/contracts/blob/main/src/TokenClaims.sol), and [FeeVault](https://github.com/asyncswap/contracts/blob/main/src/FeeVault.sol).
+
+# Price keys and crossing
+
+## Price keys
+
+Every resting order is indexed on its pool's book by a `uint128` price key computed in
+`AsyncFiller._priceKey`:
+
+| Side | Key |
+|---|---|
+| Buy (`isBuy`, maker escrows the numeraire) | `floor(amountIn * 1e18 / amountOutMin)` |
+| Sell | `floor(amountOutMin * 1e18 / amountIn)` |
+
+A ratio that rounds to zero maps to `1`, and a ratio above `type(uint128).max` saturates at the
+maximum. The key is a truncated WAD ratio, so two orders with different exact prices can share a key.
+Keys order the radix tree; they do not by themselves decide whether two orders trade.
+
+## Crossing rule
+
+`AsyncMatching._crosses(buyKey, sellKey, buy, sell)` decides whether a buy and a sell can trade:
+
+* `buyKey > sellKey` is a cross and `buyKey < sellKey` is not. Truncation is monotone, so a strict
+  ordering of keys always reflects a strict ordering of exact prices.
+* Equal keys are decided at full precision:
+
+```
+cross  <=>  buyIn / buyOut >= sellOut / sellIn
+       <=>  buyIn * sellIn >= sellOut * buyOut
+       <=>  floor(buyIn * sellIn / sellOut) >= buyOut      (sellOut and buyOut are nonzero)
+```
+
+implemented as `Math.mulDiv(buy.amountIn, sell.amountIn, sell.amountOutMin) >= buy.amountOutMin`.
+Orders cannot be created or updated with a zero minimum, so the divisor is never zero. With equal
+keys the quotient is on the order of `buyOut`, so the division cannot overflow for escrowable
+amounts.
+
+An exact tie (`buyIn * sellIn == sellOut * buyOut`) counts as a cross and executes.
+
+## Consequences
+
+* Equal-key noncrossing heads no longer terminate selection when another pair is eligible.
+  Each priority subtree stores its minimum exact ask or maximum exact bid. The search chooses
+  the higher-priority child if its summary admits a crossing order, otherwise the other child.
+  Each lookup traverses at most 128 branches without scanning or persistent cursors.
+* Incoming matching chooses the highest-priority eligible opposing order at the best bucket.
+  Resting-book matching chooses the highest-priority buy crossing any ask in the boundary
+  bucket, then the highest-priority ask crossing that buy. This buy-first lexicographic policy
+  retains fee/sequence priority among feasible pairs; it does not optimize global volume.
+* Every genuine cross, including the tie, produces a non-zero match in `_matchAmounts` that pays
+  each maker at least their signed minimum for the input consumed. This was checked exhaustively
+  for small amounts and on randomized large near-tie pairs.
+* Direct order-to-order matches swap the two escrowed inputs with no protocol fee, so rounding never
+  moves value to or from the protocol.
+
+Example of equal keys without a cross:
+
+| Order | `amountIn` | `amountOutMin` | Key |
+|---|---:|---:|---|
+| Buy | `3e18 + 1` | `1e18` | `3000000000000000001` |
+| Sell | `1e18 - 1` | `3e18 - 2` | `3000000000000000001` |
+
+`buyIn * sellIn` is one unit below `sellOut * buyOut`, so the pair does not cross and rests.
+
+## Tests
+
+`test/security/PriceKeyCrossing.t.sol`:
+
+* `test_equalKeyNonCrossingPairDoesNotBlockMatching`
+* `test_matchBookMakesNoFalseMatch`
+* `test_exactTieExecutes`
+
+## Saturation
+
+Distinct extreme ratios collapse onto the boundary keys `1` and `type(uint128).max`. The exact
+equal-key test still decides crossing correctly for them, but priority among different saturated
+prices follows priority bid and then sequence rather than exact price. The ordinary bucket-width
+bound does not apply to the saturated upper bucket; key `1` merges the zero and one bins.
+
+## Historical counterexample and repaired regression
+
+`test/security/CoarsePriceBlocking.t.sol` creates a pool with an 18-decimal asset and 6-decimal
+USDC fixture at 1,000 USDC/asset, minimum order 1 USDC, and no active LP liquidity. A sell
+offering `2e15 - 1` asset base units for `2_000_000` USDC base units has the same key as a
+1,000 USDC/asset order, but a slightly higher exact ask. Its `100_001`-unit bid outranks the
+`100_000`-unit bids of 20 honest sells. Under the previous head-only policy, twenty matching buys stopped at that blocker, and 100
+retries made no progress. The Python `legacy_matching=True` mode preserves that baseline.
+
+With exact eligibility, the same twenty buys execute against the honest sells without cancelling
+or outbidding the blocker. The blocker remains open, preserving its escrow and bid. The updated
+`CoarsePriceBlockingTest` asserts that outcome through the real Router/hook/PoolManager, and tests
+the mirrored incoming-sell case. Generated `EligiblePythonVectors.t.sol` exercises normal prices,
+both clamps, blockers on both sides, mutations, partial fills, balances and fee claims.
+
+For ordinary buckets, human price width is `10^(assetDecimals - usdcDecimals - 18)` USDC/asset:
+**0.000001 USDC/asset** for 18/6 decimals. That bounds price separation, not delay or backlog.
+The repaired selector guarantees finding a crossing pair in a valid book when one exists;
+successful settlement and transaction submission remain required. It does not guarantee that
+every low-priority order eventually fills under continuing higher-priority arrivals.
+
+The companion model is in the local uv4 checkout under `src/uv4/priority_protocol/`, with results
+and explicit modeling boundaries in `docs/priority_protocol/`. `PriorityPythonVectors.t.sol` checks
+100 independently generated Python matching cases against the real matcher;
+`PriorityPythonHashes.t.sol` checks order identities and signature struct hashes.
+
+## Maintenance, gas, and verification boundaries
+
+`EligiblePrice.sol` compares full 512-bit cross products and stores two-word exact bounds at
+priority-tree nodes. Append/remove repair the affected ancestor path. Every partial fill refreshes
+the bound even if neither the coarse key nor the remaining fee changes. New storage is appended
+to each price level; existing live trees would need their summaries initialized before using this
+code. These local changes have not been deployed.
+
+The protocol-controlled index work is O(128 M) for M matches. Eight is the existing per-call cap,
+not a per-transaction cap. Token code and external settlement costs are outside this structural
+bound. `EligibleGas.t.sol` measures composed batches through a real unlock; no numerical
+worst-case gas certificate or universally optimal batch size is claimed.
+
+The updated whitepaper is in the local `asyncswap/whitepaper` checkout. Its new section contains
+integer safety and search arguments, gas curves, and the constrained parameter objective.
+
+# AuditAgent report 1: status
+
+Tracks [`auditagent_report_1_ae602e60-d592-45ec-92ef-891968f087f0.md`](https://github.com/asyncswap/contracts/blob/main/audit/auditagent_report_1_ae602e60-d592-45ec-92ef-891968f087f0.md)
+(Nethermind AuditAgent, scan `ae602e60`, commit `e04668ec`), plus two findings of the same kind found
+while fixing it.
+
+| Status | Meaning |
+| --- | --- |
+| **Fixed** | Code changed; a regression test fails on the old code and passes on the new. |
+| **Acknowledged** | Kept as is on purpose; the reason is recorded. |
+| **Not fixed** | Open; needs a design decision. A recommended option is given. |
+
+## Summary
+
+| # | Severity | Finding | Status |
+| --- | --- | --- | --- |
+| 1 | High | `fill` pays out while the order is still live | **Fixed** |
+| 2 | High | `fillFromPoolLiquidity` pays before removing the order | **Fixed** |
+| 3 | Medium | Coarse `_priceKey` buckets: a non-crossing head blocks its level | **Fixed** |
+| 4 | Medium | Temporary LPs capture priority bids / divert `FeeVault` forfeits | **Fixed** |
+| 5 | Medium | Filler `maxPrice` caps payment, not the input received | **Fixed** |
+| 6 | Medium | Favorable partial fills weaken the remaining limit | **Fixed** |
+| 7 | Medium | Custom executors can skip the priority bid | **Fixed** |
+| 8 | Medium | New orders bypass a crossed backlog left by the 8-match cap | **Acknowledged** (harness) / **Fixed** (live) |
+| 9 | Medium | An unreceivable ERC-20 payout blocks matching | **Fixed** |
+| 10 | Medium | `updatePrice` resets `sequence`, flipping maker/taker of a crossed pair | **Fixed** |
+| 11 | Low | Deleting an emptied level costs gas in its historical peak | **Fixed** |
+| 12 | Low | One dust order blocks `setOrderingMode` | **Fixed** |
+| R-1 | — | Router fill checks the order, pulls ERC-20, then executes | **Fixed** |
+| R-2 | — | A new order is matchable before its input is settled | **Fixed** |
+
+Every finding is now fixed or acknowledged; none is open. Policy changes made alongside: a
+[minimum order and tiered priority bid](#minimum-order-and-tiered-bid), and
+[priority-fee-only pools](#priority-fee-only-pools) (closes 7 and 12).
+
+The fixes are on `main`; no deployment has been made. Storage layout and public ABI changed, so they
+ship as fresh contracts, not as an upgrade.
+
+## Fixed
+
+### 1, 2: order state is final before any payout
+
+An ERC-20 payout runs the token's code while the PoolManager is still unlocked, and the hook's own
+entry points (`cancelOrder` by the owner, `matchBook`, `updatePrice`, `executeOrder` by an executor)
+are callable from there. The order must already be closed or reduced when that code runs.
+
+* `AsyncFiller.fill`: the order is removed, deleted and its paid bid settled (`_closeOrder`) before
+  the maker's output, the fee and the filler's input are paid.
+* `AsyncMatching.fillFromPoolLiquidity`: the order is removed and deleted before the pool swap and the
+  maker's payout.
+* `AsyncMatching._matchPair`: recipients are read first (`_payouts`), both orders are reduced, then
+  the two escrow legs pay out (`_settleTransfers`). Since the fix for 9, those legs credit PoolManager
+  claims and run no token code at all.
+
+Tests: `test/nethermind_auditagent/NethermindAuditAgent.t.sol`
+`test_H1_fill_orderClosedBeforeMakerPayout`, `test_H2_poolLiquidityFill_orderClosedBeforeMakerPayout`
+(a token notifies the paid maker, which only reads the order's record) and
+`test_H1_match_orderReducedBeforeMakerPayout` (the match credits claims and the token's code never runs).
+
+### 3: exact eligibility inside coarse price buckets
+
+`EligiblePrice` augments each priority radix tree with exact subtree price extrema. A lookup
+returns the highest-fee, earliest-sequence order that crosses the counterparty in at most 128
+branches. Noncrossing heads remain open and no longer hide eligible lower-priority orders.
+For a resting equal-key book, selection maximizes buy priority first, then eligible sell priority.
+Append/remove and every live partial fill maintain the extrema, including unchanged-key/fee fills.
+
+The original approximately 2-USDC blocker no longer stalls 20,000 USDC of executable orders.
+`CoarsePriceBlockingTest` covers both incoming directions. `EligiblePythonVectors.t.sol` compares
+514 operations and 132 matches against an independent rational-price Python oracle, including
+both clamps, two-sided blockers, mutations, selected IDs, remainders, fees, and maker balances.
+`EligiblePriceTest` checks subtree invariants, randomized mutations, full depth, and node reuse.
+
+The index bound is independent of blocker count. Matching runs no token code (finding 9), so a
+blocker cannot make it revert or burn gas through a payout. See `docs/price-key-crossing.md` and the
+revised whitepaper for the argument.
+
+### 4: priority bids always go to the `FeeVault`
+
+`AsyncFiller.settlePriorityFee` no longer checks in-range liquidity: every settled bid (the filled
+share on a match, the rest on close, cancel, fill or pool fill) is burned from the hook's claims and
+minted to the `FeeVault`. Liquidity added for the moment of settlement receives none of it. (Active
+LPs still earn the 30 bps fill fee on a pool fill, as on any Uniswap swap; that fee is not a bid.)
+
+Tests: `test_M4_liquidityAddedBeforeFillGetsNoBid` (on the audited code the bid shows up as LP fee
+growth), `test_filledPriorityBidGoesToFeeVaultNotActiveLps`, `test_lpCollectsFillFeeOnWithdraw`.
+
+### 5: `order.amountIn` bounds what the filler receives
+
+`Router.unlockCallback` (fill) reverts with `"Input below order.amountIn"` when the order's live input
+is below `order.amountIn`. A missing order (live input 0) still reaches the hook's `OrderNotFound`.
+
+Tests: `test_M5_RevertWhen_LiveInputBelowFillerExpectation`, `test_M5_fillSucceeds_WhenFillerAcceptsLiveInput`.
+
+### 6: the remainder keeps the maker's own limit
+
+`AsyncMatching._reduceAfterMatch` sets the remaining minimum to
+`ceil(oldMinimum * remainingInput / oldInput)` instead of `oldMinimum - outputReceived`. A side
+closes only when its input is used up; the early close-and-refund branch is gone.
+
+**Behavior change:** an order that fills at a better price than its limit now keeps its unspent
+input on the book at its own limit, where it used to be refunded. Three existing tests were updated:
+`test_crossingOrdersMatchAndTransferEscrowedTokens`, `test_priorityFeeBreaksEqualPriceTiesAfterPricePriority`
+(`test/AsyncSwap.t.sol`), `test_retryFillsPartiallyMatchedRemainder` (`test/PoolLiquidityFill.t.sol`).
+
+Tests: `test_M6_favorablePartialFill_keepsRemainderLimit`, `test_M6_favorablePartialFill_keepsBuyerRemainderLimit`,
+`test_M6_partialFillMeetingWholeMinimum_keepsRemainderResting`.
+
+### 8 (live): one book-wide priority for arrivals and backlog
+
+`AsyncMatching.matchIncoming` now runs `matchBook` on the whole book, within the same 8-match budget,
+instead of matching only the new order against the best opposing level. A crossed backlog left by
+the cap clears first, by price, then bid, then time; the new order takes its place in that queue.
+
+Test: `test_M8_crossedBacklogClearsBeforeNewerOrder` (on the audited code a newer, worse-priced ask
+fills while the older crossed ask stays on the book).
+
+### 9: match payouts are claims
+
+`AsyncMatching._transferEscrow` credits ERC-6909 claims in every currency, for both escrow legs and
+for a remainder returned below the pool minimum. Holders redeem with the new `TokenClaims`
+(`redeem(currency, recipient, amount)`, after approving it on the PoolManager), to any recipient the
+token accepts. A recipient the token refuses therefore cannot revert a match.
+
+Fills by a filler and pool-liquidity fills still pay the maker in ERC-20. A refused maker can only
+fail its own order there: the pool fill runs behind a caught self-call and leaves the order resting,
+and a filler fill reverts for that one order.
+
+Tests: `test_M9_blockedRecipientDoesNotBlockMatch` (on the audited code the refused transfer reverts
+the whole match), `test/TokenClaims.t.sol` (redemption, approvals, a refused transfer restoring claims
+and allowance, re-entry).
+
+### 10: the maker role survives a reprice
+
+Each order now records an immutable `createdSequence`. `_matchPair` makes the order with the smaller
+`createdSequence` the maker, whose limit sets the price. `updatePrice` still takes a fresh `sequence`,
+which only sets queue position among equal-price, equal-bid orders.
+
+Test: `test_M10_repriceKeepsMakerRole` (on the audited code the older buy's reprice flips the maker,
+and the seller receives 11 instead of 12).
+
+The regression tests for 4, 8, 9 and 10 were run against the audited commit `e04668e` with the current
+`SetupHook` and its pools switched to priority-fee mode: each fails there on its own assertion and
+passes on `main`.
+
+### 11: an emptied price level is left in place
+
+`AsyncFiller._remove` no longer deletes the `PriceLevel` when its last order leaves. Its FIFO links
+are already zero and its priority tree is empty (root 0); deleting it only cleared the tree's
+`nextNodeId` and `freeIds`, a cost that grew with the level's historical peak. Those ids are now
+reused by later orders at that price.
+
+Tests: no dedicated gas test.
+
+### R-1: the Router fills only the order it checked
+
+Found while fixing 1 and 2. The fill path read the order (live input, price, `maxPrice`), then pulled
+the filler's ERC-20 with `safeTransferFrom`, which runs the token's code, then executed against
+whatever storage held by then. A changed price already reverted (the hook's deltas no longer net to
+zero); a reduced input did not. `Router` now re-reads the order after the pull and reverts with
+`"Order changed during fill"` unless it is unchanged (`_requireUnchanged`).
+
+Test: `test/security/RouterOrderWindow.t.sol` `test_RevertWhen_OrderChangesDuringFillPayment`.
+
+### R-2: a new order is not matchable before its input is settled
+
+Found while fixing 1 and 2. `_beforeSwap` puts the order on the book before the Router pulls the
+maker's input and priority bid, and the Router's comment said it "only becomes matchable after this
+maker's input has been settled". The permissionless `matchBook` did not enforce that. It now returns 0
+while this pool holds the order pending in `PENDING_MATCH_ID_SLOT`, i.e. until `matchNewOrder` takes
+it. An early match also needed the PoolManager to hold the token from other escrow or LP reserves.
+
+Test: `test/security/RouterOrderWindow.t.sol` `test_pendingOrder_notMatchableBeforeInputSettled`.
+
+## Minimum order and tiered bid
+
+Async Swap targets institutional-size orders; small trades are better served by the AMM. Measured in
+numeraire (USDC) base units:
+
+* **Minimum order.** Each pool has a minimum (`setMinOrder(key, amount)`, owner only); pools start with
+  the hook's `defaultMinOrder` (`setDefaultMinOrder`). `script/01_DeployHook.s.sol` sets it to $10
+  (`DEPLOY_MIN_ORDER_USD`, scaled by the numeraire's `decimals()`). A buy's input must be at least the
+  minimum; a sell's minimum output must be, and so must its input valued at the pool's current price,
+  which keeps out sells that ask for the minimum but offer almost nothing. `updatePrice` re-checks it.
+  The pool price is an estimate: an empty pool still shows its creation price, so this is an admission
+  gate, not an oracle.
+* **Remainders.** A partial match that leaves an order worth less than the minimum, by its own terms
+  (no pool price), closes it and returns the remaining input as claims after both orders are reduced.
+* **Tiered bid.** The least bid is `min($0.10, 0.1% of the order)`: $0.10 from $100 up, down to $0.01
+  at the $10 minimum.
+
+Tests: `test/security/MinimumOrder.t.sol`, including a sell and a buy remainder refunded below the
+minimum, and the value check on a pool whose numeraire is `currency0`. Formal tests updated: the `addOrder` and `CreateOrderSpec`
+fee guards, and `beforeInitialize`'s write set (now also `priceBooks[id].minOrder`).
+
+Hook size: `updatePriceWithSig` called the internal `AsyncFiller.updatePrice`, inlining it into the
+hook; it now goes through the linked `AsyncMatching.updatePrice` like `updatePrice`. `AsyncSwap` went
+from 24,311 to about 20,200 bytes (EIP-170 limit 24,576).
+
+## Priority-fee-only pools
+
+Findings **7 and 12 are fixed** in the working tree. Every pool queues equal-price orders by
+escrowed bid, then sequence. FIFO mode, its links, `setOrderingMode`, `orderingMode`, and the separate
+`recordPriorityFee` call are removed. `orderBookOrder` now returns `sequence` and `priorityFee` in
+its final two fields instead of FIFO neighbors; clients must update their ABI.
+
+`addOrder` mints the bid's numeraire claims to the hook immediately. This creates a matching hook
+debt in PoolManager; the unlock cannot finish until it is settled. The Router pays it with
+`settleFor(hook)`. A custom executor cannot leave an order resting with an unpaid declared bid.
+The tiered minimum still rounds down in base units, so a tiny order can have a zero minimum when
+the pool minimum permits it. This change does not impose a universal $10 minimum.
+
+Tests: `test/security/PriorityFeeOnly.t.sol` checks minimum bids on unconfigured pools, bid ordering,
+rejection of an executor that skips payment, successful paid custom execution, equal-bid time ordering,
+and removal of the mode setter. Existing placement,
+settlement, cancellation and invariant fixtures now account for escrowed bids.
+
+This changes storage layout and public ABI; deploy fresh contracts and update consumers. It is not
+a migration of existing orders or deployed contracts.
+
+## Acknowledged
+
+### 8 (harness): `MatchingEngine`
+
+`src/MatchingEngine.sol` is a standalone matching harness and gas benchmark; it holds no tokens.
+
+## Running the tests
+
+```sh
+forge test --match-path "test/nethermind_auditagent/*"
+forge test --match-contract RouterOrderWindowTest
+forge test                                   # everything
+```
+
+## Validation
+
+* `forge test`: **833 passed, 0 failed, 1 skipped** across 139 suites. The Unichain fork fixture skips
+  without `UNICHAIN_FORK_RPC_URL`; no fork validation is claimed.
+* `forge build --sizes`: runtime sizes are 19,237 bytes (`AsyncSwap`), 19,064 bytes (`AsyncMatching`)
+  and 17,580 bytes (`Router`), each below the 24,576-byte EIP-170 limit.
+* `forge coverage` of `src/`: 99.9% of lines, 99.4% of statements, 98.8% of branches, 100% of
+  functions. The uncovered branches are unreachable guards (a matched amount above the order's input,
+  `MatchingEngine`'s reentrancy check, a sell-only lookup).
+* No deployment was performed.
+
+# Contract reference
+
+These pages are generated by `forge doc` from the NatSpec comments in
+[`src/`](https://github.com/asyncswap/contracts/tree/main/src) on every docs build, so they always
+match the code on `main`. Each page links to its source file.
+
+| Contract | Role |
+| --- | --- |
+| [AsyncSwap](/reference/src/AsyncSwap) | The Uniswap v4 hook: turns swaps into orders, escrows input and bids, entry point for matching, fills and cancels. |
+| [Router](/reference/src/Router) | Entry point for makers, fillers and relayers: `swap`, `fillOrder`, `cancelOrder`, signed variants, `matchBook`, `fillFromPoolLiquidity`. |
+| [AsyncMatching](/reference/src/libraries/AsyncMatching) | Linked library that matches the book, fills from pool liquidity and settles each pair. |
+| [AsyncFiller](/reference/src/libraries/AsyncFiller) | Order storage and the per-pool book: placement, fills, cancels, repricing, bid settlement. |
+| [FeeVault](/reference/src/FeeVault) | Holds protocol fee and bid claims; the owner collects them. |
+| [TokenClaims](/reference/src/TokenClaims) | Redeems ERC-20 PoolManager claims, such as match proceeds, to any recipient. |
+| [NativeClaims](/reference/src/NativeClaims) | Redeems native ETH claims to any recipient. |
+| [RadixPriceTree](/reference/src/libraries/RadixPriceTree) and [EligiblePrice](/reference/src/libraries/EligiblePrice) | The price index and the exact-price summaries that find the best crossing order. |
+
+`MatchingEngine` is a standalone benchmark harness and is not deployed.
+
+# AsyncSwap
+
+[Git Source](https://github.com/asyncswap/contracts/blob/7cd7ee9169e905d4ba1d1d1aee38a036b3c68d62/src/AsyncSwap.sol)
+
+**Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
+
+**Title:** AsyncSwap
+
+**Author:** @msakiart
+
+Uniswap v4 hook that converts an exact-input swap into an open async order: the maker
+deposits their input via `_beforeSwap`. Crossing orders settle directly at the resting
+limit; fillers settle unmatched orders.
+
+Makers can also act by EIP-712 signature (`setExecutorWithSig`, `updatePriceWithSig`) so a
+relayer pays gas and the wallet shows a readable message. See `OrderSignatures` for types.
+
+## Constants
+
+### feeVault
+
+Holds fee claims separately from open-order escrow.
+
+```solidity
+FeeVault public immutable feeVault;
+```
+
+### numeraire
+
+Chain-specific USDC address. Every pool must include this exact currency.
+
+```solidity
+Currency public immutable numeraire;
+```
+
+### PENDING_NATIVE_DEPOSIT_SLOT
+
+<i>
+  Transient slot — keccak256("asyncswap.hook.pendingNativeDeposit") - 1.
+  Tracks ETH deposited to this contract within the current tx via
+  `receive()`, so `executeOrder` can settle native output only out of
+  the filler's just-received deposit rather than the contract's
+  accumulated balance (which may include donations, stranded ETH,
+  or in-flight native-input escrow). Cleared after each settle.
+</i>
+
+```solidity
+bytes32 constant PENDING_NATIVE_DEPOSIT_SLOT = 0x9c2a7e4f3b1d8a5c6e0f2d4b7a9c1e3d5f8b6a0c2e4d7b9f1a3c5e7d9b1f3a50;
+```
+
+### PENDING_MATCH_ID_SLOT
+
+<i>
+  Transient hand-off from `_beforeSwap` to the Router after it settles the new input.
+</i>
+
+```solidity
+bytes32 constant PENDING_MATCH_ID_SLOT = 0x247d5e35be7fbfd4d95fd66ea940bfb4ee942bef70db6afae46dc83ce0f89eb2;
+```
+
+### PENDING_MATCH_EXECUTOR_SLOT
+
+```solidity
+bytes32 constant PENDING_MATCH_EXECUTOR_SLOT = 0x9583e36f799bab8c4d06dc676d85ba05b4dfbde5934d5684d8e431d0fd3948da;
+```
+
+## State Variables
+
+### asyncOrders
+
+Per-pool order book.
+
+```solidity
+mapping(PoolId poolId => AsyncFiller.State) public asyncOrders;
+```
+
+### priceBooks
+
+```solidity
+mapping(PoolId poolId => AsyncFiller.Book) private priceBooks;
+```
+
+### owner
+
+Protocol owner authorized to collect vault fees and sweep stranded balances.
+
+```solidity
+address public owner;
+```
+
+### pendingOwner
+
+Address nominated by `transferOwnership`; becomes owner on `acceptOwnership`.
+
+```solidity
+address public pendingOwner;
+```
+
+### nonceUsed
+
+Unordered nonces consumed by signed maker actions (`setExecutorWithSig`, `updatePriceWithSig`).
+
+```solidity
+mapping(address maker => mapping(uint256 nonce => bool)) public nonceUsed;
+```
+
+### defaultMinOrder
+
+Minimum order, in numeraire base units, that pools initialized from now on start with.
+
+```solidity
+uint256 public defaultMinOrder;
+```
+
+## Functions
+
+<a id="onlyowner" />
+
+### onlyOwner
+
+Restricts a call to the protocol owner.
+
+```solidity
+modifier onlyOwner();
+```
+
+<a id="constructor-ipoolmanager-currency-address" />
+
+### constructor
+
+```solidity
+constructor(IPoolManager _poolManager, Currency _numeraire, address _owner)
+        BaseHook(_poolManager)
+        EIP712("AsyncSwap", "1");
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \_poolManager | `IPoolManager` |  |
+| \_numeraire | `Currency` |  |
+| \_owner | `address` | Explicit protocol owner. Not `msg.sender`: CREATE2 deployments run the<br />constructor from the deterministic deployer, which could never act as owner. |
+
+<a id="transferownership-address" />
+
+### transferOwnership
+
+Start a two-step ownership transfer. The deployer (or a factory) should call this after
+deployment to hand control to the intended fee recipient / governance address, which
+then calls `acceptOwnership`.
+
+```solidity
+function transferOwnership(address newOwner) external onlyOwner;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| newOwner | `address` |  |
+
+<a id="acceptownership" />
+
+### acceptOwnership
+
+Complete a two-step ownership transfer. Only the nominated `pendingOwner` may call.
+
+```solidity
+function acceptOwnership() external;
+```
+
+<a id="sweep-currency-address" />
+
+### sweep
+
+Sweep an accumulated balance of `currency` held by this hook to `to`.
+
+<i>
+  Between transactions the hook's raw balance holds only stranded funds or donations;
+  fees belong to feeVault. Maker input is escrowed as ERC-6909
+  claims in the PoolManager, and the transient native-deposit ledger is cleared at the
+  end of every tx, so no per-order escrow lives in the hook's balance across calls.
+</i>
+
+```solidity
+function sweep(Currency currency, address to) external onlyOwner;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| currency | `Currency` |  |
+| to | `address` |  |
+
+<a id="_beforeinitialize-address-poolkey-uint160" />
+
+### \_beforeInitialize
+
+```solidity
+function _beforeInitialize(address, PoolKey calldata key, uint160) internal virtual override returns (bytes4);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \_ | `address` |  |
+| key | `PoolKey` |  |
+| \_ | `uint160` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes4` |  |
+
+<a id="gethookpermissions" />
+
+### getHookPermissions
+
+Returns a struct of permissions to signal which hook functions are to be implemented
+
+<i>
+  Used at deployment to validate the address correctly represents the expected permissions
+</i>
+
+```solidity
+function getHookPermissions() public pure override returns (Hooks.Permissions memory);
+```
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `Hooks.Permissions` |  |
+
+<a id="_beforeaddliquidity-address-poolkey-modifyliquidityparams-bytes" />
+
+### \_beforeAddLiquidity
+
+```solidity
+function _beforeAddLiquidity(address, PoolKey calldata, ModifyLiquidityParams calldata, bytes calldata)
+        internal
+        pure
+        override
+        returns (bytes4);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \_ | `address` |  |
+| \_ | `PoolKey` |  |
+| \_ | `ModifyLiquidityParams` |  |
+| \_ | `bytes` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes4` |  |
+
+<a id="asyncorder-poolid-bytes32" />
+
+### asyncOrder
+
+Read an order's currently-open input amount. Returns 0 if the order does not exist.
+
+```solidity
+function asyncOrder(PoolId poolId, bytes32 orderId) external view returns (uint256 amountIn);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| orderId | `bytes32` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| amountIn | `uint256` |  |
+
+<a id="asyncorderinfo-poolid-bytes32" />
+
+### asyncOrderInfo
+
+Read both legs of an open order. Returns (0, 0) if the order does not exist.
+
+```solidity
+function asyncOrderInfo(PoolId poolId, bytes32 orderId)
+        external
+        view
+        returns (uint256 amountIn, uint256 amountOutMin);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| orderId | `bytes32` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| amountIn | `uint256` |  |
+| amountOutMin | `uint256` |  |
+
+<a id="asyncorderpriorityfee-poolid-bytes32" />
+
+### asyncOrderPriorityFee
+
+The priority bid an order escrowed when it was created.
+
+```solidity
+function asyncOrderPriorityFee(PoolId poolId, bytes32 orderId) external view returns (uint256);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| orderId | `bytes32` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint256` |  |
+
+<a id="setminorder-poolkey-uint256" />
+
+### setMinOrder
+
+Set a pool's minimum order, in numeraire base units (0: none).
+
+```solidity
+function setMinOrder(PoolKey calldata key, uint256 minimum) external onlyOwner;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| key | `PoolKey` |  |
+| minimum | `uint256` |  |
+
+<a id="setdefaultminorder-uint256" />
+
+### setDefaultMinOrder
+
+Set the minimum order new pools start with.
+
+```solidity
+function setDefaultMinOrder(uint256 minimum) external onlyOwner;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| minimum | `uint256` |  |
+
+<a id="bestorder-poolid-bool" />
+
+### bestOrder
+
+Return the best live limit order for a pool side. `isBuy` is true
+when the maker escrows the pool numeraire to buy the other asset.
+`priceKey` is a WAD-scaled raw-amount ratio for sorting within this pool,
+not a human-readable price. Equal-price orders queue by bid, then submission order.
+
+```solidity
+function bestOrder(PoolId poolId, bool isBuy)
+        external
+        view
+        returns (bool found, uint128 priceKey, bytes32 orderId, address maker);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| isBuy | `bool` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| found | `bool` |  |
+| priceKey | `uint128` |  |
+| orderId | `bytes32` |  |
+| maker | `address` |  |
+
+<a id="orderbooklevel-poolid-bool-uint128" />
+
+### orderBookLevel
+
+Return the first and last order under the pool's configured ordering mode, plus count.
+
+```solidity
+function orderBookLevel(PoolId poolId, bool isBuy, uint128 priceKey)
+        external
+        view
+        returns (bytes32 head, bytes32 tail, uint32 count);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| isBuy | `bool` |  |
+| priceKey | `uint128` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| head | `bytes32` |  |
+| tail | `bytes32` |  |
+| count | `uint32` |  |
+
+<a id="orderbookorder-poolid-bytes32" />
+
+### orderBookOrder
+
+Read one live order: its terms, price key, queue position (`sequence`) and bid.
+
+```solidity
+function orderBookOrder(PoolId poolId, bytes32 orderId)
+        external
+        view
+        returns (
+            address maker,
+            uint256 amountIn,
+            uint256 amountOutMin,
+            uint128 priceKey,
+            bool isBuy,
+            uint64 sequence,
+            uint64 priorityFee
+        );
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| orderId | `bytes32` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| maker | `address` |  |
+| amountIn | `uint256` |  |
+| amountOutMin | `uint256` |  |
+| priceKey | `uint128` |  |
+| isBuy | `bool` |  |
+| sequence | `uint64` |  |
+| priorityFee | `uint64` |  |
+
+<a id="isexecutor-poolid-address-address" />
+
+### isExecutor
+
+```solidity
+function isExecutor(PoolId poolId, address maker, address executor) external view returns (bool);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| maker | `address` |  |
+| executor | `address` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bool` |  |
+
+<a id="calculatehookfee-uint256" />
+
+### calculateHookFee
+
+```solidity
+function calculateHookFee(uint256) public pure returns (uint256);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \_ | `uint256` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint256` |  |
+
+<a id="calculatepoolfee-uint24-uint256" />
+
+### calculatePoolFee
+
+Fee added to the maker's net output: 0.3% of gross output, rounded down.
+
+```solidity
+function calculatePoolFee(uint24, uint256 amount) public pure virtual returns (uint256);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \_ | `uint24` |  |
+| amount | `uint256` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint256` |  |
+
+<a id="executeorder-asyncorder-bytes" />
+
+### executeOrder
+
+Fill `order` in full. Must be called from an authorized executor (router) that has
+already paid the filler's gross output within the same unlock: for ERC20 output via
+`PoolManager.settleFor(hook)`, for native output by sending ETH to this hook.
+
+```solidity
+function executeOrder(AsyncOrder calldata order, bytes calldata data) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| data | `bytes` | abi.encode(filler) — the address that should receive the maker's input. |
+
+<a id="matchneworder-asyncorder" />
+
+### matchNewOrder
+
+Match the order just created by the current Router unlock callback.
+
+<i>
+  The Router calls this only after settling the maker's input. The transient hand-off
+  prevents stale order ids or a different executor from triggering a match.
+</i>
+
+```solidity
+function matchNewOrder(AsyncOrder calldata order) external returns (uint8 matched);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| matched | `uint8` |  |
+
+<a id="tryfillorderfrompoolliquidity-asyncorder" />
+
+### tryFillOrderFromPoolLiquidity
+
+Permissionless executor entry for retrying a resting order against current pool LPs.
+
+<i>
+  Must run inside PoolManager.unlock. Router calls this after validating the request path.
+</i>
+
+```solidity
+function tryFillOrderFromPoolLiquidity(AsyncOrder calldata order) external returns (bool filled);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| filled | `bool` |  |
+
+<a id="fillorderfrompoolliquidity-asyncorder-bytes32" />
+
+### fillOrderFromPoolLiquidity
+
+<i>
+  The self-call boundary makes a failed AMM attempt atomic while preserving the resting
+  order. PoolManager skips hook callbacks when the hook itself is the swap caller, so this
+  swap does not create an order.
+</i>
+
+```solidity
+function fillOrderFromPoolLiquidity(AsyncOrder calldata order, bytes32 id) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| id | `bytes32` |  |
+
+<a id="matchbook-poolkey-uint8" />
+
+### matchBook
+
+Permissionlessly continue a crossed book inside a PoolManager unlock.
+
+<i>
+  The Router exposes the unlock wrapper; each call processes at most eight pairs.
+</i>
+
+```solidity
+function matchBook(PoolKey calldata key, uint8 maxMatches) external returns (uint8 matched);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| key | `PoolKey` |  |
+| maxMatches | `uint8` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| matched | `uint8` |  |
+
+<a id="updateprice-asyncorder-uint256" />
+
+### updatePrice
+
+Maker updates the limit price of an unfilled order. Direct call from the maker —
+pure state mutation, no PM interaction, so no unlock or router needed.
+
+```solidity
+function updatePrice(AsyncOrder calldata order, uint256 newAmountOutMin) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| newAmountOutMin | `uint256` |  |
+
+<a id="cancelorder-asyncorder" />
+
+### cancelOrder
+
+Maker cancels an unfilled order. Must be called via an authorized executor inside
+an `IPoolManager.unlock` context. The executor must have asserted maker identity.
+
+```solidity
+function cancelOrder(AsyncOrder calldata order) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+
+<a id="_beforeswap-address-poolkey-swapparams-bytes" />
+
+### \_beforeSwap
+
+```solidity
+function _beforeSwap(address sender, PoolKey calldata key, SwapParams calldata params, bytes calldata hookParams)
+        internal
+        override
+        returns (bytes4, BeforeSwapDelta, uint24);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| sender | `address` |  |
+| key | `PoolKey` |  |
+| params | `SwapParams` |  |
+| hookParams | `bytes` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes4` |  |
+| \<none> | `BeforeSwapDelta` |  |
+| \<none> | `uint24` |  |
+
+<a id="_createorder-poolid-bool-uint256-userparams-bool" />
+
+### \_createOrder
+
+<i>
+  Extracted to keep `_beforeSwap` stack-shallow.
+</i>
+
+```solidity
+function _createOrder(PoolId poolId, bool zeroForOne, uint256 amountIn, UserParams memory hookData, bool isBuy)
+        private;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| zeroForOne | `bool` |  |
+| amountIn | `uint256` |  |
+| hookData | `UserParams` |  |
+| isBuy | `bool` |  |
+
+<a id="setexecutor-poolid-address-bool" />
+
+### setExecutor
+
+Maker explicitly authorises an executor (typically the Router) to submit
+and fill orders on their behalf. Without this grant, `_createOrder` reverts
+on the maker's first swap. Pass `allow = false` to revoke an executor.
+
+```solidity
+function setExecutor(PoolId poolId, address executor, bool allow) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| executor | `address` |  |
+| allow | `bool` |  |
+
+<a id="setexecutorwithsig-poolkey-address-address-bool-uint256-uint256-bytes" />
+
+### setExecutorWithSig
+
+Signed `setExecutor`: anyone may submit the maker's EIP-712 `SetExecutor` grant.
+Lets a relayer authorize the Router before the maker's first gasless order on a pool.
+
+```solidity
+function setExecutorWithSig(
+        PoolKey calldata key,
+        address maker,
+        address executor,
+        bool allow,
+        uint256 nonce,
+        uint256 deadline,
+        bytes calldata signature
+    ) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| key | `PoolKey` |  |
+| maker | `address` |  |
+| executor | `address` |  |
+| allow | `bool` |  |
+| nonce | `uint256` |  |
+| deadline | `uint256` |  |
+| signature | `bytes` |  |
+
+<a id="updatepricewithsig-asyncorder-uint256-uint256-uint256-bytes" />
+
+### updatePriceWithSig
+
+Signed `updatePrice`: anyone may submit the maker's EIP-712 `UpdatePrice` message.
+
+```solidity
+function updatePriceWithSig(
+        AsyncOrder calldata order,
+        uint256 newAmountOutMin,
+        uint256 nonce,
+        uint256 deadline,
+        bytes calldata signature
+    ) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| newAmountOutMin | `uint256` |  |
+| nonce | `uint256` |  |
+| deadline | `uint256` |  |
+| signature | `bytes` |  |
+
+<a id="invalidatenonce-uint256" />
+
+### invalidateNonce
+
+Revoke a signed action before a relayer submits it.
+
+```solidity
+function invalidateNonce(uint256 nonce) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| nonce | `uint256` |  |
+
+<a id="domain_separator" />
+
+### DOMAIN_SEPARATOR
+
+EIP-712 domain separator for this hook's signed actions.
+
+```solidity
+function DOMAIN_SEPARATOR() external view returns (bytes32);
+```
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes32` |  |
+
+<a id="_verify-address-bytes32-uint256-uint256-bytes" />
+
+### \_verify
+
+<i>
+  Checks deadline, burns the nonce, then validates an EOA or ERC-1271 signature.
+</i>
+
+```solidity
+function _verify(address maker, bytes32 structHash, uint256 nonce, uint256 deadline, bytes calldata signature)
+        private;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| maker | `address` |  |
+| structHash | `bytes32` |  |
+| nonce | `uint256` |  |
+| deadline | `uint256` |  |
+| signature | `bytes` |  |
+
+<a id="receive" />
+
+### receive
+
+Accept ETH transfers. The Router (or any caller paying for a native-output
+fill) forwards `msg.value` to the hook before triggering `executeOrder`. The hook
+records the deposit on a transient slot so `executeOrder` settles only against the
+filler's same-transaction deposit. ETH sent without a follow-up `executeOrder` stays
+in the hook balance and is recoverable only through `sweep`.
+
+```solidity
+receive() external payable;
+```
+
+## Events
+
+### HookSwap
+
+Pool-level swap-event mirror; bytes32 poolId for indexer compatibility.
+
+<i>
+  See https://github.com/OpenZeppelin/uniswap-hooks BaseAsyncSwap for the source pattern.
+</i>
+
+```solidity
+event HookSwap(
+        bytes32 indexed id,
+        address indexed sender,
+        int128 amount0,
+        int128 amount1,
+        uint128 hookLPfeeAmount0,
+        uint128 hookLPfeeAmount1
+    );
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| id | `bytes32` |  |
+| sender | `address` |  |
+| amount0 | `int128` |  |
+| amount1 | `int128` |  |
+| hookLPfeeAmount0 | `uint128` |  |
+| hookLPfeeAmount1 | `uint128` |  |
+
+### OwnershipTransferred
+
+Emitted when ownership is transferred.
+
+```solidity
+event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| previousOwner | `address` |  |
+| newOwner | `address` |  |
+
+### OwnershipTransferStarted
+
+Emitted when the owner nominates a new owner.
+
+```solidity
+event OwnershipTransferStarted(address indexed previousOwner, address indexed newOwner);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| previousOwner | `address` |  |
+| newOwner | `address` |  |
+
+### Swept
+
+Emitted when the owner sweeps an accumulated balance.
+
+```solidity
+event Swept(Currency indexed currency, address indexed to, uint256 amount);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| currency | `Currency` |  |
+| to | `address` |  |
+| amount | `uint256` |  |
+
+### NonceInvalidated
+
+Emitted when a maker burns a nonce, consumed or revoked.
+
+```solidity
+event NonceInvalidated(address indexed maker, uint256 nonce);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| maker | `address` |  |
+| nonce | `uint256` |  |
+
+### ExecutorSet
+
+Emitted after each successful direct or signed executor authorization update.
+
+<i>
+  `allow` is the resulting permission, including when the value is unchanged.
+</i>
+
+```solidity
+event ExecutorSet(PoolId indexed poolId, address indexed maker, address indexed executor, bool allow);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| maker | `address` |  |
+| executor | `address` |  |
+| allow | `bool` |  |
+
+### AsyncOrdersMatched
+
+Pairwise direct escrow match; emitted by the linked matcher at the hook address.
+
+```solidity
+event AsyncOrdersMatched(
+        PoolId indexed poolId,
+        bytes32 indexed sellOrderId,
+        bytes32 indexed buyOrderId,
+        uint256 assetAmount,
+        uint256 numeraireAmount
+    );
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| sellOrderId | `bytes32` |  |
+| buyOrderId | `bytes32` |  |
+| assetAmount | `uint256` |  |
+| numeraireAmount | `uint256` |  |
+
+### AsyncOrderLiquidityFilled
+
+An open order was fully executed against active Uniswap v4 pool liquidity.
+
+```solidity
+event AsyncOrderLiquidityFilled(
+        PoolId indexed poolId, bytes32 indexed orderId, address indexed maker, uint256 amountIn, uint256 amountOut
+    );
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| orderId | `bytes32` |  |
+| maker | `address` |  |
+| amountIn | `uint256` |  |
+| amountOut | `uint256` |  |
+
+## Errors
+
+### ExactInputOnly
+
+```solidity
+error ExactInputOnly();
+```
+
+### UnaccountedNativeOutput
+
+```solidity
+error UnaccountedNativeOutput();
+```
+
+### NotOwner
+
+```solidity
+error NotOwner();
+```
+
+### ZeroAddress
+
+```solidity
+error ZeroAddress();
+```
+
+### SignatureExpired
+
+```solidity
+error SignatureExpired();
+```
+
+### InvalidSignature
+
+```solidity
+error InvalidSignature();
+```
+
+### NonceAlreadyUsed
+
+```solidity
+error NonceAlreadyUsed();
+```
+
+### InvalidNumeraire
+
+```solidity
+error InvalidNumeraire();
+```
+
+### NumeraireRequired
+
+```solidity
+error NumeraireRequired();
+```
+
+### DynamicFeeRequired
+
+```solidity
+error DynamicFeeRequired();
+```
+
+### NotSelf
+
+```solidity
+error NotSelf();
+```
+
+## Structs
+
+### UserParams
+
+Hook params decoded from the `hookData` of `IPoolManager.swap`. The maker sets
+`amountOutMin` (their limit price); `executor` is the address authorized to call fill.
+Salt is contract-assigned at create time (see `_createOrder`) and emitted in
+`AsyncOrderCreated` — the maker fetches it from the event log to reference the
+order in cancel / updatePrice later.
+
+```solidity
+struct UserParams {
+        address user;
+        address executor;
+        uint256 amountOutMin;
+        uint256 priorityFee;
+    }
+```
+
+**Properties**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| user | `address` |  |
+| executor | `address` |  |
+| amountOutMin | `uint256` |  |
+| priorityFee | `uint256` |  |
+
+# FeeVault
+
+[Git Source](https://github.com/asyncswap/contracts/blob/7cd7ee9169e905d4ba1d1d1aee38a036b3c68d62/src/FeeVault.sol)
+
+Holds and redeems protocol fee claims, never maker escrow.
+
+## Constants
+
+### poolManager
+
+```solidity
+IPoolManager public immutable poolManager;
+```
+
+### hook
+
+```solidity
+IFeeOwner public immutable hook;
+```
+
+## Functions
+
+<a id="constructor-ipoolmanager" />
+
+### constructor
+
+```solidity
+constructor(IPoolManager manager);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| manager | `IPoolManager` |  |
+
+<a id="collect-currency-address" />
+
+### collect
+
+The current protocol owner may redeem all fees of one currency.
+
+```solidity
+function collect(Currency currency, address recipient) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| currency | `Currency` |  |
+| recipient | `address` |  |
+
+<a id="unlockcallback-bytes" />
+
+### unlockCallback
+
+<i>
+  PoolManager only calls this vault back during its own collection unlock.
+</i>
+
+```solidity
+function unlockCallback(bytes calldata data) external returns (bytes memory);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| data | `bytes` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes` |  |
+
+## Events
+
+### FeesCollected
+
+```solidity
+event FeesCollected(Currency indexed currency, address indexed recipient, uint256 amount);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| currency | `Currency` |  |
+| recipient | `address` |  |
+| amount | `uint256` |  |
+
+## Errors
+
+### Unauthorized
+
+```solidity
+error Unauthorized();
+```
+
+### ZeroAddress
+
+```solidity
+error ZeroAddress();
+```
+
+# ImmutableState
+
+[Git Source](https://github.com/asyncswap/contracts/blob/7cd7ee9169e905d4ba1d1d1aee38a036b3c68d62/src/ImmutableState.sol)
+
+**Title:** Immutable State
+
+A collection of immutable state variables, commonly used across multiple contracts
+
+## Constants
+
+### poolManager
+
+```solidity
+IPoolManager public immutable poolManager;
+```
+
+## Functions
+
+<a id="onlypoolmanager" />
+
+### onlyPoolManager
+
+Only allow calls from the PoolManager contract
+
+```solidity
+modifier onlyPoolManager();
+```
+
+<a id="constructor-ipoolmanager" />
+
+### constructor
+
+```solidity
+constructor(IPoolManager _poolManager);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \_poolManager | `IPoolManager` |  |
+
+## Errors
+
+### NotPoolManager
+
+Thrown when the caller is not PoolManager
+
+```solidity
+error NotPoolManager();
+```
+
+# MatchingEngine
+
+[Git Source](https://github.com/asyncswap/contracts/blob/7cd7ee9169e905d4ba1d1d1aee38a036b3c68d62/src/MatchingEngine.sol)
+
+**Title:** MatchingEngine
+
+Standalone price-time matching harness. It maintains a radix-indexed
+limit book and emits deterministic fill instructions.
+
+<i>
+  Algorithm and gas benchmark only: it does not custody or settle tokens.
+  Live orders settle through the AsyncSwap hook and AsyncMatching.
+</i>
+
+## Constants
+
+### PRICE_SCALE
+
+```solidity
+uint128 public constant PRICE_SCALE = 1e18;
+```
+
+### MAX_MATCHES_PER_CALL
+
+```solidity
+uint8 public constant MAX_MATCHES_PER_CALL = 8;
+```
+
+## State Variables
+
+### books
+
+```solidity
+mapping(bytes32 market => Book) private books;
+```
+
+### entered
+
+```solidity
+bool private entered;
+```
+
+## Functions
+
+<a id="nonreentrant" />
+
+### nonReentrant
+
+```solidity
+modifier nonReentrant();
+```
+
+<a id="placeorder-bytes32-bool-uint128-uint128" />
+
+### placeOrder
+
+Submit a limit order. Crossing orders match immediately, up to
+eight fills; any remainder rests at its limit price.
+
+```solidity
+function placeOrder(bytes32 market, bool isBuy, uint128 amount, uint128 price)
+        external
+        nonReentrant
+        returns (uint64 orderId);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| market | `bytes32` | Identifier for a pair and settlement domain chosen by the caller. |
+| isBuy | `bool` | True for a bid, false for an ask. |
+| amount | `uint128` | Base quantity in the engine's fixed-point units. |
+| price | `uint128` | Quote per base, scaled by 1e18. |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| orderId | `uint64` |  |
+
+<a id="matchbook-bytes32-uint8" />
+
+### matchBook
+
+Continue clearing a crossed book after an order hit its per-call
+fill cap. Work is bounded by `maxMatches` and anyone may call it.
+
+```solidity
+function matchBook(bytes32 market, uint8 maxMatches) external nonReentrant returns (uint8 matched);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| market | `bytes32` |  |
+| maxMatches | `uint8` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| matched | `uint8` |  |
+
+<a id="cancelorder-bytes32-uint64" />
+
+### cancelOrder
+
+```solidity
+function cancelOrder(bytes32 market, uint64 orderId) external nonReentrant;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| market | `bytes32` |  |
+| orderId | `uint64` |  |
+
+<a id="getorder-bytes32-uint64" />
+
+### getOrder
+
+```solidity
+function getOrder(bytes32 market, uint64 orderId) external view returns (Order memory);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| market | `bytes32` |  |
+| orderId | `uint64` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `Order` |  |
+
+<a id="bestprice-bytes32-bool" />
+
+### bestPrice
+
+```solidity
+function bestPrice(bytes32 market, bool isBuy) external view returns (bool found, uint128 price);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| market | `bytes32` |  |
+| isBuy | `bool` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| found | `bool` |  |
+| price | `uint128` |  |
+
+<a id="levelordercount-bytes32-bool-uint128" />
+
+### levelOrderCount
+
+```solidity
+function levelOrderCount(bytes32 market, bool isBuy, uint128 price) external view returns (uint32);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| market | `bytes32` |  |
+| isBuy | `bool` |  |
+| price | `uint128` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint32` |  |
+
+<a id="_matchincoming-book-bytes32-uint64" />
+
+### \_matchIncoming
+
+```solidity
+function _matchIncoming(Book storage book, bytes32 market, uint64 incomingId) private returns (uint8 matched);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| book | `Book` |  |
+| market | `bytes32` |  |
+| incomingId | `uint64` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| matched | `uint8` |  |
+
+<a id="_fill-book-bytes32-uint64-uint64-uint128-uint128" />
+
+### \_fill
+
+```solidity
+function _fill(Book storage book, bytes32 market, uint64 makerId, uint64 takerId, uint128 quantity, uint128 price)
+        private;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| book | `Book` |  |
+| market | `bytes32` |  |
+| makerId | `uint64` |  |
+| takerId | `uint64` |  |
+| quantity | `uint128` |  |
+| price | `uint128` |  |
+
+<a id="_clearbestpair-book-bytes32" />
+
+### \_clearBestPair
+
+```solidity
+function _clearBestPair(Book storage book, bytes32 market) private returns (bool);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| book | `Book` |  |
+| market | `bytes32` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bool` |  |
+
+<a id="_clearorders-book-bytes32-uint64-uint64" />
+
+### \_clearOrders
+
+```solidity
+function _clearOrders(Book storage book, bytes32 market, uint64 bidId, uint64 askId) private;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| book | `Book` |  |
+| market | `bytes32` |  |
+| bidId | `uint64` |  |
+| askId | `uint64` |  |
+
+<a id="_append-book-uint64" />
+
+### \_append
+
+```solidity
+function _append(Book storage book, uint64 orderId) private;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| book | `Book` |  |
+| orderId | `uint64` |  |
+
+<a id="_remove-book-uint64" />
+
+### \_remove
+
+```solidity
+function _remove(Book storage book, uint64 orderId) private;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| book | `Book` |  |
+| orderId | `uint64` |  |
+
+## Events
+
+### OrderPlaced
+
+```solidity
+event OrderPlaced(
+        bytes32 indexed market,
+        uint64 indexed orderId,
+        address indexed owner,
+        bool isBuy,
+        uint128 amount,
+        uint128 price,
+        uint64 sequence
+    );
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| market | `bytes32` |  |
+| orderId | `uint64` |  |
+| owner | `address` |  |
+| isBuy | `bool` |  |
+| amount | `uint128` |  |
+| price | `uint128` |  |
+| sequence | `uint64` |  |
+
+### OrderCancelled
+
+```solidity
+event OrderCancelled(bytes32 indexed market, uint64 indexed orderId, address indexed owner);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| market | `bytes32` |  |
+| orderId | `uint64` |  |
+| owner | `address` |  |
+
+### OrderFilled
+
+```solidity
+event OrderFilled(
+        bytes32 indexed market,
+        uint64 indexed makerOrderId,
+        uint64 indexed takerOrderId,
+        uint128 amount,
+        uint128 price,
+        uint256 quoteAmount
+    );
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| market | `bytes32` |  |
+| makerOrderId | `uint64` |  |
+| takerOrderId | `uint64` |  |
+| amount | `uint128` |  |
+| price | `uint128` |  |
+| quoteAmount | `uint256` |  |
+
+## Errors
+
+### ZeroAmount
+
+```solidity
+error ZeroAmount();
+```
+
+### ZeroPrice
+
+```solidity
+error ZeroPrice();
+```
+
+### InvalidMatchBound
+
+```solidity
+error InvalidMatchBound();
+```
+
+### NotOrderOwner
+
+```solidity
+error NotOrderOwner();
+```
+
+### OrderNotFound
+
+```solidity
+error OrderNotFound();
+```
+
+### ReentrantCall
+
+```solidity
+error ReentrantCall();
+```
+
+## Structs
+
+### Order
+
+```solidity
+struct Order {
+        address owner;
+        uint128 price;
+        uint128 remaining;
+        uint64 sequence;
+        uint64 previous;
+        uint64 next;
+        bool isBuy;
+        bool active;
+    }
+```
+
+**Properties**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| owner | `address` |  |
+| price | `uint128` |  |
+| remaining | `uint128` |  |
+| sequence | `uint64` |  |
+| previous | `uint64` |  |
+| next | `uint64` |  |
+| isBuy | `bool` |  |
+| active | `bool` |  |
+
+### Level
+
+```solidity
+struct Level {
+        uint64 head;
+        uint64 tail;
+        uint32 orderCount;
+    }
+```
+
+**Properties**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| head | `uint64` |  |
+| tail | `uint64` |  |
+| orderCount | `uint32` |  |
+
+### Book
+
+```solidity
+struct Book {
+        uint64 nextOrderId;
+        uint64 nextSequence;
+        RadixPriceTree.Tree bids;
+        RadixPriceTree.Tree asks;
+        mapping(uint128 price => Level) bidLevels;
+        mapping(uint128 price => Level) askLevels;
+        mapping(uint64 orderId => Order) orders;
+    }
+```
+
+**Properties**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| nextOrderId | `uint64` |  |
+| nextSequence | `uint64` |  |
+| bids | `RadixPriceTree.Tree` |  |
+| asks | `RadixPriceTree.Tree` |  |
+| bidLevels | `mapping(uint128 price => Level)` |  |
+| askLevels | `mapping(uint128 price => Level)` |  |
+| orders | `mapping(uint64 orderId => Order)` |  |
+
+# NativeClaims
+
+[Git Source](https://github.com/asyncswap/contracts/blob/7cd7ee9169e905d4ba1d1d1aee38a036b3c68d62/src/NativeClaims.sol)
+
+Redeems the caller's PoolManager native ETH claims to a chosen recipient.
+
+<i>
+  Approve this contract for native claim ID 0 on PoolManager before redeeming.
+  Claim ownership and allowances are enforced by PoolManager.burn. No hook escrow is accessible.
+</i>
+
+## Constants
+
+### poolManager
+
+```solidity
+IPoolManager public immutable poolManager;
+```
+
+## State Variables
+
+### \_redeeming
+
+```solidity
+bool private _redeeming;
+```
+
+## Functions
+
+<a id="nonreentrant" />
+
+### nonReentrant
+
+```solidity
+modifier nonReentrant();
+```
+
+<a id="constructor-ipoolmanager" />
+
+### constructor
+
+```solidity
+constructor(IPoolManager manager);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| manager | `IPoolManager` |  |
+
+<a id="redeem-address-uint256" />
+
+### redeem
+
+```solidity
+function redeem(address recipient, uint256 amount) external nonReentrant;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| recipient | `address` |  |
+| amount | `uint256` |  |
+
+<a id="unlockcallback-bytes" />
+
+### unlockCallback
+
+```solidity
+function unlockCallback(bytes calldata data) external returns (bytes memory);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| data | `bytes` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes` |  |
+
+## Events
+
+### NativeRedeemed
+
+```solidity
+event NativeRedeemed(address indexed owner, address indexed recipient, uint256 amount);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| owner | `address` |  |
+| recipient | `address` |  |
+| amount | `uint256` |  |
+
+## Errors
+
+### OnlyPoolManager
+
+```solidity
+error OnlyPoolManager();
+```
+
+### InvalidRedemption
+
+```solidity
+error InvalidRedemption();
+```
+
+### ReentrantRedemption
+
+```solidity
+error ReentrantRedemption();
+```
+
+# Router
+
+[Git Source](https://github.com/asyncswap/contracts/blob/7cd7ee9169e905d4ba1d1d1aee38a036b3c68d62/src/Router.sol)
+
+**Inherits:** EIP712
+
+**Title:** Router
+
+**Author:** @msakiart
+
+Thin entrypoint for makers (`swap`), fillers (`fillOrder`), and makers cancelling orders
+(`cancelOrder`). All three actions go through `IPoolManager.unlock` so the hook can
+operate on PM debts. Native payouts/refunds are PoolManager claims (ID 0),
+redeemable through NativeClaims after approval; ERC20 payouts remain direct.
+
+Gasless variants (`swapWithSig`, `cancelWithSig`) take the maker's EIP-712 signature so a
+relayer can submit. Signed creates pull input through Permit2 with the order as witness,
+so the wallet shows the full order (tokens, amounts, pool) in one readable message.
+
+## Constants
+
+### POOLMANAGER
+
+```solidity
+IPoolManager immutable POOLMANAGER;
+```
+
+### HOOK
+
+```solidity
+AsyncSwap immutable HOOK;
+```
+
+### PERMIT2
+
+```solidity
+ISignatureTransfer public immutable PERMIT2;
+```
+
+### ACTION_LOCATION
+
+keccak256("Router.ActionType") - 1
+
+```solidity
+bytes32 constant ACTION_LOCATION = 0xf3b150ebf41dad0872df6788629edb438733cb4a5c9ea779b1b1f3614faffc69;
+```
+
+### USER_LOCATION
+
+keccak256("Router.User") - 1
+
+```solidity
+bytes32 constant USER_LOCATION = 0x3dde20d9bf5cc25a9f487c6d6b54d3c19e3fa4738b91a7a509d4fc4180a72356;
+```
+
+### ASYNC_FILLER_LOCATION
+
+keccak256("Router.AsyncFiller") - 1
+
+```solidity
+bytes32 constant ASYNC_FILLER_LOCATION = 0xd972a937b59dc5cb8c692dd9f211e85afa8def4caee6e05b31db0f53e16d02e0;
+```
+
+### MAX_PRICE_LOCATION
+
+<i>
+  keccak256("asyncswap.router.maxPrice") - 1
+</i>
+
+```solidity
+bytes32 constant MAX_PRICE_LOCATION = 0x6b4f8e2c9d5a0b7e1f3c2a8d4e9f0b6c5a1d8e7f2b3c4d5e6a7f8b9c0d1e2f30;
+```
+
+## State Variables
+
+### cancelNonceUsed
+
+Unordered nonces consumed by signed cancels (`cancelWithSig`).
+
+```solidity
+mapping(address maker => mapping(uint256 nonce => bool)) public cancelNonceUsed;
+```
+
+## Functions
+
+<a id="constructor-ipoolmanager-asyncswap-isignaturetransfer" />
+
+### constructor
+
+```solidity
+constructor(IPoolManager _poolManager, AsyncSwap _hook, ISignatureTransfer _permit2)
+        EIP712("AsyncSwap Router", "1");
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \_poolManager | `IPoolManager` |  |
+| \_hook | `AsyncSwap` |  |
+| \_permit2 | `ISignatureTransfer` |  |
+
+<a id="onlypoolmanager" />
+
+### onlyPoolManager
+
+```solidity
+modifier onlyPoolManager();
+```
+
+<a id="swap-asyncorder-bytes" />
+
+### swap
+
+Maker submits a new async order. `userData` must encode `AsyncSwap.UserParams`
+with `executor == address(this)` so the router is authorized to fill later.
+`userData.amountOutMin` MUST equal `order.amountOutMin` — the router enforces
+this so the limit price the maker signs in `order` is exactly what beforeSwap
+stores via hookData.
+
+The hook auto-assigns a salt on create and emits it in `AsyncOrderCreated`.
+Submitters can pass `order.salt = bytes32(0)` on initial submission; the
+field is only read on cancel / updatePrice / fill paths (where the maker
+supplies the salt fetched from the indexer or event log).
+
+Native input (currency0 = address(0) and zeroForOne = true, OR currency1 =
+address(0) and zeroForOne = false) requires `msg.value == order.amountIn` —
+the router holds the ETH and settles it to PM during unlock. For ERC20 input
+the maker must approve the router for `amountIn` of the input token.
+
+```solidity
+function swap(AsyncOrder calldata order, bytes memory userData) external payable;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| userData | `bytes` |  |
+
+<a id="fillorder-asyncorder-uint256-bytes" />
+
+### fillOrder
+
+Filler completes an open order, paying the maker's net minimum plus the protocol fee.
+For ERC20 output, approve the router for that gross amount. For native output,
+`msg.value` must equal the live net price plus the protocol fee;
+a stale or excessive deposit reverts rather than stranding the difference.
+Native output is currency1 for zeroForOne, otherwise currency0.
+
+`maxPrice` caps total output paid, including the fee —
+it protects fillers from a maker who front-runs them with `updatePrice` to
+bump the order's stored price. Pass `type(uint256).max` to disable the check.
+`order.amountIn` is the least input the filler accepts: the fill reverts if the
+order's live input has dropped below it (e.g. after a partial match).
+
+```solidity
+function fillOrder(AsyncOrder calldata order, uint256 maxPrice, bytes calldata) external payable;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| maxPrice | `uint256` |  |
+| \_ | `bytes` |  |
+
+<a id="swapwithsig-asyncorder-permitdata-executorgrant" />
+
+### swapWithSig
+
+Relayer submits a maker's signed order. The maker signs a Permit2
+`PermitWitnessTransferFrom` for `amountIn` of the input token with `spender = Router`
+and the `AsyncOrder` witness (see `OrderSignatures`), so one signature both approves
+the transfer and commits to the order. Input then lands in the hook escrow exactly as
+in `swap`. Requires a prior Permit2 approval of the input token; native input is not
+supported (use `swap`).
+
+```solidity
+function swapWithSig(AsyncOrder calldata order, PermitData calldata permit, ExecutorGrant calldata grant) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| permit | `PermitData` |  |
+| grant | `ExecutorGrant` |  |
+
+<a id="cancelwithsig-asyncorder-uint256-uint256-bytes" />
+
+### cancelWithSig
+
+Relayer submits a maker's signed EIP-712 `CancelOrder`. Input returns to the maker.
+
+```solidity
+function cancelWithSig(AsyncOrder calldata order, uint256 nonce, uint256 deadline, bytes calldata signature)
+        external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| nonce | `uint256` |  |
+| deadline | `uint256` |  |
+| signature | `bytes` |  |
+
+<a id="domain_separator" />
+
+### DOMAIN_SEPARATOR
+
+EIP-712 domain separator for Router-verified signatures (`CancelOrder`).
+
+```solidity
+function DOMAIN_SEPARATOR() external view returns (bytes32);
+```
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes32` |  |
+
+<a id="cancelorder-asyncorder" />
+
+### cancelOrder
+
+Maker cancels an unfilled order and reclaims their reserved input.
+
+```solidity
+function cancelOrder(AsyncOrder calldata order) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+
+<a id="matchbook-poolkey-uint8" />
+
+### matchBook
+
+Anyone can continue a crossed book after a transaction hits the automatic match cap.
+
+<i>
+  Work is capped at eight matched pairs per unlock to keep gas predictable.
+</i>
+
+```solidity
+function matchBook(PoolKey calldata key, uint8 maxMatches) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| key | `PoolKey` |  |
+| maxMatches | `uint8` |  |
+
+<a id="fillfrompoolliquidity-asyncorder" />
+
+### fillFromPoolLiquidity
+
+Retry a resting order against the pool's active Uniswap v4 LP positions.
+
+<i>
+  The order is left untouched when the pool cannot fully fill it at its minimum output.
+</i>
+
+```solidity
+function fillFromPoolLiquidity(AsyncOrder calldata order) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+
+<a id="unlockcallback-bytes" />
+
+### unlockCallback
+
+PM unlock-callback dispatcher. The action enum is read from transient storage, set
+by the externally-callable entry above. Each branch must leave PM deltas net-zero.
+
+```solidity
+function unlockCallback(bytes calldata data) external onlyPoolManager returns (bytes memory);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| data | `bytes` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes` |  |
+
+<a id="_requireunchanged-asyncorder-bytes32-uint256-uint256" />
+
+### \_requireUnchanged
+
+<i>
+  Reverts unless the order still reads `(amountIn, amountOutMin)` in the hook.
+</i>
+
+```solidity
+function _requireUnchanged(AsyncOrder memory order, bytes32 id, uint256 amountIn, uint256 amountOutMin)
+        private
+        view;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| id | `bytes32` |  |
+| amountIn | `uint256` |  |
+| amountOutMin | `uint256` |  |
+
+<a id="_settlewithpermit-currency-asyncorder-permitdata" />
+
+### \_settleWithPermit
+
+<i>
+  Pays the maker's input into the PoolManager via Permit2. Permit2 verifies the maker's
+  signature over the transfer AND the order witness, so a relayer cannot alter the order.
+</i>
+
+```solidity
+function _settleWithPermit(Currency input, AsyncOrder memory order, PermitData memory permit) private;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| input | `Currency` |  |
+| order | `AsyncOrder` |  |
+| permit | `PermitData` |  |
+
+<a id="_settlepriorityfee-asyncorder" />
+
+### \_settlePriorityFee
+
+<i>
+  Pays the order's bid, which the hook escrowed as claims when it created the order, in the
+  pool's USDC numeraire. Signed orders also require an ERC-20 approval for the bid; the
+  signed order commits to its amount.
+</i>
+
+```solidity
+function _settlePriorityFee(AsyncOrder memory order) private;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+
+<a id="_orderid-asyncorder" />
+
+### \_orderId
+
+<i>
+  MUST match AsyncOrderLibrary.orderId exactly: (chainId, poolId, owner, zeroForOne, salt).
+</i>
+
+```solidity
+function _orderId(AsyncOrder memory order) private view returns (bytes32);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes32` |  |
+
+## Errors
+
+### SignatureExpired
+
+```solidity
+error SignatureExpired();
+```
+
+### InvalidSignature
+
+```solidity
+error InvalidSignature();
+```
+
+### NonceAlreadyUsed
+
+```solidity
+error NonceAlreadyUsed();
+```
+
+## Structs
+
+### SwapCallback
+
+```solidity
+struct SwapCallback {
+        ActionType action;
+        AsyncOrder order;
+        uint8 maxMatches;
+    }
+```
+
+**Properties**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| action | `ActionType` |  |
+| order | `AsyncOrder` |  |
+| maxMatches | `uint8` |  |
+
+### PermitData
+
+Permit2 signature + nonce/deadline for a signed create.
+
+```solidity
+struct PermitData {
+        uint256 nonce;
+        uint256 deadline;
+        bytes signature;
+    }
+```
+
+**Properties**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| nonce | `uint256` |  |
+| deadline | `uint256` |  |
+| signature | `bytes` |  |
+
+### ExecutorGrant
+
+Optional signed `SetExecutor` grant, submitted to the hook ahead of the maker's first
+gasless order on a pool. Leave `signature` empty when the Router is already authorized.
+
+```solidity
+struct ExecutorGrant {
+        uint256 nonce;
+        uint256 deadline;
+        bytes signature;
+    }
+```
+
+**Properties**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| nonce | `uint256` |  |
+| deadline | `uint256` |  |
+| signature | `bytes` |  |
+
+## Enums
+
+### ActionType
+
+```solidity
+enum ActionType {
+        Swap,
+        FillOrder,
+        Cancel,
+        SwapWithSig,
+        MatchBook,
+        PoolLiquidityFill
+    }
+```
+
+**Variants**
+
+| Name | Description |
+| ---- | ----------- |
+| Swap |  |
+| FillOrder |  |
+| Cancel |  |
+| SwapWithSig |  |
+| MatchBook |  |
+| PoolLiquidityFill |  |
+
+# TokenClaims
+
+[Git Source](https://github.com/asyncswap/contracts/blob/7cd7ee9169e905d4ba1d1d1aee38a036b3c68d62/src/TokenClaims.sol)
+
+Redeems the caller's PoolManager currency claims to a chosen recipient.
+
+<i>
+  Approve this contract for the currency claim ID on PoolManager before redeeming.
+  Claim ownership and allowances are enforced by PoolManager.burn. No hook escrow is accessible.
+</i>
+
+## Constants
+
+### poolManager
+
+```solidity
+IPoolManager public immutable poolManager;
+```
+
+## State Variables
+
+### \_redeeming
+
+```solidity
+bool private _redeeming;
+```
+
+## Functions
+
+<a id="nonreentrant" />
+
+### nonReentrant
+
+```solidity
+modifier nonReentrant();
+```
+
+<a id="constructor-ipoolmanager" />
+
+### constructor
+
+```solidity
+constructor(IPoolManager manager);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| manager | `IPoolManager` |  |
+
+<a id="redeem-currency-address-uint256" />
+
+### redeem
+
+```solidity
+function redeem(Currency currency, address recipient, uint256 amount) external nonReentrant;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| currency | `Currency` |  |
+| recipient | `address` |  |
+| amount | `uint256` |  |
+
+<a id="unlockcallback-bytes" />
+
+### unlockCallback
+
+```solidity
+function unlockCallback(bytes calldata data) external returns (bytes memory);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| data | `bytes` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes` |  |
+
+## Events
+
+### ClaimsRedeemed
+
+```solidity
+event ClaimsRedeemed(address indexed owner, address indexed recipient, Currency indexed currency, uint256 amount);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| owner | `address` |  |
+| recipient | `address` |  |
+| currency | `Currency` |  |
+| amount | `uint256` |  |
+
+## Errors
+
+### OnlyPoolManager
+
+```solidity
+error OnlyPoolManager();
+```
+
+### InvalidRedemption
+
+```solidity
+error InvalidRedemption();
+```
+
+### ReentrantRedemption
+
+```solidity
+error ReentrantRedemption();
+```
+
+# BaseHook
+
+[Git Source](https://github.com/asyncswap/contracts/blob/7cd7ee9169e905d4ba1d1d1aee38a036b3c68d62/src/BaseHook.sol)
+
+**Inherits:** IHooks, [ImmutableState](/reference/src/ImmutableState)
+
+**Title:** Base Hook
+
+abstract contract for hook implementations
+
+## Functions
+
+<a id="constructor-ipoolmanager" />
+
+### constructor
+
+```solidity
+constructor(IPoolManager _manager) ImmutableState(_manager);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \_manager | `IPoolManager` |  |
+
+<a id="gethookpermissions" />
+
+### getHookPermissions
+
+Returns a struct of permissions to signal which hook functions are to be implemented
+
+<i>
+  Used at deployment to validate the address correctly represents the expected permissions
+</i>
+
+```solidity
+function getHookPermissions() public pure virtual returns (Hooks.Permissions memory);
+```
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `Hooks.Permissions` |  |
+
+<a id="validatehookaddress-basehook" />
+
+### validateHookAddress
+
+Validates the deployed hook address agrees with the expected permissions of the hook
+
+<i>
+  Virtual so tests can override it, deploy an implementation at any address,
+  and etch the bytecode at the permission-encoded address.
+</i>
+
+```solidity
+function validateHookAddress(BaseHook _this) internal pure virtual;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \_this | `BaseHook` |  |
+
+<a id="beforeinitialize-address-poolkey-uint160" />
+
+### beforeInitialize
+
+The hook called before the state of a pool is initialized
+
+```solidity
+function beforeInitialize(address sender, PoolKey calldata key, uint160 sqrtPriceX96)
+        external
+        onlyPoolManager
+        returns (bytes4);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| sender | `address` | The initial msg.sender for the initialize call |
+| key | `PoolKey` | The key for the pool being initialized |
+| sqrtPriceX96 | `uint160` | The sqrt(price) of the pool as a Q64.96 |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes4` | bytes4 The function selector for the hook |
+
+<a id="_beforeinitialize-address-poolkey-uint160" />
+
+### \_beforeInitialize
+
+```solidity
+function _beforeInitialize(address, PoolKey calldata, uint160) internal virtual returns (bytes4);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \_ | `address` |  |
+| \_ | `PoolKey` |  |
+| \_ | `uint160` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes4` |  |
+
+<a id="afterinitialize-address-poolkey-uint160-int24" />
+
+### afterInitialize
+
+The hook called after the state of a pool is initialized
+
+```solidity
+function afterInitialize(address sender, PoolKey calldata key, uint160 sqrtPriceX96, int24 tick)
+        external
+        onlyPoolManager
+        returns (bytes4);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| sender | `address` | The initial msg.sender for the initialize call |
+| key | `PoolKey` | The key for the pool being initialized |
+| sqrtPriceX96 | `uint160` | The sqrt(price) of the pool as a Q64.96 |
+| tick | `int24` | The current tick after the state of a pool is initialized |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes4` | bytes4 The function selector for the hook |
+
+<a id="_afterinitialize-address-poolkey-uint160-int24" />
+
+### \_afterInitialize
+
+```solidity
+function _afterInitialize(address, PoolKey calldata, uint160, int24) internal virtual returns (bytes4);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \_ | `address` |  |
+| \_ | `PoolKey` |  |
+| \_ | `uint160` |  |
+| \_ | `int24` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes4` |  |
+
+<a id="beforeaddliquidity-address-poolkey-modifyliquidityparams-bytes" />
+
+### beforeAddLiquidity
+
+The hook called before liquidity is added
+
+```solidity
+function beforeAddLiquidity(
+        address sender,
+        PoolKey calldata key,
+        ModifyLiquidityParams calldata params,
+        bytes calldata hookData
+    ) external onlyPoolManager returns (bytes4);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| sender | `address` | The initial msg.sender for the add liquidity call |
+| key | `PoolKey` | The key for the pool |
+| params | `ModifyLiquidityParams` | The parameters for adding liquidity |
+| hookData | `bytes` | Arbitrary data handed into the PoolManager by the liquidity provider to be passed on to the hook |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes4` | bytes4 The function selector for the hook |
+
+<a id="_beforeaddliquidity-address-poolkey-modifyliquidityparams-bytes" />
+
+### \_beforeAddLiquidity
+
+```solidity
+function _beforeAddLiquidity(address, PoolKey calldata, ModifyLiquidityParams calldata, bytes calldata)
+        internal
+        virtual
+        returns (bytes4);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \_ | `address` |  |
+| \_ | `PoolKey` |  |
+| \_ | `ModifyLiquidityParams` |  |
+| \_ | `bytes` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes4` |  |
+
+<a id="beforeremoveliquidity-address-poolkey-modifyliquidityparams-bytes" />
+
+### beforeRemoveLiquidity
+
+The hook called before liquidity is removed
+
+```solidity
+function beforeRemoveLiquidity(
+        address sender,
+        PoolKey calldata key,
+        ModifyLiquidityParams calldata params,
+        bytes calldata hookData
+    ) external onlyPoolManager returns (bytes4);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| sender | `address` | The initial msg.sender for the remove liquidity call |
+| key | `PoolKey` | The key for the pool |
+| params | `ModifyLiquidityParams` | The parameters for removing liquidity |
+| hookData | `bytes` | Arbitrary data handed into the PoolManager by the liquidity provider to be be passed on to the hook |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes4` | bytes4 The function selector for the hook |
+
+<a id="_beforeremoveliquidity-address-poolkey-modifyliquidityparams-bytes" />
+
+### \_beforeRemoveLiquidity
+
+```solidity
+function _beforeRemoveLiquidity(address, PoolKey calldata, ModifyLiquidityParams calldata, bytes calldata)
+        internal
+        virtual
+        returns (bytes4);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \_ | `address` |  |
+| \_ | `PoolKey` |  |
+| \_ | `ModifyLiquidityParams` |  |
+| \_ | `bytes` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes4` |  |
+
+<a id="afteraddliquidity-address-poolkey-modifyliquidityparams-balancedelta-balancedelta-bytes" />
+
+### afterAddLiquidity
+
+The hook called after liquidity is added
+
+```solidity
+function afterAddLiquidity(
+        address sender,
+        PoolKey calldata key,
+        ModifyLiquidityParams calldata params,
+        BalanceDelta delta,
+        BalanceDelta feesAccrued,
+        bytes calldata hookData
+    ) external onlyPoolManager returns (bytes4, BalanceDelta);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| sender | `address` | The initial msg.sender for the add liquidity call |
+| key | `PoolKey` | The key for the pool |
+| params | `ModifyLiquidityParams` | The parameters for adding liquidity |
+| delta | `BalanceDelta` | The caller's balance delta after adding liquidity; the sum of principal delta, fees accrued, and hook delta |
+| feesAccrued | `BalanceDelta` | The fees accrued since the last time fees were collected from this position |
+| hookData | `bytes` | Arbitrary data handed into the PoolManager by the liquidity provider to be passed on to the hook |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes4` | bytes4 The function selector for the hook |
+| \<none> | `BalanceDelta` | BalanceDelta The hook's delta in token0 and token1. Positive: the hook is owed/took currency, negative: the hook owes/sent currency |
+
+<a id="_afteraddliquidity-address-poolkey-modifyliquidityparams-balancedelta-balancedelta-bytes" />
+
+### \_afterAddLiquidity
+
+```solidity
+function _afterAddLiquidity(
+        address,
+        PoolKey calldata,
+        ModifyLiquidityParams calldata,
+        BalanceDelta,
+        BalanceDelta,
+        bytes calldata
+    ) internal virtual returns (bytes4, BalanceDelta);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \_ | `address` |  |
+| \_ | `PoolKey` |  |
+| \_ | `ModifyLiquidityParams` |  |
+| \_ | `BalanceDelta` |  |
+| \_ | `BalanceDelta` |  |
+| \_ | `bytes` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes4` |  |
+| \<none> | `BalanceDelta` |  |
+
+<a id="afterremoveliquidity-address-poolkey-modifyliquidityparams-balancedelta-balancedelta-bytes" />
+
+### afterRemoveLiquidity
+
+The hook called after liquidity is removed
+
+```solidity
+function afterRemoveLiquidity(
+        address sender,
+        PoolKey calldata key,
+        ModifyLiquidityParams calldata params,
+        BalanceDelta delta,
+        BalanceDelta feesAccrued,
+        bytes calldata hookData
+    ) external onlyPoolManager returns (bytes4, BalanceDelta);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| sender | `address` | The initial msg.sender for the remove liquidity call |
+| key | `PoolKey` | The key for the pool |
+| params | `ModifyLiquidityParams` | The parameters for removing liquidity |
+| delta | `BalanceDelta` | The caller's balance delta after removing liquidity; the sum of principal delta, fees accrued, and hook delta |
+| feesAccrued | `BalanceDelta` | The fees accrued since the last time fees were collected from this position |
+| hookData | `bytes` | Arbitrary data handed into the PoolManager by the liquidity provider to be be passed on to the hook |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes4` | bytes4 The function selector for the hook |
+| \<none> | `BalanceDelta` | BalanceDelta The hook's delta in token0 and token1. Positive: the hook is owed/took currency, negative: the hook owes/sent currency |
+
+<a id="_afterremoveliquidity-address-poolkey-modifyliquidityparams-balancedelta-balancedelta-bytes" />
+
+### \_afterRemoveLiquidity
+
+```solidity
+function _afterRemoveLiquidity(
+        address,
+        PoolKey calldata,
+        ModifyLiquidityParams calldata,
+        BalanceDelta,
+        BalanceDelta,
+        bytes calldata
+    ) internal virtual returns (bytes4, BalanceDelta);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \_ | `address` |  |
+| \_ | `PoolKey` |  |
+| \_ | `ModifyLiquidityParams` |  |
+| \_ | `BalanceDelta` |  |
+| \_ | `BalanceDelta` |  |
+| \_ | `bytes` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes4` |  |
+| \<none> | `BalanceDelta` |  |
+
+<a id="beforeswap-address-poolkey-swapparams-bytes" />
+
+### beforeSwap
+
+The hook called before a swap
+
+```solidity
+function beforeSwap(address sender, PoolKey calldata key, SwapParams calldata params, bytes calldata hookData)
+        external
+        onlyPoolManager
+        returns (bytes4, BeforeSwapDelta, uint24);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| sender | `address` | The initial msg.sender for the swap call |
+| key | `PoolKey` | The key for the pool |
+| params | `SwapParams` | The parameters for the swap |
+| hookData | `bytes` | Arbitrary data handed into the PoolManager by the swapper to be be passed on to the hook |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes4` | bytes4 The function selector for the hook |
+| \<none> | `BeforeSwapDelta` | BeforeSwapDelta The hook's delta in specified and unspecified currencies. Positive: the hook is owed/took currency, negative: the hook owes/sent currency |
+| \<none> | `uint24` | uint24 Optionally override the lp fee, only used if three conditions are met: 1. the Pool has a dynamic fee, 2. the value's 2nd highest bit is set (23rd bit, 0x400000), and 3. the value is less than or equal to the maximum fee (1 million) |
+
+<a id="_beforeswap-address-poolkey-swapparams-bytes" />
+
+### \_beforeSwap
+
+```solidity
+function _beforeSwap(address, PoolKey calldata, SwapParams calldata, bytes calldata)
+        internal
+        virtual
+        returns (bytes4, BeforeSwapDelta, uint24);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \_ | `address` |  |
+| \_ | `PoolKey` |  |
+| \_ | `SwapParams` |  |
+| \_ | `bytes` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes4` |  |
+| \<none> | `BeforeSwapDelta` |  |
+| \<none> | `uint24` |  |
+
+<a id="afterswap-address-poolkey-swapparams-balancedelta-bytes" />
+
+### afterSwap
+
+The hook called after a swap
+
+```solidity
+function afterSwap(
+        address sender,
+        PoolKey calldata key,
+        SwapParams calldata params,
+        BalanceDelta delta,
+        bytes calldata hookData
+    ) external onlyPoolManager returns (bytes4, int128);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| sender | `address` | The initial msg.sender for the swap call |
+| key | `PoolKey` | The key for the pool |
+| params | `SwapParams` | The parameters for the swap |
+| delta | `BalanceDelta` | The amount owed to the caller (positive) or owed to the pool (negative) |
+| hookData | `bytes` | Arbitrary data handed into the PoolManager by the swapper to be be passed on to the hook |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes4` | bytes4 The function selector for the hook |
+| \<none> | `int128` | int128 The hook's delta in unspecified currency. Positive: the hook is owed/took currency, negative: the hook owes/sent currency |
+
+<a id="_afterswap-address-poolkey-swapparams-balancedelta-bytes" />
+
+### \_afterSwap
+
+```solidity
+function _afterSwap(address, PoolKey calldata, SwapParams calldata, BalanceDelta, bytes calldata)
+        internal
+        virtual
+        returns (bytes4, int128);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \_ | `address` |  |
+| \_ | `PoolKey` |  |
+| \_ | `SwapParams` |  |
+| \_ | `BalanceDelta` |  |
+| \_ | `bytes` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes4` |  |
+| \<none> | `int128` |  |
+
+<a id="beforedonate-address-poolkey-uint256-uint256-bytes" />
+
+### beforeDonate
+
+The hook called before donate
+
+```solidity
+function beforeDonate(
+        address sender,
+        PoolKey calldata key,
+        uint256 amount0,
+        uint256 amount1,
+        bytes calldata hookData
+    ) external onlyPoolManager returns (bytes4);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| sender | `address` | The initial msg.sender for the donate call |
+| key | `PoolKey` | The key for the pool |
+| amount0 | `uint256` | The amount of token0 being donated |
+| amount1 | `uint256` | The amount of token1 being donated |
+| hookData | `bytes` | Arbitrary data handed into the PoolManager by the donor to be be passed on to the hook |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes4` | bytes4 The function selector for the hook |
+
+<a id="_beforedonate-address-poolkey-uint256-uint256-bytes" />
+
+### \_beforeDonate
+
+```solidity
+function _beforeDonate(address, PoolKey calldata, uint256, uint256, bytes calldata)
+        internal
+        virtual
+        returns (bytes4);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \_ | `address` |  |
+| \_ | `PoolKey` |  |
+| \_ | `uint256` |  |
+| \_ | `uint256` |  |
+| \_ | `bytes` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes4` |  |
+
+<a id="afterdonate-address-poolkey-uint256-uint256-bytes" />
+
+### afterDonate
+
+The hook called after donate
+
+```solidity
+function afterDonate(
+        address sender,
+        PoolKey calldata key,
+        uint256 amount0,
+        uint256 amount1,
+        bytes calldata hookData
+    ) external onlyPoolManager returns (bytes4);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| sender | `address` | The initial msg.sender for the donate call |
+| key | `PoolKey` | The key for the pool |
+| amount0 | `uint256` | The amount of token0 being donated |
+| amount1 | `uint256` | The amount of token1 being donated |
+| hookData | `bytes` | Arbitrary data handed into the PoolManager by the donor to be be passed on to the hook |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes4` | bytes4 The function selector for the hook |
+
+<a id="_afterdonate-address-poolkey-uint256-uint256-bytes" />
+
+### \_afterDonate
+
+```solidity
+function _afterDonate(address, PoolKey calldata, uint256, uint256, bytes calldata)
+        internal
+        virtual
+        returns (bytes4);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \_ | `address` |  |
+| \_ | `PoolKey` |  |
+| \_ | `uint256` |  |
+| \_ | `uint256` |  |
+| \_ | `bytes` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes4` |  |
+
+## Errors
+
+### HookNotImplemented
+
+```solidity
+error HookNotImplemented();
+```
+
+# IFeeOwner
+
+[Git Source](https://github.com/asyncswap/contracts/blob/7cd7ee9169e905d4ba1d1d1aee38a036b3c68d62/src/FeeVault.sol)
+
+## Functions
+
+<a id="owner" />
+
+### owner
+
+```solidity
+function owner() external view returns (address);
+```
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `address` |  |
+
+# ISignatureTransfer
+
+[Git Source](https://github.com/asyncswap/contracts/blob/7cd7ee9169e905d4ba1d1d1aee38a036b3c68d62/src/interfaces/ISignatureTransfer.sol)
+
+**Title:** ISignatureTransfer
+
+Minimal subset of Uniswap Permit2's SignatureTransfer interface used by the Router.
+Canonical Permit2 lives at 0x000000000022D473030F116dDEE9F6B43aC78BA3 on every chain.
+
+<i>
+  Vendored instead of imported because Permit2's sources pin solc 0.8.17.
+</i>
+
+## Functions
+
+<a id="permitwitnesstransferfrom-permittransferfrom-signaturetransferdetails-address-bytes32-string-bytes" />
+
+### permitWitnessTransferFrom
+
+```solidity
+function permitWitnessTransferFrom(
+        PermitTransferFrom memory permit,
+        SignatureTransferDetails calldata transferDetails,
+        address owner,
+        bytes32 witness,
+        string calldata witnessTypeString,
+        bytes calldata signature
+    ) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| permit | `PermitTransferFrom` |  |
+| transferDetails | `SignatureTransferDetails` |  |
+| owner | `address` |  |
+| witness | `bytes32` |  |
+| witnessTypeString | `string` |  |
+| signature | `bytes` |  |
+
+## Structs
+
+### TokenPermissions
+
+```solidity
+struct TokenPermissions {
+        address token;
+        uint256 amount;
+    }
+```
+
+**Properties**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| token | `address` |  |
+| amount | `uint256` |  |
+
+### PermitTransferFrom
+
+```solidity
+struct PermitTransferFrom {
+        TokenPermissions permitted;
+        uint256 nonce;
+        uint256 deadline;
+    }
+```
+
+**Properties**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| permitted | `TokenPermissions` |  |
+| nonce | `uint256` |  |
+| deadline | `uint256` |  |
+
+### SignatureTransferDetails
+
+```solidity
+struct SignatureTransferDetails {
+        address to;
+        uint256 requestedAmount;
+    }
+```
+
+**Properties**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| to | `address` |  |
+| requestedAmount | `uint256` |  |
+
+# AsyncFiller
+
+[Git Source](https://github.com/asyncswap/contracts/blob/7cd7ee9169e905d4ba1d1d1aee38a036b3c68d62/src/libraries/AsyncFiller.sol)
+
+**Title:** AsyncFiller
+
+**Author:** @msakiart
+
+Stores open async orders and settles fills against them.
+
+<i>
+  Authorization model: the maker authorizes a Router/executor at order-creation time
+  (`setExecutor[owner][executor] = true`). All subsequent fill / cancel / updatePrice
+  calls on the hook must come from that registered executor. The hook forwards its
+  immediate caller (`msg.sender`) and the resolved end-actor address (filler / canceller)
+  into this library; the executor is checked here, and PM settlement targets the actor.
+</i>
+
+## Constants
+
+### PRICE_SCALE
+
+```solidity
+uint256 private constant PRICE_SCALE = 1e18;
+```
+
+### MAX_PRIORITY_FEE
+
+```solidity
+uint64 internal constant MAX_PRIORITY_FEE = type(uint64).max;
+```
+
+### MIN_PRIORITY_FEE
+
+<i>
+  $0.10 in six-decimal USDC base units. Async Swap pools are configured with USDC as numeraire.
+</i>
+
+```solidity
+uint64 internal constant MIN_PRIORITY_FEE = 100_000;
+```
+
+### PRIORITY_FEE_BPS
+
+<i>
+  Below a $100 order the least bid is 10 bps of the order instead: min($0.10, 0.1% of it).
+</i>
+
+```solidity
+uint256 internal constant PRIORITY_FEE_BPS = 10;
+```
+
+## Functions
+
+<a id="addorder-state-book-bytes32-address-uint256-uint256-bool-bool-uint256" />
+
+### addOrder
+
+```solidity
+function addOrder(
+        State storage self,
+        Book storage book,
+        bytes32 id,
+        address owner,
+        uint256 amountIn,
+        uint256 amountOutMin,
+        bool isBuy,
+        bool zeroForOne,
+        uint256 priorityFee
+    ) internal;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `State` |  |
+| book | `Book` |  |
+| id | `bytes32` |  |
+| owner | `address` |  |
+| amountIn | `uint256` |  |
+| amountOutMin | `uint256` |  |
+| isBuy | `bool` |  |
+| zeroForOne | `bool` |  |
+| priorityFee | `uint256` |  |
+
+<a id="minpriorityfee-uint256" />
+
+### minPriorityFee
+
+The least bid for an order worth `notional` numeraire units: $0.10, or 0.1% of the
+order when that is less (orders under $100).
+
+```solidity
+function minPriorityFee(uint256 notional) internal pure returns (uint256);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| notional | `uint256` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint256` |  |
+
+<a id="checkminimum-state-book-poolid-bool-bool-uint256-uint256" />
+
+### checkMinimum
+
+Reverts unless the order is worth at least the pool's minimum in the numeraire: a buy's
+input; a sell's minimum output and its input at the pool's current price. The price
+check keeps out sells that ask for the minimum but offer almost nothing.
+
+```solidity
+function checkMinimum(
+        State storage self,
+        Book storage book,
+        PoolId poolId,
+        bool isBuy,
+        bool zeroForOne,
+        uint256 amountIn,
+        uint256 amountOutMin
+    ) internal view;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `State` |  |
+| book | `Book` |  |
+| poolId | `PoolId` |  |
+| isBuy | `bool` |  |
+| zeroForOne | `bool` |  |
+| amountIn | `uint256` |  |
+| amountOutMin | `uint256` |  |
+
+<a id="setminorder-book-poolid-uint256" />
+
+### setMinOrder
+
+```solidity
+function setMinOrder(Book storage book, PoolId poolId, uint256 minimum) internal;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| book | `Book` |  |
+| poolId | `PoolId` |  |
+| minimum | `uint256` |  |
+
+<a id="settlepriorityfee-state-poolkey-bytes32-address-uint256-address" />
+
+### settlePriorityFee
+
+```solidity
+function settlePriorityFee(
+        State storage self,
+        PoolKey memory key,
+        bytes32 id,
+        address maker,
+        uint256 amount,
+        address hook
+    ) internal;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `State` |  |
+| key | `PoolKey` |  |
+| id | `bytes32` |  |
+| maker | `address` |  |
+| amount | `uint256` |  |
+| hook | `address` |  |
+
+<a id="bestorder-state-book-bool" />
+
+### bestOrder
+
+```solidity
+function bestOrder(State storage self, Book storage book, bool isBuy)
+        internal
+        view
+        returns (bool found, uint128 price, bytes32 orderId, address owner);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `State` |  |
+| book | `Book` |  |
+| isBuy | `bool` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| found | `bool` |  |
+| price | `uint128` |  |
+| orderId | `bytes32` |  |
+| owner | `address` |  |
+
+<a id="level-book-bool-uint128" />
+
+### level
+
+```solidity
+function level(Book storage book, bool isBuy, uint128 price)
+        internal
+        view
+        returns (bytes32 head, bytes32 tail, uint32 orderCount);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| book | `Book` |  |
+| isBuy | `bool` |  |
+| price | `uint128` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| head | `bytes32` |  |
+| tail | `bytes32` |  |
+| orderCount | `uint32` |  |
+
+<a id="bestatprice-book-bool-uint128" />
+
+### bestAtPrice
+
+```solidity
+function bestAtPrice(Book storage book, bool isBuy, uint128 price) internal view returns (bytes32 id);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| book | `Book` |  |
+| isBuy | `bool` |  |
+| price | `uint128` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| id | `bytes32` |  |
+
+<a id="updateprice-state-book-asyncorder-bytes32-uint256-address" />
+
+### updatePrice
+
+Maker-only price update. The executor (router) is required to be authorized by
+the maker, AND `caller` must equal `order.owner` — both checked here.
+
+```solidity
+function updatePrice(
+        State storage self,
+        Book storage book,
+        AsyncOrder memory order,
+        bytes32 id,
+        uint256 newAmountOutMin,
+        address caller
+    ) internal;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `State` |  |
+| book | `Book` |  |
+| order | `AsyncOrder` |  |
+| id | `bytes32` |  |
+| newAmountOutMin | `uint256` |  |
+| caller | `address` |  |
+
+<a id="fill-state-book-asyncorder-bytes32-address-address-address-address-uint256" />
+
+### fill
+
+Full-fill. The caller (the hook contract) must be an authorized executor of the
+order owner; `filler` is the actual end-user paying the output and receiving the
+input. Must be invoked from inside an `IPoolManager.unlock` context.
+
+<i>
+  Settle gross output (native only; ERC20 is pre-settled), pay the signed net minimum to the maker, and mint fee
+  claims to the vault. Burn input claims and pay the full input to the filler.
+  Both currency deltas net to zero. A failed fill reverts all legs.
+</i>
+
+```solidity
+function fill(
+        State storage self,
+        Book storage book,
+        AsyncOrder memory order,
+        bytes32 id,
+        address hook,
+        address executor,
+        address filler,
+        address feeVault,
+        uint256 fee
+    ) internal;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `State` |  |
+| book | `Book` |  |
+| order | `AsyncOrder` |  |
+| id | `bytes32` |  |
+| hook | `address` |  |
+| executor | `address` |  |
+| filler | `address` |  |
+| feeVault | `address` |  |
+| fee | `uint256` |  |
+
+<a id="_closeorder-state-book-poolkey-bytes32-address" />
+
+### \_closeOrder
+
+<i>
+  Remove and delete an order, then settle its bid.
+</i>
+
+```solidity
+function _closeOrder(State storage self, Book storage book, PoolKey memory key, bytes32 id, address hook) private;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `State` |  |
+| book | `Book` |  |
+| key | `PoolKey` |  |
+| id | `bytes32` |  |
+| hook | `address` |  |
+
+<a id="settleorderpriorityfee-state-poolkey-bytes32-address" />
+
+### settleOrderPriorityFee
+
+```solidity
+function settleOrderPriorityFee(State storage self, PoolKey memory key, bytes32 id, address hook) internal;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `State` |  |
+| key | `PoolKey` |  |
+| id | `bytes32` |  |
+| hook | `address` |  |
+
+<a id="cancel-state-book-asyncorder-bytes32-address-address" />
+
+### cancel
+
+Cancel an unfilled order. Must be called inside an unlock context. Auth: `executor`
+must be either the order owner themselves (smart-contract makers calling the hook
+directly from their own unlock) or an executor the maker authorised via
+`setExecutor`. Funds always return to `order.owner`.
+
+```solidity
+function cancel(
+        State storage self,
+        Book storage book,
+        AsyncOrder memory order,
+        bytes32 id,
+        address hook,
+        address executor
+    ) internal;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `State` |  |
+| book | `Book` |  |
+| order | `AsyncOrder` |  |
+| id | `bytes32` |  |
+| hook | `address` |  |
+| executor | `address` |  |
+
+<a id="_append-state-book-bytes32" />
+
+### \_append
+
+```solidity
+function _append(State storage self, Book storage book, bytes32 id) internal;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `State` |  |
+| book | `Book` |  |
+| id | `bytes32` |  |
+
+<a id="_remove-state-book-bytes32" />
+
+### \_remove
+
+```solidity
+function _remove(State storage self, Book storage book, bytes32 id) internal;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `State` |  |
+| book | `Book` |  |
+| id | `bytes32` |  |
+
+<a id="_prioritykey-uint64-uint64" />
+
+### \_priorityKey
+
+```solidity
+function _priorityKey(uint64 priorityFee, uint64 sequence) private pure returns (uint128);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| priorityFee | `uint64` |  |
+| sequence | `uint64` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint128` |  |
+
+<a id="refreshexactprice-state-book-bytes32" />
+
+### refreshExactPrice
+
+<i>
+  Refresh even when a partial fill changes neither the price key nor remaining bid.
+</i>
+
+```solidity
+function refreshExactPrice(State storage self, Book storage book, bytes32 id) internal;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `State` |  |
+| book | `Book` |  |
+| id | `bytes32` |  |
+
+<a id="exactprice-orderinfo" />
+
+### exactPrice
+
+```solidity
+function exactPrice(OrderInfo storage order) internal view returns (EligiblePrice.Ratio memory);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `OrderInfo` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `EligiblePrice.Ratio` |  |
+
+<a id="eligibleatprice-book-bool-uint128-eligibleprice-ratio" />
+
+### eligibleAtPrice
+
+```solidity
+function eligibleAtPrice(Book storage book, bool isBuy, uint128 price, EligiblePrice.Ratio memory limit)
+        internal
+        view
+        returns (bytes32);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| book | `Book` |  |
+| isBuy | `bool` |  |
+| price | `uint128` |  |
+| limit | `EligiblePrice.Ratio` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes32` |  |
+
+<a id="mostpermissiveatprice-book-bool-uint128" />
+
+### mostPermissiveAtPrice
+
+```solidity
+function mostPermissiveAtPrice(Book storage book, bool isBuy, uint128 price)
+        internal
+        view
+        returns (EligiblePrice.Ratio memory);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| book | `Book` |  |
+| isBuy | `bool` |  |
+| price | `uint128` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `EligiblePrice.Ratio` |  |
+
+<a id="_pricekey-bool-uint256-uint256" />
+
+### \_priceKey
+
+<i>
+  WAD-scaled price ratio bounded to the radix key range: a ratio that rounds to zero
+  maps to 1 and a ratio above uint128 saturates at the maximum.
+</i>
+
+```solidity
+function _priceKey(bool isBuy, uint256 amountIn, uint256 amountOut) private pure returns (uint128);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| isBuy | `bool` |  |
+| amountIn | `uint256` |  |
+| amountOut | `uint256` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint128` |  |
+
+## Events
+
+### AsyncOrderCreated
+
+```solidity
+event AsyncOrderCreated(
+        PoolId indexed poolId,
+        bytes32 indexed orderId,
+        address indexed owner,
+        bool zeroForOne,
+        uint256 amountIn,
+        uint256 amountOutMin,
+        bytes32 salt
+    );
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| orderId | `bytes32` |  |
+| owner | `address` |  |
+| zeroForOne | `bool` |  |
+| amountIn | `uint256` |  |
+| amountOutMin | `uint256` |  |
+| salt | `bytes32` |  |
+
+### AsyncOrderPriceUpdated
+
+```solidity
+event AsyncOrderPriceUpdated(
+        PoolId indexed poolId, bytes32 indexed orderId, uint256 oldAmountOutMin, uint256 newAmountOutMin
+    );
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| orderId | `bytes32` |  |
+| oldAmountOutMin | `uint256` |  |
+| newAmountOutMin | `uint256` |  |
+
+### AsyncOrderFilled
+
+```solidity
+event AsyncOrderFilled(
+        PoolId indexed poolId, bytes32 indexed orderId, address indexed filler, uint256 amountIn, uint256 amountOutMin
+    );
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| orderId | `bytes32` |  |
+| filler | `address` |  |
+| amountIn | `uint256` |  |
+| amountOutMin | `uint256` |  |
+
+### AsyncOrderCancelled
+
+```solidity
+event AsyncOrderCancelled(PoolId indexed poolId, bytes32 indexed orderId, address indexed owner, uint256 amountIn);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| orderId | `bytes32` |  |
+| owner | `address` |  |
+| amountIn | `uint256` |  |
+
+### OrderFeeAccrued
+
+```solidity
+event OrderFeeAccrued(bytes32 indexed orderId, Currency indexed currency, uint256 amount);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| orderId | `bytes32` |  |
+| currency | `Currency` |  |
+| amount | `uint256` |  |
+
+### PriorityFeeDonated
+
+```solidity
+event PriorityFeeDonated(PoolId indexed poolId, bytes32 indexed orderId, address indexed maker, uint256 amount);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| orderId | `bytes32` |  |
+| maker | `address` |  |
+| amount | `uint256` |  |
+
+### PriorityFeeForfeited
+
+```solidity
+event PriorityFeeForfeited(PoolId indexed poolId, bytes32 indexed orderId, address indexed maker, uint256 amount);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| orderId | `bytes32` |  |
+| maker | `address` |  |
+| amount | `uint256` |  |
+
+### MinOrderSet
+
+```solidity
+event MinOrderSet(PoolId indexed poolId, uint256 minOrder);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| minOrder | `uint256` |  |
+
+## Errors
+
+### OrderAlreadyExists
+
+```solidity
+error OrderAlreadyExists();
+```
+
+### OrderNotFound
+
+```solidity
+error OrderNotFound();
+```
+
+### NotOrderOwner
+
+```solidity
+error NotOrderOwner();
+```
+
+### NotAuthorizedExecutor
+
+```solidity
+error NotAuthorizedExecutor();
+```
+
+### ZeroAmount
+
+```solidity
+error ZeroAmount();
+```
+
+### PriorityFeeTooLarge
+
+```solidity
+error PriorityFeeTooLarge();
+```
+
+### PriorityFeeTooSmall
+
+```solidity
+error PriorityFeeTooSmall();
+```
+
+### BelowMinimumOrder
+
+```solidity
+error BelowMinimumOrder();
+```
+
+## Structs
+
+### OrderInfo
+
+Open-order record. Filler fills are full-order; direct matches can reduce it
+partially while keeping the remaining input in escrow.
+
+```solidity
+struct OrderInfo {
+        address owner;
+        uint256 amountIn;
+        uint256 amountOutMin;
+        uint128 price;
+        bool isBuy;
+        bool zeroForOne;
+        uint64 sequence;
+        /// @dev The bid, escrowed as hook claims since the order was created.
+        uint64 priorityFee;
+        uint128 priorityKey;
+        /// @dev Immutable settlement age; repricing only resets queue sequence.
+        uint64 createdSequence;
+    }
+```
+
+**Properties**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| owner | `address` |  |
+| amountIn | `uint256` |  |
+| amountOutMin | `uint256` |  |
+| price | `uint128` |  |
+| isBuy | `bool` |  |
+| zeroForOne | `bool` |  |
+| sequence | `uint64` |  |
+| priorityFee | `uint64` |  |
+| priorityKey | `uint128` |  |
+| createdSequence | `uint64` |  |
+
+### PriceLevel
+
+<i>
+  Orders at one price, highest bid first, then earliest.
+</i>
+
+```solidity
+struct PriceLevel {
+        uint32 orderCount;
+        RadixPriceTree.Tree priorityOrders;
+        mapping(uint128 priorityKey => bytes32 orderId) priorityOrderIds;
+        mapping(uint32 nodeId => EligiblePrice.Ratio) exactBounds;
+    }
+```
+
+**Properties**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| orderCount | `uint32` |  |
+| priorityOrders | `RadixPriceTree.Tree` |  |
+| priorityOrderIds | `mapping(uint128 priorityKey => bytes32 orderId)` |  |
+| exactBounds | `mapping(uint32 nodeId => EligiblePrice.Ratio)` |  |
+
+### MatchAmounts
+
+```solidity
+struct MatchAmounts {
+        uint256 assetAmount;
+        uint256 quoteAmount;
+    }
+```
+
+**Properties**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| assetAmount | `uint256` |  |
+| quoteAmount | `uint256` |  |
+
+### NewOrder
+
+```solidity
+struct NewOrder {
+        bytes32 id;
+        address owner;
+        uint256 amountIn;
+        uint256 amountOutMin;
+        bool isBuy;
+        bool zeroForOne;
+        uint256 priorityFee;
+        PoolId poolId;
+    }
+```
+
+**Properties**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| id | `bytes32` |  |
+| owner | `address` |  |
+| amountIn | `uint256` |  |
+| amountOutMin | `uint256` |  |
+| isBuy | `bool` |  |
+| zeroForOne | `bool` |  |
+| priorityFee | `uint256` |  |
+| poolId | `PoolId` |  |
+
+### State
+
+```solidity
+struct State {
+        IPoolManager poolManager;
+        Currency numeraire;
+        address feeVault;
+        mapping(bytes32 orderId => OrderInfo) orders;
+        mapping(address owner => mapping(address executor => bool)) isExecutor;
+    }
+```
+
+**Properties**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolManager | `IPoolManager` |  |
+| numeraire | `Currency` |  |
+| feeVault | `address` |  |
+| orders | `mapping(bytes32 orderId => OrderInfo)` |  |
+| isExecutor | `mapping(address owner => mapping(address executor => bool))` |  |
+
+### Book
+
+```solidity
+struct Book {
+        uint64 nextSequence;
+        uint64 openOrderCount;
+        RadixPriceTree.Tree bids;
+        RadixPriceTree.Tree asks;
+        mapping(uint128 price => PriceLevel) bidLevels;
+        mapping(uint128 price => PriceLevel) askLevels;
+        /// @dev Least order size in numeraire base units (0: none); see `checkMinimum`.
+        uint256 minOrder;
+    }
+```
+
+**Properties**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| nextSequence | `uint64` |  |
+| openOrderCount | `uint64` |  |
+| bids | `RadixPriceTree.Tree` |  |
+| asks | `RadixPriceTree.Tree` |  |
+| bidLevels | `mapping(uint128 price => PriceLevel)` |  |
+| askLevels | `mapping(uint128 price => PriceLevel)` |  |
+| minOrder | `uint256` |  |
+
+# AsyncMatching
+
+[Git Source](https://github.com/asyncswap/contracts/blob/7cd7ee9169e905d4ba1d1d1aee38a036b3c68d62/src/libraries/AsyncMatching.sol)
+
+Linked matching module operating on the hook's order and radix-book storage.
+
+<i>
+  Public library calls use DELEGATECALL, so ERC-6909 escrow remains owned by Async Swap.
+</i>
+
+## Constants
+
+### PRICE_SCALE
+
+```solidity
+uint256 private constant PRICE_SCALE = 1e18;
+```
+
+### MAX_MATCHES_PER_CALL
+
+```solidity
+uint8 public constant MAX_MATCHES_PER_CALL = 8;
+```
+
+### POOL_LIQUIDITY_FILL_FEE
+
+```solidity
+uint24 private constant POOL_LIQUIDITY_FILL_FEE = 3_000;
+```
+
+## Functions
+
+<a id="addorder-asyncfiller-state-asyncfiller-book-asyncfiller-neworder" />
+
+### addOrder
+
+```solidity
+function addOrder(AsyncFiller.State storage self, AsyncFiller.Book storage book, AsyncFiller.NewOrder memory order)
+        public;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| book | `AsyncFiller.Book` |  |
+| order | `AsyncFiller.NewOrder` |  |
+
+<a id="setminorder-asyncfiller-book-poolid-uint256" />
+
+### setMinOrder
+
+```solidity
+function setMinOrder(AsyncFiller.Book storage book, PoolId poolId, uint256 minimum) public;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| book | `AsyncFiller.Book` |  |
+| poolId | `PoolId` |  |
+| minimum | `uint256` |  |
+
+<a id="bestorder-asyncfiller-state-asyncfiller-book-bool" />
+
+### bestOrder
+
+```solidity
+function bestOrder(AsyncFiller.State storage self, AsyncFiller.Book storage book, bool isBuy)
+        public
+        view
+        returns (bool found, uint128 price, bytes32 orderId, address owner);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| book | `AsyncFiller.Book` |  |
+| isBuy | `bool` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| found | `bool` |  |
+| price | `uint128` |  |
+| orderId | `bytes32` |  |
+| owner | `address` |  |
+
+<a id="level-asyncfiller-book-bool-uint128" />
+
+### level
+
+```solidity
+function level(AsyncFiller.Book storage book, bool isBuy, uint128 price)
+        public
+        view
+        returns (bytes32 head, bytes32 tail, uint32 orderCount);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| book | `AsyncFiller.Book` |  |
+| isBuy | `bool` |  |
+| price | `uint128` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| head | `bytes32` |  |
+| tail | `bytes32` |  |
+| orderCount | `uint32` |  |
+
+<a id="fill-asyncfiller-state-asyncfiller-book-fillparams" />
+
+### fill
+
+```solidity
+function fill(AsyncFiller.State storage self, AsyncFiller.Book storage book, FillParams memory params) public;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| book | `AsyncFiller.Book` |  |
+| params | `FillParams` |  |
+
+<a id="cancel-asyncfiller-state-asyncfiller-book-cancelparams" />
+
+### cancel
+
+```solidity
+function cancel(AsyncFiller.State storage self, AsyncFiller.Book storage book, CancelParams memory params) public;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| book | `AsyncFiller.Book` |  |
+| params | `CancelParams` |  |
+
+<a id="updateprice-asyncfiller-state-asyncfiller-book-updateparams" />
+
+### updatePrice
+
+```solidity
+function updatePrice(AsyncFiller.State storage self, AsyncFiller.Book storage book, UpdateParams memory params)
+        public;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| book | `AsyncFiller.Book` |  |
+| params | `UpdateParams` |  |
+
+<a id="matchincoming-asyncfiller-state-asyncfiller-book-poolkey-bytes32-address" />
+
+### matchIncoming
+
+```solidity
+function matchIncoming(
+        AsyncFiller.State storage self,
+        AsyncFiller.Book storage book,
+        PoolKey calldata key,
+        bytes32 incomingId,
+        address hook
+    ) public returns (uint8 matched);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| book | `AsyncFiller.Book` |  |
+| key | `PoolKey` |  |
+| incomingId | `bytes32` |  |
+| hook | `address` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| matched | `uint8` |  |
+
+<a id="matchbook-asyncfiller-state-asyncfiller-book-poolkey-uint8-address" />
+
+### matchBook
+
+```solidity
+function matchBook(
+        AsyncFiller.State storage self,
+        AsyncFiller.Book storage book,
+        PoolKey calldata key,
+        uint8 maxMatches,
+        address hook
+    ) public returns (uint8 matched);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| book | `AsyncFiller.Book` |  |
+| key | `PoolKey` |  |
+| maxMatches | `uint8` |  |
+| hook | `address` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| matched | `uint8` |  |
+
+<a id="_bookpair-asyncfiller-state-asyncfiller-book" />
+
+### \_bookPair
+
+```solidity
+function _bookPair(AsyncFiller.State storage self, AsyncFiller.Book storage book)
+        private
+        view
+        returns (bytes32 bidId, bytes32 askId);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| book | `AsyncFiller.Book` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| bidId | `bytes32` |  |
+| askId | `bytes32` |  |
+
+<a id="fillfrompoolliquidity-asyncfiller-state-asyncfiller-book-poolkey-bytes32-address-address" />
+
+### fillFromPoolLiquidity
+
+Execute an order against active v4 LP positions if they meet the signed minimum.
+
+<i>
+  Reverts atomically on insufficient liquidity/output or partial execution. The caller
+  catches this across a self-call so the resting order is preserved.
+</i>
+
+```solidity
+function fillFromPoolLiquidity(
+        AsyncFiller.State storage self,
+        AsyncFiller.Book storage book,
+        PoolKey calldata key,
+        bytes32 id,
+        address maker,
+        address hook
+    ) public;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| book | `AsyncFiller.Book` |  |
+| key | `PoolKey` |  |
+| id | `bytes32` |  |
+| maker | `address` |  |
+| hook | `address` |  |
+
+<a id="_swapagainstpool-ipoolmanager-poolkey-bool-uint256-uint256-address" />
+
+### \_swapAgainstPool
+
+```solidity
+function _swapAgainstPool(
+        IPoolManager manager,
+        PoolKey calldata key,
+        bool zeroForOne,
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address hook
+    ) private returns (uint256 amountOut);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| manager | `IPoolManager` |  |
+| key | `PoolKey` |  |
+| zeroForOne | `bool` |  |
+| amountIn | `uint256` |  |
+| amountOutMin | `uint256` |  |
+| hook | `address` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| amountOut | `uint256` |  |
+
+<a id="_matchpair-asyncfiller-state-asyncfiller-book-poolkey-bytes32-bytes32-address" />
+
+### \_matchPair
+
+<i>
+  `buyId` comes from the bid tree and `sellId` from the ask tree (`_bookPair`), so their
+  sides are fixed by construction.
+</i>
+
+```solidity
+function _matchPair(
+        AsyncFiller.State storage self,
+        AsyncFiller.Book storage book,
+        PoolKey calldata key,
+        bytes32 buyId,
+        bytes32 sellId,
+        address hook
+    ) private returns (bool);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| book | `AsyncFiller.Book` |  |
+| key | `PoolKey` |  |
+| buyId | `bytes32` |  |
+| sellId | `bytes32` |  |
+| hook | `address` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bool` |  |
+
+<a id="_matchamounts-asyncfiller-orderinfo-asyncfiller-orderinfo-bool" />
+
+### \_matchAmounts
+
+```solidity
+function _matchAmounts(AsyncFiller.OrderInfo storage sell, AsyncFiller.OrderInfo storage buy, bool restingBuy)
+        private
+        view
+        returns (AsyncFiller.MatchAmounts memory amounts);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| sell | `AsyncFiller.OrderInfo` |  |
+| buy | `AsyncFiller.OrderInfo` |  |
+| restingBuy | `bool` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| amounts | `AsyncFiller.MatchAmounts` |  |
+
+<a id="_payouts-asyncfiller-state-poolkey-bytes32-bytes32" />
+
+### \_payouts
+
+```solidity
+function _payouts(AsyncFiller.State storage self, PoolKey calldata key, bytes32 buyId, bytes32 sellId)
+        private
+        view
+        returns (Payouts memory payouts);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| key | `PoolKey` |  |
+| buyId | `bytes32` |  |
+| sellId | `bytes32` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| payouts | `Payouts` |  |
+
+<a id="_settletransfers-ipoolmanager-payouts-asyncfiller-matchamounts-address" />
+
+### \_settleTransfers
+
+```solidity
+function _settleTransfers(
+        IPoolManager manager,
+        Payouts memory payouts,
+        AsyncFiller.MatchAmounts memory amounts,
+        address hook
+    ) private;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| manager | `IPoolManager` |  |
+| payouts | `Payouts` |  |
+| amounts | `AsyncFiller.MatchAmounts` |  |
+| hook | `address` |  |
+
+<a id="_reducematchedorders-asyncfiller-state-asyncfiller-book-poolkey-bytes32-bytes32-asyncfiller-matchamounts-address" />
+
+### \_reduceMatchedOrders
+
+```solidity
+function _reduceMatchedOrders(
+        AsyncFiller.State storage self,
+        AsyncFiller.Book storage book,
+        PoolKey calldata key,
+        bytes32 buyId,
+        bytes32 sellId,
+        AsyncFiller.MatchAmounts memory amounts,
+        address hook
+    ) private returns (uint256 sellRefund, uint256 buyRefund);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| book | `AsyncFiller.Book` |  |
+| key | `PoolKey` |  |
+| buyId | `bytes32` |  |
+| sellId | `bytes32` |  |
+| amounts | `AsyncFiller.MatchAmounts` |  |
+| hook | `address` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| sellRefund | `uint256` |  |
+| buyRefund | `uint256` |  |
+
+<a id="_transferescrow-ipoolmanager-currency-address-uint256-address" />
+
+### \_transferEscrow
+
+```solidity
+function _transferEscrow(IPoolManager manager, Currency currency, address recipient, uint256 amount, address hook)
+        private;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| manager | `IPoolManager` |  |
+| currency | `Currency` |  |
+| recipient | `address` |  |
+| amount | `uint256` |  |
+| hook | `address` |  |
+
+<a id="_reduceaftermatch-asyncfiller-state-asyncfiller-book-poolkey-reductionparams-address" />
+
+### \_reduceAfterMatch
+
+```solidity
+function _reduceAfterMatch(
+        AsyncFiller.State storage self,
+        AsyncFiller.Book storage book,
+        PoolKey calldata key,
+        ReductionParams memory params,
+        address hook
+    ) private returns (uint256);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| book | `AsyncFiller.Book` |  |
+| key | `PoolKey` |  |
+| params | `ReductionParams` |  |
+| hook | `address` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint256` |  |
+
+<a id="_settlematchedpriorityfee-asyncfiller-state-poolkey-bytes32-uint256-uint256-address" />
+
+### \_settleMatchedPriorityFee
+
+```solidity
+function _settleMatchedPriorityFee(
+        AsyncFiller.State storage self,
+        PoolKey calldata key,
+        bytes32 id,
+        uint256 inputUsed,
+        uint256 oldInput,
+        address hook
+    ) private returns (uint256 unfilledPriorityFee);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| key | `PoolKey` |  |
+| id | `bytes32` |  |
+| inputUsed | `uint256` |  |
+| oldInput | `uint256` |  |
+| hook | `address` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| unfilledPriorityFee | `uint256` |  |
+
+<a id="_pricekey-bool-uint256-uint256" />
+
+### \_priceKey
+
+```solidity
+function _priceKey(bool isBuy, uint256 amountIn, uint256 amountOut) private pure returns (uint128);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| isBuy | `bool` |  |
+| amountIn | `uint256` |  |
+| amountOut | `uint256` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint128` |  |
+
+<a id="_crosses-uint128-uint128-asyncfiller-orderinfo-asyncfiller-orderinfo" />
+
+### \_crosses
+
+Decide whether a buy and a sell order cross, i.e. a price exists that satisfies both
+makers' limits.
+
+<i>
+  The `uint128` price keys on the book are truncated WAD ratios, so two distinct prices
+  can share a key. Strictly ordered keys decide the result directly, since truncation
+  cannot invert a strict inequality. Equal keys are decided by a full-precision
+  cross-multiply:
+</i>
+
+cross  \<=>  buyIn/buyOut >= sellOut/sellIn  \<=>  buyIn*sellIn >= sellOut*buyOut
+\<=>  floor(buyIn\*sellIn / sellOut) >= buyOut   (sellOut, buyOut are nonzero).
+
+An exact tie counts as a cross. With equal keys the quotient is on the order of
+`buyOut`, so the `mulDiv` cannot overflow for escrowable amounts.
+
+```solidity
+function _crosses(
+        uint128 buyKey,
+        uint128 sellKey,
+        AsyncFiller.OrderInfo storage buy,
+        AsyncFiller.OrderInfo storage sell
+    ) internal view returns (bool);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| buyKey | `uint128` |  |
+| sellKey | `uint128` |  |
+| buy | `AsyncFiller.OrderInfo` |  |
+| sell | `AsyncFiller.OrderInfo` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bool` |  |
+
+## Events
+
+### AsyncOrdersMatched
+
+```solidity
+event AsyncOrdersMatched(
+        PoolId indexed poolId,
+        bytes32 indexed sellOrderId,
+        bytes32 indexed buyOrderId,
+        uint256 assetAmount,
+        uint256 numeraireAmount
+    );
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| sellOrderId | `bytes32` |  |
+| buyOrderId | `bytes32` |  |
+| assetAmount | `uint256` |  |
+| numeraireAmount | `uint256` |  |
+
+### AsyncOrderLiquidityFilled
+
+```solidity
+event AsyncOrderLiquidityFilled(
+        PoolId indexed poolId, bytes32 indexed orderId, address indexed maker, uint256 amountIn, uint256 amountOut
+    );
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| orderId | `bytes32` |  |
+| maker | `address` |  |
+| amountIn | `uint256` |  |
+| amountOut | `uint256` |  |
+
+## Errors
+
+### InvalidMatchBound
+
+```solidity
+error InvalidMatchBound();
+```
+
+### PartialLiquidityFill
+
+```solidity
+error PartialLiquidityFill();
+```
+
+### LimitPriceNotMet
+
+```solidity
+error LimitPriceNotMet();
+```
+
+### NoActiveLiquidity
+
+```solidity
+error NoActiveLiquidity();
+```
+
+## Structs
+
+### ReductionParams
+
+```solidity
+struct ReductionParams {
+        bytes32 id;
+        uint256 inputUsed;
+        uint256 outputReceived;
+    }
+```
+
+**Properties**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| id | `bytes32` |  |
+| inputUsed | `uint256` |  |
+| outputReceived | `uint256` |  |
+
+### Payouts
+
+<i>
+  Who receives each leg of a match, read before the matched orders are reduced.
+</i>
+
+```solidity
+struct Payouts {
+        address sellOwner;
+        address buyOwner;
+        Currency sellInput;
+        Currency buyInput;
+        uint256 sellRefund; // input returned to an order left below the pool minimum
+        uint256 buyRefund;
+    }
+```
+
+**Properties**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| sellOwner | `address` |  |
+| buyOwner | `address` |  |
+| sellInput | `Currency` |  |
+| buyInput | `Currency` |  |
+| sellRefund | `uint256` |  |
+| buyRefund | `uint256` |  |
+
+### FillParams
+
+```solidity
+struct FillParams {
+        AsyncOrder order;
+        bytes32 id;
+        address hook;
+        address executor;
+        address filler;
+        address feeVault;
+        uint256 fee;
+    }
+```
+
+**Properties**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| id | `bytes32` |  |
+| hook | `address` |  |
+| executor | `address` |  |
+| filler | `address` |  |
+| feeVault | `address` |  |
+| fee | `uint256` |  |
+
+### CancelParams
+
+```solidity
+struct CancelParams {
+        AsyncOrder order;
+        bytes32 id;
+        address hook;
+        address executor;
+    }
+```
+
+**Properties**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| id | `bytes32` |  |
+| hook | `address` |  |
+| executor | `address` |  |
+
+### UpdateParams
+
+```solidity
+struct UpdateParams {
+        AsyncOrder order;
+        bytes32 id;
+        uint256 newAmountOutMin;
+        address caller;
+    }
+```
+
+**Properties**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| id | `bytes32` |  |
+| newAmountOutMin | `uint256` |  |
+| caller | `address` |  |
+
+# CurrencySettler
+
+[Git Source](https://github.com/asyncswap/contracts/blob/7cd7ee9169e905d4ba1d1d1aee38a036b3c68d62/src/libraries/CurrencySettler.sol)
+
+**Title:** CurrencySettler
+
+Production copy of v4-core's test-only `CurrencySettler`, using safe transfers so tokens
+that return no data from `transfer` / `transferFrom` (e.g. USDT) settle correctly.
+
+## Functions
+
+<a id="settle-currency-ipoolmanager-address-uint256-bool" />
+
+### settle
+
+Settle (pay) a currency to the PoolManager.
+
+```solidity
+function settle(Currency currency, IPoolManager manager, address payer, uint256 amount, bool burn) internal;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| currency | `Currency` |  |
+| manager | `IPoolManager` |  |
+| payer | `address` |  |
+| amount | `uint256` |  |
+| burn | `bool` | If true, burn the payer's ERC-6909 claims instead of transferring tokens. |
+
+<a id="take-currency-ipoolmanager-address-uint256-bool" />
+
+### take
+
+Take (receive) a currency from the PoolManager.
+
+```solidity
+function take(Currency currency, IPoolManager manager, address recipient, uint256 amount, bool claims) internal;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| currency | `Currency` |  |
+| manager | `IPoolManager` |  |
+| recipient | `address` |  |
+| amount | `uint256` |  |
+| claims | `bool` | If true, mint ERC-6909 claims instead of transferring tokens. |
+
+# EligiblePrice
+
+[Git Source](https://github.com/asyncswap/contracts/blob/7cd7ee9169e905d4ba1d1d1aee38a036b3c68d62/src/libraries/EligiblePrice.sol)
+
+Exact-price summaries on a priority-key radix tree.
+
+<i>
+  A buy subtree stores its maximum limit; a sell subtree its minimum.
+  This is an existence certificate, not an approximation of an order's limit.
+</i>
+
+## Functions
+
+<a id="le-ratio-ratio" />
+
+### le
+
+<i>
+  Exact comparison of positive-denominator ratios using two 512-bit products.
+</i>
+
+```solidity
+function le(Ratio memory a, Ratio memory b) internal pure returns (bool result);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| a | `Ratio` |  |
+| b | `Ratio` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| result | `bool` |  |
+
+<a id="refresh-radixpricetree-tree-mapping-uint32-ratio-uint128-ratio-bool" />
+
+### refresh
+
+```solidity
+function refresh(
+        RadixPriceTree.Tree storage tree,
+        mapping(uint32 => Ratio) storage bounds,
+        uint128 rank,
+        Ratio memory price,
+        bool isBuy
+    ) internal;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| tree | `RadixPriceTree.Tree` |  |
+| bounds | `mapping(uint32 => Ratio)` |  |
+| rank | `uint128` |  |
+| price | `Ratio` |  |
+| isBuy | `bool` |  |
+
+<a id="remove-radixpricetree-tree-mapping-uint32-ratio-uint128-bool" />
+
+### remove
+
+```solidity
+function remove(RadixPriceTree.Tree storage tree, mapping(uint32 => Ratio) storage bounds, uint128 rank, bool isBuy)
+        internal;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| tree | `RadixPriceTree.Tree` |  |
+| bounds | `mapping(uint32 => Ratio)` |  |
+| rank | `uint128` |  |
+| isBuy | `bool` |  |
+
+<a id="_repair-radixpricetree-tree-mapping-uint32-ratio-uint32-bool-bool" />
+
+### \_repair
+
+```solidity
+function _repair(
+        RadixPriceTree.Tree storage tree,
+        mapping(uint32 => Ratio) storage bounds,
+        uint32 cursor,
+        bool isBuy,
+        bool forceFirst
+    ) private;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| tree | `RadixPriceTree.Tree` |  |
+| bounds | `mapping(uint32 => Ratio)` |  |
+| cursor | `uint32` |  |
+| isBuy | `bool` |  |
+| forceFirst | `bool` |  |
+
+<a id="_eligible-ratio-ratio-bool" />
+
+### \_eligible
+
+```solidity
+function _eligible(Ratio memory bound, Ratio memory limit, bool isBuy) private pure returns (bool);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| bound | `Ratio` |  |
+| limit | `Ratio` |  |
+| isBuy | `bool` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bool` |  |
+
+<a id="best-radixpricetree-tree-mapping-uint32-ratio-ratio-bool" />
+
+### best
+
+Highest priority key among orders crossing `limit`, in at most 128 branches.
+
+<i>
+  Right children have greater priority keys. No backtracking or linear scan.
+</i>
+
+```solidity
+function best(
+        RadixPriceTree.Tree storage tree,
+        mapping(uint32 => Ratio) storage bounds,
+        Ratio memory limit,
+        bool isBuy
+    ) internal view returns (bool found, uint128 rank);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| tree | `RadixPriceTree.Tree` |  |
+| bounds | `mapping(uint32 => Ratio)` |  |
+| limit | `Ratio` |  |
+| isBuy | `bool` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| found | `bool` |  |
+| rank | `uint128` |  |
+
+## Structs
+
+### Ratio
+
+```solidity
+struct Ratio {
+        uint256 numerator;
+        uint256 denominator;
+    }
+```
+
+**Properties**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| numerator | `uint256` |  |
+| denominator | `uint256` |  |
+
+# OrderSignatures
+
+[Git Source](https://github.com/asyncswap/contracts/blob/7cd7ee9169e905d4ba1d1d1aee38a036b3c68d62/src/libraries/OrderSignatures.sol)
+
+**Title:** OrderSignatures
+
+**Author:** @msakiart
+
+EIP-712 types for signed AsyncSwap actions. Every type spells out the maker, both tokens
+and the amounts so wallets render a readable message instead of opaque calldata.
+
+* `AsyncOrder` is the Permit2 witness for `Router.swapWithSig` (Permit2 domain).
+* `SetExecutor` and `UpdatePrice` are verified by the hook (AsyncSwap domain).
+* `CancelOrder` is verified by the Router (AsyncSwap Router domain).
+
+## Constants
+
+### POOL_KEY_TYPE
+
+```solidity
+bytes internal constant POOL_KEY_TYPE =
+        "PoolKey(address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks)";
+```
+
+### ASYNC_ORDER_TYPE
+
+```solidity
+bytes internal constant ASYNC_ORDER_TYPE =
+        "AsyncOrder(address maker,address tokenIn,address tokenOut,uint256 amountIn,uint256 amountOutMin,uint256 priorityFee,PoolKey pool)";
+```
+
+### POOL_KEY_TYPEHASH
+
+```solidity
+bytes32 internal constant POOL_KEY_TYPEHASH = keccak256(POOL_KEY_TYPE);
+```
+
+### ASYNC_ORDER_TYPEHASH
+
+```solidity
+bytes32 internal constant ASYNC_ORDER_TYPEHASH = keccak256(abi.encodePacked(ASYNC_ORDER_TYPE, POOL_KEY_TYPE));
+```
+
+### PERMIT2_WITNESS_TYPE
+
+Witness type string appended by Permit2 to `PermitWitnessTransferFrom(...)`.
+Referenced types are sorted alphabetically per EIP-712.
+
+```solidity
+string internal constant PERMIT2_WITNESS_TYPE = string(
+        abi.encodePacked(
+            "AsyncOrder witness)", ASYNC_ORDER_TYPE, POOL_KEY_TYPE, "TokenPermissions(address token,uint256 amount)"
+        )
+    );
+```
+
+### SET_EXECUTOR_TYPEHASH
+
+```solidity
+bytes32 internal constant SET_EXECUTOR_TYPEHASH = keccak256(
+        abi.encodePacked(
+            "SetExecutor(address maker,address executor,bool allow,PoolKey pool,uint256 nonce,uint256 deadline)",
+            POOL_KEY_TYPE
+        )
+    );
+```
+
+### UPDATE_PRICE_TYPEHASH
+
+```solidity
+bytes32 internal constant UPDATE_PRICE_TYPEHASH = keccak256(
+        "UpdatePrice(address maker,address tokenIn,address tokenOut,uint256 amountIn,uint256 newAmountOutMin,bytes32 orderId,uint256 nonce,uint256 deadline)"
+    );
+```
+
+### CANCEL_ORDER_TYPEHASH
+
+```solidity
+bytes32 internal constant CANCEL_ORDER_TYPEHASH = keccak256(
+        "CancelOrder(address maker,address tokenIn,address tokenOut,uint256 amountIn,bytes32 orderId,uint256 nonce,uint256 deadline)"
+    );
+```
+
+## Functions
+
+<a id="tokens-asyncorder" />
+
+### tokens
+
+```solidity
+function tokens(AsyncOrder memory order) internal pure returns (address tokenIn, address tokenOut);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| tokenIn | `address` |  |
+| tokenOut | `address` |  |
+
+<a id="hashpoolkey-poolkey" />
+
+### hashPoolKey
+
+```solidity
+function hashPoolKey(PoolKey memory key) internal pure returns (bytes32);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| key | `PoolKey` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes32` |  |
+
+<a id="hashorder-asyncorder" />
+
+### hashOrder
+
+Struct hash of the order a maker signs as the Permit2 witness. Covers everything that
+defines the order; `sqrtPrice` is excluded (the hook consumes the whole swap, so v4
+never reads the price limit) and `salt` is assigned by the hook at create time.
+
+```solidity
+function hashOrder(AsyncOrder memory order) internal pure returns (bytes32);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes32` |  |
+
+<a id="hashsetexecutor-poolkey-address-address-bool-uint256-uint256" />
+
+### hashSetExecutor
+
+```solidity
+function hashSetExecutor(
+        PoolKey memory key,
+        address maker,
+        address executor,
+        bool allow,
+        uint256 nonce,
+        uint256 deadline
+    ) internal pure returns (bytes32);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| key | `PoolKey` |  |
+| maker | `address` |  |
+| executor | `address` |  |
+| allow | `bool` |  |
+| nonce | `uint256` |  |
+| deadline | `uint256` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes32` |  |
+
+<a id="hashupdateprice-asyncorder-bytes32-uint256-uint256-uint256-uint256" />
+
+### hashUpdatePrice
+
+```solidity
+function hashUpdatePrice(
+        AsyncOrder memory order,
+        bytes32 orderId,
+        uint256 amountIn,
+        uint256 newAmountOutMin,
+        uint256 nonce,
+        uint256 deadline
+    ) internal pure returns (bytes32);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| orderId | `bytes32` |  |
+| amountIn | `uint256` | the order's stored input, so the maker sees the size of the order they reprice. |
+| newAmountOutMin | `uint256` |  |
+| nonce | `uint256` |  |
+| deadline | `uint256` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes32` |  |
+
+<a id="hashcancel-asyncorder-bytes32-uint256-uint256-uint256" />
+
+### hashCancel
+
+<i>
+  Carries a nonce: order ids can recur (identical order re-placed in the same block after a
+  cancel), so order deletion alone does not stop a signed cancel from being replayed.
+</i>
+
+```solidity
+function hashCancel(AsyncOrder memory order, bytes32 orderId, uint256 amountIn, uint256 nonce, uint256 deadline)
+        internal
+        pure
+        returns (bytes32);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| orderId | `bytes32` |  |
+| amountIn | `uint256` |  |
+| nonce | `uint256` |  |
+| deadline | `uint256` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes32` |  |
+
+# RadixPriceTree
+
+[Git Source](https://github.com/asyncswap/contracts/blob/7cd7ee9169e905d4ba1d1d1aee38a036b3c68d62/src/libraries/RadixPriceTree.sol)
+
+Patricia radix index for uint128 price levels. Inserts and removals
+traverse at most 128 branch bits; each distinct price creates one
+leaf and at most one branch node. Node ids released by `remove` are
+recycled by later inserts, so the id counter only grows with the peak
+number of simultaneously stored prices and can never be exhausted in
+practice (2^31 simultaneous levels).
+
+## Functions
+
+<a id="insert-tree-uint128" />
+
+### insert
+
+```solidity
+function insert(Tree storage self, uint128 price) internal returns (bool created);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `Tree` |  |
+| price | `uint128` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| created | `bool` |  |
+
+<a id="remove-tree-uint128" />
+
+### remove
+
+```solidity
+function remove(Tree storage self, uint128 price) internal;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `Tree` |  |
+| price | `uint128` |  |
+
+<a id="best-tree-bool" />
+
+### best
+
+```solidity
+function best(Tree storage self, bool highest) internal view returns (bool found, uint128 price);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `Tree` |  |
+| highest | `bool` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| found | `bool` |  |
+| price | `uint128` |  |
+
+<a id="_newnode-tree" />
+
+### \_newNode
+
+<i>
+  Reuse a released id first; only grow the counter when none is free. A freed id
+  is referenced by nothing (its parent, sibling and `leaves` entries were rewired in
+  `remove`), so reusing it cannot alias a live node.
+</i>
+
+```solidity
+function _newNode(Tree storage self) private returns (uint32 id);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `Tree` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| id | `uint32` |  |
+
+<a id="_freenode-tree-uint32" />
+
+### \_freeNode
+
+```solidity
+function _freeNode(Tree storage self, uint32 id) private;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `Tree` |  |
+| id | `uint32` |  |
+
+<a id="_bitset-uint128-uint8" />
+
+### \_bitSet
+
+```solidity
+function _bitSet(uint128 value, uint8 bit) private pure returns (bool);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| value | `uint128` |  |
+| bit | `uint8` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bool` |  |
+
+<a id="_mostsignificantbit-uint128" />
+
+### \_mostSignificantBit
+
+```solidity
+function _mostSignificantBit(uint128 value) private pure returns (uint8 bit);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| value | `uint128` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| bit | `uint8` |  |
+
+## Errors
+
+### PriceLevelMissing
+
+```solidity
+error PriceLevelMissing();
+```
+
+### NodeIdOverflow
+
+```solidity
+error NodeIdOverflow();
+```
+
+## Structs
+
+### Node
+
+```solidity
+struct Node {
+        uint32 parent;
+        uint32 left;
+        uint32 right;
+        uint128 price;
+        uint8 bit;
+        bool leaf;
+    }
+```
+
+**Properties**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| parent | `uint32` |  |
+| left | `uint32` |  |
+| right | `uint32` |  |
+| price | `uint128` |  |
+| bit | `uint8` |  |
+| leaf | `bool` |  |
+
+### Tree
+
+```solidity
+struct Tree {
+        uint32 root;
+        uint32 nextNodeId;
+        /// @dev Ids released by `remove`; `_newNode` pops from here before growing `nextNodeId`.
+        uint32[] freeIds;
+        mapping(uint32 id => Node) nodes;
+        mapping(uint128 price => uint32 id) leaves;
+    }
+```
+
+**Properties**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| root | `uint32` |  |
+| nextNodeId | `uint32` |  |
+| freeIds | `uint32[]` |  |
+| nodes | `mapping(uint32 id => Node)` |  |
+| leaves | `mapping(uint128 price => uint32 id)` |  |
+
+# AsyncOrderLibrary
+
+[Git Source](https://github.com/asyncswap/contracts/blob/7cd7ee9169e905d4ba1d1d1aee38a036b3c68d62/src/types/AsyncOrder.sol)
+
+**Title:** AsyncOrderLibrary
+
+Helpers attached to AsyncOrder for identity and pricing.
+
+## Functions
+
+<a id="orderid-asyncorder" />
+
+### orderId
+
+Stable identifier for an order, derived from its addressing fields.
+
+<i>
+  (chainId, poolId, owner, zeroForOne, salt) uniquely identifies one open order.
+
+  * `block.chainid` keeps ids unique across chains where the same PoolKey can be
+    deployed (for example Unichain mainnet and Sepolia).
+  * `salt` is contract-assigned at create time and stored off-chain (in the event
+    log) so the maker can pass it back when calling cancel / updatePrice / fill.
+    `view` (not `pure`) because `block.chainid` reads EVM context.
+</i>
+
+```solidity
+function orderId(AsyncOrder calldata order) internal view returns (bytes32);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes32` |  |
+
+# AsyncOrder
+
+[Git Source](https://github.com/asyncswap/contracts/blob/7cd7ee9169e905d4ba1d1d1aee38a036b3c68d62/src/types/AsyncOrder.sol)
+
+Represents an async order for a swap in the Uniswap V4 pool.
+
+```solidity
+struct AsyncOrder {
+    PoolKey key;
+    address owner;
+    bool zeroForOne;
+    uint256 amountIn;
+    uint256 amountOutMin;
+    uint256 priorityFee;
+    uint160 sqrtPrice;
+    bytes32 salt;
+}
+```
+
+**Properties**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| key | `PoolKey` | The Uniswap V4 PoolKey identifying the pool the order is placed against. |
+| owner | `address` | The maker who supplied `amountIn` of the input currency at order submission. |
+| zeroForOne | `bool` | Direction of the order. true => input is currency0, output is currency1. |
+| amountIn | `uint256` | Amount of input currency the maker escrowed. Direct matching may partially fill it;<br />unused input is returned when the maker's minimum output is satisfied. |
+| amountOutMin | `uint256` | Minimum amount of output currency the maker accepts. The implicit limit price is<br />`amountOutMin / amountIn`. A filler or direct match must satisfy the live minimum<br />for the amount it consumes. |
+| priorityFee | `uint256` | Non-refundable USDC bid for equal-price priority. Priority-fee mode requires at<br />least $0.10; filled portions are donated to active LPs, and any remainder is<br />donated when canceled or moved to the protocol FeeVault if no LPs are active. |
+| sqrtPrice | `uint160` | Sqrt-price limit passed to `PoolManager.swap` on submission. The hook consumes<br />the whole input in `beforeSwap`, so the pool never trades against it. |
+| salt | `bytes32` | Contract-assigned salt that disambiguates orders. The hook computes this at create<br />time from `keccak256(timestamp, block.number, msg.sender, owner, amountIn,<br/>amountOutMin, priorityFee)` and emits it in `AsyncOrderCreated` so the maker can reference the<br />order in cancel / updatePrice. Submitters pass `bytes32(0)` on create — the value<br />in this slot is only read on cancel / updatePrice / fill paths. |

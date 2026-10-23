@@ -1,0 +1,36 @@
+![AsyncSwap](/assets/async-swap-banner.png)
+
+# AsyncSwap
+
+AsyncSwap is an on-chain order book and matching engine built as a Uniswap v4 hook. Traders set a
+limit price for assets paired with USDC. Orders match with other traders or with the pool's active
+liquidity, and anyone can permissionlessly fill a resting order.
+
+* **Price, then bid, then time.** Book matching ranks orders by price. Among orders at the same
+  price, a higher escrowed USDC priority bid goes first, and earlier orders break equal bids.
+* **Orders rest until they execute.** Unfilled amounts stay open for later matching, a pool fill,
+  a filler, repricing or cancellation.
+* **No swap touches the curve directly.** Every swap becomes an order. The only AMM swaps are the
+  ones the hook makes to fill a resting order from pool liquidity, and those pay active LPs a
+  0.30% fee.
+* **Proceeds you can always claim.** A book match credits both sides as PoolManager claims, which
+  you redeem to any address through `TokenClaims` (ERC-20) or `NativeClaims` (ETH). A recipient a
+  token refuses cannot block matching.
+
+## Where to start
+
+| If you want to | Read |
+| --- | --- |
+| Understand the contracts, custody and fees | [Protocol overview](/protocol/overview) |
+| Follow an order from placement to settlement, and how priority bids are paid | [Order lifecycle and priority bids](/protocol/order-lifecycle) |
+| See every call, callback and withdrawal step | [Contract call sequences](/protocol/contract-call-sequences) |
+| Check how prices are compared and rounded | [Price keys and crossing](/protocol/price-key-crossing) |
+| Review audit findings and their fixes | [Audit status](/audit/status) |
+| Look up a contract, function or event | [Contract reference](/reference) |
+
+## Status
+
+The contracts are on [`asyncswap/contracts`](https://github.com/asyncswap/contracts) `main`. Every
+finding of the Nethermind AuditAgent report is fixed or acknowledged; see the
+[audit status](/audit/status). These docs rebuild from that repository on every change to its
+sources, guides or audit notes.

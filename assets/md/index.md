@@ -1,8 +1,8 @@
-![AsyncSwap](/assets/async-swap-banner.png)
+![Async Swap](/assets/async-swap-banner.png)
 
-# AsyncSwap
+# Async Swap
 
-AsyncSwap is an on-chain order book and matching engine built as a Uniswap v4 hook. Traders set a
+Async Swap is an on-chain order book and matching engine built as a Uniswap v4 hook. Traders set a
 limit price for assets paired with USDC. Orders match with other traders or with the pool's active
 liquidity, and anyone can permissionlessly fill a resting order.
 

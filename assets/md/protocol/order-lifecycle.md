@@ -1,10 +1,10 @@
 # Order lifecycle and priority bids
 
-Current V2 behavior, checked against the contract source. See also [contract call sequences](/protocol/contract-call-sequences) and the [V2 README](/).
+Current behavior, checked against the contract source. See also [contract call sequences](/protocol/contract-call-sequences) and the [README](/).
 
 ## Order lifecycle
 
-These diagrams describe the current V2 source, not a deployment or mainnet-readiness guarantee. Book matching ranks the best opposing price first; higher escrowed USDC bids break ties at that price, followed by earlier submission. Private fills and explicit LP retries target a specific order and do not enforce the book's global priority queue.
+These diagrams describe the current source, not a deployment or mainnet-readiness guarantee. Book matching ranks the best opposing price first; higher escrowed USDC bids break ties at that price, followed by earlier submission. Private fills and explicit LP retries target a specific order and do not enforce the book's global priority queue.
 
 ```mermaid
 flowchart TD

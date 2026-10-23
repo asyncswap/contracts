@@ -1,9 +1,9 @@
-# AsyncSwap
+# Async Swap
 
 An on-chain order book and matching engine built as a Uniswap v4 hook: limit orders against USDC, matched by price, priority bid and time.
 
-- [AsyncSwap](/index): An on-chain order book and matching engine built as a Uniswap v4 hook.
-- [Async Swap v2 protocol map](/protocol/overview)
+- [Async Swap](/index): An on-chain order book and matching engine built as a Uniswap v4 hook.
+- [Async Swap protocol map](/protocol/overview)
 - [Order lifecycle and priority bids](/protocol/order-lifecycle)
 - [Contract call sequences](/protocol/contract-call-sequences)
 - [Price keys and crossing](/protocol/price-key-crossing)

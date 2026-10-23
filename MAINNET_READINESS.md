@@ -1,46 +1,104 @@
 # Unichain mainnet readiness
 
-Status: BLOCKED. No mainnet deployment was broadcast during this preparation.
+Status: **WAITING FOR AUDIT.** The contracts are ready for independent security review. No mainnet
+deployment has been broadcast, and none will be until the audit is complete and its findings are resolved.
 
-## Native settlement
+## Audit
 
-Native ETH proceeds and refunds mint PoolManager ERC-6909 claims (ID 0) directly to recipients. Matching, manual fills, LP fills, and cancellations make no calls to native recipients. ERC20 settlement transfers tokens directly.
+- **Scope:** [`audit/AUDIT_SCOPE_10_19_26.md`](audit/AUDIT_SCOPE_10_19_26.md). It freezes the code at
+  `dc8042d` (2026-10-19). `main` has moved 34 commits since: exact-price eligibility (`EligiblePrice`),
+  `TokenClaims`, claim-based match payouts, FeeVault-only priority bids, priority-fee-only pools, the
+  minimum order size and `optimizer_runs = 1_000`. Re-freeze the scope at the commit the auditor will
+  review, and update its file list and description, before the audit starts.
+- **Automated review:** every finding of the Nethermind AuditAgent report is fixed or acknowledged, each
+  fix with a regression test that fails on the audited commit; see
+  [`audit/auditagent_report_1_status.md`](audit/auditagent_report_1_status.md).
+- **Previous audits** (Lee, 33 Labs, the H-05 follow-up) covered the earlier
+  [asyncswap/protocol](https://github.com/asyncswap/protocol) code; see [`audit/README.md`](audit/README.md).
 
-A recipient that rejects ETH is covered by `test_rejectingBestBuyerReceivesClaimsWithoutBlocking`, which requires successful matching and credits the rejecting recipient with claims. NativeClaims redeems only the caller's claims after a PoolManager approval, to a chosen nonzero recipient. Failed transfers restore claims and allowance atomically. Tests cover partial redemption, unauthorized access, callback authentication, reentrant unlock attempts, and double spending.
+## Settlement model
 
-This covers native settlement only. ERC20 callback behavior and the broader matching/settlement architecture require security review.
+- **Book matches** credit both sides, and any remainder returned below the pool minimum, as PoolManager
+  ERC-6909 claims in every currency. Matching makes no token transfers and calls no recipient code, so a
+  recipient that a token refuses (for example a USDC-blocklisted address) or that rejects ETH cannot block
+  the book.
+- **Filler fills and pool-liquidity fills** pay ERC-20 output directly to the maker; native output is
+  credited as claims. The order is closed before any payout, and a failed pool fill reverts only its own
+  attempt, leaving the order resting.
+- **Cancellations** return ERC-20 input directly and native input as claims.
+- **Redemption:** `TokenClaims.redeem(currency, recipient, amount)` (ERC-20) and
+  `NativeClaims.redeem(recipient, amount)` (ETH) redeem only the caller's claims, after a PoolManager
+  approval for that claim id, to any nonzero recipient. A failed transfer restores claims and allowance
+  atomically; re-entry is blocked.
+- **Priority bids** are escrowed as hook claims at order creation and always settle to the FeeVault,
+  never to LPs.
 
 ## Evidence collected
 
-- Existing suite: 119 passing tests before this preparation.
-- UnichainForkTest: 3 passing tests against block 61279110, using real PoolManager and USDC with test-funded accounts. Covers native/USDC fills, residual cancellation, nonrefundable priority fees without LPs, and continuation after the eight-match bound.
-- MatchingInvariantTest and priority variant: 6 passing invariants, each with 64 runs and depth 64 (4096 calls), fail-on-revert enabled. Checks outstanding escrow, asset conservation, and best prices against a linear scan.
-- UnpaidBidInvariantTest: 7 passing invariants (128 runs, depth 64) with orders whose priority bid was never paid (placed straight through the PoolManager, down to 1 wei, bids up to `uint64` max): matching never reverts, a crossing taker can always trade, every open order can be cancelled, an unpaid bid buys no priority, plus escrow, conservation and best-price checks. Against the code before #9, five of them fail.
-- Full run: 155 tests passed, zero failed (2026-10-19, at the audit freeze). The 3 pinned Unichain fork tests are skipped unless the fork RPC variables are set; with them set they pass (re-run 2026-10-15 against block 61279110). Includes the native LP fill test and the price-key crossing tests (`docs/price-key-crossing.md`). Invariants include randomized claim redemption and exact native backing (64 runs, depth 64, fail-on-revert).
-- Local CREATE2 deployment and indexed frontend: integrated contracts settle 0.4 ETH for 1000 USDC and 0.6 ETH for 1500 USDC, with recipient balances reflecting both fills.
-
-Fork command:
+- **Full suite:** 833 passed, 0 failed, 1 skipped (2026-10-23, `main` at `e62a183`). The skipped suite is
+  the Unichain fork test, which runs when its RPC variables are set.
+- **Invariants:** 10 invariants across `MatchingInvariantTest`, `PriorityMatchingInvariantTest` and
+  `LpMatchingInvariantTest`, 64 runs × depth 64 (4,096 calls) each with fail-on-revert: escrow equals
+  outstanding obligations, asset conservation, best prices against a linear scan, and the hook holds no
+  USDC beyond escrow.
+- **Regression suites:** `test/security/` (exact-price eligibility, minimum order, priority fees, native
+  settlement, reentrancy, fee claims, order windows and more), `test/nethermind_auditagent/` (one test per
+  AuditAgent finding) and `test/TokenClaims.t.sol`.
+- **Bytecode checks:** `test/formal/` runs single-call property checks of the compiled contracts.
+- **Coverage of `src/`:** 99.9% lines, 99.4% statements, 98.8% branches, 100% functions. The uncovered
+  branches are unreachable guards.
+- **Unichain fork:** `UnichainForkTest`, 3 tests against block 61279110 with the real PoolManager and USDC:
+  native/USDC fills, residual cancellation, non-refundable priority fees without LPs, and continuation
+  after the eight-match bound. Last run 2026-10-15; re-run on the audited commit.
+- **Local CREATE2 deployment** with the indexed frontend settled 0.4 ETH for 1,000 USDC and 0.6 ETH for
+  1,500 USDC, with recipient balances reflecting both fills.
 
 ```sh
+forge test                                   # full suite
 UNICHAIN_FORK_RPC_URL=https://mainnet.unichain.org UNICHAIN_FORK_BLOCK=61279110 forge test --match-contract UnichainForkTest -vv
-FOUNDRY_INVARIANT_RUNS=64 FOUNDRY_INVARIANT_DEPTH=64 FOUNDRY_INVARIANT_FAIL_ON_REVERT=true forge test --match-contract MatchingInvariantTest -vv
+forge coverage --skip 'test/formal/AsyncSwapBeforeSwap.t.sol' --report summary --no-match-coverage '(test|script|dependencies)/'
 ```
 
-The fork fixture installs hook code for tests. It is not a rehearsal of the complete production deployment script. The local demo deploys a new mock-USDC market; it is not a mainnet liquidity simulation.
+The fork fixture installs hook code for tests. It is not a rehearsal of the production deployment
+script. The local demo deploys a new mock-USDC market; it is not a mainnet liquidity simulation.
 
 ## Deployment constraints
 
 - Chain: Unichain 130.
-- PoolManager: 0x1F98400000000000000000000000000000000004. Source: https://developers.uniswap.org/docs/protocols/v4/deployments
-- USDC configuration: 0x078D782b760474a361dDA0AF3839290b0EF57AD6. Revalidate issuer address and decimals in the final rehearsal.
-- Current artifact runtime size: hook 24,428 bytes, leaving 148 bytes under EIP-170 (after #9). Recheck after any further change.
-- Deployment wrapper checks library code presence, not exact runtime identity. Pin and verify the final library and hook runtime hashes.
-- Owner in current script: 0xb1F0982E02f9F71E60512fd47471d76610CcB556. Confirm final owner, operational permissions, and funding before broadcast.
+- PoolManager: `0x1F98400000000000000000000000000000000004`.
+  Source: <https://developers.uniswap.org/docs/protocols/v4/deployments>
+- USDC: `0x078D782b760474a361dDA0AF3839290b0EF57AD6`. Revalidate issuer address and decimals in the final
+  rehearsal.
+- Runtime sizes (`forge build --sizes`, `optimizer_runs = 1_000`, 2026-10-23): AsyncSwap 19,237 bytes,
+  AsyncMatching 19,064, Router 17,580, FeeVault 1,952, TokenClaims 1,760, NativeClaims 1,666. All under the
+  24,576-byte EIP-170 limit; the hook has 5,339 bytes of margin. Recheck after any audit fix.
+- The deployment wrapper checks library code presence, not exact runtime identity. Pin and verify the
+  final library and hook runtime hashes.
+- `AsyncMatching` deploys through CREATE2 with the salt `keccak256("asyncswap.v2.AsyncMatching")`, which
+  fixes its address across chains. Keep it unless a new address is intended.
+- Owner in the current script: `0xb1F0982E02f9F71E60512fd47471d76610CcB556`. Confirm the final owner,
+  operational permissions and funding before broadcast.
 
-## Release work remaining
+## Before the audit starts
 
-Complete callback safety review beyond native settlement. Stress the integrated custody path at 100 transactions per block with adversarial dust, cancellation, and priority cases. Existing standalone matching benchmarks do not establish integrated throughput. Complete a pinned deployment-script fork rehearsal, final-bytecode verification, and independent security review. Confirm the production indexer/frontend understand all events and order states. The local matching lab uses a separate SQLite indexer.
+- Re-freeze `audit/AUDIT_SCOPE_10_19_26.md` at the commit to be audited (see [Audit](#audit)).
 
-`script/check-mainnet-readiness.sh` runs the native rejecting-recipient test and deliberately keeps release blocked pending independent review and the remaining deployment/stress work.
+## After the audit
 
-NativeClaims deployment preparation: `script/DeployNativeClaims.s.sol`. No broadcast has been made. Clients must display native proceeds as claim balances, approve claim ID 0 on PoolManager, and call `NativeClaims.redeem(recipient, amount)`. Approval is for claims, not ERC20 or hook executor permissions. Runtime sizes as of 2026-10-19 (`forge build --sizes`): hook 24,428 bytes, AsyncMatching 19,440 bytes, NativeClaims 1,666 bytes.
+- Fix or acknowledge every finding, each fix with a regression test, and re-run the full suite, the
+  invariants and the fork tests on the final commit.
+- Stress the integrated custody path at 100 transactions per block with adversarial dust, cancellation and
+  priority cases. The standalone matching benchmarks (`script/stress-matching-engine.sh`) do not establish
+  integrated throughput.
+- Rehearse the pinned deployment script on a Unichain fork, then verify the final bytecode and publish
+  sources.
+- Deploy the claim redeemers with the core contracts: `script/DeployTokenClaims.s.sol` and
+  `script/DeployNativeClaims.s.sol` (not broadcast yet).
+- Ship the claim experience in the indexer and frontend before launch: match proceeds and native proceeds
+  are claim balances, which users redeem by approving the claim id on the PoolManager and calling
+  `TokenClaims.redeem` or `NativeClaims.redeem`. Approval is for claims, not ERC-20 or hook executor
+  permissions. Confirm the production indexer and frontend understand all events and order states; the
+  local matching lab uses a separate SQLite indexer.
+
+`script/check-mainnet-readiness.sh` runs the native rejecting-recipient test and deliberately exits
+non-zero, keeping release blocked until the audit and the remaining work are complete.

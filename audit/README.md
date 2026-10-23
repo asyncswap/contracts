@@ -1,6 +1,8 @@
 # Audit
 
-- [AUDIT_SCOPE_10_19_26.md](AUDIT_SCOPE_10_19_26.md): scope for the next audit of this repository.
+- [AUDIT_SCOPE_10_23_26.md](AUDIT_SCOPE_10_23_26.md): scope for the next audit of this repository, frozen at
+  `830cd9e`.
+- [AUDIT_SCOPE_10_19_26.md](AUDIT_SCOPE_10_19_26.md): earlier scope, frozen at `dc8042d`; superseded.
 - [auditagent_report_1_status.md](auditagent_report_1_status.md): what is fixed, acknowledged or open
   from the Nethermind AuditAgent report
   ([auditagent_report_1_ae602e60-d592-45ec-92ef-891968f087f0.md](auditagent_report_1_ae602e60-d592-45ec-92ef-891968f087f0.md)).

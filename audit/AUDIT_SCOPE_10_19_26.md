@@ -1,5 +1,7 @@
 # Audit scope: Async Swap
 
+> Superseded by [`AUDIT_SCOPE_10_23_26.md`](AUDIT_SCOPE_10_23_26.md). Kept for history.
+
 - **Repository:** <https://github.com/asyncswap/contracts>
 - **Code frozen at:** `dc8042d3eff80d042f92b7cc4300cb3ef56a3c1f` on `main`.
 - **Compiler:** solc 0.8.26, optimizer on (`optimizer_runs = 1_000_000`); see `foundry.toml`.

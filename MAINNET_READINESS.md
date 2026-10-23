@@ -5,11 +5,10 @@ deployment has been broadcast, and none will be until the audit is complete and 
 
 ## Audit
 
-- **Scope:** [`audit/AUDIT_SCOPE_10_19_26.md`](audit/AUDIT_SCOPE_10_19_26.md). It freezes the code at
-  `dc8042d` (2026-10-19). `main` has moved 34 commits since: exact-price eligibility (`EligiblePrice`),
-  `TokenClaims`, claim-based match payouts, FeeVault-only priority bids, priority-fee-only pools, the
-  minimum order size and `optimizer_runs = 1_000`. Re-freeze the scope at the commit the auditor will
-  review, and update its file list and description, before the audit starts.
+- **Scope:** [`audit/AUDIT_SCOPE_10_23_26.md`](audit/AUDIT_SCOPE_10_23_26.md). It freezes the code at
+  `830cd9e` (2026-10-23): 3,156 nSLOC across `src/` and `script/`. It supersedes
+  [`audit/AUDIT_SCOPE_10_19_26.md`](audit/AUDIT_SCOPE_10_19_26.md) (`dc8042d`). If `src/` or `script/`
+  changes before the audit starts, re-freeze in a new dated scope file.
 - **Automated review:** every finding of the Nethermind AuditAgent report is fixed or acknowledged, each
   fix with a regression test that fails on the audited commit; see
   [`audit/auditagent_report_1_status.md`](audit/auditagent_report_1_status.md).
@@ -81,7 +80,8 @@ script. The local demo deploys a new mock-USDC market; it is not a mainnet liqui
 
 ## Before the audit starts
 
-- Re-freeze `audit/AUDIT_SCOPE_10_19_26.md` at the commit to be audited (see [Audit](#audit)).
+- If `src/` or `script/` changes after `830cd9e`, add a new dated scope file frozen at the commit to be
+  audited (see [Audit](#audit)).
 
 ## After the audit
 

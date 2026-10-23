@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
-import {FormalMatchD} from "../harness/FormalMatchD.sol";
+import {FormalMatchD} from "../formal/FormalMatchD.sol";
 
 contract EligibleRemainderTest is FormalMatchD {
     function test_refreshWhenPriceKeyAndFeeAreUnchanged() public {

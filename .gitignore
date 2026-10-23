@@ -25,5 +25,5 @@ dependencies/uniswap-v4-core-4/
 node_modules/
 
 # Retired Lean proofs and Formal Mind tooling: kept out of the repository
-formal/
-.formal/
+/formal/
+/.formal/

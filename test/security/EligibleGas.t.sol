@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
-import {FormalMatchD} from "../harness/FormalMatchD.sol";
+import {FormalMatchD} from "../formal/FormalMatchD.sol";
 import {AsyncMatching} from "@async-swap/libraries/AsyncMatching.sol";
 
 /// @notice Gross execution gas around the real unlock; refunds and transaction intrinsic gas excluded.

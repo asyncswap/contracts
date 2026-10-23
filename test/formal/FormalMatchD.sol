@@ -21,7 +21,7 @@ import {MockERC20} from "../utils/MockERC20.sol";
 ///         Router's `matchNewOrder`, so they rest crossed; the test contract is their executor and
 ///         pays their input. The PoolManager / ERC-20 / hook events of the match are decoded into an
 ///         ordered trace of `burn` / `mint` / `take` / priority-fee settlements / the match event,
-///         which the tests compare with the expected sequence, in order. Both orders are
+///         which the tests compare with what the theorems say happens, in order. Both orders are
 ///         reduced before either escrow leg pays out, so the trace is: the sell reduction, the buy
 ///         reduction, the asset leg, the quote leg, then the match event.
 abstract contract FormalMatchD is HookUnlockBase {
@@ -103,7 +103,7 @@ abstract contract FormalMatchD is HookUnlockBase {
         return (x * y) % d == 0 ? (x * y) / d : (x * y) / d + 1;
     }
 
-    /// @dev Reference model of `AsyncMatching._matchAmounts` on (sell, buy). Plain
+    /// @dev `AsyncSwap.matchAmounts` (formal/AsyncSwapSpec/Match.lean:27) on (sell, buy). Plain
     ///      arithmetic is exact here: every amount is below 2^127.
     function _spec(uint256 a, uint256 q, uint256 Q, uint256 A, bool rb)
         internal

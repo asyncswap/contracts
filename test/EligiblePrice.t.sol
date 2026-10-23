@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
-import {FormalRefA} from "./harness/FormalHarnessesA.sol";
+import {FormalRefA} from "./formal/FormalHarnessesA.sol";
 import {RadixPriceTree} from "@async-swap/libraries/RadixPriceTree.sol";
 import {EligiblePrice} from "@async-swap/libraries/EligiblePrice.sol";
 

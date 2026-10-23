@@ -16,7 +16,8 @@ contract MathMulDivHarness {
 }
 
 /// @notice Runs the real `RadixPriceTree.insert` / `remove` on its own tree. The setters only write
-///         the tree's fields, so a test can start from any tree state. The private `_newNode`, `_freeNode`, `_bitSet` and `_mostSignificantBit` are
+///         the tree's fields, so a test can start from any tree state (the Lean theorems quantify over
+///         every state). The private `_newNode`, `_freeNode`, `_bitSet` and `_mostSignificantBit` are
 ///         reached through `insert` and `remove`.
 contract RadixPriceTreeHarness {
     using RadixPriceTree for RadixPriceTree.Tree;

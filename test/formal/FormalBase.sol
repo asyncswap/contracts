@@ -8,8 +8,9 @@ import {Hooks} from "v4-core/libraries/Hooks.sol";
 import {PoolModifyLiquidityTest} from "v4-core/test/PoolModifyLiquidityTest.sol";
 import {ModifyLiquidityParams} from "v4-core/types/PoolOperation.sol";
 
-/// @notice Shared scaffold for single-call checks on the compiled contracts: deploys the hook, places
-///         orders and reads hook storage directly.
+/// @notice Shared scaffold for the bytecode checks of Formal Mind's Lean theorems (`formal/Refinement`).
+///         Each test in `test/formal/` states one theorem's single-call outcome on the compiled
+///         contracts; see `test/formal/README.md` for the theorem → test map.
 contract FormalBase is SetupHook {
     address alice = makeAddr("alice"); // maker
     address bob = makeAddr("bob"); // filler
@@ -137,7 +138,7 @@ contract FormalBase is SetupHook {
     }
 
     /// @dev Snapshot of the hook's whole account storage is not available; tests compare the slots
-    ///      they care about (`vm.load`) or the public getters before and after a call.
+    ///      a theorem names (`vm.load`) or the public getters before and after a call.
     function _loadHook(bytes32 slot) internal view returns (bytes32) {
         return vm.load(address(hook), slot);
     }

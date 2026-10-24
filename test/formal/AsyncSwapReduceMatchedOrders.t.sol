@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 import {FormalMatchD} from "./FormalMatchD.sol";
 
 /// @notice Bytecode checks of `formal/Refinement/Swarm/AsyncSwapReduceMatchedOrders.lean`.
@@ -28,7 +29,7 @@ contract AsyncSwapReduceMatchedOrdersFormalTest is FormalMatchD {
         if (r.matched == 0) return;
         Op[] memory sellOps = _sideOps(c, c.sellId, r.asset, true, r);
         Op[] memory buyOps = _sideOps(c, c.buyId, r.quote, false, r);
-        assertEq(r.ops.length, sellOps.length + buyOps.length + 4 + 1, "sell reduction, buy reduction, legs, event");
+        _assertOps(r.ops, _expected(c, r));
         for (uint256 i; i < sellOps.length; ++i) {
             _assertOp(r.ops[i], sellOps[i], "sell reduction first");
         }
@@ -50,17 +51,24 @@ contract AsyncSwapReduceMatchedOrdersFormalTest is FormalMatchD {
         }
         (bool matches, uint256 asset, uint256 quote) = _pre(c);
         if (!matches) return;
-        Run memory pre;
-        pre.sell0 = _info(c.pid, c.sellId);
-        pre.buy0 = _info(c.pid, c.buyId);
-        Op[] memory buyOps = _sideOps(c, c.buyId, quote, false, pre);
-        uint256 i;
-        while (i < buyOps.length && (buyOps[i].kind == OP_FEE_DONATED || buyOps[i].kind == OP_FEE_FORFEITED)) ++i;
-        if (i == buyOps.length) return; // the buy reduction makes no PoolManager call here
-        bytes memory reason = abi.encodeWithSignature("MockedBuyReduction(uint256)", tag);
-        _mockOpRevert(buyOps[i], reason);
+        AsyncFiller.OrderInfo memory sell0 = _info(c.pid, c.sellId);
+        AsyncFiller.OrderInfo memory buy0 = _info(c.pid, c.buyId);
+        uint256 fees = (_closes(sell0, asset) ? _paid(sell0) : _filled(sell0, asset))
+            + (_closes(buy0, quote) ? _paid(buy0) : _filled(buy0, quote));
+        if (fees == 0) return;
+        address vault = address(hook.feeVault());
+        uint256 vaultBefore = _claims(vault, currency1);
+        uint256 buyerBefore = _claims(bob, c.k.currency0);
+        uint256 sellerBefore = _claims(alice, c.k.currency1);
+        bytes memory reason = abi.encodeWithSignature("MockedBatchSettlement(uint256)", tag);
+        _mockPayoutRevert(currency1, vault, fees, reason);
         vm.expectRevert(reason);
         _run(_matchCalls(c.k));
+        assertEq(keccak256(abi.encode(_info(c.pid, c.sellId))), keccak256(abi.encode(sell0)), "sell restored");
+        assertEq(keccak256(abi.encode(_info(c.pid, c.buyId))), keccak256(abi.encode(buy0)), "buy restored");
+        assertEq(_claims(vault, currency1), vaultBefore, "vault unchanged");
+        assertEq(_claims(bob, c.k.currency0), buyerBefore, "buyer unchanged");
+        assertEq(_claims(alice, c.k.currency1), sellerBefore, "seller unchanged");
     }
 
     /// @notice formal/Refinement/Swarm/AsyncSwapReduceMatchedOrders.lean:148 — on success the sell order held at least assetAmount at entry and the buy order at least quoteAmount once the sell side was reduced.
@@ -68,7 +76,7 @@ contract AsyncSwapReduceMatchedOrdersFormalTest is FormalMatchD {
         Case memory c = _mkCase(s, flags);
         Run memory r = _exec(c);
         if (r.matched == 0) return;
-        Op memory m = r.ops[r.ops.length - 1];
+        Op memory m = _matchedOp(r.ops);
         assertLe(m.amount, r.sell0.amountIn, "assetAmount <= sell amountIn at entry");
         assertLe(m.amount2, r.buy0.amountIn, "quoteAmount <= buy amountIn (unchanged by the sell reduction)");
     }

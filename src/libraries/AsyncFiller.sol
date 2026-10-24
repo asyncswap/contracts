@@ -214,8 +214,7 @@ library AsyncFiller {
     ) internal {
         if (amount == 0) return;
         // Priority bids fund the protocol independently of instantaneous LP liquidity.
-        self.numeraire.settle(self.poolManager, hook, amount, true);
-        self.numeraire.take(self.poolManager, self.feeVault, amount, true);
+        self.poolManager.transfer(self.feeVault, self.numeraire.toId(), amount);
         emit PriorityFeeForfeited(key.toId(), id, maker, amount);
     }
 

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
+import {IERC6909Claims} from "v4-core/interfaces/external/IERC6909Claims.sol";
 
 import {HookUnlockBase} from "./HookUnlockBase.sol";
 import {AsyncSwap} from "@async-swap/AsyncSwap.sol";
@@ -12,18 +13,9 @@ import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {MockERC20} from "../utils/MockERC20.sol";
 
-/// @notice Group-D scaffold for the private steps of `AsyncMatching`'s matching pipeline
-///         (`_matchPair` → `_matchAmounts`, `_settleTransfers` → `_transferEscrow`,
-///         `_reduceMatchedOrders` → `_reduceAfterMatch` → `_settleMatchedPriorityFee`). They are
-///         private, so they are observed through one `AsyncSwap.matchBook(key, 1)` call: exactly one
-///         `_matchPair(bidId, askId)` on a book holding one resting sell (alice, `zeroForOne`) and one
-///         resting buy (bob, `!zeroForOne`). The two orders are created inside an unlock without the
-///         Router's `matchNewOrder`, so they rest crossed; the test contract is their executor and
-///         pays their input. The PoolManager / ERC-20 / hook events of the match are decoded into an
-///         ordered trace of `burn` / `mint` / `take` / priority-fee settlements / the match event,
-///         which the tests compare with what the theorems say happens, in order. Both orders are
-///         reduced before either escrow leg pays out, so the trace is: the sell reduction, the buy
-///         reduction, the asset leg, the quote leg, then the match event.
+/// @notice One-pair runtime checks for the matching pipeline. Orders rest crossed before
+///         matchBook(key, 1). The trace records fee notices and the match event, followed
+///         by direct claim transfers in first-credit order. No underlying token payout occurs.
 abstract contract FormalMatchD is HookUnlockBase {
     using PoolIdLibrary for PoolKey;
 
@@ -32,6 +24,7 @@ abstract contract FormalMatchD is HookUnlockBase {
     uint8 constant OP_TAKE = 3; // PoolManager.take(token = cur, to = who, amount) (ERC-20 leaves the PM)
     uint8 constant OP_FEE_DONATED = 4; // PriorityFeeDonated(orderId = tag, maker = who, amount)
     uint8 constant OP_FEE_FORFEITED = 5; // PriorityFeeForfeited(orderId = tag, maker = who, amount)
+    uint8 constant OP_TRANSFER = 7; // direct ERC-6909 claim transfer from the hook
     uint8 constant OP_MATCHED = 6; // AsyncOrdersMatched(sell = tag, buy = tag2, asset = amount, quote = amount2)
 
     bytes32 constant T6909 = keccak256("Transfer(address,address,address,uint256,uint256)");
@@ -345,6 +338,8 @@ abstract contract FormalMatchD is HookUnlockBase {
                     ops[n++] = Op(OP_BURN, from, uint256(l.topics[3]), amount, 0, 0, 0);
                 } else if (from == address(0)) {
                     ops[n++] = Op(OP_MINT, to, uint256(l.topics[3]), amount, 0, 0, 0);
+                } else if (from == address(hook)) {
+                    ops[n++] = Op(OP_TRANSFER, to, uint256(l.topics[3]), amount, 0, 0, 0);
                 }
             } else if (
                 t0 == T20 && (l.emitter == address(token0) || l.emitter == address(token1))
@@ -410,17 +405,14 @@ abstract contract FormalMatchD is HookUnlockBase {
         _add(t, Op(OP_MINT, to, c.toId(), amount, 0, 0, 0));
     }
 
-    /// @dev `_transferEscrow`: burn `amount` of `c` from the hook, then the payout.
+    /// @dev A direct claim transfer from the hook, deferred until the match loop completes.
     function _escrowLeg(Trace memory t, Currency c, address to, uint256 amount) internal view {
-        _add(t, Op(OP_BURN, address(hook), c.toId(), amount, 0, 0, 0));
-        _payout(t, c, to, amount);
+        _add(t, Op(OP_TRANSFER, to, c.toId(), amount, 0, 0, 0));
     }
 
     /// @dev `AsyncFiller.settlePriorityFee(amount)` (nothing when `amount == 0`).
     function _feeOps(Trace memory t, Case memory c, bytes32 id, address maker, uint256 amount) internal view {
         if (amount == 0) return;
-        _add(t, Op(OP_BURN, address(hook), currency1.toId(), amount, 0, 0, 0));
-        _add(t, Op(OP_MINT, address(hook.feeVault()), currency1.toId(), amount, 0, 0, 0));
         _add(t, Op(OP_FEE_FORFEITED, maker, 0, amount, 0, id, 0));
     }
 
@@ -461,23 +453,26 @@ abstract contract FormalMatchD is HookUnlockBase {
         return _done(t);
     }
 
-    /// @dev The four escrow-leg ops of a matched trace: the ones just before `AsyncOrdersMatched`.
-    function _legsOf(Op[] memory ops) internal pure returns (Op[] memory legs) {
-        legs = new Op[](4);
-        for (uint256 i; i < 4; ++i) {
-            legs[i] = ops[ops.length - 5 + i];
+    /// @dev Recipient claim transfers after the match event, excluding the aggregated FeeVault credit.
+    function _legsOf(Op[] memory ops) internal view returns (Op[] memory legs) {
+        Trace memory t = _newTrace();
+        for (uint256 i; i < ops.length; ++i) {
+            if (ops[i].kind == OP_TRANSFER && ops[i].who != address(hook.feeVault())) _add(t, ops[i]);
         }
+        return _done(t);
     }
 
-    /// @dev The whole `_matchPair` trace for a `true` result (`matchPair_true`): sell reduction, buy
-    ///      reduction, asset leg, quote leg, then `AsyncOrdersMatched`.
+    /// @dev Fee notices, match event, then FeeVault and maker claim transfers.
     function _expected(Case memory c, Run memory r) internal view returns (Op[] memory) {
         Trace memory t = _newTrace();
         _reduceOps(t, c, c.sellId, r.sell0, r.asset);
         _reduceOps(t, c, c.buyId, r.buy0, r.quote);
+        _add(t, Op(OP_MATCHED, address(0), 0, r.asset, r.quote, c.sellId, c.buyId));
+        uint256 fee = (_closes(r.sell0, r.asset) ? _paid(r.sell0) : _filled(r.sell0, r.asset))
+            + (_closes(r.buy0, r.quote) ? _paid(r.buy0) : _filled(r.buy0, r.quote));
+        if (fee != 0) _escrowLeg(t, currency1, address(hook.feeVault()), fee);
         _escrowLeg(t, c.k.currency0, r.buy0.owner, r.asset);
         _escrowLeg(t, c.k.currency1, r.sell0.owner, r.quote);
-        _add(t, Op(OP_MATCHED, address(0), 0, r.asset, r.quote, c.sellId, c.buyId));
         return _done(t);
     }
 
@@ -605,30 +600,22 @@ abstract contract FormalMatchD is HookUnlockBase {
     }
 
     function _mockPayoutRevert(Currency cur, address to, uint256 amount, bytes memory reason) internal {
-        vm.mockCallRevert(address(manager), abi.encodeCall(IPoolManager.mint, (to, cur.toId(), amount)), reason);
+        vm.mockCallRevert(address(manager), abi.encodeCall(IERC6909Claims.transfer, (to, cur.toId(), amount)), reason);
     }
 
     /// @dev Make one PoolManager call of `_settleTransfers` revert with `reason` (exact calldata):
     ///      1 the asset leg's burn, 2 its payout to the buyer, 3 the quote leg's burn, 4 its payout to the
     ///      seller; 0 nothing.
     function _mockLeg(Case memory c, uint256 asset, uint256 quote, uint256 mode, bytes memory reason) internal {
-        if (mode == 1) {
-            vm.mockCallRevert(
-                address(manager),
-                abi.encodeCall(IPoolManager.burn, (address(hook), c.k.currency0.toId(), asset)),
-                reason
-            );
-        } else if (mode == 2) {
-            _mockPayoutRevert(c.k.currency0, bob, asset, reason);
-        } else if (mode == 3) {
-            vm.mockCallRevert(
-                address(manager),
-                abi.encodeCall(IPoolManager.burn, (address(hook), c.k.currency1.toId(), quote)),
-                reason
-            );
-        } else if (mode == 4) {
-            _mockPayoutRevert(c.k.currency1, alice, quote, reason);
+        if (mode == 1 || mode == 2) _mockPayoutRevert(c.k.currency0, bob, asset, reason);
+        else if (mode == 3 || mode == 4) _mockPayoutRevert(c.k.currency1, alice, quote, reason);
+    }
+
+    function _matchedOp(Op[] memory ops) internal pure returns (Op memory) {
+        for (uint256 i; i < ops.length; ++i) {
+            if (ops[i].kind == OP_MATCHED) return ops[i];
         }
+        revert("missing match event");
     }
 
     /// @dev The priority-fee settlements of order `id` in `ops`, in order.
@@ -648,7 +635,8 @@ abstract contract FormalMatchD is HookUnlockBase {
     /// @dev Mock the PoolManager call behind trace op `o` to revert with `reason`.
     function _mockOpRevert(Op memory o, bytes memory reason) internal {
         bytes memory cd;
-        if (o.kind == OP_BURN) cd = abi.encodeCall(IPoolManager.burn, (o.who, o.cur, o.amount));
+        if (o.kind == OP_TRANSFER) cd = abi.encodeCall(IERC6909Claims.transfer, (o.who, o.cur, o.amount));
+        else if (o.kind == OP_BURN) cd = abi.encodeCall(IPoolManager.burn, (o.who, o.cur, o.amount));
         else if (o.kind == OP_MINT) cd = abi.encodeCall(IPoolManager.mint, (o.who, o.cur, o.amount));
         else cd = abi.encodeCall(IPoolManager.take, (Currency.wrap(address(uint160(o.cur))), o.who, o.amount));
         vm.mockCallRevert(address(manager), cd, reason);

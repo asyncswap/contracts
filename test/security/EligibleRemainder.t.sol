@@ -26,7 +26,7 @@ contract EligibleRemainderTest is FormalMatchD {
         vm.recordLogs();
         _run(_matchCalls(key));
         Op[] memory ops = _ops(vm.getRecordedLogs());
-        Op memory trade = ops[ops.length - 1];
+        Op memory trade = _matchedOp(ops);
         assertEq(trade.kind, OP_MATCHED);
         assertEq(trade.tag, eligible);
         assertEq(trade.tag2, buy);

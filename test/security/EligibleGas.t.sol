@@ -49,15 +49,16 @@ contract EligibleGasTest is FormalMatchD {
         assertTrue(vm.revertToState(snap));
     }
 
-    function _bench(uint256 blockers) internal {
+    function _bench(uint256 blockers, bool distinctOwners) internal {
+        emit log_named_uint("distinct_owners", distinctOwners ? 1 : 0);
         for (uint256 i; i < blockers; ++i) {
             _rest(key, address(uint160(0x1000 + i)), true, 2e15 - 1, 2_000_000, 100001 + i);
         }
         for (uint256 i; i < 32; ++i) {
-            _rest(key, alice, true, 1e18, 1e9, 100000);
+            _rest(key, distinctOwners ? address(uint160(0x10000 + i)) : alice, true, 1e18, 1e9, 100000);
         }
         for (uint256 i; i < 32; ++i) {
-            _rest(key, bob, false, 1e9, 1e18, 100000);
+            _rest(key, distinctOwners ? address(uint160(0x20000 + i)) : bob, false, 1e9, 1e18, 100000);
         }
         if (blockers == 128 && vm.envOr("EXPORT_GAS_FIXTURE", false)) {
             // dumpState exports touched accounts; ensure the Router's immutable runtime is included.
@@ -76,18 +77,22 @@ contract EligibleGasTest is FormalMatchD {
     }
 
     function test_gasNoBlockers() public {
-        _bench(0);
+        _bench(0, false);
     }
 
     function test_gasOneBlocker() public {
-        _bench(1);
+        _bench(1, false);
     }
 
     function test_gasSixteenBlockers() public {
-        _bench(16);
+        _bench(16, false);
     }
 
     function test_gas128Blockers() public {
-        _bench(128);
+        _bench(128, false);
+    }
+
+    function test_gas128BlockersDistinctOwners() public {
+        _bench(128, true);
     }
 }

@@ -16,11 +16,9 @@ import {Currency} from "v4-core/types/Currency.sol";
 contract AsyncSwapUpdatePriceFormalTest is HookUnlockBase {
     using PoolIdLibrary for PoolKey;
 
+    /// @dev Orders here are placed so that `isBuy == !zeroForOne` (asks sell currency0).
     function _priceKey(bool isBuy, uint256 amountIn, uint256 amountOut) internal pure returns (uint128) {
-        uint256 p = isBuy ? Math.mulDiv(amountIn, 1e18, amountOut) : Math.mulDiv(amountOut, 1e18, amountIn);
-        if (p == 0) return 1;
-        if (p > type(uint128).max) return type(uint128).max;
-        return uint128(p);
+        return AsyncFiller._priceKey(isBuy, !isBuy, amountIn, amountOut);
     }
 
     function _price(bytes32 id) internal view returns (uint128 p) {
@@ -88,7 +86,7 @@ contract AsyncSwapUpdatePriceFormalTest is HookUnlockBase {
         hook.updatePrice(o, n);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean:127 — _priceKey returns a key in [1, 2^128) (observed as the stored price after a reprice to any n).
+    /// @notice formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean:127 (stale: was [1, 2^128)) — _priceKey returns the tick key in [1, 2 * MAX_TICK + 1] (observed as the stored price after a reprice to any n).
     function testFuzz_priceKey_ok(bool zeroForOne, uint256 amountIn, uint256 n) public {
         (AsyncOrder memory o, bytes32 id) = _live(zeroForOne, amountIn);
         uint256 stored = hook.asyncOrder(poolId, id);
@@ -97,8 +95,8 @@ contract AsyncSwapUpdatePriceFormalTest is HookUnlockBase {
         hook.updatePrice(o, n);
         uint128 p = _price(id);
         assertGe(p, 1);
-        assertLe(uint256(p), type(uint128).max);
-        assertEq(p, _priceKey(!zeroForOne, stored, n), "the clamped WAD ratio");
+        assertLe(uint256(p), 2 * 887272 + 1);
+        assertEq(p, _priceKey(!zeroForOne, stored, n), "the v4 tick key");
     }
 
     /// @notice formal/Refinement/Swarm/AsyncSwapUpdatePrice.lean:176 — the writes between _remove and _append: amountOutMin := n, price := _priceKey(isBuy, amountIn, n), nextSequence := nextSequence + 1 (no uint64 overflow), sequence := that.

@@ -293,6 +293,11 @@ contract AsyncSwap is BaseHook, EIP712 {
         return (info.owner, info.amountIn, info.amountOutMin, info.price, info.isBuy, info.sequence, info.priorityFee);
     }
 
+    /// @notice Immutable incarnation of a live order, used to bind cancellation signatures.
+    function orderCreatedSequence(PoolId poolId, bytes32 id) external view returns (uint64) {
+        return asyncOrders[poolId].orders[id].createdSequence;
+    }
+
     function isExecutor(PoolId poolId, address maker, address executor) external view returns (bool) {
         return asyncOrders[poolId].isExecutor[maker][executor];
     }
@@ -562,7 +567,9 @@ contract AsyncSwap is BaseHook, EIP712 {
         uint256 amountIn = asyncOrders[poolId].orders[id].amountIn;
         _verify(
             order.owner,
-            OrderSignatures.hashUpdatePrice(order, id, amountIn, newAmountOutMin, nonce, deadline),
+            OrderSignatures.hashUpdatePrice(
+                order, id, amountIn, newAmountOutMin, asyncOrders[poolId].orders[id].createdSequence, nonce, deadline
+            ),
             nonce,
             deadline,
             signature
@@ -576,9 +583,15 @@ contract AsyncSwap is BaseHook, EIP712 {
 
     /// @notice Revoke a signed action before a relayer submits it.
     function invalidateNonce(uint256 nonce) external {
-        if (nonceUsed[msg.sender][nonce]) revert NonceAlreadyUsed();
-        nonceUsed[msg.sender][nonce] = true;
-        emit NonceInvalidated(msg.sender, nonce);
+        _useNonce(msg.sender, nonce);
+    }
+
+    /// @notice Burns `maker`'s nonce for a signature the calling executor verified itself (the
+    ///         Router's `cancelWithSig`). Every maker signature shares this one nonce space, so
+    ///         `invalidateNonce` revokes those signatures too.
+    function useNonce(PoolId poolId, address maker, uint256 nonce) external {
+        if (!asyncOrders[poolId].isExecutor[maker][msg.sender]) revert AsyncFiller.NotAuthorizedExecutor();
+        _useNonce(maker, nonce);
     }
 
     /// @notice EIP-712 domain separator for this hook's signed actions.
@@ -592,12 +605,16 @@ contract AsyncSwap is BaseHook, EIP712 {
         private
     {
         if (block.timestamp > deadline) revert SignatureExpired();
-        if (nonceUsed[maker][nonce]) revert NonceAlreadyUsed();
-        nonceUsed[maker][nonce] = true;
-        emit NonceInvalidated(maker, nonce);
+        _useNonce(maker, nonce);
         if (!SignatureChecker.isValidSignatureNow(maker, _hashTypedDataV4(structHash), signature)) {
             revert InvalidSignature();
         }
+    }
+
+    function _useNonce(address maker, uint256 nonce) private {
+        if (nonceUsed[maker][nonce]) revert NonceAlreadyUsed();
+        nonceUsed[maker][nonce] = true;
+        emit NonceInvalidated(maker, nonce);
     }
 
     /// @notice Accept ETH transfers. The Router (or any caller paying for a native-output

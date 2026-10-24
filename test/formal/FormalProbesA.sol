@@ -26,7 +26,6 @@ import {PoolId} from "v4-core/types/PoolId.sol";
 abstract contract FormalProbesA is FormalBase {
     using PoolIdLibrary for PoolKey;
 
-    uint256 constant ROUTER_CANCEL_NONCE_SLOT = 2; // `forge inspect Router storageLayout`
     bytes32 constant EIP712_TYPE_HASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 
@@ -105,8 +104,15 @@ abstract contract FormalProbesA is FormalBase {
         vm.clearMockedCalls();
     }
 
+    /// @dev Signed cancels burn the hook's `nonceUsed[maker][nonce]`.
     function _cancelNonceSlot(address maker, uint256 nonce) internal pure returns (bytes32) {
-        return keccak256(abi.encode(nonce, keccak256(abi.encode(maker, ROUTER_CANCEL_NONCE_SLOT))));
+        return keccak256(abi.encode(nonce, keccak256(abi.encode(maker, NONCE_USED_SLOT))));
+    }
+
+    /// @dev `cancelWithSig` burns its nonce through `AsyncSwap.useNonce`, which requires the Router to
+    ///      be the maker's executor on the order's pool.
+    function _authRouter(AsyncOrder memory o) internal {
+        vm.store(address(hook), _execSlot(o.key.toId(), o.owner, address(router)), bytes32(uint256(1)));
     }
 
     /// @dev `asyncOrders[poolId].isExecutor[maker][executor]` (State: poolManager, numeraire, feeVault,

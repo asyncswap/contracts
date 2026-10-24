@@ -1,0 +1,1547 @@
+Compiling 126 files with Solc 0.8.26
+Solc 0.8.26 finished in 75.85s
+Compiler run successful with warnings:
+Warning (5667): Unused function parameter. Remove or comment out the variable name to silence this warning.
+   --> test/formal/FormalMatchD.sol:420:38:
+    |
+420 |     function _feeOps(Trace memory t, Case memory c, bytes32 id, address maker, uint256 amount) internal view {
+    |                                      ^^^^^^^^^^^^^
+
+Warning (2072): Unused local variable.
+  --> test/formal/AsyncSwapReduceMatchedOrders.t.sol:51:24:
+   |
+51 |         (bool matches, uint256 asset, uint256 quote) = _pre(c);
+   |                        ^^^^^^^^^^^^^
+
+Warning (5667): Unused function parameter. Remove or comment out the variable name to silence this warning.
+  --> test/formal/AsyncSwapSettleOrderPriorityFee.t.sol:73:73:
+   |
+73 |     function _assertSettled(bytes32 id, address owner_, uint256 amount, bool liq) internal {
+   |                                                                         ^^^^^^^^
+
+Warning (5667): Unused function parameter. Remove or comment out the variable name to silence this warning.
+  --> test/security/NativeSettlementReentrancy.t.sol:42:28:
+   |
+42 |     function approveRouter(uint256 amt) external {
+   |                            ^^^^^^^^^^^
+
+Warning (2018): Function state mutability can be restricted to view
+   --> test/formal/AsyncSwapAddOrder.t.sol:202:5:
+    |
+202 |     function _assertSameStorage() internal {
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/formal/AsyncSwapBeforeInitialize.t.sol:84:5:
+   |
+84 |     function _assertWrites(PoolKey memory k) internal {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+   --> test/formal/FormalProbesA.sol:131:5:
+    |
+131 |     function _assertNoWrites(address target) internal {
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/formal/RefinementAsyncSwap.t.sol:92:5:
+   |
+92 |     function _assertOnlyWrite(bytes32 slot) internal {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+   --> test/formal/SpecBook.t.sol:302:5:
+    |
+302 |     function _assertNoWrites() internal {
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+    --> test/security/EligiblePythonVectors.t.sol:1008:5:
+     |
+1008 |     function _phase6() internal {
+     |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+    --> test/security/EligiblePythonVectors.t.sol:1998:5:
+     |
+1998 |     function _phase6() internal {
+     |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+    --> test/security/EligiblePythonVectors.t.sol:2988:5:
+     |
+2988 |     function _phase6() internal {
+     |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+    --> test/security/EligiblePythonVectors.t.sol:6904:5:
+     |
+6904 |     function _phase25() internal {
+     |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+     --> test/security/EligiblePythonVectors.t.sol:11731:5:
+      |
+11731 |     function _phase31() internal {
+      |     ^ (Relevant source part starts here and spans across multiple lines).
+
+
+Ran 30 tests for test/AsyncSwap.t.sol:AsyncSwapTest
+[PASS] test_RevertWhen_ExactOutputSwap() (gas: 1976609)
+[PASS] test_RevertWhen_RouterCallbackNotFromPoolManager() (gas: 32045)
+[PASS] test_cancel_makerReclaimsInput() (gas: 1045745)
+[PASS] test_cancel_revertsAfterFill() (gas: 1138161)
+[PASS] test_cancel_revertsForNonOwner() (gas: 44330)
+[PASS] test_crossingOrdersMatchAndTransferEscrowedTokens() (gas: 1810381)
+[PASS] test_crossingOrdersPartiallyFillAndKeepResidualOnBook() (gas: 1861303)
+[PASS] test_fill_makerReceivesPricedOutput_fillerReceivesInput() (gas: 1200024)
+[PASS] test_fill_reverseDirection_token1ForToken0() (gas: 1146814)
+[PASS] test_fill_revertsAfterCancel() (gas: 1117354)
+[PASS] test_fill_revertsWhenOrderMissing() (gas: 131599)
+[PASS] test_fill_usesUpdatedPrice() (gas: 1465231)
+[PASS] test_filledPriorityBidGoesToFeeVaultNotActiveLps() (gas: 2949902)
+[PASS] test_lpLiquidityFillsOrderWhenMakerMinimumIsMet() (gas: 2861303)
+[PASS] test_lpLiquidityFillsReverseDirection() (gas: 2793708)
+[PASS] test_lpPriceFailureLeavesOrderOpenAndRetryCanFill() (gas: 3831694)
+[PASS] test_matchBookContinuesAfterAutomaticMatchBound() (gas: 10897794)
+[PASS] test_partialMatchAndCancelForfeitTheEntirePriorityBid() (gas: 1900278)
+[PASS] test_priceBookReturnsHighestNumeraireBid() (gas: 1356314)
+[PASS] test_priceBookSortsBidsAndPreservesFifoAtPrice() (gas: 2060058)
+[PASS] test_priceBookUpdateAndCancelMaintainBestLevel() (gas: 2089193)
+[PASS] test_priorityFeeBelowTenCentsReverts() (gas: 194812)
+[PASS] test_priorityFeeBreaksEqualPriceTiesAfterPricePriority() (gas: 2828986)
+[PASS] test_setExecutor_emitsGrant() (gas: 67547)
+[PASS] test_setExecutor_emitsRevocation() (gas: 46570)
+[PASS] test_swap_createsOrderWithPrice() (gas: 800631)
+[PASS] test_swap_duplicateParamsTriggerSaltWalk() (gas: 1383926)
+[PASS] test_swap_twoOrdersSameMaker_distinctSalts() (gas: 1382515)
+[PASS] test_updatePrice_makerCanRaisePrice() (gas: 1117617)
+[PASS] test_updatePrice_revertsForNonOwner() (gas: 816657)
+Suite result: ok. 30 passed; 0 failed; 0 skipped; finished in 35.66ms (31.21ms CPU time)
+
+Ran 5 tests for test/formal/AsyncSwapAcceptOwnership.t.sol:AsyncSwapAcceptOwnershipFormalTest
+[PASS] testFuzz_acceptOwnership_notPending(address,address,address) (runs: 256, μ: 30976, ~: 30976)
+[PASS] testFuzz_acceptOwnership_ok_iff(address,address,address,bool) (runs: 256, μ: 52835, ~: 68485)
+[PASS] testFuzz_acceptOwnership_ok_state(address,address,address,bool) (runs: 256, μ: 38891, ~: 45893)
+[PASS] testFuzz_acceptOwnership_reverts_iff(address,address,address,bool) (runs: 256, μ: 33358, ~: 35412)
+[PASS] testFuzz_acceptOwnership_run(address,address,address,bool) (runs: 256, μ: 46941, ~: 49460)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 52.69ms (50.87ms CPU time)
+
+Ran 3 tests for test/formal/AsyncSwapBitSet.t.sol:AsyncSwapBitSetFormalTest
+[PASS] testFuzz_bitSet_noRevert(uint128,uint8) (runs: 256, μ: 434127, ~: 434457)
+[PASS] testFuzz_bitSet_spec(uint128,uint8) (runs: 256, μ: 434253, ~: 434583)
+[PASS] testFuzz_bitSet_testBit(uint128,uint8) (runs: 256, μ: 434296, ~: 434630)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 151.38ms (150.85ms CPU time)
+
+Ran 7 tests for test/formal/Eip712Domain.t.sol:AsyncSwapEip712DomainFormalTest
+[PASS] testFuzz_EIP712Name_spec(bytes32,bytes32,uint64,address,bool) (runs: 256, μ: 22328, ~: 22328)
+[PASS] testFuzz_EIP712Version_spec(bytes32,bytes32,uint64,address,bool) (runs: 256, μ: 22352, ~: 22352)
+[PASS] testFuzz_eip712Domain_matches_DOMAIN_SEPARATOR(bytes32,bytes32,uint64,address,bool) (runs: 256, μ: 23326, ~: 23326)
+[PASS] testFuzz_eip712Domain_never_reverts(bytes32,bytes32,uint64,address,bool) (runs: 256, μ: 18076, ~: 18076)
+[PASS] testFuzz_eip712Domain_ok(bytes32,bytes32,uint64,address,bool) (runs: 256, μ: 27223, ~: 27223)
+[PASS] testFuzz_eip712Domain_short(bytes32,bytes32,uint64,address,bool) (runs: 256, μ: 32185, ~: 32185)
+[PASS] testFuzz_eip712Domain_spec(bytes32,bytes32,uint64,address,bool) (runs: 256, μ: 26278, ~: 26278)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 200.67ms (199.35ms CPU time)
+
+Ran 4 tests for test/formal/AsyncSwapAsyncOrder.t.sol:AsyncSwapAsyncOrderFormalTest
+[PASS] testFuzz_asyncOrder_never_reverts(address,bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint64,uint128,uint64),bool) (runs: 256, μ: 34832, ~: 34932)
+[PASS] testFuzz_asyncOrder_ok_iff(bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint64,uint128,uint64),uint96) (runs: 256, μ: 760334, ~: 760117)
+[PASS] testFuzz_asyncOrder_reads_only_asyncOrders(bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint64,uint128,uint64),uint256,address,address) (runs: 256, μ: 68164, ~: 68587)
+[PASS] testFuzz_asyncOrder_run(address,bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint64,uint128,uint64)) (runs: 256, μ: 37355, ~: 37574)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 222.89ms (217.30ms CPU time)
+
+Ran 4 tests for test/formal/AsyncSwapBubbleUpAndRevertWith.t.sol:AsyncSwapBubbleUpAndRevertWithFormalTest
+[PASS] testFuzz_bubbleUpAndRevertWith_indep(bool,bytes,address,bytes4,bytes4,bool,bytes,address,bytes4,bytes4) (runs: 256, μ: 439327, ~: 321911)
+[PASS] testFuzz_bubbleUpAndRevertWith_never_ok(bool,bytes,address,bytes4,bytes4) (runs: 256, μ: 266469, ~: 185460)
+[PASS] testFuzz_bubbleUpAndRevertWith_reverts(bool,bytes,address,bytes4,bytes4) (runs: 256, μ: 268401, ~: 187266)
+[PASS] testFuzz_bubbleUpAndRevertWith_reverts_(bool,bytes,address,bytes4,bytes4) (runs: 256, μ: 268358, ~: 187223)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 95.01ms (94.52ms CPU time)
+
+Ran 4 tests for test/formal/AsyncSwapCalculateHookFee.t.sol:AsyncSwapCalculateHookFeeFormalTest
+[PASS] testFuzz_calculateHookFee_const(uint256,uint256,address,address,uint64) (runs: 256, μ: 54674, ~: 54653)
+[PASS] testFuzz_calculateHookFee_never_reverts(address,uint256) (runs: 256, μ: 30182, ~: 30138)
+[PASS] testFuzz_calculateHookFee_ok_iff(uint256) (runs: 256, μ: 14343, ~: 14343)
+[PASS] testFuzz_calculateHookFee_run(address,uint256) (runs: 256, μ: 31986, ~: 31942)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 37.30ms (34.93ms CPU time)
+
+Ran 4 tests for test/formal/AsyncSwapAfterDonate.t.sol:AsyncSwapAfterDonateFormalTest
+[PASS] testFuzz_afterDonate_never_ok((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 359851, ~: 39220)
+[PASS] testFuzz_afterDonate_notPoolManager((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 361584, ~: 40507)
+[PASS] testFuzz_afterDonate_poolManager((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 361239, ~: 40162)
+[PASS] testFuzz_afterDonate_spec((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 361361, ~: 40287)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 308.04ms (309.78ms CPU time)
+
+Ran 4 tests for test/formal/AsyncSwapCalculatePoolFee.t.sol:AsyncSwapCalculatePoolFeeFormalTest
+[PASS] testFuzz_calculatePoolFee_le(uint24,uint256) (runs: 256, μ: 14948, ~: 14948)
+[PASS] testFuzz_calculatePoolFee_ok(uint24,uint256) (runs: 256, μ: 32518, ~: 32473)
+[PASS] testFuzz_calculatePoolFee_run(uint24,uint256) (runs: 256, μ: 32459, ~: 32432)
+[PASS] test_calculatePoolFee_ok_edges() (gas: 37935)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 37.60ms (35.88ms CPU time)
+
+Ran 12 tests for test/nethermind_auditagent/NethermindAuditAgent.t.sol:NethermindAuditAgentTest
+[PASS] test_H1_fill_orderClosedBeforeMakerPayout() (gas: 1114430)
+[PASS] test_H1_match_orderReducedBeforeMakerPayout() (gas: 1563794)
+[PASS] test_H2_poolLiquidityFill_orderClosedBeforeMakerPayout() (gas: 2832815)
+[PASS] test_M10_repriceKeepsMakerRole() (gas: 2218405)
+[PASS] test_M4_liquidityAddedBeforeFillGetsNoBid() (gas: 2873424)
+[PASS] test_M5_RevertWhen_LiveInputBelowFillerExpectation() (gas: 2021356)
+[PASS] test_M5_fillSucceeds_WhenFillerAcceptsLiveInput() (gas: 2241647)
+[PASS] test_M6_favorablePartialFill_keepsBuyerRemainderLimit() (gas: 1701495)
+[PASS] test_M6_favorablePartialFill_keepsRemainderLimit() (gas: 1704358)
+[PASS] test_M6_partialFillMeetingWholeMinimum_keepsRemainderResting() (gas: 1731215)
+[PASS] test_M8_crossedBacklogClearsBeforeNewerOrder() (gas: 11473066)
+[PASS] test_M9_blockedRecipientDoesNotBlockMatch() (gas: 1595899)
+Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 29.90ms (25.02ms CPU time)
+
+Ran 2 tests for test/security/NoReturnToken.t.sol:NoReturnTokenTest
+[PASS] test_noReturnTokenAsFillerOutput_fill() (gas: 1027072)
+[PASS] test_noReturnTokenAsMakerInput_createAndCancel() (gas: 970588)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 5.59ms (4.12ms CPU time)
+
+Ran 12 tests for test/Numeraire.t.sol:NumeraireTest
+[PASS] testFuzz_rejectPairsWithoutNumeraire(address,address) (runs: 256, μ: 43251, ~: 43409)
+[PASS] test_acceptNativeUsdcPool() (gas: 140721)
+[PASS] test_acceptNumeraireOnEitherSortedSide() (gas: 273114)
+[PASS] test_buyAssetWithSixDecimalUsdc() (gas: 1536340)
+[PASS] test_numeraireIsConfiguredToken() (gas: 7675)
+[PASS] test_ownerIsExplicitArgumentNotDeployer() (gas: 5489023)
+[PASS] test_rejectNativeNonUsdcPool() (gas: 42324)
+[PASS] test_rejectNonContractNumeraire() (gas: 484957)
+[PASS] test_rejectTokenWithUsdcSymbolButWrongAddress() (gas: 582488)
+[PASS] test_rejectZeroNumeraire() (gas: 480911)
+[PASS] test_rejectZeroOwner() (gas: 485479)
+[PASS] test_sellAssetForSixDecimalUsdc() (gas: 1585557)
+Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 18.69ms (14.04ms CPU time)
+
+Ran 1 test for test/security/OrderSpoofing.t.sol:OrderSpoofingTest
+[PASS] test_RevertWhen_NonExecutorOpensOrderForMaker() (gas: 1313035)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.11ms (237.50µs CPU time)
+
+Ran 1 test for test/security/OwnerDirectCancel.t.sol:OwnerDirectCancelTest
+[PASS] test_owner_can_cancel_directly_after_revoking_executor() (gas: 2349116)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.06ms (680.42µs CPU time)
+
+Ran 4 tests for test/PoolLiquidityFill.t.sol:PoolLiquidityFillSixDecimalTest
+[PASS] test_buyAssetWithUsdcAtMarket() (gas: 644791)
+[PASS] test_dustInputNeverFillsForZeroOutput() (gas: 733141)
+[PASS] test_limitAboveSpotRestsOnBothSides() (gas: 1472862)
+[PASS] test_sellAssetForUsdcAtMarket() (gas: 663924)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 4.32ms (2.45ms CPU time)
+
+Ran 7 tests for test/formal/Eip712Domain.t.sol:RouterEip712DomainFormalTest
+[PASS] testFuzz_EIP712Name_spec(bytes32,bytes32,uint64,address,bool) (runs: 256, μ: 21729, ~: 21729)
+[PASS] testFuzz_EIP712Version_spec(bytes32,bytes32,uint64,address,bool) (runs: 256, μ: 21708, ~: 21708)
+[PASS] testFuzz_eip712Domain_matches_DOMAIN_SEPARATOR(bytes32,bytes32,uint64,address,bool) (runs: 256, μ: 22594, ~: 22594)
+[PASS] testFuzz_eip712Domain_never_reverts(bytes32,bytes32,uint64,address,bool) (runs: 256, μ: 17345, ~: 17345)
+[PASS] testFuzz_eip712Domain_ok(bytes32,bytes32,uint64,address,bool) (runs: 256, μ: 26491, ~: 26491)
+[PASS] testFuzz_eip712Domain_short(bytes32,bytes32,uint64,address,bool) (runs: 256, μ: 31343, ~: 31343)
+[PASS] testFuzz_eip712Domain_spec(bytes32,bytes32,uint64,address,bool) (runs: 256, μ: 25547, ~: 25547)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 194.66ms (193.31ms CPU time)
+
+Ran 4 tests for test/formal/AsyncSwapAsyncOrderInfo.t.sol:AsyncSwapAsyncOrderInfoFormalTest
+[PASS] testFuzz_asyncOrderInfo_never_reverts(address,bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint64,uint128,uint64),bool) (runs: 256, μ: 36977, ~: 37076)
+[PASS] testFuzz_asyncOrderInfo_ok_iff(bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint64,uint128,uint64),uint96) (runs: 256, μ: 754154, ~: 753942)
+[PASS] testFuzz_asyncOrderInfo_reads_only_asyncOrders(bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint64,uint128,uint64),uint256,address,address) (runs: 256, μ: 72175, ~: 72590)
+[PASS] testFuzz_asyncOrderInfo_run(address,bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint64,uint128,uint64)) (runs: 256, μ: 40255, ~: 40478)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 222.54ms (220.73ms CPU time)
+
+Ran 4 tests for test/formal/AsyncSwapCallOptionalReturn.t.sol:AsyncSwapCallOptionalReturnFormalTest
+[PASS] testFuzz_callOptionalReturn_after(uint8,uint256,bytes,address,uint256) (runs: 256, μ: 553359, ~: 423918)
+[PASS] testFuzz_callOptionalReturn_call_reverts((address,bool,bool,uint8,uint256,bytes),address,uint256) (runs: 256, μ: 246032, ~: 359792)
+[PASS] testFuzz_callOptionalReturn_false_reverts(bytes,address,uint256) (runs: 256, μ: 532362, ~: 394080)
+[PASS] testFuzz_callOptionalReturn_ok((address,bool,bool,uint8,uint256,bytes),address,uint256) (runs: 256, μ: 236620, ~: 351485)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 135.34ms (134.84ms CPU time)
+
+Ran 4 tests for test/formal/AsyncSwapBeforeDonate.t.sol:AsyncSwapBeforeDonateFormalTest
+[PASS] testFuzz_beforeDonate_never_ok((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 359878, ~: 39243)
+[PASS] testFuzz_beforeDonate_notPoolManager((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 361589, ~: 40507)
+[PASS] testFuzz_beforeDonate_poolManager((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 361287, ~: 40205)
+[PASS] testFuzz_beforeDonate_spec((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 361320, ~: 40242)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 313.45ms (311.64ms CPU time)
+
+Ran 15 tests for test/formal/AsyncSwapLibHelpers.t.sol:AsyncSwapLibHelpersFormalTest
+[PASS] testFuzz_EIP712Name_run(string,string) (runs: 256, μ: 1355741, ~: 1351343)
+[PASS] testFuzz_EIP712Version_run(string,string) (runs: 256, μ: 1355566, ~: 1351163)
+[PASS] testFuzz_bubbleUpAndRevertWith_run(bool,bytes,bytes4,bytes4) (runs: 256, μ: 1078660, ~: 1077802)
+[PASS] testFuzz_byteLength_ok(bytes32) (runs: 256, μ: 873959, ~: 874596)
+[PASS] testFuzz_byteLength_run(bytes32) (runs: 256, μ: 873958, ~: 874595)
+[PASS] testFuzz_callOptionalReturn_run(address,address,uint256,uint8,bool,bytes) (runs: 256, μ: 1524962, ~: 1522103)
+[PASS] testFuzz_functionCallWithValue_run(uint256,uint256,bool,bytes,bool,uint256) (runs: 256, μ: 983288, ~: 917324)
+[PASS] testFuzz_functionCall_run(uint256,bool,bytes,bool,uint256) (runs: 256, μ: 979106, ~: 885614)
+[PASS] testFuzz_priorityKey_run(uint64,uint64,bool,bool) (runs: 256, μ: 708925, ~: 699224)
+[PASS] testFuzz_revert_never_ok(bytes) (runs: 256, μ: 879653, ~: 875975)
+[PASS] testFuzz_revert_run(bytes) (runs: 256, μ: 879632, ~: 875954)
+[PASS] testFuzz_safeTransferFrom_ok(address,address,uint256,uint8,bool,bytes) (runs: 256, μ: 1524918, ~: 1522059)
+[PASS] testFuzz_safeTransferFrom_run(address,address,uint256,uint8,bool,bytes) (runs: 256, μ: 1524986, ~: 1522127)
+[PASS] testFuzz_verify_ok_iff(bool,bytes,bool,uint256) (runs: 256, μ: 963970, ~: 881371)
+[PASS] testFuzz_verify_run(bool,bytes,bool,uint256) (runs: 256, μ: 963970, ~: 881371)
+Suite result: ok. 15 passed; 0 failed; 0 skipped; finished in 629.72ms (627.41ms CPU time)
+
+Ran 5 tests for test/formal/AsyncSwapAsyncOrderPriorityFee.t.sol:AsyncSwapAsyncOrderPriorityFeeFormalTest
+[PASS] testFuzz_asyncOrderPriorityFee_escrowed(bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint64,uint128,uint64),uint64) (runs: 256, μ: 749835, ~: 749589)
+[PASS] testFuzz_asyncOrderPriorityFee_never_reverts(address,bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint64,uint128,uint64),bool) (runs: 256, μ: 34832, ~: 34936)
+[PASS] testFuzz_asyncOrderPriorityFee_ok_iff(bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint64,uint128,uint64)) (runs: 256, μ: 19171, ~: 19172)
+[PASS] testFuzz_asyncOrderPriorityFee_reads_only_asyncOrders(bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint64,uint128,uint64),uint256,address,address) (runs: 256, μ: 67758, ~: 68192)
+[PASS] testFuzz_asyncOrderPriorityFee_run(address,bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint64,uint128,uint64)) (runs: 256, μ: 37361, ~: 37583)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 218.48ms (216.67ms CPU time)
+
+Ran 8 tests for test/formal/AsyncSwapSetExecutorWithSig.t.sol:AsyncSwapSetExecutorWithSigFormalTest
+[PASS] testFuzz_setExecutorWithSig_expired(address,bool,uint256,uint256,bool,bytes) (runs: 256, μ: 56226, ~: 61732)
+[PASS] testFuzz_setExecutorWithSig_frame(address,bool,uint256,address,address) (runs: 256, μ: 1086687, ~: 1086778)
+[PASS] testFuzz_setExecutorWithSig_invalid_sig(address,bool,uint256,uint256,uint256,bytes) (runs: 256, μ: 89011, ~: 78837)
+[PASS] testFuzz_setExecutorWithSig_no_replay(address,bool,uint256,address,bool,uint256,uint8) (runs: 256, μ: 143846, ~: 145504)
+[PASS] testFuzz_setExecutorWithSig_nonce_used(address,bool,uint256,uint256,bool) (runs: 256, μ: 132479, ~: 113800)
+[PASS] testFuzz_setExecutorWithSig_ok(address,address,bool,uint256,uint256) (runs: 256, μ: 121115, ~: 120061)
+[PASS] testFuzz_setExecutorWithSig_ok_inv(address,bool,uint256,uint256,uint8,address) (runs: 256, μ: 100756, ~: 94848)
+[PASS] testFuzz_setExecutorWithSig_ok_state(address,bool,uint256,uint256) (runs: 256, μ: 151953, ~: 151873)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 649.33ms (642.55ms CPU time)
+
+Ran 14 tests for test/PoolLiquidityFill.t.sol:PoolLiquidityFillTest
+[PASS] testFuzz_fillOrRestUntouched(uint256,uint256,bool) (runs: 256, μ: 2865050, ~: 2871802)
+[PASS] test_bookMatchesFirstThenPoolFillsRemainder() (gas: 4018999)
+[PASS] test_directSelfCallEntryIsRejected() (gas: 2977406)
+[PASS] test_failedPoolFillKeepsPriorityBidEscrowed() (gas: 859053)
+[PASS] test_fillAccountingAndEvent() (gas: 2918520)
+[PASS] test_limitFailureRestoresFeeAndPrice() (gas: 3253010)
+[PASS] test_lpCollectsFillFeeOnWithdraw() (gas: 3023081)
+[PASS] test_noLiquidity_orderRestsAndEscrowIsIntact() (gas: 1081852)
+[PASS] test_orderLargerThanRangeIsRejectedAtomically() (gas: 25311225)
+[PASS] test_outOfRangeLiquidityCountsAsNoLiquidity() (gas: 2839094)
+[PASS] test_retryAfterFillReverts() (gas: 2872786)
+[PASS] test_retryFillsPartiallyMatchedRemainder() (gas: 4106051)
+[PASS] test_retryRequiresMakerAuthorizedExecutor() (gas: 2932549)
+[PASS] test_retryUnknownOrderReverts() (gas: 2183266)
+Suite result: ok. 14 passed; 0 failed; 0 skipped; finished in 434.13ms (432.25ms CPU time)
+
+Ran 3 tests for test/security/PriceKeyCrossing.t.sol:PriceKeyCrossingTest
+[PASS] test_equalKeyNonCrossingPairDoesNotBlockMatching() (gas: 2392194)
+[PASS] test_exactTieExecutes() (gas: 1606279)
+[PASS] test_matchBookMakesNoFalseMatch() (gas: 1602972)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 5.03ms (3.34ms CPU time)
+
+Ran 6 tests for test/security/PriorityFeeOnly.t.sol:PriorityFeeOnlyTest
+[PASS] test_RevertWhen_ExecutorSkipsTheBid() (gas: 1615790)
+[PASS] test_RevertWhen_NewPoolOrderHasNoBid() (gas: 153796)
+[PASS] test_customExecutor_canRestOrderWhenBidIsPaid() (gas: 1710236)
+[PASS] test_equalBids_keepSubmissionOrder() (gas: 1479307)
+[PASS] test_newPool_equalPricesQueueByBid() (gas: 1479472)
+[PASS] test_setOrderingModeIsGone() (gas: 34388)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 5.71ms (4.12ms CPU time)
+
+Ran 1 test for test/security/PriorityPythonHashes.t.sol:PriorityPythonHashesTest
+[PASS] test_pythonHashesMatchSolidityLibrary() (gas: 6534)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 361.92µs (35.38µs CPU time)
+
+Ran 10 tests for test/formal/AsyncSwapBeforeInitialize.t.sol:AsyncSwapBeforeInitializeFormalTest
+[PASS] testFuzz_beforeInitialize_dynamicFeeRequired(address,address,bool,bool,uint24,int24,address,uint160) (runs: 256, μ: 46855, ~: 48994)
+[PASS] testFuzz_beforeInitialize_frame(address,address,bool,int24,address,uint160,bool) (runs: 256, μ: 558359, ~: 882925)
+[PASS] testFuzz_beforeInitialize_notPoolManager(address,address,address,address,uint24,int24,address,uint160) (runs: 256, μ: 35730, ~: 35876)
+[PASS] testFuzz_beforeInitialize_numeraireRequired(address,address,address,uint24,int24,address,uint160) (runs: 256, μ: 46742, ~: 46900)
+[PASS] testFuzz_beforeInitialize_ok(address,address,bool,int24,address,uint160,bool) (runs: 256, μ: 537318, ~: 861880)
+[PASS] testFuzz_beforeInitialize_ok_inv((address,bool,address,address,address,bool,bool,uint24,bool,int24,address,uint160)) (runs: 256, μ: 62194, ~: 40643)
+[PASS] testFuzz_beforeInitialize_run_ok(address,address,bool,int24,address,uint160) (runs: 256, μ: 138594, ~: 138683)
+[PASS] testFuzz_beforeInitialize_succeeds_iff((address,bool,address,address,address,bool,bool,uint24,bool,int24,address,uint160)) (runs: 256, μ: 59380, ~: 43931)
+[PASS] test_beforeInitialize_dynamicFeeRequired_viaPoolManager() (gas: 591062)
+[PASS] test_beforeInitialize_run_ok_viaPoolManager() (gas: 714760)
+Suite result: ok. 10 passed; 0 failed; 0 skipped; finished in 278.34ms (276.52ms CPU time)
+
+Ran 1 test for test/security/PriorityPythonVectors.t.sol:PriorityPythonVectorsTest
+[PASS] test_oneHundredPythonVectors() (gas: 202903529)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 122.09ms (119.46ms CPU time)
+
+Ran 5 tests for test/ProtocolFee.t.sol:ProtocolFeeTest
+[PASS] testFuzz_feeCannotOverflow(uint256) (runs: 256, μ: 6672, ~: 6672)
+[PASS] testFuzz_feeIsPointThreePercentOfGross(uint128) (runs: 256, μ: 6634, ~: 6634)
+[PASS] test_feeIsPointThreePercent() (gas: 11972)
+[PASS] test_feeRoundsDownAtSmallestUnit() (gas: 17907)
+[PASS] test_fillSplitsHundredUsdcAndPaysFullInput() (gas: 1614134)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 18.27ms (16.85ms CPU time)
+
+Ran 4 tests for test/security/EligibleGas.t.sol:EligibleGasTest
+[PASS] test_gas128Blockers() (gas: 199068823)
+Logs:
+  blockers: 128
+  matches: 1
+  gross_gas: 571633
+  blockers: 128
+  matches: 2
+  gross_gas: 775361
+  blockers: 128
+  matches: 4
+  gross_gas: 1194054
+  blockers: 128
+  matches: 8
+  gross_gas: 2054602
+  blockers: 128
+  matches: 16
+  gross_gas: 3776982
+  blockers: 128
+  matches: 32
+  gross_gas: 7213365
+
+[PASS] test_gasNoBlockers() (gas: 85664039)
+Logs:
+  blockers: 0
+  matches: 1
+  gross_gas: 515143
+  blockers: 0
+  matches: 2
+  gross_gas: 710201
+  blockers: 0
+  matches: 4
+  gross_gas: 1111526
+  blockers: 0
+  matches: 8
+  gross_gas: 1937234
+  blockers: 0
+  matches: 16
+  gross_gas: 3581122
+  blockers: 0
+  matches: 32
+  gross_gas: 6842164
+
+[PASS] test_gasOneBlocker() (gas: 86921147)
+Logs:
+  blockers: 1
+  matches: 1
+  gross_gas: 522424
+  blockers: 1
+  matches: 2
+  gross_gas: 709879
+  blockers: 1
+  matches: 4
+  gross_gas: 1100079
+  blockers: 1
+  matches: 8
+  gross_gas: 1938755
+  blockers: 1
+  matches: 16
+  gross_gas: 3602232
+  blockers: 1
+  matches: 32
+  gross_gas: 6836509
+
+[PASS] test_gasSixteenBlockers() (gas: 101340808)
+Logs:
+  blockers: 16
+  matches: 1
+  gross_gas: 537611
+  blockers: 16
+  matches: 2
+  gross_gas: 736416
+  blockers: 16
+  matches: 4
+  gross_gas: 1145245
+  blockers: 16
+  matches: 8
+  gross_gas: 1990004
+  blockers: 16
+  matches: 16
+  gross_gas: 3673146
+  blockers: 16
+  matches: 32
+  gross_gas: 7041781
+
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 608.34ms (606.56ms CPU time)
+
+Ran 4 tests for test/formal/AsyncSwapAfterSwap.t.sol:AsyncSwapAfterSwapFormalTest
+[PASS] testFuzz_afterSwap_hookNotImplemented((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 362037, ~: 40970)
+[PASS] testFuzz_afterSwap_never_ok((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 360692, ~: 40200)
+[PASS] testFuzz_afterSwap_notPoolManager((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 362381, ~: 41314)
+[PASS] testFuzz_afterSwap_spec((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 362180, ~: 41142)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 1.01s (317.37ms CPU time)
+
+Ran 5 tests for test/formal/AsyncSwapBeforeAddLiquidity.t.sol:AsyncSwapBeforeAddLiquidityFormalTest
+[PASS] testFuzz_beforeAddLiquidity_frame((address,bool,address,address,address,uint24,int24,address,int24,int24,int256,bytes32,bytes,bool)) (runs: 256, μ: 431607, ~: 758134)
+[PASS] testFuzz_beforeAddLiquidity_notPoolManager((address,bool,address,address,address,uint24,int24,address,int24,int24,int256,bytes32,bytes,bool)) (runs: 256, μ: 432630, ~: 759331)
+[PASS] testFuzz_beforeAddLiquidity_ok((address,bool,address,address,address,uint24,int24,address,int24,int24,int256,bytes32,bytes,bool)) (runs: 256, μ: 432429, ~: 759131)
+[PASS] testFuzz_beforeAddLiquidity_spec((address,bool,address,address,address,uint24,int24,address,int24,int24,int256,bytes32,bytes,bool)) (runs: 256, μ: 432464, ~: 759083)
+[PASS] test_beforeAddLiquidity_ok_viaPoolManager() (gas: 2129611)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 376.98ms (374.30ms CPU time)
+
+Ran 4 tests for test/formal/AsyncSwapBeforeRemoveLiquidity.t.sol:AsyncSwapBeforeRemoveLiquidityFormalTest
+[PASS] testFuzz_beforeRemoveLiquidity_hookNotImplemented((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 362248, ~: 41317)
+[PASS] testFuzz_beforeRemoveLiquidity_never_ok((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 360841, ~: 40447)
+[PASS] testFuzz_beforeRemoveLiquidity_notPoolManager((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 362598, ~: 41667)
+[PASS] testFuzz_beforeRemoveLiquidity_spec((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 362373, ~: 41505)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 269.80ms (267.91ms CPU time)
+
+Ran 2 tests for test/RadixPriceTree.t.sol:RadixPriceTreeTest
+[PASS] test_counterTracksPeakNotHistory() (gas: 56857160)
+[PASS] test_recycledIdsKeepBestCorrect(uint128[12],uint8) (runs: 256, μ: 1624293, ~: 1630138)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 212.19ms (211.75ms CPU time)
+
+Ran 4 tests for test/formal/RouterFillFromPoolLiquidity.t.sol:RouterFillFromPoolLiquidityFormalTest
+[PASS] testFuzz_fillFromPoolLiquidityPre_get(address,address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32)) (runs: 256, μ: 94320, ~: 94862)
+[PASS] testFuzz_fillFromPoolLiquidity_eq(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),bytes) (runs: 256, μ: 90808, ~: 88955)
+[PASS] testFuzz_fillFromPoolLiquidity_ok_iff(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),bytes) (runs: 256, μ: 47114, ~: 47325)
+[PASS] testFuzz_fillFromPoolLiquidity_revert_iff(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),bool,bytes) (runs: 256, μ: 45191, ~: 45450)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 197.68ms (195.82ms CPU time)
+
+Ran 4 tests for test/formal/RefinementAsyncSwap.t.sol:RefinementAsyncSwapFormalTest
+[PASS] testFuzz_isExecutor_refines(bytes32,address,address,bool,bool) (runs: 256, μ: 36836, ~: 44987)
+[PASS] testFuzz_setExecutor_frame(address,bytes32,address,bool,bool) (runs: 256, μ: 825377, ~: 815653)
+[PASS] testFuzz_setExecutor_refines(address,address,bool,address,address,bool,bool) (runs: 256, μ: 61520, ~: 51898)
+[PASS] testFuzz_setExecutor_run(address,bytes32,address,bool,bool) (runs: 256, μ: 41565, ~: 37259)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 262.60ms (260.70ms CPU time)
+
+Ran 7 tests for test/formal/AsyncSwapCancelOrder.t.sol:AsyncSwapCancelOrderFormalTest
+[PASS] testFuzz_cancelOrder_notFound(bool,bool,bytes32,uint256) (runs: 256, μ: 87049, ~: 87764)
+[PASS] testFuzz_cancelOrder_ok(uint256,bool,bool,uint256) (runs: 256, μ: 1021422, ~: 1002217)
+[PASS] testFuzz_cancelOrder_ok_nativeInput(uint256) (runs: 256, μ: 1152959, ~: 1152738)
+[PASS] testFuzz_cancelOrder_ok_paidBid(uint256,uint256) (runs: 256, μ: 1034309, ~: 1034205)
+[PASS] testFuzz_cancelOrder_reentry_reverts(uint8,bool) (runs: 256, μ: 1024962, ~: 1019787)
+[PASS] testFuzz_cancelOrder_run(uint8,bool,bool,uint256,uint256) (runs: 256, μ: 846684, ~: 787484)
+[PASS] testFuzz_cancelOrder_unauthorized(address,bool,bytes32) (runs: 256, μ: 796688, ~: 796812)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 1.32s (1.31s CPU time)
+
+Ran 14 tests for test/formal/RouterHelpers.t.sol:RouterHelpersFormalTest
+[PASS] testFuzz_address_revert_run(bytes) (runs: 256, μ: 879606, ~: 875950)
+[PASS] testFuzz_bubbleUpAndRevertWith_reverts(bool,bytes,bytes4,bytes4) (runs: 256, μ: 1078616, ~: 1077762)
+[PASS] testFuzz_byteLength_le(bytes32) (runs: 256, μ: 873945, ~: 874640)
+[PASS] testFuzz_byteLength_run(bytes32) (runs: 256, μ: 873922, ~: 874617)
+[PASS] testFuzz_callOptionalReturn_after(address,address,uint256,uint8,bool,bytes) (runs: 256, μ: 1607138, ~: 1502018)
+[PASS] testFuzz_callOptionalReturn_call_reverts(address,address,uint256,bool,bytes) (runs: 256, μ: 1223796, ~: 1521700)
+[PASS] testFuzz_eip712Name_eq(string,string) (runs: 256, μ: 1355639, ~: 1351241)
+[PASS] testFuzz_eip712Version_eq(string,string) (runs: 256, μ: 1355479, ~: 1351076)
+[PASS] testFuzz_functionCallWithValue_eq(uint256,uint256,bool,bytes,bool,uint256) (runs: 256, μ: 995244, ~: 917962)
+[PASS] testFuzz_functionCallWithValue_insufficient(uint256,uint256,bool,bytes) (runs: 256, μ: 1079910, ~: 1075440)
+[PASS] testFuzz_functionCall_eq(uint256,bool,bytes,bool,uint256) (runs: 256, μ: 979149, ~: 885657)
+[PASS] testFuzz_safeTransferFrom_eq(address,address,uint256,uint8,bool,bytes) (runs: 256, μ: 1529056, ~: 1504663)
+[PASS] testFuzz_verifyCallResult_fail(bytes,bool,uint256) (runs: 256, μ: 973807, ~: 881253)
+[PASS] testFuzz_verifyCallResult_ok(bytes,bool,uint256) (runs: 256, μ: 974616, ~: 882023)
+Suite result: ok. 14 passed; 0 failed; 0 skipped; finished in 597.98ms (596.15ms CPU time)
+
+Ran 9 tests for test/formal/RefinementRouter.t.sol:RefinementRouterFormalTest
+[PASS] testFuzz_cancelOrder_complete(((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32)) (runs: 256, μ: 86486, ~: 86770)
+[PASS] testFuzz_cancelOrder_sound(((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),address,bool) (runs: 256, μ: 40869, ~: 39274)
+[PASS] testFuzz_fillOrder_forwards(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),bool,uint256,uint256) (runs: 256, μ: 101666, ~: 98107)
+[PASS] testFuzz_fillOrder_maxPrice(uint256,uint256,uint8) (runs: 256, μ: 942176, ~: 1016171)
+[PASS] testFuzz_fillOrder_value_sound(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),bool,uint256,uint256,uint256,bool,uint256) (runs: 256, μ: 65537, ~: 62562)
+[PASS] testFuzz_swap_complete((address,address,bool,bool,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint8,uint8,uint8,bytes)) (runs: 256, μ: 98167, ~: 94035)
+[PASS] testFuzz_swap_sound((address,address,bool,bool,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint8,uint8,uint8,bytes)) (runs: 256, μ: 54678, ~: 55637)
+[PASS] testFuzz_unlockCallback_cancel(((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),bool,bytes) (runs: 256, μ: 49322, ~: 49259)
+[PASS] testFuzz_unlockCallback_fill_maxPrice(address,bytes32,uint256,uint256,uint256,uint8) (runs: 256, μ: 102443, ~: 102620)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 612.02ms (610.12ms CPU time)
+
+Ran 14 tests for test/formal/RouterLibHelpers.t.sol:RouterLibHelpersFormalTest
+[PASS] testFuzz_EIP712Name_run(string,string) (runs: 256, μ: 1355653, ~: 1351255)
+[PASS] testFuzz_EIP712Version_run(string,string) (runs: 256, μ: 1355500, ~: 1351097)
+[PASS] testFuzz_bubbleUpAndRevertWith_run(bool,bytes,bytes4,bytes4) (runs: 256, μ: 1078665, ~: 1077819)
+[PASS] testFuzz_byteLength_ok(bytes32) (runs: 256, μ: 873923, ~: 874596)
+[PASS] testFuzz_byteLength_run(bytes32) (runs: 256, μ: 873922, ~: 874595)
+[PASS] testFuzz_callOptionalReturn_run(address,address,uint256,uint8,bool,bytes) (runs: 256, μ: 1496626, ~: 1502856)
+[PASS] testFuzz_functionCallWithValue_run(uint256,uint256,bool,bytes,bool,uint256) (runs: 256, μ: 983907, ~: 917346)
+[PASS] testFuzz_functionCall_run(uint256,bool,bytes,bool,uint256) (runs: 256, μ: 979106, ~: 885614)
+[PASS] testFuzz_revert_never_ok(bytes) (runs: 256, μ: 879664, ~: 875996)
+[PASS] testFuzz_revert_run(bytes) (runs: 256, μ: 879665, ~: 875997)
+[PASS] testFuzz_safeTransferFrom_ok(address,address,uint256,uint8,bool,bytes) (runs: 256, μ: 1496582, ~: 1502812)
+[PASS] testFuzz_safeTransferFrom_run(address,address,uint256,uint8,bool,bytes) (runs: 256, μ: 1496583, ~: 1502813)
+[PASS] testFuzz_verify_ok_iff(bool,bytes,bool,uint256) (runs: 256, μ: 963972, ~: 881380)
+[PASS] testFuzz_verify_run(bool,bytes,bool,uint256) (runs: 256, μ: 963906, ~: 881314)
+Suite result: ok. 14 passed; 0 failed; 0 skipped; finished in 350.08ms (348.25ms CPU time)
+
+Ran 3 tests for test/formal/RouterMatchBook.t.sol:RouterMatchBookFormalTest
+[PASS] testFuzz_matchBook_eq(address,address,(address,address,uint24,int24,address),uint8,bytes) (runs: 256, μ: 96620, ~: 95076)
+[PASS] testFuzz_matchBook_ok_iff(address,(address,address,uint24,int24,address),uint8,bytes) (runs: 256, μ: 44318, ~: 44384)
+[PASS] testFuzz_matchBook_revert_iff(address,(address,address,uint24,int24,address),uint8,bool,bytes) (runs: 256, μ: 42426, ~: 42312)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 112.66ms (110.93ms CPU time)
+
+Ran 2 tests for test/security/RouterOrderWindow.t.sol:RouterOrderWindowTest
+[PASS] test_RevertWhen_OrderChangesDuringFillPayment() (gas: 899918)
+[PASS] test_pendingOrder_notMatchableBeforeInputSettled() (gas: 3038477)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 3.54ms (1.77ms CPU time)
+
+Ran 10 tests for test/formal/AsyncSwapConstructor.t.sol:AsyncSwapConstructorFormalTest
+[PASS] testFuzz_DOMAIN_SEPARATOR_eq_built(uint64,address,bool) (runs: 256, μ: 5494145, ~: 5500373)
+[PASS] testFuzz_ctor_deployed(address,uint8,address) (runs: 256, μ: 5500462, ~: 5501794)
+[PASS] testFuzz_ctor_fresh_state(address,uint8,address) (runs: 256, μ: 5494478, ~: 5495810)
+[PASS] testFuzz_ctor_invalidNumeraire(address,address,address) (runs: 256, μ: 484343, ~: 484804)
+[PASS] testFuzz_ctor_ok_iff(address,address,bool,uint8,address,bool) (runs: 256, μ: 1695738, ~: 485941)
+[PASS] testFuzz_ctor_reverts_iff(address,address,bool,uint8,address,bool) (runs: 256, μ: 1691402, ~: 482131)
+[PASS] testFuzz_ctor_zeroOwner(address,uint8) (runs: 256, μ: 482573, ~: 483880)
+[PASS] testFuzz_domainSeparatorV4_eq_built(uint64,address,bool) (runs: 256, μ: 5494168, ~: 5500396)
+[PASS] testFuzz_owner_nonzero_acceptOwnership(address,address,address,bool) (runs: 256, μ: 5511481, ~: 5514900)
+[PASS] testFuzz_owner_nonzero_transferOwnership(address,address,address,bool,address) (runs: 256, μ: 5515906, ~: 5510622)
+Suite result: ok. 10 passed; 0 failed; 0 skipped; finished in 527.28ms (525.62ms CPU time)
+
+Ran 13 tests for test/formal/AsyncSwapBeforeSwap.t.sol:AsyncSwapBeforeSwapFormalTest
+[PASS] testFuzz_beforeSwap_badDecode(address,address,address,uint24,int24,bool,int256,uint160,bytes) (runs: 256, μ: 40518, ~: 40067)
+[PASS] testFuzz_beforeSwap_badDecode_dirtyAddress(address,bool,int256,uint256,uint256,uint256,uint256,bytes) (runs: 256, μ: 48182, ~: 47668)
+[PASS] testFuzz_beforeSwap_exactInputOnly(address,address,address,uint24,int24,(bool,int256,uint160),bytes) (runs: 256, μ: 40828, ~: 38180)
+[PASS] testFuzz_beforeSwap_negOverflow(address,address,address,uint24,int24,bool,uint160,bytes) (runs: 256, μ: 40780, ~: 38736)
+[PASS] testFuzz_beforeSwap_notExecutor(address,address,address,uint24,int24,bool,int256,address,address,uint256,uint256,bytes) (runs: 256, μ: 43659, ~: 43290)
+[PASS] testFuzz_beforeSwap_notPoolManager(address,address,address,address,uint24,int24,(bool,int256,uint160),bytes) (runs: 256, μ: 42009, ~: 38413)
+[PASS] testFuzz_beforeSwap_ok_delta((address,bool,address,bool,bool,address,address,uint24,int24,bool,int256,bool,uint160,bool,address,address,uint256,uint256,bool,bytes,bool)) (runs: 2048, μ: 93975, ~: 107826)
+[PASS] testFuzz_beforeSwap_ok_inv((address,bool,address,bool,bool,address,address,uint24,int24,bool,int256,bool,uint160,bool,address,address,uint256,uint256,bool,bytes,bool)) (runs: 2048, μ: 102427, ~: 115660)
+[PASS] testFuzz_beforeSwap_ok_returns((address,bool,address,bool,bool,address,address,uint24,int24,bool,int256,bool,uint160,bool,address,address,uint256,uint256,bool,bytes,bool)) (runs: 2048, μ: 93954, ~: 107807)
+[PASS] testFuzz_beforeSwap_run_ok(bool,uint256,address,address,uint256,bytes) (runs: 256, μ: 655167, ~: 633307)
+[PASS] testFuzz_beforeSwap_run_ok_tailErrors(bool,uint256,address,address,uint256,uint256,bool,bool) (runs: 256, μ: 139814, ~: 99486)
+[PASS] testFuzz_beforeSwap_succeeds_iff((address,bool,address,bool,bool,address,address,uint24,int24,bool,int256,bool,uint160,bool,address,address,uint256,uint256,bool,bytes,bool)) (runs: 2048, μ: 95304, ~: 108356)
+[PASS] test_beforeSwap_run_ok_viaRouter() (gas: 758272)
+Suite result: ok. 13 passed; 0 failed; 0 skipped; finished in 1.25s (1.25s CPU time)
+
+Ran 6 tests for test/formal/AsyncSwapCrosses.t.sol:AsyncSwapCrossesFormalTest
+[PASS] testFuzz_crosses_frame(uint128,uint128,(uint256,uint256,uint256,uint256),bool) (runs: 256, μ: 258889, ~: 256000)
+[PASS] testFuzz_crosses_ne_any(uint128,uint128,(uint256,uint256,uint256,uint256)) (runs: 256, μ: 255477, ~: 255692)
+[PASS] testFuzz_crosses_reverts_div0(uint128,uint256,uint256,uint256,bool) (runs: 256, μ: 245160, ~: 245988)
+[PASS] testFuzz_crosses_reverts_overflow(uint128,(uint256,uint256,uint256,uint256)) (runs: 256, μ: 266137, ~: 266380)
+[PASS] testFuzz_crosses_run(uint128,uint128,(uint256,uint256,uint256,uint256),bool,bool) (runs: 256, μ: 251001, ~: 255236)
+[PASS] test_crosses_reverts_div0_counterexample() (gas: 243909)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 134.60ms (134.14ms CPU time)
+
+Ran 3 tests for test/formal/AsyncSwapDOMAIN_SEPARATOR.t.sol:AsyncSwapDOMAIN_SEPARATORFormalTest
+[PASS] testFuzz_DOMAIN_SEPARATOR_never_reverts(address,uint64) (runs: 256, μ: 30501, ~: 30501)
+[PASS] testFuzz_DOMAIN_SEPARATOR_preserves(uint64,bool) (runs: 256, μ: 15236, ~: 15521)
+[PASS] testFuzz_DOMAIN_SEPARATOR_spec(address,uint64,bool) (runs: 256, μ: 32498, ~: 32767)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 36.60ms (34.07ms CPU time)
+
+Ran 4 tests for test/formal/AsyncSwapSettleMatchedPriorityFee.t.sol:AsyncSwapSettleMatchedPriorityFeeFormalTest
+[PASS] testFuzz_settleMatchedPriorityFee_matched(uint256[6],uint8) (runs: 256, μ: 2444988, ~: 2221380)
+[PASS] testFuzz_settleMatchedPriorityFee_no_fee(uint256[6],uint8) (runs: 256, μ: 2224812, ~: 1993748)
+[PASS] testFuzz_settleMatchedPriorityFee_ok(uint256[6],uint8) (runs: 256, μ: 2336676, ~: 2068016)
+[PASS] testFuzz_settleMatchedPriorityFee_run(uint256[6],uint8) (runs: 256, μ: 2444323, ~: 2220391)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 1.88s (1.88s CPU time)
+
+Ran 9 tests for test/formal/RouterSwapWithSig.t.sol:RouterSwapWithSigFormalTest
+[PASS] testFuzz_swapWithSigPre_filler(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),(uint256,uint256,bytes)) (runs: 256, μ: 92748, ~: 91036)
+[PASS] testFuzz_swapWithSigPre_get(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),(uint256,uint256,bytes),(uint256,uint256,bytes),bool) (runs: 256, μ: 104348, ~: 99712)
+[PASS] testFuzz_swapWithSigPre_user(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),(uint256,uint256,bytes)) (runs: 256, μ: 101166, ~: 99453)
+[PASS] testFuzz_swapWithSig_alreadyExecutor(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),(uint256,uint256,bytes),(uint256,uint256,bytes)) (runs: 256, μ: 102690, ~: 100064)
+[PASS] testFuzz_swapWithSig_grant(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),(uint256,uint256,bytes),(uint256,uint256,bytes),bool,bytes) (runs: 256, μ: 85538, ~: 65537)
+[PASS] testFuzz_swapWithSig_isExecutor_revert(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),(uint256,uint256,bytes),(uint256,uint256,bytes),bytes) (runs: 256, μ: 55220, ~: 52676)
+[PASS] testFuzz_swapWithSig_native(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),(uint256,uint256,bytes),(uint256,uint256,bytes)) (runs: 256, μ: 43889, ~: 41401)
+[PASS] testFuzz_swapWithSig_noGrant(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),(uint256,uint256,bytes),(uint256,uint256,bytes)) (runs: 256, μ: 100783, ~: 98173)
+[PASS] testFuzz_swapWithSig_ok_input(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),(uint256,uint256,bytes),(uint256,uint256,bytes),bool,bool) (runs: 256, μ: 55638, ~: 49866)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 433.20ms (431.16ms CPU time)
+
+Ran 23 tests for test/SignedOrders.t.sol:SignedOrdersTest
+[PASS] test_RevertWhen_useNonceByNonExecutor() (gas: 39663)
+[PASS] test_cancelWithSig_rejectsExpired() (gas: 918473)
+[PASS] test_cancelWithSig_rejectsReplayOnRecurringOrderId() (gas: 1742542)
+[PASS] test_cancelWithSig_rejectsUnusedSignatureOnReplacement() (gas: 1775198)
+[PASS] test_cancelWithSig_rejectsWrongSigner() (gas: 969581)
+[PASS] test_cancelWithSig_returnsInputToMaker() (gas: 1188759)
+[PASS] test_cancelWithSig_revokedByInvalidateNonce() (gas: 987860)
+[PASS] test_cancelWithSig_sharesHookNonces() (gas: 1166763)
+[PASS] test_invalidateNonce_revokesSignedUpdate() (gas: 979852)
+[PASS] test_setExecutorWithSig_emitsGrantForMaker() (gas: 156401)
+[PASS] test_setExecutorWithSig_emitsRevocationForMaker() (gas: 172764)
+[PASS] test_swapWithSig_relayerCreatesOrder_andGrantsExecutor() (gas: 909382)
+[PASS] test_swapWithSig_replayReverts() (gas: 1325037)
+[PASS] test_swapWithSig_revertsWhenRelayerAltersPrice() (gas: 674732)
+[PASS] test_swapWithSig_revertsWithoutExecutorGrant() (gas: 113016)
+[PASS] test_swapWithSig_skipsGrantWhenAlreadyAuthorized() (gas: 1569606)
+[PASS] test_swapWithSig_thenFill() (gas: 1203649)
+[PASS] test_typeStrings() (gas: 4769)
+[PASS] test_updatePriceWithSig_rejectsExpired() (gas: 929566)
+[PASS] test_updatePriceWithSig_rejectsTamperedPrice() (gas: 960568)
+[PASS] test_updatePriceWithSig_rejectsUnusedSignatureOnReplacement() (gas: 2185008)
+[PASS] test_updatePriceWithSig_rejectsWrongSigner() (gas: 958374)
+[PASS] test_updatePriceWithSig_relayerUpdates() (gas: 1322355)
+Suite result: ok. 23 passed; 0 failed; 0 skipped; finished in 27.84ms (25.70ms CPU time)
+
+Ran 9 tests for test/formal/RouterCancelWithSig.t.sol:RouterCancelWithSigFormalTest
+[PASS] testFuzz_cancelWithSig_expired(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint256,uint256,uint256,bytes,bool) (runs: 256, μ: 42022, ~: 39856)
+[PASS] testFuzz_cancelWithSig_info_revert(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint256,uint256,bytes,bytes) (runs: 256, μ: 78274, ~: 76588)
+[PASS] testFuzz_cancelWithSig_invalid_sig(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint256,uint256,uint256,uint256,uint256,bool,bytes) (runs: 256, μ: 124771, ~: 118919)
+[PASS] testFuzz_cancelWithSig_no_replay(uint256,uint256,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint256,bytes,address,bool) (runs: 256, μ: 1319951, ~: 1319800)
+[PASS] testFuzz_cancelWithSig_nonce_used(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint256,uint256,uint256,bytes) (runs: 256, μ: 53611, ~: 51255)
+[PASS] testFuzz_cancelWithSig_ok(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint256,uint256,uint256,uint256) (runs: 256, μ: 121496, ~: 121587)
+[PASS] testFuzz_cancelWithSig_ok_inv(((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),(address,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint8,uint8)) (runs: 256, μ: 124477, ~: 137069)
+[PASS] testFuzz_cancelWithSig_ok_state(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint256,uint256,uint256,uint256,address,uint256) (runs: 256, μ: 189595, ~: 189692)
+[PASS] testFuzz_cancelWithSig_reentry_reverts(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint256,uint256,uint256,bytes) (runs: 256, μ: 49583, ~: 48370)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 754.27ms (751.64ms CPU time)
+
+Ran 3 tests for test/formal/AsyncSwapSettleOrderPriorityFee.t.sol:AsyncSwapSettleOrderPriorityFeeFormalTest
+[PASS] testFuzz_settleOrderPriorityFee_escrowed(bytes32,address,uint64,bool) (runs: 256, μ: 1403077, ~: 2420754)
+[PASS] testFuzz_settleOrderPriorityFee_run(bytes32,address,uint64,bool,bool) (runs: 256, μ: 1395906, ~: 2232463)
+[PASS] testFuzz_settleOrderPriorityFee_zero_fee(bytes32,address,bool,uint256) (runs: 256, μ: 115966, ~: 116839)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 267.81ms (265.95ms CPU time)
+
+Ran 3 tests for test/formal/AsyncSwapOrderBookLevel.t.sol:AsyncSwapOrderBookLevelFormalTest
+[PASS] testFuzz_orderBookLevel_congr(uint256,bool,uint256,bool,uint128,address,address,uint256) (runs: 256, μ: 4915853, ~: 4907432)
+[PASS] testFuzz_orderBookLevel_readOnly(uint256,bool,bool,uint256,bool,uint128) (runs: 256, μ: 2468495, ~: 4842964)
+[PASS] testFuzz_orderBookLevel_view(uint256,bool,bool,uint256,bool,uint128,address) (runs: 256, μ: 2620910, ~: 4846515)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 2.47s (2.47s CPU time)
+
+Ran 9 tests for test/formal/SpecEip712.t.sol:AssumptionsFormalTest
+[PASS] test_asyncSwapRouter_short() (gas: 42010)
+[PASS] test_asyncSwap_short() (gas: 40514)
+[PASS] test_decode_asyncSwap() (gas: 14416)
+[PASS] test_decode_asyncSwapRouter() (gas: 15465)
+[PASS] test_decode_one() (gas: 13150)
+[PASS] test_deployed_short() (gas: 17012)
+[PASS] test_fallbackStore_none() (gas: 160191)
+[PASS] test_hash_constants() (gas: 459)
+[PASS] test_one_short() (gas: 38754)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 646.96µs (278.17µs CPU time)
+
+Ran 4 tests for test/formal/AsyncSwapOrderBookOrder.t.sol:AsyncSwapOrderBookOrderFormalTest
+[PASS] testFuzz_orderBookOrder_congr(bytes32,bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint64,uint128,uint64),(address,uint256,uint256,uint128,bool,bool,uint64,uint64,uint128,uint64),uint256,address,address) (runs: 256, μ: 90912, ~: 91304)
+[PASS] testFuzz_orderBookOrder_never_reverts(address,bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint64,uint128,uint64),bool) (runs: 256, μ: 43737, ~: 43834)
+[PASS] testFuzz_orderBookOrder_readOnly(bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint64,uint128,uint64)) (runs: 256, μ: 771927, ~: 771928)
+[PASS] testFuzz_orderBookOrder_run(address,bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint64,uint128,uint64)) (runs: 256, μ: 47566, ~: 47785)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 197.58ms (195.25ms CPU time)
+
+Ran 3 tests for test/formal/AsyncSwapPriorityKey.t.sol:AsyncSwapPriorityKeyFormalTest
+[PASS] testFuzz_priorityKey_ok(uint64,uint64,bool,uint128) (runs: 256, μ: 447146, ~: 447227)
+[PASS] testFuzz_priorityKey_run(uint64,uint64,bool,uint128) (runs: 256, μ: 447228, ~: 447309)
+[PASS] testFuzz_priorityKey_spec(uint64,uint64,bool,uint128) (runs: 256, μ: 447125, ~: 447206)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 64.70ms (64.24ms CPU time)
+
+Ran 3 tests for test/formal/AsyncSwapReduceAfterMatch.t.sol:AsyncSwapReduceAfterMatchFormalTest
+[PASS] testFuzz_priceKey_ok(uint256[6],uint8) (runs: 256, μ: 2335803, ~: 2051670)
+[PASS] testFuzz_reduceAfterMatch_ok_close(uint256[6],uint8) (runs: 256, μ: 2393645, ~: 2154972)
+[PASS] testFuzz_reduceAfterMatch_ok_partial(uint256[6],uint8) (runs: 256, μ: 2341049, ~: 2059405)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 1.40s (1.40s CPU time)
+
+Ran 5 tests for test/formal/AsyncSwapReceive.t.sol:AsyncSwapReceiveFormalTest
+[PASS] testFuzz_receive_frame(address,uint256,uint256,bytes32,uint256) (runs: 256, μ: 854198, ~: 854420)
+[PASS] testFuzz_receive_never_reverts(address,uint256,uint256,bool) (runs: 256, μ: 54653, ~: 54614)
+[PASS] testFuzz_receive_ok(address,uint256,uint256,uint256) (runs: 256, μ: 48861131, ~: 94666)
+[PASS] testFuzz_receive_run(address,uint256,uint256) (runs: 256, μ: 70869, ~: 70921)
+[PASS] test_probe_roundTrip() (gas: 64537)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 489.68ms (487.80ms CPU time)
+
+Ran 12 tests for test/formal/AsyncSwapExecuteOrder.t.sol:AsyncSwapExecuteOrderFormalTest
+[PASS] testFuzz_afterNative_run(uint256,uint256,uint256,uint256) (runs: 256, μ: 1434757, ~: 1435349)
+[PASS] testFuzz_calculatePoolFee_run(uint24,uint256) (runs: 256, μ: 6703, ~: 6703)
+[PASS] testFuzz_executeOrder_decode(bytes,uint256,bool,address,bool) (runs: 256, μ: 845584, ~: 761781)
+[PASS] testFuzz_executeOrder_nativeOverflow(uint256,address) (runs: 256, μ: 951363, ~: 951417)
+[PASS] testFuzz_executeOrder_notFound(bytes32,bool,address,bool) (runs: 256, μ: 73307, ~: 72536)
+[PASS] testFuzz_executeOrder_ok(bool,uint256,uint256,uint160) (runs: 256, μ: 1122995, ~: 1122182)
+[PASS] testFuzz_executeOrder_ok_native(uint256,uint256,bool) (runs: 256, μ: 1441790, ~: 1412667)
+[PASS] testFuzz_executeOrder_run(uint8,bool,bool,uint256) (runs: 256, μ: 829084, ~: 811041)
+[PASS] testFuzz_executeOrder_unaccountedNative(uint256,uint256,address) (runs: 256, μ: 977924, ~: 978780)
+[PASS] testFuzz_executeOrder_unauthorized(address,bool,bytes32,address) (runs: 256, μ: 782751, ~: 782870)
+[PASS] testFuzz_fill_run(bool,bool,bool,uint256,uint256) (runs: 256, μ: 860354, ~: 828465)
+[PASS] testFuzz_pf_le(uint24,uint256) (runs: 256, μ: 6277, ~: 6277)
+Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 1.98s (1.97s CPU time)
+
+Ran 4 tests for test/formal/AsyncSwapSettleTransfers.t.sol:AsyncSwapSettleTransfersFormalTest
+[PASS] testFuzz_settleTransfers_ok(uint256[6],uint8) (runs: 256, μ: 2356662, ~: 2074595)
+[PASS] testFuzz_settleTransfers_ok_same_manager(uint256[6],uint8) (runs: 256, μ: 2331883, ~: 2075401)
+[PASS] testFuzz_settleTransfers_reverts_iff(uint256[6],uint8,uint8,uint256) (runs: 256, μ: 2248543, ~: 2013381)
+[PASS] testFuzz_settleTransfers_run(uint256[6],uint8) (runs: 256, μ: 2355246, ~: 2072617)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 1.72s (1.72s CPU time)
+
+Ran 11 tests for test/formal/AsyncSwapMatchAmounts.t.sol:AsyncSwapMatchAmountsFormalTest
+[PASS] testFuzz_ceil_run(uint256,uint256,uint256,uint8) (runs: 256, μ: 11834, ~: 13310)
+[PASS] testFuzz_floor_run(uint256,uint256,uint256,uint8) (runs: 256, μ: 8162, ~: 7388)
+[PASS] testFuzz_matchAmounts_ok(uint256[6],bool,uint8) (runs: 256, μ: 2406088, ~: 2083752)
+[PASS] testFuzz_matchAmounts_ok_sound(uint256[6],bool,uint8) (runs: 256, μ: 2406938, ~: 2085051)
+[PASS] testFuzz_matchAmounts_reverts_restingBuy(uint256[6],uint256,uint256,bool) (runs: 256, μ: 1580649, ~: 1620240)
+[PASS] testFuzz_matchAmounts_reverts_restingSell(uint256[6],uint256,uint256,bool) (runs: 256, μ: 1580656, ~: 1620249)
+[PASS] testFuzz_matchAmounts_succeeds(uint256[6],bool,uint8) (runs: 256, μ: 2406111, ~: 2083775)
+[PASS] testFuzz_noerr_restingBuy(uint256[6],uint8) (runs: 256, μ: 2374649, ~: 2092805)
+[PASS] testFuzz_noerr_restingSell(uint256[6],uint8) (runs: 256, μ: 2336684, ~: 2029342)
+[PASS] testFuzz_ok_restingBuy(uint256[6],uint8) (runs: 256, μ: 2374672, ~: 2092828)
+[PASS] testFuzz_ok_restingSell(uint256[6],uint8) (runs: 256, μ: 2336708, ~: 2029366)
+Suite result: ok. 11 passed; 0 failed; 0 skipped; finished in 4.05s (4.05s CPU time)
+
+Ran 8 tests for test/formal/SpecBook.t.sol:SpecBookFormalTest
+[PASS] testFuzz_AppendSpec_post((uint256,uint8,bool,bool,uint8,uint64,uint64,bool,uint256,uint8)) (runs: 256, μ: 4259804, ~: 4011695)
+[PASS] testFuzz_AppendSpec_post_guards((uint256,uint8,bool,bool,uint8,uint64,uint64,bool,uint256,uint8)) (runs: 256, μ: 2080703, ~: 2050409)
+[PASS] testFuzz_AppendSpec_progress((uint256,uint8,bool,bool,uint8,uint64,uint64,bool,uint256,uint8)) (runs: 256, μ: 2080715, ~: 2185421)
+[PASS] testFuzz_BestAtPriceSpec_priority((uint256,uint8,bool,uint8,uint256)) (runs: 256, μ: 1513372, ~: 1317974)
+[PASS] testFuzz_LevelSpec_priority((uint256,uint8,bool,uint8,uint256)) (runs: 256, μ: 1520931, ~: 1319295)
+[PASS] testFuzz_RemoveSpec_post((uint256,uint8,uint8,bool,uint8,uint256)) (runs: 256, μ: 3574598, ~: 3468815)
+[PASS] testFuzz_RemoveSpec_progress((uint256,uint8,uint8,bool,uint8,uint256)) (runs: 256, μ: 1883253, ~: 1871952)
+[PASS] testFuzz_RemoveSpec_reverts((uint256,uint8,uint8,bool,uint8,uint256)) (runs: 256, μ: 1882752, ~: 1843326)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 2.24s (2.24s CPU time)
+
+Ran 3 tests for test/formal/AsyncSwapReduceMatchedOrders.t.sol:AsyncSwapReduceMatchedOrdersFormalTest
+[PASS] testFuzz_reduceMatchedOrders_eq(uint256[6],uint8) (runs: 256, μ: 2424333, ~: 2204803)
+[PASS] testFuzz_reduceMatchedOrders_ok_bounds(uint256[6],uint8) (runs: 256, μ: 2313861, ~: 2041703)
+[PASS] testFuzz_reduceMatchedOrders_ok_iff(uint256[6],uint8,bool,uint256) (runs: 256, μ: 2221179, ~: 1898594)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 1.38s (1.37s CPU time)
+
+Ran 6 tests for test/EligiblePrice.t.sol:EligiblePriceTest
+[PASS] testFuzz_fullWidthComparison(uint256,uint256,uint256,uint256) (runs: 256, μ: 2841, ~: 2841)
+[PASS] testFuzz_mutationsAndEligibility(uint256,bool) (runs: 256, μ: 10513185, ~: 10529519)
+[PASS] test_full128BranchPathAndIdReuse() (gas: 33928518)
+[PASS] test_fullWidthRatioComparison() (gas: 1570)
+[PASS] test_recycledBuySummaryMustPropagateToNewAncestors() (gas: 706687)
+[PASS] test_recycledSummaryMustPropagateToNewAncestors() (gas: 706826)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 4.45s (4.44s CPU time)
+
+Ran 1 test for test/security/EligiblePythonVectors.t.sol:EligiblePython0Test
+[PASS] test_pythonStatefulTrace() (gas: 68912569)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 58.76ms (56.79ms CPU time)
+
+Ran 1 test for test/security/EligiblePythonVectors.t.sol:EligiblePython1Test
+[PASS] test_pythonStatefulTrace() (gas: 68758115)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 51.11ms (49.22ms CPU time)
+
+Ran 1 test for test/security/EligiblePythonVectors.t.sol:EligiblePython2Test
+[PASS] test_pythonStatefulTrace() (gas: 68728063)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 67.24ms (65.02ms CPU time)
+
+Ran 1 test for test/security/EligiblePythonVectors.t.sol:EligiblePython3Test
+[PASS] test_pythonStatefulTrace() (gas: 134607835)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 94.28ms (91.99ms CPU time)
+
+Ran 1 test for test/security/EligiblePythonVectors.t.sol:EligiblePython4Test
+[PASS] test_pythonStatefulTrace() (gas: 170539450)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 90.04ms (87.90ms CPU time)
+
+Ran 1 test for test/security/EligiblePythonVectors.t.sol:EligiblePython5Test
+[PASS] test_pythonStatefulTrace() (gas: 145436365)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 97.21ms (90.10ms CPU time)
+
+Ran 1 test for test/security/EligiblePythonVectors.t.sol:EligiblePython6Test
+[PASS] test_pythonStatefulTrace() (gas: 162888141)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 118.34ms (115.99ms CPU time)
+
+Ran 1 test for test/security/EligiblePythonVectors.t.sol:EligiblePython7Test
+[PASS] test_pythonStatefulTrace() (gas: 188970963)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 116.11ms (113.79ms CPU time)
+
+Ran 1 test for test/security/EligibleRemainder.t.sol:EligibleRemainderTest
+[PASS] test_refreshWhenPriceKeyAndFeeAreUnchanged() (gas: 3454417)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 6.16ms (3.14ms CPU time)
+
+Ran 1 test for test/security/ExecutorAuthorization.t.sol:ExecutorAuthorizationTest
+[PASS] test_RevertWhen_UnauthorizedExecutorCreatesOrFills() (gas: 2648689)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.99ms (552.46µs CPU time)
+
+Ran 5 tests for test/formal/AsyncSwapRemove.t.sol:AsyncSwapRemoveFormalTest
+[PASS] testFuzz_remove_footprint(uint256[8],uint32,uint32,uint128,uint128,uint32,uint32[],uint32) (runs: 256, μ: 1336729, ~: 1342549)
+[PASS] testFuzz_remove_ok(uint256[8],uint32,uint32,uint128) (runs: 256, μ: 735435, ~: 739063)
+[PASS] testFuzz_remove_ok_validTree(uint128[],uint256) (runs: 256, μ: 3013958, ~: 3125482)
+[PASS] testFuzz_remove_reverts_iff(uint256[8],uint32,uint32,uint128,bool) (runs: 256, μ: 555204, ~: 536458)
+[PASS] testFuzz_remove_run(uint256[8],uint32,uint32,uint128,uint32[],uint32,bool) (runs: 256, μ: 1162444, ~: 1125539)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 1.00s (1.00s CPU time)
+
+Ran 4 tests for test/formal/AsyncSwapRevert.t.sol:AsyncSwapRevertFormalTest
+[PASS] testFuzz_revert_never_ok(bytes) (runs: 256, μ: 6917, ~: 6682)
+[PASS] testFuzz_revert_nonempty(bytes) (runs: 256, μ: 13110, ~: 12727)
+[PASS] testFuzz_revert_run(bytes) (runs: 256, μ: 10335, ~: 9951)
+[PASS] test_revert_empty() (gas: 9647)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 14.18ms (13.74ms CPU time)
+
+Ran 2 tests for test/formal/AsyncSwapSafeTransferFrom.t.sol:AsyncSwapSafeTransferFromFormalTest
+[PASS] testFuzz_safeTransferFrom_ok_iff((address,bool,bool,uint8,uint256,bytes),address,address,uint256) (runs: 256, μ: 292895, ~: 377344)
+[PASS] testFuzz_safeTransferFrom_spec((address,bool,bool,uint8,uint256,bytes),address,address,uint256) (runs: 256, μ: 330082, ~: 425823)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 43.32ms (42.82ms CPU time)
+
+Ran 6 tests for test/BatchActions.t.sol:BatchActionsTest
+[PASS] test_atomicWhenClaimFailsAfterCancel() (gas: 1106045)
+[PASS] test_cancelAndRedeemInOneUnlock() (gas: 3450171)
+[PASS] test_cancelTwoOrdersInOneUnlock() (gas: 1637005)
+[PASS] test_redeemTwoClaimsInOneUnlock() (gas: 2804302)
+[PASS] test_rejectsInvalidInputsAndDirectCallback() (gas: 92499)
+[PASS] test_rejectsOtherMakersOrders() (gas: 770120)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 9.10ms (7.19ms CPU time)
+
+Ran 3 tests for test/BatchCancels.t.sol:BatchCancelsTest
+[PASS] test_atomicWhenAnOrderIsAlreadyClosed() (gas: 1768477)
+[PASS] test_cancelTwoOrdersInOneTransaction() (gas: 1633669)
+[PASS] test_rejectsOtherOwnerAndDirectCallback() (gas: 792765)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 4.57ms (2.69ms CPU time)
+
+Ran 3 tests for test/BatchClaims.t.sol:BatchClaimsTest
+[PASS] test_redeemsTwoCurrenciesAtomicallyAfterOperatorApproval() (gas: 2890295)
+[PASS] test_rejectsDuplicateAndUnownedClaims() (gas: 2779273)
+[PASS] test_rejectsInvalidInputAndDirectCallback() (gas: 132157)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 6.36ms (4.02ms CPU time)
+
+Ran 6 tests for test/security/CoarsePriceBlocking.t.sol:CoarsePriceBlockingTest
+[PASS] test_higherBidOnCrossingOrderCanBypassBlocker() (gas: 2290353)
+[PASS] test_incomingSellSkipsHigherFeeNoncrossingBuy() (gas: 2268848)
+[PASS] test_sameTickBestBidBeatsHigherFeeAndEarlierAge() (gas: 2281040)
+[PASS] test_sameTickExactPriceBeatsHigherFeeAndEarlierAge() (gas: 2362455)
+[PASS] test_twoDollarBlockerCannotStallTwentyThousandDollars() (gas: 28956794)
+[PASS] test_worsePriceCannotJumpAheadWithBidOrAge() (gas: 3085855)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 32.13ms (30.28ms CPU time)
+
+Ran 1 test for test/formal/Eip712ConstantsLog.t.sol:Eip712ConstantsLog
+[PASS] test_log() (gas: 20816)
+Logs:
+  0x72bb025359d2292b4e59f168b9de8e3967bb96d5053211bfa4d833b6867bdb86
+  0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6
+  0x08476627fc511b8f0bf0674a96c4492f05a5c5df2795822dac01ecd5bdbd9167
+  0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f
+  0x4173796e63537761700000000000000000000000000000000000000000000009
+  0x3100000000000000000000000000000000000000000000000000000000000001
+  0x4173796e635377617020526f7574657200000000000000000000000000000010
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.01ms (693.21µs CPU time)
+
+Ran 11 tests for test/formal/AsyncSwapUpdatePrice.t.sol:AsyncSwapUpdatePriceFormalTest
+[PASS] testFuzz_midState_frame(uint256,address,uint256) (runs: 256, μ: 1202885, ~: 1202765)
+[PASS] testFuzz_midState_order(bool,uint256,uint256) (runs: 256, μ: 1099324, ~: 1122858)
+[PASS] testFuzz_midState_other_order(uint256) (runs: 256, μ: 1723992, ~: 1724243)
+[PASS] testFuzz_midState_other_pool(uint256) (runs: 256, μ: 1921961, ~: 1921721)
+[PASS] testFuzz_mid_ok(bool,uint256,uint256,uint8) (runs: 256, μ: 1851168, ~: 1723628)
+[PASS] testFuzz_priceKey_ok(bool,uint256,uint256) (runs: 256, μ: 1068507, ~: 1089359)
+[PASS] testFuzz_updatePrice_notFound(((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint256) (runs: 256, μ: 779102, ~: 779485)
+[PASS] testFuzz_updatePrice_notOwner(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint256) (runs: 256, μ: 45249, ~: 45597)
+[PASS] testFuzz_updatePrice_ok(address,bool,uint256,bool,uint256,bool) (runs: 256, μ: 869282, ~: 805221)
+[PASS] testFuzz_updatePrice_run(uint8,uint256,bool,bool,uint256) (runs: 256, μ: 792644, ~: 768018)
+[PASS] testFuzz_updatePrice_zero(((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),bool) (runs: 256, μ: 441889, ~: 765779)
+Suite result: ok. 11 passed; 0 failed; 0 skipped; finished in 2.25s (2.25s CPU time)
+
+Ran 6 tests for test/formal/SpecEip712.t.sol:SpecEip712ShortStringsFormalTest
+[PASS] testFuzz_ShortStringsSpec_toString_ok(bytes32,uint8) (runs: 256, μ: 35231, ~: 34790)
+[PASS] testFuzz_ShortStringsSpec_toString_reverts(bytes32,uint8) (runs: 256, μ: 32871, ~: 32888)
+[PASS] testFuzz_ShortStringsSpec_withFallback(bytes32,bool,string) (runs: 256, μ: 112044, ~: 101357)
+[PASS] testFuzz_byteLength_eq(bytes32) (runs: 256, μ: 32348, ~: 32573)
+[PASS] testFuzz_toString_eq(bytes) (runs: 256, μ: 40438, ~: 40169)
+[PASS] testFuzz_toString_reverts_iff_byteLength(bytes32,bool,uint8) (runs: 256, μ: 50232, ~: 50161)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 83.88ms (83.46ms CPU time)
+
+Ran 12 tests for test/security/FeeClaims.t.sol:FeeClaimsTest
+[PASS] testFuzz_cancelNeverChargesFees(uint96,bool) (runs: 256, μ: 1086574, ~: 1053310)
+[PASS] testFuzz_fillConservesInput(uint96,bool) (runs: 256, μ: 1257540, ~: 1258583)
+[PASS] test_callbackCannotBeCalledDirectly() (gas: 1136555)
+[PASS] test_cancelReverseDirection_refundsFullDeposit() (gas: 1055773)
+[PASS] test_collectBeforeFill_cannotTakeEscrow() (gas: 1315294)
+[PASS] test_collectionAuthorizationFollowsOwnership() (gas: 1346448)
+[PASS] test_emptyAndRepeatedCollection() (gas: 1260894)
+[PASS] test_failedFillDoesNotEarnFees() (gas: 1150803)
+[PASS] test_failedNativeRecipient_preservesClaims() (gas: 1416696)
+[PASS] test_feeUsesStoredOutput_andCollectionPreservesOtherOrders() (gas: 2167334)
+[PASS] test_nativeCancellation_refundsFullDeposit() (gas: 1212297)
+[PASS] test_zeroRecipientRejected() (gas: 37486)
+Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 440.22ms (438.65ms CPU time)
+
+Ran 6 tests for test/security/FeeCollect.t.sol:FeeCollectTest
+[PASS] test_customExecutor_underpayingFee_ERC20Output_reverts() (gas: 3660585)
+[PASS] test_customExecutor_underpayingFee_nativeOutput_reverts() (gas: 3262927)
+[PASS] test_info_collectRevertsIfClaimsExceedInt128() (gas: 2514783)
+[PASS] test_ownerCannotReachEscrow_onlyFees() (gas: 2067786)
+[PASS] test_reentrantMaker_cannotSpendHookFeeCredit() (gas: 3121192)
+[PASS] test_thirdParty_cannotTransferOrBurnVaultClaims() (gas: 1627932)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 8.37ms (6.78ms CPU time)
+
+Ran 6 tests for test/formal/AsyncSwapBestOrder.t.sol:AsyncSwapBestOrderFormalTest
+[PASS] testFuzz_bestOrder_empty(bytes32,bool,uint256,bool) (runs: 256, μ: 385821, ~: 39512)
+[PASS] testFuzz_bestOrder_loopBound(bytes32,bool,uint8,uint256) (runs: 256, μ: 4955708, ~: 4955100)
+[PASS] testFuzz_bestOrder_ok(uint256,bool,bool,bool,bool,uint8,uint128) (runs: 256, μ: 1350007, ~: 125800)
+[PASS] testFuzz_bestOrder_readOnly(uint256,bool,bool,bool,address) (runs: 256, μ: 2363714, ~: 41618)
+[PASS] testFuzz_bestOrder_run(uint256,bool,bool,bool,address) (runs: 256, μ: 2364329, ~: 41523)
+[PASS] testFuzz_bestOrder_run_synthetic(bytes32,bool,uint8,uint128,bytes32,address,uint256) (runs: 256, μ: 166061, ~: 126190)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 4.84s (6.04s CPU time)
+
+Ran 7 tests for test/formal/FeeVaultCollect.t.sol:FeeVaultCollectFormalTest
+[PASS] testFuzz_collect_ok(bool,bool,uint96,uint256) (runs: 256, μ: 267590, ~: 272080)
+[PASS] testFuzz_collect_only_owner(address,bool,uint8,address,address,uint96) (runs: 256, μ: 236183, ~: 237664)
+[PASS] testFuzz_collect_owner_view_reverts(address,uint8,address,address,bytes) (runs: 256, μ: 38919, ~: 39679)
+[PASS] testFuzz_collect_reverts_iff(address,uint8,address,address,uint96,uint96) (runs: 256, μ: 383364, ~: 400052)
+[PASS] testFuzz_collect_run(address,uint8,address,address,uint96,uint96) (runs: 256, μ: 391012, ~: 405657)
+[PASS] testFuzz_collect_unauthorized(address,bool,uint8,address,address) (runs: 256, μ: 91738, ~: 126138)
+[PASS] testFuzz_collect_zero_recipient(bool,uint8,address,uint96) (runs: 256, μ: 231294, ~: 197766)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 386.06ms (384.10ms CPU time)
+
+Ran 22 tests for test/formal/SpecSig.t.sol:SpecSigFormalTest
+[PASS] testFuzz_ERC1271Spec_onHook(bool,bytes,bool,uint8,bool,address,bool,uint256,bytes) (runs: 256, μ: 491877867, ~: 234845)
+[PASS] testFuzz_ERC1271Spec_onRouter(((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),bool,bytes,bool,uint8,bool,uint256,uint256,bytes) (runs: 256, μ: 520338318, ~: 520346213)
+[PASS] testFuzz_ERC1271Spec_readOnly(bool,bytes,bool,uint8,bool,bytes32,bytes) (runs: 256, μ: 532518009, ~: 1040454585)
+[PASS] testFuzz_ERC1271Spec_result(bool,bytes,bool,uint8,bytes32,bytes) (runs: 256, μ: 200454, ~: 121513)
+[PASS] testFuzz_ERC1271Spec_result_calldata(bytes32,bytes,bytes32) (runs: 256, μ: 136172, ~: 136008)
+[PASS] testFuzz_ERC1271Spec_result_noCode_precompile(bytes32,bytes,uint32) (runs: 256, μ: 29323, ~: 29151)
+[PASS] testFuzz_ERC1271Spec_total(uint8,bool,bytes,bool,uint8,bool,bytes32,bytes) (runs: 256, μ: 162684872, ~: 137522)
+[PASS] testFuzz_HashPoolKeySpec_result(address,address,uint24,int24,address) (runs: 256, μ: 8045, ~: 8045)
+[PASS] testFuzz_HashPoolKeySpec_total_readOnly(address,address,uint24,int24,address) (runs: 256, μ: 34390, ~: 34497)
+[PASS] testFuzz_HashSetExecutorSpec_onHook(uint256,int24,address,bool,uint256,uint256) (runs: 256, μ: 93299, ~: 84303)
+[PASS] testFuzz_HashSetExecutorSpec_result(address,address,uint24,int24,address,address,address,bool,uint256,uint256) (runs: 256, μ: 9929, ~: 9934)
+[PASS] testFuzz_HashSetExecutorSpec_total_readOnly(address,address,uint24,int24,address,address,address,bool,uint256,uint256) (runs: 256, μ: 37203, ~: 37435)
+[PASS] testFuzz_TypedDataHashSpec_readOnly(bytes32,bytes32) (runs: 256, μ: 14526, ~: 14526)
+[PASS] testFuzz_TypedDataHashSpec_result(bytes32,bytes32,address,uint64,uint256) (runs: 256, μ: 9803, ~: 9803)
+[PASS] testFuzz_TypedDataHashSpec_total(bytes32,bytes32) (runs: 256, μ: 27875, ~: 28071)
+[PASS] testFuzz_hashTypedDataV4_run(uint64,address,bool,uint256,bytes) (runs: 256, μ: 198023, ~: 189269)
+[PASS] testFuzz_hashTypedDataV4_run_router(((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint64,uint256,uint256,bytes) (runs: 256, μ: 226403, ~: 224053)
+[PASS] testFuzz_isValidSignatureNow_run(uint256,bool,bytes,bool,address,bool,uint256) (runs: 256, μ: 290729, ~: 254239)
+[PASS] testFuzz_isValidSignatureNow_run_router(((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint256,bool,bytes,bool,uint256,uint256) (runs: 256, μ: 346100, ~: 319554)
+[PASS] testFuzz_tryRecover_5888_ok(((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint256,uint256,uint256,bytes) (runs: 256, μ: 111418, ~: 109199)
+[PASS] testFuzz_tryRecover_9821_ok(address,bool,uint256,bytes,uint256) (runs: 256, μ: 72626, ~: 71408)
+[PASS] test_SpecSig_typehash_words() (gas: 11572)
+Suite result: ok. 22 passed; 0 failed; 0 skipped; finished in 971.51ms (969.33ms CPU time)
+
+Ran 8 tests for test/TokenClaims.t.sol:TokenClaimsTest
+[PASS] test_RevertWhen_CallbackNotFromPoolManager() (gas: 1599921)
+[PASS] test_RevertWhen_InvalidRedemption() (gas: 102210)
+[PASS] test_RevertWhen_RedeemingAnotherOwnersClaims() (gas: 1640866)
+[PASS] test_RevertWhen_RedeemingWithoutApproval() (gas: 1580995)
+[PASS] test_failedTransferPreservesClaimsAndAllowance() (gas: 2622604)
+[PASS] test_redeemPartialToChosenRecipientThenNoDoubleSpend() (gas: 1846560)
+[PASS] test_redeemsEachCurrencySeparately() (gas: 1728355)
+[PASS] test_reentrantRedemptionIsBlocked() (gas: 2782870)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 8.64ms (6.87ms CPU time)
+
+Ran 1 test for test/UnichainFork.t.sol:UnichainForkTest
+[SKIP: skipped] setUp() (gas: 0)
+Suite result: ok. 0 passed; 0 failed; 1 skipped; finished in 520.00µs (0.00ns CPU time)
+
+Ran 1 test for test/security/UserDataMatchesOrder.t.sol:UserDataMatchesOrderTest
+[PASS] test_RevertWhen_UserDataDivergesFromOrder() (gas: 96346)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.51ms (40.67µs CPU time)
+
+Ran 19 tests for test/formal/AsyncSwapAddOrder.t.sol:AsyncSwapAddOrderFormalTest
+[PASS] testFuzz_addOrder_feeTooLarge((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8)) (runs: 256, μ: 2412402, ~: 2175370)
+[PASS] testFuzz_addOrder_feeTooSmall((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8)) (runs: 256, μ: 2403765, ~: 2175531)
+[PASS] testFuzz_addOrder_ok((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8)) (runs: 256, μ: 2618324, ~: 2866927)
+[PASS] testFuzz_addOrder_run((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8)) (runs: 256, μ: 2618522, ~: 2853855)
+[PASS] testFuzz_addOrder_seqOverflow((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8)) (runs: 256, μ: 2451633, ~: 2204608)
+[PASS] testFuzz_addState_book((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8)) (runs: 256, μ: 3312045, ~: 3089597)
+[PASS] testFuzz_addState_frame(bool,uint256,uint256,address,uint256) (runs: 256, μ: 792521, ~: 769444)
+[PASS] testFuzz_addState_order((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8)) (runs: 256, μ: 3307046, ~: 3084592)
+[PASS] testFuzz_addState_other_order((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8)) (runs: 256, μ: 3367548, ~: 3137421)
+[PASS] testFuzz_addState_other_pool((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8)) (runs: 256, μ: 3116716, ~: 2874198)
+[PASS] testFuzz_matching_addOrder_eq((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8)) (runs: 256, μ: 2637971, ~: 2853941)
+[PASS] testFuzz_matching_addOrder_feeTooLarge((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8)) (runs: 256, μ: 2418588, ~: 2181556)
+[PASS] testFuzz_matching_addOrder_feeTooSmall((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8)) (runs: 256, μ: 2409975, ~: 2181741)
+[PASS] testFuzz_matching_addOrder_ok((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8)) (runs: 256, μ: 2624555, ~: 2873236)
+[PASS] testFuzz_matching_addOrder_run((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8)) (runs: 256, μ: 2624860, ~: 2860209)
+[PASS] testFuzz_matching_addOrder_seqOverflow((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8)) (runs: 256, μ: 2457914, ~: 2210889)
+[PASS] testFuzz_priorityKey_bidAndSequence((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8)) (runs: 256, μ: 2819159, ~: 2572591)
+[PASS] test_addOrder_tickDirectionZeroBoundary() (gas: 14370892)
+[PASS] test_addOrder_tickExtremeRatioClamps() (gas: 3704765)
+Suite result: ok. 19 passed; 0 failed; 0 skipped; finished in 7.43s (4.77s CPU time)
+
+Ran 23 tests for test/formal/SpecCore.t.sol:SpecCoreFormalTest
+[PASS] testFuzz_CreateOrderSpec_notAuthorised(address,address,bool,uint256,uint256,bool) (runs: 256, μ: 149895, ~: 196538)
+[PASS] testFuzz_CreateOrderSpec_run(address,address,bool,uint256,uint256,uint256,uint256) (runs: 256, μ: 1023461, ~: 1008239)
+[PASS] testFuzz_CreateOrderSpec_run_addOrderGuards(address,address,bool,uint256,uint256,uint256,bool) (runs: 256, μ: 343758, ~: 155428)
+[PASS] testFuzz_CreateOrderSpec_run_repeat(address,address,bool,uint256,uint256) (runs: 256, μ: 1421791, ~: 1421518)
+[PASS] testFuzz_CreateOrderSpec_zeroAmount(address,address,bool,uint256,uint256,bool,uint256) (runs: 256, μ: 132694, ~: 123407)
+[PASS] testFuzz_PoolStateSlotSpec_pure_ok(bytes32) (runs: 256, μ: 14857, ~: 14857)
+[PASS] testFuzz_PoolStateSlotSpec_value(bytes32) (runs: 256, μ: 5934, ~: 5934)
+[PASS] testFuzz_Router_TransferSpec_erc20(uint8,uint256,bytes,address,uint256) (runs: 256, μ: 263621, ~: 168450)
+[PASS] testFuzz_Router_TransferSpec_frame(bool,uint256,address) (runs: 256, μ: 134949, ~: 145201)
+[PASS] testFuzz_Router_TransferSpec_native(uint8,address,bytes,uint256,uint256) (runs: 256, μ: 135353, ~: 132518)
+[PASS] testFuzz_Router_TransferSpec_ok_iff(bool,uint8,uint256,bytes,address,uint256) (runs: 256, μ: 142314, ~: 145515)
+[PASS] testFuzz_TransferSpec_erc20(uint8,uint256,bytes,address,uint256) (runs: 256, μ: 263578, ~: 168407)
+[PASS] testFuzz_TransferSpec_erc20_noCode(address,address,uint256) (runs: 256, μ: 38237, ~: 38301)
+[PASS] testFuzz_TransferSpec_frame(bool,uint256,address) (runs: 256, μ: 134908, ~: 145160)
+[PASS] testFuzz_TransferSpec_native(uint8,address,bytes,uint256,uint256) (runs: 256, μ: 135354, ~: 132519)
+[PASS] testFuzz_TransferSpec_ok_iff(bool,uint8,uint256,bytes,address,uint256) (runs: 256, μ: 142338, ~: 145539)
+[PASS] testFuzz_TransferSpec_viaSweep(bool,bool,bytes,uint256,uint8,uint256,address) (runs: 256, μ: 211691, ~: 187367)
+[PASS] testFuzz_beforeSwap_frame_of_spec(address,address,bool,uint256,uint256,uint256,uint256) (runs: 256, μ: 1143917, ~: 1128934)
+[PASS] testFuzz_createBody_frame(address,address,bool,uint256,uint256,uint256,uint256) (runs: 256, μ: 1023438, ~: 1008216)
+[PASS] testFuzz_getLiquidity_of_spec(bytes32,bool,uint256) (runs: 256, μ: 1075826, ~: 22104)
+[PASS] testFuzz_getLiquidity_zero_of_spec(bytes32,uint128) (runs: 256, μ: 19321, ~: 19321)
+[PASS] testFuzz_getSlot0_of_spec(bytes32,bool,uint256) (runs: 256, μ: 26853, ~: 25984)
+[PASS] test_note_beforeSwap_frame_hcreate_false() (gas: 699187)
+Suite result: ok. 23 passed; 0 failed; 0 skipped; finished in 2.67s (2.66s CPU time)
+
+Ran 3 tests for test/formal/AsyncSwapVerifyCallResultFromTarget.t.sol:AsyncSwapVerifyCallResultFromTargetFormalTest
+[PASS] testFuzz_verify_frame(address,bool,bool,bytes) (runs: 256, μ: 36491, ~: 34719)
+[PASS] testFuzz_verify_ok_iff(address,bool,bool,bytes) (runs: 256, μ: 10632, ~: 9482)
+[PASS] testFuzz_verify_run(address,bool,bool,bytes) (runs: 256, μ: 12639, ~: 11860)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 18.69ms (18.27ms CPU time)
+
+Ran 2 tests for test/BaseHookDefaults.t.sol:BaseHookDefaultsTest
+[PASS] test_RevertWhen_CalledByAnyoneButThePoolManager() (gas: 37472)
+[PASS] test_unimplementedCallbacksRevert() (gas: 95323)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 1.04ms (72.46µs CPU time)
+
+Ran 4 tests for test/formal/AsyncSwapAfterAddLiquidity.t.sol:AsyncSwapAfterAddLiquidityFormalTest
+[PASS] testFuzz_afterAddLiquidity_never_ok((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 361630, ~: 41303)
+[PASS] testFuzz_afterAddLiquidity_notPoolManager((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 363296, ~: 42465)
+[PASS] testFuzz_afterAddLiquidity_poolManager((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 362976, ~: 42145)
+[PASS] testFuzz_afterAddLiquidity_spec((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 363096, ~: 42300)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 237.80ms (236.14ms CPU time)
+
+Ran 11 tests for test/formal/FeeVaultUnlockCallback.t.sol:FeeVaultUnlockCallbackFormalTest
+[PASS] testFuzz_unlockCallback_badData((uint8,bytes32,bytes32,bytes,uint256)) (runs: 256, μ: 66239, ~: 61701)
+[PASS] testFuzz_unlockCallback_burn_fails(uint96,address) (runs: 256, μ: 204110, ~: 204666)
+[PASS] testFuzz_unlockCallback_nonzero(uint96,address,bytes) (runs: 256, μ: 267794, ~: 265856)
+[PASS] testFuzz_unlockCallback_ok(address,uint8,(uint8,bytes32,bytes32,bytes,uint256),uint96) (runs: 256, μ: 228029, ~: 218442)
+[PASS] testFuzz_unlockCallback_reverts_iff(address,bool,(uint8,bytes32,bytes32,bytes,uint256),uint96) (runs: 256, μ: 244673, ~: 235601)
+[PASS] testFuzz_unlockCallback_run(address,bool,(uint8,bytes32,bytes32,bytes,uint256),uint96) (runs: 256, μ: 301060, ~: 274144)
+[PASS] testFuzz_unlockCallback_take_eq_own_balance(uint96,uint96,address) (runs: 256, μ: 412926, ~: 414159)
+[PASS] testFuzz_unlockCallback_unauthorized(address,bytes,uint96) (runs: 256, μ: 195629, ~: 199003)
+[PASS] testFuzz_unlockCallback_view_reverts(address,address,bytes) (runs: 256, μ: 36157, ~: 36189)
+[PASS] testFuzz_unlockCallback_zero(address,address,bytes,uint96) (runs: 256, μ: 241210, ~: 242227)
+[PASS] test_unlockCallback_burn_fails_overflow() (gas: 767499)
+Suite result: ok. 11 passed; 0 failed; 0 skipped; finished in 778.22ms (775.45ms CPU time)
+
+Ran 1 test for test/security/FillerMaxPrice.t.sol:FillerMaxPriceTest
+[PASS] test_RevertWhen_LivePriceExceedsFillerMax() (gas: 1187933)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.27ms (623.67µs CPU time)
+
+Ran 1 test for test/security/HookBalanceIsolation.t.sol:HookBalanceIsolationTest
+[PASS] test_RevertWhen_SelfExecutorFillsFromHookBalance() (gas: 10013411)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 3.04ms (2.02ms CPU time)
+
+Ran 2 tests for test/security/MakerIdentity.t.sol:MakerIdentityTest
+[PASS] test_mismatchedOwnerRevertsBeforeTransfer() (gas: 127967)
+[PASS] test_mismatchedUserDataRevertsBeforeTransfer() (gas: 128589)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 1.77ms (144.25µs CPU time)
+
+Ran 7 tests for test/MatchingAdversarial.t.sol:MatchingAdversarialTest
+[PASS] test_RevertWhen_NativeOutputForwardFails() (gas: 747177)
+[PASS] test_cancel_nativeInput_makerReclaimsEth() (gas: 965205)
+[PASS] test_fill_nativeInput_fillerSendsEth_receivesErc20() (gas: 1089515)
+[PASS] test_fill_nativeOutput_fillerSendsErc20_receivesEth() (gas: 1081579)
+[PASS] test_rejectingBestBuyerReceivesClaimsWithoutBlocking() (gas: 1995113)
+[PASS] test_swap_nativeInput_create() (gas: 708766)
+[PASS] test_swap_nativeOutput_create() (gas: 712421)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 8.87ms (7.08ms CPU time)
+
+Ran 13 tests for test/MatchingEngine.t.sol:MatchingEngineTest
+[PASS] testBestPricesAreOrderedByTheRadixTree() (gas: 883628)
+[PASS] testCancelUnlinksMiddleOfPriceLevel() (gas: 701535)
+[PASS] testCrossedRemainderCanBeClearedInBoundedChunks() (gas: 1733745)
+[PASS] testFuzzBestAskMatchesMinimum(uint128[16]) (runs: 256, μ: 3696113, ~: 3706663)
+[PASS] testGas_100OrdersAtDistinctPrices() (gas: 22981540)
+Logs:
+  gas for 100 unique-price orders: 24965778
+
+[PASS] testGas_OneCallMatchesEightDistinctLevels() (gas: 2220056)
+Logs:
+  gas for one order matching eight levels: 548663
+
+[PASS] testIncomingAskFillsBestBidAtTheBidPrice() (gas: 734592)
+[PASS] testMatchBookUsesTheOlderBidAsMaker() (gas: 1652015)
+[PASS] testMatchBoundCannotBeRaisedByCaller() (gas: 98520)
+[PASS] testPartiallyFilledOrderKeepsItsTimePriority() (gas: 607543)
+[PASS] testPriceTimePriorityAndPartialFills() (gas: 522313)
+[PASS] testRevertWhenAmountOrPriceIsZero() (gas: 99786)
+[PASS] testRevertWhenCancellingMissingOrAnotherOwnersOrder() (gas: 332220)
+Suite result: ok. 13 passed; 0 failed; 0 skipped; finished in 339.76ms (338.50ms CPU time)
+
+Ran 12 tests for test/formal/AsyncSwapUpdatePriceWithSig.t.sol:AsyncSwapUpdatePriceWithSigFormalTest
+[PASS] testFuzz_updatePriceWithSig_burns_nonce(uint256,uint256,uint256,uint256,uint256,bool) (runs: 256, μ: 1276229, ~: 1275612)
+[PASS] testFuzz_updatePriceWithSig_expired(((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint256,uint256,uint256,bytes) (runs: 256, μ: 48428, ~: 46794)
+[PASS] testFuzz_updatePriceWithSig_invalidSig(uint8,uint256,uint256,uint256,bytes) (runs: 256, μ: 815488, ~: 819626)
+[PASS] testFuzz_updatePriceWithSig_missing_reverts(bool,bytes32,uint256,uint256,uint256,bool) (runs: 256, μ: 821880, ~: 831211)
+[PASS] testFuzz_updatePriceWithSig_noOwnerGuard(address,uint256,uint256,uint256,bool) (runs: 256, μ: 870799, ~: 817152)
+[PASS] testFuzz_updatePriceWithSig_nonceUsed(uint256,uint256,uint256) (runs: 256, μ: 846393, ~: 846529)
+[PASS] testFuzz_updatePriceWithSig_notFound(bytes32,uint256,uint256,uint256) (runs: 256, μ: 132722, ~: 132772)
+[PASS] testFuzz_updatePriceWithSig_ok(uint256,uint256,uint256) (runs: 256, μ: 1172362, ~: 1172494)
+[PASS] testFuzz_updatePriceWithSig_run(bool,bool,uint256,uint256,uint256) (runs: 256, μ: 905457, ~: 833196)
+[PASS] testFuzz_updatePriceWithSig_zero(uint256,uint256,bool) (runs: 256, μ: 832531, ~: 832423)
+[PASS] testFuzz_verify_ok_inv(uint256,uint256,uint256,uint256) (runs: 256, μ: 1152596, ~: 1152687)
+[PASS] testFuzz_verify_run(bool,bool,bool,uint256,uint256,uint256) (runs: 256, μ: 871177, ~: 841690)
+Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 2.51s (2.51s CPU time)
+
+Ran 7 tests for test/formal/AsyncSwapFillOrderFromPoolLiquidity.t.sol:AsyncSwapFillOrderFromPoolLiquidityFormalTest
+[PASS] testFuzz_fillOrderFromPoolLiquidity_noLiquidity(uint256,bool,uint256) (runs: 256, μ: 921675, ~: 897049)
+[PASS] testFuzz_fillOrderFromPoolLiquidity_notFound(bytes32,address,bool) (runs: 256, μ: 2869380, ~: 2869570)
+[PASS] testFuzz_fillOrderFromPoolLiquidity_notSelf(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),bytes32) (runs: 256, μ: 35672, ~: 36104)
+[PASS] testFuzz_fillOrderFromPoolLiquidity_ok(uint256,uint256,bool) (runs: 256, μ: 7796147, ~: 3268428)
+[PASS] testFuzz_fillOrderFromPoolLiquidity_ok_full(uint256,address,bool,bool) (runs: 256, μ: 3187180, ~: 3205670)
+[PASS] testFuzz_fillOrderFromPoolLiquidity_reentry_reverts(uint256,bool) (runs: 256, μ: 3154603, ~: 3148288)
+[PASS] testFuzz_swapAgainstPool_ok(uint256,uint256,bool) (runs: 256, μ: 3162939, ~: 3144055)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 6.11s (6.10s CPU time)
+
+Ran 4 tests for test/formal/AsyncSwapMatchBook.t.sol:AsyncSwapMatchBookFormalTest
+[PASS] testFuzz_asyncMatching_matchBook_ok(uint8,uint8) (runs: 256, μ: 9001885, ~: 8694808)
+[PASS] testFuzz_matchBook_bound_noOk(uint8,bool,uint8) (runs: 256, μ: 8284694, ~: 8086594)
+[PASS] testFuzz_matchBook_invalidBound((address,address,uint24,int24,address),uint8,bool) (runs: 256, μ: 38000, ~: 37975)
+[PASS] testFuzz_matchBook_ok(uint8,uint8,bool) (runs: 256, μ: 4372045, ~: 61155)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 5.95s (5.95s CPU time)
+
+Ran 5 tests for test/formal/AsyncSwapSwapAgainstPool.t.sol:AsyncSwapSwapAgainstPoolFormalTest
+[PASS] testFuzz_swapAgainstPool_amountIn_lt(uint256,bool,bool) (runs: 256, μ: 1992529, ~: 1094752)
+[PASS] testFuzz_swapAgainstPool_noLiquidity(uint256,uint256,bool) (runs: 256, μ: 1076137, ~: 1052179)
+[PASS] testFuzz_swapAgainstPool_ok_liquidity_min(uint256,uint256,bool,bool) (runs: 256, μ: 6924744, ~: 1099238)
+[PASS] testFuzz_swapAgainstPool_spec(uint256,uint256,bool,int128,int128,uint8,uint24) (runs: 256, μ: 3206240, ~: 3192990)
+[PASS] testFuzz_swapAgainstPool_success(uint256,bool,uint24) (runs: 256, μ: 3331416, ~: 3311658)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 6.02s (6.01s CPU time)
+
+Ran 6 tests for test/formal/AsyncSwapSweep.t.sol:AsyncSwapSweepFormalTest
+[PASS] testFuzz_sweep_notOwner(address,address,address,address) (runs: 256, μ: 31385, ~: 31522)
+[PASS] testFuzz_sweep_ok(address,address,bool,uint8,uint128,address) (runs: 256, μ: 4170063, ~: 105157)
+[PASS] testFuzz_sweep_reverts_unless(address,address,bool,uint8,uint128,address) (runs: 256, μ: 62471, ~: 64173)
+[PASS] testFuzz_sweep_run(uint8,uint128,uint256) (runs: 256, μ: 126429, ~: 148688)
+[PASS] testFuzz_sweep_storage_unchanged(uint8,uint128,address) (runs: 256, μ: 4172903, ~: 123320)
+[PASS] testFuzz_sweep_zeroTo(address,address) (runs: 256, μ: 30718, ~: 30803)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 95.99ms (94.26ms CPU time)
+
+Ran 7 tests for test/formal/AsyncSwapMatchPair.t.sol:AsyncSwapMatchPairFormalTest
+[PASS] testFuzz_matchPair_eq(uint256[6],uint8) (runs: 256, μ: 2390803, ~: 2173860)
+[PASS] testFuzz_matchPair_error(uint256[6],uint8,uint8,uint256) (runs: 256, μ: 1925266, ~: 1655731)
+[PASS] testFuzz_matchPair_ok(uint256[6],uint8,uint8) (runs: 256, μ: 2146347, ~: 1725080)
+[PASS] testFuzz_matchPair_reverts_restingZero(uint256[6],bool,uint256,uint256,bool) (runs: 256, μ: 1577435, ~: 1620221)
+[PASS] testFuzz_matchPair_skip(uint256[6],uint8,uint8) (runs: 256, μ: 2079801, ~: 1722857)
+[PASS] testFuzz_matchPair_true(uint256[6],uint8) (runs: 256, μ: 2403532, ~: 2164198)
+[PASS] testFuzz_matchRun_ok(uint256[6],uint8) (runs: 256, μ: 2340436, ~: 2082281)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 3.11s (3.11s CPU time)
+
+Ran 4 tests for test/formal/AsyncSwapFreeNode.t.sol:AsyncSwapFreeNodeFormalTest
+[PASS] testFuzz_freeNode_footprint(uint32,(uint32,uint32,uint32,uint128,uint8,bool),uint128,uint32[],uint32,uint128) (runs: 256, μ: 992254, ~: 979234)
+[PASS] testFuzz_freeNode_no_revert(uint32,(uint32,uint32,uint32,uint128,uint8,bool),uint128,uint32[]) (runs: 256, μ: 783393, ~: 762728)
+[PASS] testFuzz_freeNode_run(uint32,(uint32,uint32,uint32,uint128,uint8,bool),uint128,uint32[],uint32,uint128) (runs: 256, μ: 939330, ~: 926311)
+[PASS] testFuzz_freeNode_run_wrapped(uint32,(uint32,uint32,uint32,uint128,uint8,bool),uint128,uint32[],uint32,uint128) (runs: 256, μ: 939375, ~: 926356)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 616.75ms (616.33ms CPU time)
+
+Ran 4 tests for test/formal/AsyncSwapMostSignificantBit.t.sol:AsyncSwapMostSignificantBitFormalTest
+[PASS] testFuzz_mostSignificantBit_bounds(uint128,uint128) (runs: 256, μ: 219853, ~: 219833)
+[PASS] testFuzz_mostSignificantBit_eq_log2(uint128,uint128) (runs: 256, μ: 244275, ~: 245178)
+[PASS] testFuzz_mostSignificantBit_noRevert(uint128,uint128) (runs: 256, μ: 217308, ~: 216813)
+[PASS] testFuzz_mostSignificantBit_spec(uint128,uint128) (runs: 256, μ: 244296, ~: 245199)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 177.69ms (177.27ms CPU time)
+
+Ran 5 tests for test/formal/AsyncSwapMulDiv.t.sol:AsyncSwapMulDivFormalTest
+[PASS] testFuzz_mulDiv_eq_mulDivFloor(uint256,uint256,uint256) (runs: 256, μ: 11980, ~: 12106)
+[PASS] testFuzz_mulDiv_ok(uint256,uint256,uint256) (runs: 256, μ: 12239, ~: 12172)
+[PASS] testFuzz_mulDiv_overflow(uint256,uint256,uint256) (runs: 256, μ: 10041, ~: 10041)
+[PASS] testFuzz_mulDiv_spec(uint256,uint256,uint256,bool) (runs: 256, μ: 9671, ~: 9701)
+[PASS] testFuzz_mulDiv_zero(uint256,uint256) (runs: 256, μ: 9845, ~: 9980)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 56.83ms (55.26ms CPU time)
+
+Ran 3 tests for test/formal/AsyncSwapFunctionCall.t.sol:AsyncSwapFunctionCallFormalTest
+[PASS] testFuzz_functionCall_eq_withValue((address,bool,bool,uint8,uint256,bytes),bytes,uint128) (runs: 256, μ: 425699, ~: 199698)
+[PASS] testFuzz_functionCall_ok((address,bool,bool,uint8,uint256,bytes),bytes) (runs: 256, μ: 233416, ~: 64111)
+[PASS] testFuzz_functionCall_run((address,bool,bool,uint8,uint256,bytes),bytes) (runs: 256, μ: 277183, ~: 104272)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 86.50ms (85.96ms CPU time)
+
+Ran 3 tests for test/formal/AsyncSwapFunctionCallWithValue.t.sol:AsyncSwapFunctionCallWithValueFormalTest
+[PASS] testFuzz_functionCallWithValue_ok((address,bool,bool,uint8,uint256,bytes),bytes,uint256,uint256) (runs: 256, μ: 313643, ~: 168322)
+[PASS] testFuzz_functionCallWithValue_reverts_insufficient((address,bool,bool,uint8,uint256,bytes),bytes,uint256,uint256) (runs: 256, μ: 162752, ~: 126587)
+[PASS] testFuzz_functionCallWithValue_run((address,bool,bool,uint8,uint256,bytes),bytes,uint256,uint256) (runs: 256, μ: 400581, ~: 246659)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 111.66ms (111.11ms CPU time)
+
+Ran 4 tests for test/formal/AsyncSwapGetHookPermissions.t.sol:AsyncSwapGetHookPermissionsFormalTest
+[PASS] testFuzz_getHookPermissions_never_reverts(address) (runs: 256, μ: 31154, ~: 31154)
+[PASS] testFuzz_getHookPermissions_run(address,uint64) (runs: 256, μ: 35673, ~: 35673)
+[PASS] test_getHookPermissions_fields() (gas: 17770)
+[PASS] test_getHookPermissions_ok_iff() (gas: 20164)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 29.41ms (21.45ms CPU time)
+
+Ran 2 tests for test/MatchingInvariant.t.sol:LpMatchingInvariantTest
+[PASS]
+LpMatchingInvariantTest invariants:
+[PASS] invariant_assetsConserved
+[PASS] invariant_bestPricesAgreeWithLinearScan
+[PASS] invariant_escrowEqualsOutstandingObligations
+[PASS] invariant_hookHoldsNoUsdcBeyondEscrow
+ LpMatchingInvariantTest invariants (runs: 64, calls: 4096, reverts: 0)
+
+╭-----------------+----------+-------+---------+----------╮
+| Contract        | Selector | Calls | Reverts | Discards |
++=========================================================+
+| MatchingHandler | cancel   | 705   | 0       | 0        |
+|-----------------+----------+-------+---------+----------|
+| MatchingHandler | clear    | 685   | 0       | 0        |
+|-----------------+----------+-------+---------+----------|
+| MatchingHandler | lpFill   | 705   | 0       | 0        |
+|-----------------+----------+-------+---------+----------|
+| MatchingHandler | redeem   | 641   | 0       | 0        |
+|-----------------+----------+-------+---------+----------|
+| MatchingHandler | reprice  | 684   | 0       | 0        |
+|-----------------+----------+-------+---------+----------|
+| MatchingHandler | submit   | 676   | 0       | 0        |
+╰-----------------+----------+-------+---------+----------╯
+
+[PASS] test_campaignPricesReachThePool() (gas: 2711519)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 3.43s (3.43s CPU time)
+
+Ran 4 tests for test/formal/AsyncSwapNewNode.t.sol:AsyncSwapNewNodeFormalTest
+[PASS] testFuzz_newNode_footprint(uint32[],uint32,uint128,uint128,uint32,(uint32,uint32,uint32,uint128,uint8,bool),bool) (runs: 256, μ: 654608, ~: 372539)
+[PASS] testFuzz_newNode_reverts_iff(uint32[],uint32,uint128,bool,bool) (runs: 256, μ: 398539, ~: 234914)
+[PASS] testFuzz_newNode_run_free(uint32[],uint32,uint128) (runs: 256, μ: 814555, ~: 806524)
+[PASS] testFuzz_newNode_run_fresh(uint32,uint128,bool) (runs: 256, μ: 139857, ~: 166530)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 408.58ms (408.08ms CPU time)
+
+Ran 5 tests for test/formal/AsyncSwapOnlyOwner.t.sol:AsyncSwapOnlyOwnerFormalTest
+[PASS] testFuzz_onlyOwner_notOwner(address,address,uint8,address,bool) (runs: 256, μ: 92297, ~: 92192)
+[PASS] testFuzz_onlyOwner_ok(address,address,bool,uint8,address,bool) (runs: 256, μ: 42918, ~: 38744)
+[PASS] testFuzz_onlyOwner_owner(address,uint8,address,bool) (runs: 256, μ: 52926, ~: 55011)
+[PASS] testFuzz_onlyOwner_reverts_NotOwner_iff(address,address,bool,uint8,address,bool) (runs: 256, μ: 43119, ~: 39064)
+[PASS] testFuzz_onlyOwner_run(address,address,bool,uint8,address,bool) (runs: 256, μ: 43544, ~: 39646)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 69.76ms (64.24ms CPU time)
+
+Ran 19 tests for test/security/MinimumOrder.t.sol:MinimumOrderTest
+[PASS] test_RevertWhen_BuyBelowMinimum() (gas: 186029)
+[PASS] test_RevertWhen_NonOwnerSetsMinimum() (gas: 66824)
+[PASS] test_RevertWhen_SellAsksBelowMinimum() (gas: 212511)
+[PASS] test_RevertWhen_SellInputWorthLessThanMinimum() (gas: 216047)
+[PASS] test_RevertWhen_SellInputWorthLessThanMinimum_numeraireIsCurrency0() (gas: 539482)
+[PASS] test_RevertWhen_UpdatePriceBelowMinimum() (gas: 915477)
+[PASS] test_RevertWhen_priorityFee_smallOrderBelowTenBps() (gas: 127529)
+[PASS] test_RevertWhen_updatePrice_raisesSellBidFloor() (gas: 787114)
+[PASS] test_RevertWhen_updatePrice_raisesSellBidFloor_withMinimum() (gas: 927667)
+[PASS] test_buyAtMinimum_rests() (gas: 798271)
+[PASS] test_newPoolsTakeTheDefaultMinimum() (gas: 386763)
+[PASS] test_partialMatchBuyRemainderBelowMinimum_refunded() (gas: 1732628)
+[PASS] test_partialMatchRemainderBelowMinimum_refunded() (gas: 1733874)
+[PASS] test_priorityFee_smallOrderPaysTenBps() (gas: 741258)
+[PASS] test_sellAtMinimum_rests() (gas: 877853)
+[PASS] test_sellAtMinimum_rests_numeraireIsCurrency0() (gas: 1173159)
+[PASS] test_updatePrice_buyUnaffectedBySellBidFloor() (gas: 1074475)
+[PASS] test_updatePrice_partiallyFilledSellKeepsProRatedBid() (gas: 2044229)
+[PASS] test_updatePrice_withinSellBidFloor() (gas: 1414874)
+Suite result: ok. 19 passed; 0 failed; 0 skipped; finished in 10.77ms (9.04ms CPU time)
+
+Ran 6 tests for test/NativeAsyncSwap.t.sol:NativeAsyncSwapTest
+[PASS] test_RevertWhen_NativeOutputForwardFails() (gas: 747154)
+[PASS] test_cancel_nativeInput_makerReclaimsEth() (gas: 965162)
+[PASS] test_fill_nativeInput_fillerSendsEth_receivesErc20() (gas: 1089480)
+[PASS] test_fill_nativeOutput_fillerSendsErc20_receivesEth() (gas: 1081566)
+[PASS] test_swap_nativeInput_create() (gas: 708743)
+[PASS] test_swap_nativeOutput_create() (gas: 712386)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 8.85ms (7.28ms CPU time)
+
+Ran 11 tests for test/NativeClaims.t.sol:NativeClaimsTest
+[PASS] test_RevertWhen_NativeOutputForwardFails() (gas: 747199)
+[PASS] test_cancel_nativeInput_makerReclaimsEth() (gas: 965162)
+[PASS] test_cannotRedeemAnotherOwnerOrCallCallback() (gas: 1091338)
+[PASS] test_failedRedemptionPreservesClaimsAndAllowance() (gas: 1348419)
+[PASS] test_fill_nativeInput_fillerSendsEth_receivesErc20() (gas: 1089525)
+[PASS] test_fill_nativeOutput_fillerSendsErc20_receivesEth() (gas: 1081566)
+[PASS] test_nativeLpFillCreditsClaims() (gas: 2672182)
+[PASS] test_redeemPartialToChosenRecipientThenNoDoubleSpend() (gas: 1223757)
+[PASS] test_reentrantRedemptionCannotUnlockAgain() (gas: 1314239)
+[PASS] test_swap_nativeInput_create() (gas: 708743)
+[PASS] test_swap_nativeOutput_create() (gas: 712386)
+Suite result: ok. 11 passed; 0 failed; 0 skipped; finished in 8.51ms (6.85ms CPU time)
+
+Ran 7 tests for test/formal/NativeClaimsRedeem.t.sol:NativeClaimsRedeemFormalTest
+[PASS] testFuzz_redeem_invalid(address,address,uint256,bool,uint96) (runs: 256, μ: 170883, ~: 171643)
+[PASS] testFuzz_redeem_nested_reverts(uint96,uint256,address,uint256) (runs: 256, μ: 842374, ~: 843111)
+[PASS] testFuzz_redeem_ok(address,address,uint256,uint96,uint256,bool) (runs: 256, μ: 233081, ~: 267740)
+[PASS] testFuzz_redeem_ok_state(uint96,uint256) (runs: 256, μ: 798219, ~: 798713)
+[PASS] testFuzz_redeem_reentrant(address,address,uint256,uint96) (runs: 256, μ: 149197, ~: 149466)
+[PASS] testFuzz_redeem_reverts_iff(address,bool,bool,address,uint256,uint96,uint256) (runs: 256, μ: 4407645, ~: 234371)
+[PASS] testFuzz_redeem_run(address,bool,bool,address,uint256,uint96,uint256) (runs: 256, μ: 4411528, ~: 235955)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 276.34ms (274.39ms CPU time)
+
+Ran 1 test for test/security/NativeInputMsgValue.t.sol:NativeInputMsgValueTest
+[PASS] test_RevertWhen_NativeInputMsgValueMismatch() (gas: 45634)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.60ms (43.46µs CPU time)
+
+Ran 1 test for test/security/NativeOutputEscrow.t.sol:NativeOutputEscrowTest
+[PASS] test_RevertWhen_FillerDoesNotDepositNativeOutput() (gas: 757249)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.86ms (477.42µs CPU time)
+
+Ran 3 tests for test/security/NativeSettlementReentrancy.t.sol:NativeSettlementReentrancyTest
+[PASS] test_control_eoaFill_succeeds() (gas: 1183689)
+Logs:
+  maker ETH received: 0
+
+[PASS] test_reentrancyOnCancel_blocked() (gas: 2886310)
+Logs:
+  reentry attempts: 0
+  reentry successes: 0
+  maker ETH reclaimed: 0
+
+[PASS] test_reentrancyOnFill_blocked() (gas: 2954641)
+Logs:
+  reentry attempts: 0
+  reentry successes: 0
+  maker ETH received: 0
+
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 4.19ms (2.66ms CPU time)
+
+Ran 8 tests for test/formal/NativeClaimsUnlockCallback.t.sol:NativeClaimsUnlockCallbackFormalTest
+[PASS] testFuzz_unlockCallback_badData((uint8,bytes32,bytes32,bytes32,bytes,uint256)) (runs: 256, μ: 67181, ~: 60694)
+[PASS] testFuzz_unlockCallback_burn_fails(uint96,uint256,uint256,uint256) (runs: 256, μ: 208794, ~: 217965)
+[PASS] testFuzz_unlockCallback_ok(uint96,uint256,uint256,bytes) (runs: 256, μ: 338551, ~: 343292)
+[PASS] testFuzz_unlockCallback_ok_args(bytes32,bytes32,uint96,uint256,uint256) (runs: 256, μ: 181408, ~: 150877)
+[PASS] testFuzz_unlockCallback_onlyPoolManager(address,bytes,uint96) (runs: 256, μ: 104095, ~: 104370)
+[PASS] testFuzz_unlockCallback_reverts_iff(address,bool,uint96,uint256,uint8,uint256,uint256,(uint8,bytes32,bytes32,bytes32,bytes,uint256)) (runs: 256, μ: 239579, ~: 243835)
+[PASS] testFuzz_unlockCallback_run(address,bool,(uint8,bytes32,bytes32,bytes32,bytes,uint256),uint96) (runs: 256, μ: 156932, ~: 152739)
+[PASS] testFuzz_unlockCallback_run_unlocked((uint8,bytes32,bytes32,bytes32,bytes,uint256),uint96,bool,uint256) (runs: 256, μ: 246093, ~: 215612)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 403.44ms (401.42ms CPU time)
+
+Ran 9 tests for test/security/NativeFillExactPayment.t.sol:NativeFillExactPaymentTest
+[PASS] testFuzz_overpaymentReverts(uint96) (runs: 256, μ: 809437, ~: 809430)
+[PASS] test_control_fairFill_noStranding() (gas: 1083000)
+[PASS] test_exactLivePrice_succeedsWithStaleStruct() (gas: 1446285)
+[PASS] test_inflatedStructPrice_rejectsOverpayment() (gas: 810923)
+[PASS] test_livePriceAboveMax_revertsAtomically() (gas: 819997)
+[PASS] test_loweredPrice_rejectsStaleDeposit() (gas: 1141508)
+[PASS] test_nativeInput_rejectsMismatchedOwner() (gas: 56260)
+[PASS] test_ownerSweep_recoversDonationsWithoutTouchingOpenOrder() (gas: 1165805)
+[PASS] test_underpayment_cannotConsumeDonatedEth() (gas: 811233)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 178.12ms (174.18ms CPU time)
+
+Ran 6 tests for test/formal/AsyncSwapTransferOwnership.t.sol:AsyncSwapTransferOwnershipFormalTest
+[PASS] testFuzz_transferOwnership_notOwner(address,address,address,address) (runs: 256, μ: 31517, ~: 31585)
+[PASS] testFuzz_transferOwnership_ok_iff(address,address,address,address,bool) (runs: 256, μ: 41719, ~: 50773)
+[PASS] testFuzz_transferOwnership_ok_state(address,address,address,address,bool) (runs: 256, μ: 46837, ~: 58337)
+[PASS] testFuzz_transferOwnership_reverts_iff(address,address,address,address,bool,bool) (runs: 256, μ: 33142, ~: 31231)
+[PASS] testFuzz_transferOwnership_run(address,address,address,address,bool,bool) (runs: 256, μ: 46190, ~: 44284)
+[PASS] testFuzz_transferOwnership_zero(address,address) (runs: 256, μ: 30821, ~: 30821)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 68.20ms (66.18ms CPU time)
+
+Ran 8 tests for test/formal/AsyncSwapMatchNewOrder.t.sol:AsyncSwapMatchNewOrderFormalTest
+[PASS] testFuzz_matchIncoming_le(uint8) (runs: 256, μ: 4286594, ~: 3274127)
+[PASS] testFuzz_matchNewOrder_emptyOrder(address) (runs: 256, μ: 756492, ~: 756552)
+[PASS] testFuzz_matchNewOrder_ok(uint8,address,address,bool,bool) (runs: 256, μ: 3191399, ~: 2442306)
+[PASS] testFuzz_matchNewOrder_reentry_reverts(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint8) (runs: 256, μ: 1611621, ~: 1862082)
+[PASS] testFuzz_matchNewOrder_run(bool,bool,uint8,bool,address) (runs: 256, μ: 2724295, ~: 2657367)
+[PASS] testFuzz_matchNewOrder_unauthorized(address,bool,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32)) (runs: 256, μ: 342061, ~: 595980)
+[PASS] testFuzz_matchNewOrder_wrongOwner(address,address,bool) (runs: 256, μ: 594243, ~: 594696)
+[PASS] test_matchIncoming_empty() (gas: 758624)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 3.06s (3.40s CPU time)
+
+Ran 6 tests for test/formal/AsyncSwapInvalidateNonce.t.sol:AsyncSwapInvalidateNonceFormalTest
+[PASS] testFuzz_invalidateNonce_ok_iff(address,uint256,bool) (runs: 256, μ: 42745, ~: 52424)
+[PASS] testFuzz_invalidateNonce_ok_state(address,uint256,uint256,address,bool) (runs: 256, μ: 109093, ~: 109049)
+[PASS] testFuzz_invalidateNonce_other_maker(address,uint256,address,uint256,bool) (runs: 256, μ: 65029, ~: 64981)
+[PASS] testFuzz_invalidateNonce_reverts_iff(address,uint256,bool) (runs: 256, μ: 42746, ~: 52425)
+[PASS] testFuzz_invalidateNonce_run(address,uint256,bool) (runs: 256, μ: 48721, ~: 58508)
+[PASS] testFuzz_invalidateNonce_used(address,uint256) (runs: 256, μ: 30875, ~: 30831)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 52.38ms (50.29ms CPU time)
+
+Ran 4 tests for test/formal/SpecEip712.t.sol:AsyncSwapCtorSpecFormalTest
+[PASS] testFuzz_CtorSpec(address,uint8,address,uint64) (runs: 256, μ: 9315721, ~: 9317957)
+[PASS] testFuzz_CtorSpec_name_word(address,uint8,address,uint64) (runs: 256, μ: 9280805, ~: 9282300)
+[PASS] testFuzz_CtorSpec_version_word(address,uint8,address,uint64) (runs: 256, μ: 9280900, ~: 9282395)
+[PASS] testFuzz_DOMAIN_SEPARATOR_deployed(uint64,uint64,address,bool) (runs: 256, μ: 5497347, ~: 5491142)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 10.60s (10.70s CPU time)
+
+Ran 26 tests for test/formal/AsyncSwapHelpers.t.sol:AsyncSwapHelpersFormalTest
+[PASS] testFuzz_address_revert_run(bytes) (runs: 256, μ: 879631, ~: 875944)
+[PASS] testFuzz_bitSet_run(uint128,uint8) (runs: 256, μ: 1345490, ~: 1345406)
+[PASS] testFuzz_bubbleUpAndRevertWith_reverts(bool,bytes,bytes4,bytes4) (runs: 256, μ: 1078637, ~: 1077767)
+[PASS] testFuzz_byteLength_le(bytes32) (runs: 256, μ: 873987, ~: 874630)
+[PASS] testFuzz_byteLength_run(bytes32) (runs: 256, μ: 874008, ~: 874651)
+[PASS] testFuzz_callOptionalReturn_after(address,address,uint256,uint8,bool,bytes) (runs: 256, μ: 1580676, ~: 1502115)
+[PASS] testFuzz_callOptionalReturn_call_reverts(address,address,uint256,bool,bytes) (runs: 256, μ: 1223740, ~: 1521708)
+[PASS] testFuzz_crosses_eq(uint256,uint256,uint256,uint256) (runs: 256, μ: 1797302, ~: 1900847)
+[PASS] testFuzz_crosses_ne(uint256,uint256,uint256,uint256) (runs: 256, μ: 1669657, ~: 1477413)
+[PASS] testFuzz_eip712Name_eq(string,string) (runs: 256, μ: 1355554, ~: 1351156)
+[PASS] testFuzz_eip712Version_eq(string,string) (runs: 256, μ: 1355450, ~: 1351047)
+[PASS] testFuzz_freeNode_run(uint128[5],uint256,bool) (runs: 256, μ: 1997649, ~: 2081822)
+[PASS] testFuzz_functionCallWithValue_eq(uint256,uint256,bool,bytes,bool,uint256) (runs: 256, μ: 995228, ~: 917939)
+[PASS] testFuzz_functionCallWithValue_insufficient(uint256,uint256,bool,bytes) (runs: 256, μ: 1079866, ~: 1075407)
+[PASS] testFuzz_functionCall_eq(uint256,bool,bytes,bool,uint256) (runs: 256, μ: 979129, ~: 885634)
+[PASS] testFuzz_mulDiv_rounding_eq(uint256,uint256,uint256,uint8,bool,bool) (runs: 256, μ: 876466, ~: 876676)
+[PASS] testFuzz_priceKey_eq(uint256,uint256,uint256,uint256) (runs: 256, μ: 1803825, ~: 1806762)
+[PASS] testFuzz_priceKey_range(uint256,uint256,uint256,uint256) (runs: 256, μ: 1803870, ~: 1806807)
+[PASS] testFuzz_priorityKey_lt_iff(uint64,uint64,uint64,bool,bool) (runs: 256, μ: 1295229, ~: 1276900)
+[PASS] testFuzz_priorityKey_run(uint64,uint64,bool,bool) (runs: 256, μ: 709139, ~: 699304)
+[PASS] testFuzz_safeTransferFrom_eq(address,address,uint256,uint8,bool,bytes) (runs: 256, μ: 1499410, ~: 1504665)
+[PASS] testFuzz_unsignedRoundsUp_run(uint8) (runs: 256, μ: 850811, ~: 851035)
+[PASS] testFuzz_verifyCallResult_fail(bytes,bool,uint256) (runs: 256, μ: 973817, ~: 881267)
+[PASS] testFuzz_verifyCallResult_ok(bytes,bool,uint256) (runs: 256, μ: 974651, ~: 882062)
+[PASS] test_priceKey_eq_formerHighClamp() (gas: 1775741)
+[PASS] test_priceKey_eq_formerLowClamp() (gas: 2046223)
+Suite result: ok. 26 passed; 0 failed; 0 skipped; finished in 3.27s (2.59s CPU time)
+
+Ran 1 test for test/MatchingInvariant.t.sol:MatchingInvariantTest
+[PASS]
+MatchingInvariantTest invariants:
+[PASS] invariant_assetsConserved
+[PASS] invariant_bestPricesAgreeWithLinearScan
+[PASS] invariant_escrowEqualsOutstandingObligations
+ MatchingInvariantTest invariants (runs: 64, calls: 4096, reverts: 0)
+
+╭-----------------+----------+-------+---------+----------╮
+| Contract        | Selector | Calls | Reverts | Discards |
++=========================================================+
+| MatchingHandler | cancel   | 835   | 0       | 0        |
+|-----------------+----------+-------+---------+----------|
+| MatchingHandler | clear    | 830   | 0       | 0        |
+|-----------------+----------+-------+---------+----------|
+| MatchingHandler | redeem   | 793   | 0       | 0        |
+|-----------------+----------+-------+---------+----------|
+| MatchingHandler | reprice  | 831   | 0       | 0        |
+|-----------------+----------+-------+---------+----------|
+| MatchingHandler | submit   | 807   | 0       | 0        |
+╰-----------------+----------+-------+---------+----------╯
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 3.13s (3.12s CPU time)
+
+Ran 7 tests for test/formal/AsyncSwapInsert.t.sol:AsyncSwapInsertFormalTest
+[PASS] testFuzz_insert_empty(uint32[],uint32,uint128,(uint32,uint32,uint32,uint128,uint8,bool)) (runs: 256, μ: 785972, ~: 788278)
+[PASS] testFuzz_insert_footprint(uint128[],uint8,uint128,bool) (runs: 256, μ: 1197039, ~: 1222068)
+[PASS] testFuzz_insert_overflow(uint128,uint32) (runs: 256, μ: 110542, ~: 110631)
+[PASS] testFuzz_insert_present(uint128,uint32,uint32,uint32,uint32[]) (runs: 256, μ: 605671, ~: 546264)
+[PASS] testFuzz_insert_reverts(uint128[],uint8,uint128,bool,bool) (runs: 256, μ: 1849221, ~: 1129326)
+[PASS] testFuzz_newNode_err(uint128,uint128,bool,bool,bool) (runs: 256, μ: 207915, ~: 197833)
+[PASS] testFuzz_newNode_ok(uint32[],uint32,uint128,uint128,uint32) (runs: 256, μ: 846065, ~: 847846)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 2.12s (2.23s CPU time)
+
+Ran 6 tests for test/formal/AsyncSwapTransferEscrow.t.sol:AsyncSwapTransferEscrowFormalTest
+[PASS] testFuzz_transferEscrow_burn_reverts(uint256[6],uint8,bool,uint256) (runs: 256, μ: 2292316, ~: 1991357)
+[PASS] testFuzz_transferEscrow_erc20(uint256[6],uint8,bool,bool,uint256) (runs: 256, μ: 2566419, ~: 2068760)
+[PASS] testFuzz_transferEscrow_native(uint256[6],uint8,bool,uint256) (runs: 256, μ: 1901999, ~: 1946484)
+[PASS] testFuzz_transferEscrow_ok(uint256[6],uint8) (runs: 256, μ: 2391072, ~: 2073396)
+[PASS] testFuzz_transferEscrow_reverts_iff(uint256[6],uint8,uint8,uint256) (runs: 256, μ: 2161165, ~: 1988764)
+[PASS] testFuzz_transferEscrow_run(uint256[6],uint8) (runs: 256, μ: 2389213, ~: 2070755)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 4.23s (2.61s CPU time)
+
+Ran 5 tests for test/formal/SpecEip712.t.sol:RouterSpecEip712FormalTest
+[PASS] testFuzz_Eip712DomainSpec_body(bytes32,bytes32,uint64,address,bool) (runs: 256, μ: 36126, ~: 36126)
+[PASS] testFuzz_name_ne_sentinel(bytes32,bytes32,uint64,address,bool) (runs: 256, μ: 3270731, ~: 3270731)
+[PASS] testFuzz_toString_name(bytes32,bytes32,uint64,address,bool) (runs: 256, μ: 3270754, ~: 3270754)
+[PASS] testFuzz_toString_version(bytes32,bytes32,uint64,address,bool) (runs: 256, μ: 3270613, ~: 3270613)
+[PASS] testFuzz_version_ne_sentinel(bytes32,bytes32,uint64,address,bool) (runs: 256, μ: 3270571, ~: 3270571)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 6.32s (11.52s CPU time)
+
+Ran 8 tests for test/formal/AsyncSwapTryFillOrderFromPoolLiquidity.t.sol:AsyncSwapTryFillOrderFromPoolLiquidityFormalTest
+[PASS] testFuzz_tryFillOrderFromPoolLiquidity_eq(bool,bool,bool,uint256,uint256,bool) (runs: 256, μ: 2070468, ~: 2820908)
+[PASS] testFuzz_tryFillOrderFromPoolLiquidity_false_noop(bool,uint256,uint256,bool) (runs: 256, μ: 2096449, ~: 1068370)
+[PASS] testFuzz_tryFillOrderFromPoolLiquidity_notExecutor(address,bool,bytes32) (runs: 256, μ: 768966, ~: 769008)
+[PASS] testFuzz_tryFillOrderFromPoolLiquidity_notFound(address,bytes32,bool) (runs: 256, μ: 70897, ~: 71002)
+[PASS] testFuzz_tryFillOrderFromPoolLiquidity_ok(uint8,bool,bool,uint256,uint256,bool) (runs: 256, μ: 2051767, ~: 2890125)
+[PASS] testFuzz_tryFillOrderFromPoolLiquidity_pass(bool,bool,uint256,uint256,bool) (runs: 256, μ: 2174895, ~: 1281561)
+[PASS] testFuzz_tryFillOrderFromPoolLiquidity_reverts_iff(address,bool,bool,uint256,uint256,bool) (runs: 256, μ: 1739509, ~: 785455)
+[PASS] testFuzz_tryFillOrderFromPoolLiquidity_storage(uint256,uint256,bool,bool) (runs: 256, μ: 2585375, ~: 1487062)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 2.73s (3.20s CPU time)
+
+Ran 5 tests for test/formal/SpecEip712.t.sol:AsyncSwapSpecEip712FormalTest
+[PASS] testFuzz_Eip712DomainSpec_body(bytes32,bytes32,uint64,address,bool) (runs: 256, μ: 37006, ~: 46313)
+[PASS] testFuzz_name_ne_sentinel(bytes32,bytes32,uint64,address,bool) (runs: 256, μ: 3866438, ~: 3883591)
+[PASS] testFuzz_toString_name(bytes32,bytes32,uint64,address,bool) (runs: 256, μ: 3866461, ~: 3883614)
+[PASS] testFuzz_toString_version(bytes32,bytes32,uint64,address,bool) (runs: 256, μ: 3866365, ~: 3883518)
+[PASS] testFuzz_version_ne_sentinel(bytes32,bytes32,uint64,address,bool) (runs: 256, μ: 3866323, ~: 3883476)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 6.61s (9.72s CPU time)
+
+Ran 10 tests for test/formal/RouterConstructor.t.sol:RouterConstructorFormalTest
+[PASS] testFuzz_CtorSpec(address,address,address,uint64) (runs: 256, μ: 7781000, ~: 7782073)
+[PASS] testFuzz_CtorSpec_name_word(address,address,address,uint64) (runs: 256, μ: 7757047, ~: 7757968)
+[PASS] testFuzz_CtorSpec_version_word(address,address,address,uint64) (runs: 256, μ: 7757209, ~: 7758130)
+[PASS] testFuzz_DOMAIN_SEPARATOR_deployed(uint64,uint64,address,bool) (runs: 256, μ: 4549836, ~: 4543834)
+[PASS] testFuzz_DOMAIN_SEPARATOR_eq_built(uint64,uint64,address,bool) (runs: 256, μ: 4553834, ~: 4547832)
+[PASS] testFuzz_ctor_deployed(address,address,address,uint64) (runs: 256, μ: 7759138, ~: 7760106)
+[PASS] testFuzz_ctor_never_reverts(address,address,address) (runs: 256, μ: 4535444, ~: 4535654)
+[PASS] testFuzz_ctor_ok(address,address,address,uint64) (runs: 256, μ: 4542578, ~: 4542794)
+[PASS] testFuzz_domainSeparatorV4_eq_built(uint64,uint64,address,bool) (runs: 256, μ: 4553834, ~: 4547832)
+[PASS] test_typeHash_eq() (gas: 268)
+Suite result: ok. 10 passed; 0 failed; 0 skipped; finished in 12.55s (12.05s CPU time)
+
+Ran 4 tests for test/formal/AsyncSwapAfterRemoveLiquidity.t.sol:AsyncSwapAfterRemoveLiquidityFormalTest
+[PASS] testFuzz_afterRemoveLiquidity_hookNotImplemented((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 362973, ~: 42146)
+[PASS] testFuzz_afterRemoveLiquidity_never_ok((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 361580, ~: 41258)
+[PASS] testFuzz_afterRemoveLiquidity_notPoolManager((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 363268, ~: 42441)
+[PASS] testFuzz_afterRemoveLiquidity_spec((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 363090, ~: 42299)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 15.36s (314.50ms CPU time)
+
+Ran 4 tests for test/formal/AsyncSwapAfterInitialize.t.sol:AsyncSwapAfterInitializeFormalTest
+[PASS] testFuzz_afterInitialize_hookNotImplemented((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 357953, ~: 38406)
+[PASS] testFuzz_afterInitialize_never_ok((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 356525, ~: 37459)
+[PASS] testFuzz_afterInitialize_notPoolManager((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 358263, ~: 38716)
+[PASS] testFuzz_afterInitialize_spec((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool)) (runs: 256, μ: 358035, ~: 38533)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 15.36s (15.35s CPU time)
+
+Ran 3 tests for test/formal/RouterDOMAIN_SEPARATOR.t.sol:RouterDOMAIN_SEPARATORFormalTest
+[PASS] testFuzz_DOMAIN_SEPARATOR_never_reverts(uint64,address,uint256) (runs: 256, μ: 30817, ~: 30817)
+[PASS] testFuzz_DOMAIN_SEPARATOR_preserves(uint64,address) (runs: 256, μ: 15302, ~: 15302)
+[PASS] testFuzz_DOMAIN_SEPARATOR_spec(uint64,bool,address) (runs: 256, μ: 15640, ~: 15920)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 7.70ms (16.95ms CPU time)
+
+Ran 1 test for test/MatchingInvariant.t.sol:PriorityMatchingInvariantTest
+[PASS]
+PriorityMatchingInvariantTest invariants:
+[PASS] invariant_assetsConserved
+[PASS] invariant_bestPricesAgreeWithLinearScan
+[PASS] invariant_escrowEqualsOutstandingObligations
+ PriorityMatchingInvariantTest invariants (runs: 64, calls: 4096, reverts: 0)
+
+╭-----------------+----------+-------+---------+----------╮
+| Contract        | Selector | Calls | Reverts | Discards |
++=========================================================+
+| MatchingHandler | cancel   | 835   | 0       | 0        |
+|-----------------+----------+-------+---------+----------|
+| MatchingHandler | clear    | 830   | 0       | 0        |
+|-----------------+----------+-------+---------+----------|
+| MatchingHandler | redeem   | 793   | 0       | 0        |
+|-----------------+----------+-------+---------+----------|
+| MatchingHandler | reprice  | 831   | 0       | 0        |
+|-----------------+----------+-------+---------+----------|
+| MatchingHandler | submit   | 807   | 0       | 0        |
+╰-----------------+----------+-------+---------+----------╯
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.51s (2.50s CPU time)
+
+Ran 142 test suites in 17.20s (176.07s CPU time): 860 tests passed, 0 failed, 1 skipped (861 total tests)

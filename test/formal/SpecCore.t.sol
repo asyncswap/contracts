@@ -299,9 +299,7 @@ contract SpecCoreFormalTest is FormalSlotsB, IUnlockCallback {
     function _assertStored(Swap memory s, bytes32 id, uint64 seq, bytes32) internal view {
         bytes32 o = _orderSlot(poolId, id);
         bool isBuy = !s.zeroForOne; // specified == numeraire (currency1)
-        uint256 price = isBuy ? Math.mulDiv(s.amt, 1e18, s.aom) : Math.mulDiv(s.aom, 1e18, s.amt);
-        if (price == 0) price = 1;
-        if (price > type(uint128).max) price = type(uint128).max;
+        uint256 price = AsyncFiller._priceKey(isBuy, s.zeroForOne, s.amt, s.aom);
         assertEq(uint256(_loadHook(o)), uint256(uint160(s.user)), "owner = hookData.user");
         assertEq(uint256(_loadHook(_add(o, 1))), s.amt, "amountIn");
         assertEq(uint256(_loadHook(_add(o, 2))), s.aom, "amountOutMin = hookData.amountOutMin");

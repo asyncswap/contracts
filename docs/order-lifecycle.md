@@ -67,3 +67,8 @@ Bids always go to the FeeVault, whatever liquidity is in range, so liquidity add
 
 Sources: [`_reduceAfterMatch` and `_settleMatchedPriorityFee`](../src/libraries/AsyncMatching.sol), [`settlePriorityFee`, `fill`, and `cancel`](../src/libraries/AsyncFiller.sol). The [original chat diagrams](historical-matching-diagrams.md) are retained as historical references.
 
+
+Raising a sell's minimum output requires its remaining bid to meet the new notional's bid floor.
+A partially filled sell can retain its prorated bid when repricing to unchanged or lower terms.
+Book selection compares exact prices first, even within a shared tick; fee and queue age only
+break exact-price ties. Settlement age remains the immutable creation sequence.

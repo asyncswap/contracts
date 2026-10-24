@@ -28,7 +28,6 @@ library AsyncMatching {
     using SafeCast for *;
     using StateLibrary for IPoolManager;
 
-    uint256 private constant PRICE_SCALE = 1e18;
     uint8 public constant MAX_MATCHES_PER_CALL = 8;
 
     struct ReductionParams {
@@ -184,18 +183,7 @@ library AsyncMatching {
         bidId = book.bestAtPrice(true, bidPrice);
         askId = book.bestAtPrice(false, askPrice);
         if (_crosses(bidPrice, askPrice, self.orders[bidId], self.orders[askId])) return (bidId, askId);
-        // The only ambiguous boundary is a shared bucket. Maximize buy priority among
-        // buys crossing any ask, then sell priority conditional on that selected buy.
-        EligiblePrice.Ratio memory cheapestAsk = book.mostPermissiveAtPrice(false, askPrice);
-        // The head bid is already the highest priority. If it crosses any ask,
-        // retain it rather than traversing its priority tree a second time.
-        if (!EligiblePrice.le(cheapestAsk, AsyncFiller.exactPrice(self.orders[bidId]))) {
-            bidId = book.eligibleAtPrice(true, bidPrice, cheapestAsk);
-            if (bidId == bytes32(0)) return (bytes32(0), bytes32(0));
-        }
-        askId = book.eligibleAtPrice(false, askPrice, AsyncFiller.exactPrice(self.orders[bidId]));
-        // A feasible bid has an eligible ask by the summary invariant. The
-        // match-pair guard also rejects an empty record before any settlement.
+        return (bytes32(0), bytes32(0));
     }
 
     /// @notice Execute an order against active v4 LP positions if they meet the signed minimum.
@@ -286,8 +274,9 @@ library AsyncMatching {
         returns (AsyncFiller.MatchAmounts memory amounts)
     {
         if (restingBuy) {
-            amounts.quoteAmount = Math.mulDiv(sell.amountIn, buy.amountIn, buy.amountOutMin);
-            if (amounts.quoteAmount > buy.amountIn) amounts.quoteAmount = buy.amountIn;
+            amounts.quoteAmount = buy.amountOutMin != 0 && sell.amountIn >= buy.amountOutMin
+                ? buy.amountIn
+                : Math.mulDiv(sell.amountIn, buy.amountIn, buy.amountOutMin);
             if (amounts.quoteAmount == 0) return amounts;
             amounts.assetAmount = Math.mulDiv(amounts.quoteAmount, buy.amountOutMin, buy.amountIn, Math.Rounding.Ceil);
             if (amounts.assetAmount > sell.amountIn) return AsyncFiller.MatchAmounts(0, 0);
@@ -295,8 +284,9 @@ library AsyncMatching {
                 Math.mulDiv(amounts.assetAmount, sell.amountOutMin, sell.amountIn, Math.Rounding.Ceil);
             if (amounts.quoteAmount < sellerMinimum) return AsyncFiller.MatchAmounts(0, 0);
         } else {
-            amounts.assetAmount = Math.mulDiv(buy.amountIn, sell.amountIn, sell.amountOutMin);
-            if (amounts.assetAmount > sell.amountIn) amounts.assetAmount = sell.amountIn;
+            amounts.assetAmount = sell.amountOutMin != 0 && buy.amountIn >= sell.amountOutMin
+                ? sell.amountIn
+                : Math.mulDiv(buy.amountIn, sell.amountIn, sell.amountOutMin);
             if (amounts.assetAmount == 0) return amounts;
             amounts.quoteAmount = Math.mulDiv(amounts.assetAmount, sell.amountOutMin, sell.amountIn, Math.Rounding.Ceil);
             if (amounts.quoteAmount > buy.amountIn) return AsyncFiller.MatchAmounts(0, 0);
@@ -389,7 +379,7 @@ library AsyncMatching {
         info.amountIn = remainingInput;
         info.amountOutMin = remainingMinimum;
         info.priorityFee = uint64(unfilledPriorityFee);
-        uint128 updatedPrice = _priceKey(info.isBuy, remainingInput, remainingMinimum);
+        uint128 updatedPrice = AsyncFiller._priceKey(info.isBuy, info.zeroForOne, remainingInput, remainingMinimum);
         bool priceChanged = updatedPrice != info.price;
         if (priceChanged || unfilledPriorityFee != oldPriorityFee) {
             AsyncFiller._remove(self, book, params.id);
@@ -421,20 +411,12 @@ library AsyncMatching {
         AsyncFiller.settlePriorityFee(self, key, id, info.owner, filledPriorityFee, hook);
     }
 
-    function _priceKey(bool isBuy, uint256 amountIn, uint256 amountOut) private pure returns (uint128) {
-        uint256 price =
-            isBuy ? Math.mulDiv(amountIn, PRICE_SCALE, amountOut) : Math.mulDiv(amountOut, PRICE_SCALE, amountIn);
-        if (price == 0) return 1;
-        if (price > type(uint128).max) return type(uint128).max;
-        return uint128(price);
-    }
-
     /// @notice Decide whether a buy and a sell order cross, i.e. a price exists that satisfies both
     ///         makers' limits.
-    /// @dev The `uint128` price keys on the book are truncated WAD ratios, so two distinct prices
-    ///      can share a key. Strictly ordered keys decide the result directly, since truncation
-    ///      cannot invert a strict inequality. Equal keys are decided by a full-precision
-    ///      cross-multiply:
+    /// @dev Keys are the floor ticks of the exact limits, ordered by numeraire per asset, so two
+    ///      distinct prices can share a key. Strictly ordered keys decide the result directly,
+    ///      since a monotone key cannot invert a strict inequality. Equal keys are decided by a
+    ///      full-precision cross-multiply:
     ///
     ///      cross  <=>  buyIn/buyOut >= sellOut/sellIn  <=>  buyIn*sellIn >= sellOut*buyOut
     ///             <=>  floor(buyIn*sellIn / sellOut) >= buyOut   (sellOut, buyOut are nonzero).

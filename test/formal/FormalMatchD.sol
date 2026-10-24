@@ -520,7 +520,11 @@ abstract contract FormalMatchD is HookUnlockBase {
         assertEq(o1.amountIn, o0.amountIn - used, "amountIn := remIn");
         assertEq(o1.amountOutMin, _remMin(o0, used), "amountOutMin := remainingMinimum");
         assertEq(o1.priorityFee, uint64(u), "priorityFee := uint64(unfilled)");
-        assertGe(o1.price, 1, "price key >= 1");
+        assertEq(
+            o1.price,
+            AsyncFiller._priceKey(o0.isBuy, o0.zeroForOne, o1.amountIn, o1.amountOutMin),
+            "price key := tick key of the remainder"
+        );
         bool moved = o1.price != o0.price;
         bool rekey = moved || (c.pf && u != o0.priorityFee);
         if (moved) {

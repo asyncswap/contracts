@@ -3,28 +3,29 @@ pragma solidity ^0.8.26;
 
 import {FormalMatchD} from "./FormalMatchD.sol";
 import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
+import {TickMath} from "v4-core/libraries/TickMath.sol";
+import {PoolId} from "v4-core/types/PoolId.sol";
 
 /// @notice Bytecode checks of `formal/Refinement/Swarm/AsyncSwapReduceAfterMatch.lean`. `_reduceAfterMatch`
-///         (and `_priceKey`) are private; `_reduceMatchedOrders` runs `_reduceAfterMatch` once per side of
-///         a matched pair, reached through `matchBook(key, 1)` (`FormalMatchD`): sell (input asset, output
+///         is private (`_priceKey` is now `AsyncFiller._priceKey`, the v4 tick key);
+///         `_reduceMatchedOrders` runs `_reduceAfterMatch` once per side of a matched pair, reached through `matchBook(key, 1)` (`FormalMatchD`): sell (input asset, output
 ///         quote), then buy (input quote, output asset). Each side is checked from its storage before
 ///         and after, `book.nextSequence`, its level, and its events (fee settlements, refund).
 contract AsyncSwapReduceAfterMatchFormalTest is FormalMatchD {
-    /// @notice formal/Refinement/Swarm/AsyncSwapReduceAfterMatch.lean:95 — `_priceKey` touches no storage and returns a key in [1, 2^128) (observed as the re-keyed price of a partially matched order).
+    /// @notice formal/Refinement/Swarm/AsyncSwapReduceAfterMatch.lean:95 (stale: the key is now `AsyncFiller._priceKey` = `TickPrice.key`, no longer a WAD ratio clamped to uint128) — `_priceKey` touches no storage and returns the tick key of (remIn, remainingMinimum), in [1, 2·MAX_TICK + 1] (observed as the re-keyed price of a partially matched order).
     function testFuzz_priceKey_ok(uint256[6] memory s, uint8 flags) public {
         Case memory c = _mkCase(s, flags);
         Run memory r = _exec(c);
         if (r.matched == 0) return;
-        if (!_closes(r.sell0, r.asset)) {
-            uint256 raw = uint128(uint256(_loadHook(bytes32(_orderSlot(c.pid, c.sellId) + 3))));
-            assertGe(raw, 1, "sell key >= 1");
-            assertLt(raw, 2 ** 128, "sell key < 2^128");
-        }
-        if (!_closes(r.buy0, r.quote)) {
-            uint256 raw = uint128(uint256(_loadHook(bytes32(_orderSlot(c.pid, c.buyId) + 3))));
-            assertGe(raw, 1, "buy key >= 1");
-            assertLt(raw, 2 ** 128, "buy key < 2^128");
-        }
+        if (!_closes(r.sell0, r.asset)) _assertKey(c.pid, c.sellId, r.sell1);
+        if (!_closes(r.buy0, r.quote)) _assertKey(c.pid, c.buyId, r.buy1);
+    }
+
+    function _assertKey(PoolId pid, bytes32 id, AsyncFiller.OrderInfo memory o1) internal view {
+        uint256 raw = uint128(uint256(_loadHook(bytes32(_orderSlot(pid, id) + 3))));
+        assertEq(raw, AsyncFiller._priceKey(o1.isBuy, o1.zeroForOne, o1.amountIn, o1.amountOutMin), "tick key");
+        assertGe(raw, 1, "key >= 1");
+        assertLe(raw, uint256(2 * uint256(int256(TickMath.MAX_TICK)) + 1), "key <= 2 * MAX_TICK + 1");
     }
 
     /// @notice formal/Refinement/Swarm/AsyncSwapReduceAfterMatch.lean:149 — closed order (no input or no minimum left): matched fee share settled, `_remove`, `orders[id]` deleted, the unfilled share settled for the owner, then (if input remains) exactly remIn refunded to the owner.

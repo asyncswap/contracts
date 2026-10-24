@@ -40,12 +40,12 @@ contract PriorityPythonHashesTest is Test {
             0x83cb48b27bae0fca22b3074f06d1518a4430f4097c3311b605705362a1a3007a
         );
         assertEq(
-            OrderSignatures.hashUpdatePrice(o, id, o.amountIn, 2000000000, 8, 100),
-            0xe0c18785189a47e0c19d2e45c1b9cbea7141f5f62093592ce024467253285ce4
+            OrderSignatures.hashUpdatePrice(o, id, o.amountIn, 2000000000, 1, 8, 100),
+            0xa94cc7025525c8665b24864de04a05e372946e4026a5ea61d407b57c626217c1
         );
         assertEq(
-            OrderSignatures.hashCancel(o, id, o.amountIn, 9, 100),
-            0x806619034dba35548e5e340a71c947554d419f0a479d3587e5accfe98ddfae18
+            OrderSignatures.hashCancel(o, id, o.amountIn, 1, 9, 100),
+            0x4026f4286d862f2b6556aebc5eebda39585f4e6b928a140ffe90e6e857338cab
         );
     }
 }

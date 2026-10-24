@@ -1,0 +1,34 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+__________ test_unused_reprice_cannot_change_replacement_incarnation ___________
+
+    def test_unused_reprice_cannot_change_replacement_incarnation():
+        m, p, maker, private = signing_world()
+        oid = m.create(p, maker, False, 10**18, 10**9)
+        order = m.pools[p].orders[oid]
+        digest = signatures.action_digest(m.chain_id, m.pools[p], order, 78, 100, 2 * 10**9)
+        old_sig = sign(private, digest)
+        generation = order.created_sequence
+        m.cancel(p, oid, maker)
+        replacement = m.create(p, maker, False, 10**18, 10**9)
+        assert replacement == oid
+        current = m.pools[p].orders[replacement]
+        assert current.created_sequence > generation
+>       unchanged(m, lambda: m.update_price_with_sig(p, replacement, 2 * 10**9, 78, 100, old_sig), "InvalidSignature")
+
+tests/priority_protocol/test_protocol.py:470: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+m = <uv4.priority_protocol.model.Protocol object at 0x10bc66ed0>
+operation = <function test_unused_reprice_cannot_change_replacement_incarnation.<locals>.<lambda> at 0x10c2d7f60>
+error = 'InvalidSignature'
+
+    def unchanged(m, operation, error):
+        before = deepcopy(m.__dict__)
+>       with pytest.raises(Revert, match=error):
+E       Failed: DID NOT RAISE <class 'uv4.priority_protocol.arithmetic.Revert'>
+
+tests/priority_protocol/test_protocol.py:23: Failed
+=========================== short test summary info ============================
+FAILED tests/priority_protocol/test_protocol.py::test_unused_reprice_cannot_change_replacement_incarnation
+1 failed, 36 deselected in 0.34s

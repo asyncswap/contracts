@@ -164,7 +164,10 @@ contract NethermindAuditAgentTest is SetupHook {
             order,
             abi.encode(
                 AsyncSwap.UserParams({
-                    user: order.owner, executor: address(router), amountOutMin: order.amountOutMin, priorityFee: 100_000
+                    user: order.owner,
+                    executor: address(router),
+                    amountOutMin: order.amountOutMin,
+                    priorityFee: order.priorityFee
                 })
             )
         );
@@ -301,6 +304,12 @@ contract NethermindAuditAgentTest is SetupHook {
     /// @dev Alice's 100:100 ask is matched down to 10 and repriced to 100 before Bob's fill lands.
     function _shrinkAndReprice() internal returns (AsyncOrder memory ask) {
         ask = _order(alice, true, 100 ether, 100 ether);
+        ask.priorityFee = 1_000_000; // 10% remains after the fill, enough for the raised minimum.
+        ask.salt = keccak256(
+            abi.encode(
+                block.timestamp, block.number, address(manager), alice, ask.amountIn, ask.amountOutMin, ask.priorityFee
+            )
+        );
         _submit(ask);
         _submit(_order(carol, false, 90 ether, 90 ether));
         vm.prank(alice);

@@ -1,0 +1,22 @@
+{
+  "optimizer_runs": 100000000,
+  "protocol_deployable": true,
+  "runtime_bytes": {
+    "AsyncMatching": 22924,
+    "AsyncSwap": 22229,
+    "Router": 20609,
+    "TickPrice": 3331,
+    "TokenClaims": 2110
+  },
+  "executable_bytecode_matches_43690": {
+    "AsyncMatching": true,
+    "AsyncSwap": true,
+    "Router": true,
+    "TickPrice": true,
+    "TokenClaims": true
+  },
+  "upstream_fixture_over_limit": {
+    "PoolManager": 26988
+  },
+  "configuration_retained": 43690
+}

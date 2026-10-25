@@ -2,7 +2,7 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://docs.asyncswap.org/</loc>
-    <lastmod>2026-10-24</lastmod>
+    <lastmod>2026-10-25</lastmod>
   </url>
   <url>
     <loc>https://docs.asyncswap.org/audit/status</loc>
@@ -26,7 +26,7 @@
   </url>
   <url>
     <loc>https://docs.asyncswap.org/reference</loc>
-    <lastmod>2026-10-24</lastmod>
+    <lastmod>2026-10-25</lastmod>
   </url>
   <url>
     <loc>https://docs.asyncswap.org/reference/src/AsyncSwap</loc>
@@ -34,6 +34,10 @@
   </url>
   <url>
     <loc>https://docs.asyncswap.org/reference/src/BaseHook</loc>
+    <lastmod>2026-10-25</lastmod>
+  </url>
+  <url>
+    <loc>https://docs.asyncswap.org/reference/src/BatchActions</loc>
     <lastmod>2026-10-25</lastmod>
   </url>
   <url>

@@ -68,8 +68,13 @@ contract BatchActions {
     ///      can be redeemed in the same unlock if the caller included their amounts.
     function unlockCallback(bytes calldata data) external returns (bytes memory) {
         if (msg.sender != address(poolManager)) revert OnlyPoolManager();
-        (address owner, AsyncOrder[] memory orders, Currency[] memory currencies, uint256[] memory amounts, address recipient)
-        = abi.decode(data, (address, AsyncOrder[], Currency[], uint256[], address));
+        (
+            address owner,
+            AsyncOrder[] memory orders,
+            Currency[] memory currencies,
+            uint256[] memory amounts,
+            address recipient
+        ) = abi.decode(data, (address, AsyncOrder[], Currency[], uint256[], address));
         if (owner == address(0) || owner != activeOwner) revert InvalidBatch();
 
         for (uint256 i; i < orders.length; ++i) {

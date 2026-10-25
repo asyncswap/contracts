@@ -176,9 +176,10 @@ abstract contract FormalMatchD is HookUnlockBase {
         uint256 bid
     ) internal view returns (Call memory) {
         AsyncSwap.UserParams memory up = AsyncSwap.UserParams({
-            user: maker, executor: address(this), amountOutMin: amountOutMin, priorityFee: bid
+            user: maker, executor: address(router), amountOutMin: amountOutMin, priorityFee: bid
         });
-        return _c(
+        return _cAs(
+            address(router),
             address(manager),
             abi.encodeCall(
                 manager.swap, (k, SwapParams(zeroForOne, -int256(amountIn), uint160(2 ** 96)), abi.encode(up))
@@ -186,7 +187,7 @@ abstract contract FormalMatchD is HookUnlockBase {
         );
     }
 
-    /// @dev Create a resting order for `maker` with this contract as executor and payer, inside one
+    /// @dev Create a resting order for `maker` with the Router as executor and this contract as payer, inside one
     ///      unlock, without `matchNewOrder`. `bid` is recorded (escrowed) only when `paid`.
     function _rest(
         PoolKey memory k,
@@ -203,9 +204,9 @@ abstract contract FormalMatchD is HookUnlockBase {
             vm.roll(block.number + 1);
             return _rest(k, maker, zeroForOne, amountIn, amountOutMin, bid);
         }
-        if (!hook.isExecutor(k.toId(), maker, address(this))) {
+        if (!hook.isExecutor(k.toId(), maker, address(router))) {
             vm.prank(maker);
-            hook.setExecutor(k.toId(), address(this), true);
+            hook.setExecutor(k.toId(), address(router), true);
         }
         Currency input = zeroForOne ? k.currency0 : k.currency1;
         Call[] memory cs = _one(_swapCall(k, maker, zeroForOne, amountIn, amountOutMin, bid));
@@ -217,14 +218,14 @@ abstract contract FormalMatchD is HookUnlockBase {
                     caller: address(this),
                     target: address(manager),
                     value: amountIn,
-                    data: abi.encodeWithSignature("settle()")
+                    data: abi.encodeCall(manager.settleFor, (address(router)))
                 })
             );
         } else {
             MockERC20(Currency.unwrap(input)).mint(address(this), amountIn);
             cs = _push(cs, _c(address(manager), abi.encodeCall(manager.sync, (input))));
             cs = _push(cs, _c(Currency.unwrap(input), abi.encodeCall(MockERC20.transfer, (address(manager), amountIn))));
-            cs = _push(cs, _c(address(manager), abi.encodeWithSignature("settle()")));
+            cs = _push(cs, _c(address(manager), abi.encodeCall(manager.settleFor, (address(router)))));
         }
         if (bid != 0) {
             // the hook escrowed the bid as claims on creation; the executor pays it in this unlock

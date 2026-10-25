@@ -10,6 +10,8 @@ import {MockERC20} from "./utils/MockERC20.sol";
 import {PoolManager} from "v4-core/PoolManager.sol";
 import {Currency, IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {Hooks} from "v4-core/libraries/Hooks.sol";
+import {CustomRevert} from "v4-core/libraries/CustomRevert.sol";
+import {IHooks} from "v4-core/interfaces/IHooks.sol";
 import {LPFeeLibrary} from "v4-core/libraries/LPFeeLibrary.sol";
 import {PoolId} from "v4-core/types/PoolId.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
@@ -33,8 +35,8 @@ contract SetupHook is Test {
     function setUp() public virtual {
         _deployManager();
         _deployTokens();
-        _deployHook();
         _deployRouter();
+        _deployHook();
         _createKey();
         _initializePool();
         _mintToOwner();
@@ -64,17 +66,36 @@ contract SetupHook is Test {
         vm.label(t1, "token1");
     }
 
-    function _deployHook() internal {
-        uint160 flags = uint160(
-            Hooks.BEFORE_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG
-                | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
+    /// @dev The hook's address: its permission flags.
+    function _hookAddress() internal pure returns (address) {
+        return address(
+            uint160(
+                Hooks.BEFORE_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG
+                    | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
+            )
         );
-        deployCodeTo("AsyncSwap.sol", abi.encode(manager, currency1, address(this)), address(flags));
-        hook = AsyncSwap(payable(address(flags)));
     }
 
+    /// @dev Deploys the hook with `router` as its one trusted swap caller: `_deployRouter` runs first.
+    function _deployHook() internal {
+        deployCodeTo("AsyncSwap.sol", abi.encode(manager, currency1, address(this), address(router)), _hookAddress());
+        hook = AsyncSwap(payable(_hookAddress()));
+    }
+
+    /// @dev The revert a swap from any caller but the hook's trusted Router ends in.
+    function _notTrustedRouter() internal view returns (bytes memory) {
+        return abi.encodeWithSelector(
+            CustomRevert.WrappedError.selector,
+            address(hook),
+            IHooks.beforeSwap.selector,
+            abi.encodeWithSelector(AsyncSwap.NotTrustedRouter.selector),
+            abi.encodeWithSelector(Hooks.HookCallFailed.selector)
+        );
+    }
+
+    /// @dev The Router, built with the hook's address before the hook is deployed there (as the deploy script does).
     function _deployRouter() internal {
-        router = new Router(manager, hook, ISignatureTransfer(Permit2Bytecode.PERMIT2));
+        router = new Router(manager, AsyncSwap(payable(_hookAddress())), ISignatureTransfer(Permit2Bytecode.PERMIT2));
     }
 
     function _createKey() internal {

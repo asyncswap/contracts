@@ -50,8 +50,8 @@ contract FormalBase is SetupHook {
     function setUp() public virtual override {
         _deployManager();
         _deployTokens();
-        _deployHookLinked();
         _deployRouter();
+        _deployHookLinked();
         _createKey();
         _initializePool();
         _mintToOwner();
@@ -78,7 +78,12 @@ contract FormalBase is SetupHook {
                     | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
             )
         );
-        vm.etch(flags, abi.encodePacked(type(AsyncSwap).creationCode, abi.encode(manager, currency1, address(this))));
+        vm.etch(
+            flags,
+            abi.encodePacked(
+                type(AsyncSwap).creationCode, abi.encode(manager, currency1, address(this), address(router))
+            )
+        );
         (bool ok, bytes memory runtime) = flags.call("");
         require(ok, "AsyncSwap constructor reverted");
         vm.etch(flags, runtime);

@@ -75,12 +75,8 @@ contract Router is EIP712 {
         bytes signature;
     }
 
-    /// @notice Unordered nonces consumed by signed cancels (`cancelWithSig`).
-    mapping(address maker => mapping(uint256 nonce => bool)) public cancelNonceUsed;
-
     error SignatureExpired();
     error InvalidSignature();
-    error NonceAlreadyUsed();
 
     constructor(IPoolManager _poolManager, AsyncSwap _hook, ISignatureTransfer _permit2)
         EIP712("AsyncSwap Router", "1")
@@ -197,15 +193,19 @@ contract Router is EIP712 {
     }
 
     /// @notice Relayer submits a maker's signed EIP-712 `CancelOrder`. Input returns to the maker.
+    ///         The nonce is burnt in the hook's store, so `AsyncSwap.invalidateNonce` revokes it.
     function cancelWithSig(AsyncOrder calldata order, uint256 nonce, uint256 deadline, bytes calldata signature)
         external
     {
         if (block.timestamp > deadline) revert SignatureExpired();
-        if (cancelNonceUsed[order.owner][nonce]) revert NonceAlreadyUsed();
-        cancelNonceUsed[order.owner][nonce] = true;
+        HOOK.useNonce(order.key.toId(), order.owner, nonce);
         bytes32 id = _orderId(order);
         (uint256 amountIn,) = HOOK.asyncOrderInfo(order.key.toId(), id);
-        bytes32 digest = _hashTypedDataV4(OrderSignatures.hashCancel(order, id, amountIn, nonce, deadline));
+        bytes32 digest = _hashTypedDataV4(
+            OrderSignatures.hashCancel(
+                order, id, amountIn, HOOK.orderCreatedSequence(order.key.toId(), id), nonce, deadline
+            )
+        );
         if (!SignatureChecker.isValidSignatureNow(order.owner, digest, signature)) revert InvalidSignature();
         POOLMANAGER.unlock(abi.encode(SwapCallback({action: ActionType.Cancel, order: order, maxMatches: 0})));
     }

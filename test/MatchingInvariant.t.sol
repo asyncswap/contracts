@@ -95,6 +95,12 @@ contract MatchingHandler is Test {
         uint256 p = bound(price, 1_000e6, 4_000e6);
         uint256 minimum = order.zeroForOne ? remaining * p / 1 ether : remaining * 1 ether / p;
         if (minimum == 0) return;
+        if (order.zeroForOne) {
+            // A partially filled sell keeps a pro-rated bid; raising its bid floor reverts by design.
+            (, uint256 oldMinimum) = hook.asyncOrderInfo(key.toId(), id(order));
+            uint256 required = AsyncFiller.minPriorityFee(minimum);
+            if (minimum > oldMinimum && hook.asyncOrderPriorityFee(key.toId(), id(order)) < required) return;
+        }
         vm.prank(order.owner);
         hook.updatePrice(order, minimum);
         ++updates;
@@ -184,9 +190,13 @@ contract MatchingInvariantTest is StdInvariant, Test {
             Hooks.BEFORE_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG
                 | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
         );
-        deployCodeTo("AsyncSwap.sol", abi.encode(manager, Currency.wrap(address(usdc)), address(this)), address(flags));
+        Router router = new Router(manager, AsyncSwap(payable(address(flags))), ISignatureTransfer(address(0)));
+        deployCodeTo(
+            "AsyncSwap.sol",
+            abi.encode(manager, Currency.wrap(address(usdc)), address(this), address(router)),
+            address(flags)
+        );
         hook = AsyncSwap(payable(address(flags)));
-        Router router = new Router(manager, hook, ISignatureTransfer(address(0)));
         key = PoolKey(Currency.wrap(address(0)), Currency.wrap(address(usdc)), LPFeeLibrary.DYNAMIC_FEE_FLAG, 1, hook);
         manager.initialize(key, initialSqrtPrice());
         _seedLiquidity();

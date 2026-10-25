@@ -117,15 +117,16 @@ contract RouterOrderWindowTest is SetupHook {
         vm.stopPrank();
     }
 
-    /// An order created inside an unlock is not matched before its input is settled.
+    /// An order created inside an unlock is not matched before its input is settled. Only the Router can create
+    /// one, and it settles the input and hands the order to `matchNewOrder` in the same unlock; a custom executor
+    /// that would call `matchBook` in between can't open the order at all.
     function test_pendingOrder_notMatchableBeforeInputSettled() public {
         _submit(_order(alice, true, 5 ether, 50 ether)); // unrelated ask: the PoolManager holds token0
         _submit(_order(bob, false, 1 ether, 1 ether)); // resting bid that the new ask crosses
 
         PendingOrderExecutor executor = new PendingOrderExecutor(manager, hook, key);
         topUp(address(executor), 10 ether);
+        vm.expectRevert(_notTrustedRouter());
         executor.place();
-
-        assertEq(executor.matchedWhilePending(), 0, "pending order matched before its input was settled");
     }
 }

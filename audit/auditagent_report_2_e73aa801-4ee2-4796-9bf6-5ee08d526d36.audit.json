@@ -1,0 +1,136 @@
+{
+  "auditor": "AuditAgent",
+  "authors": [
+    "AuditAgent"
+  ],
+  "commit": "961879f2...aacc2b9f",
+  "date": "2026-10-23",
+  "findings": [
+    {
+      "description": "Context: `AsyncFiller` indexes orders by a truncated, clamped WAD price key. The outer radix trees select the highest bid bucket and lowest ask bucket; orders inside each bucket are ranked by `priorityKey = (priorityFee << 64) | (type(uint64).max - sequence)`, favoring the highest remaining priority fee and then the earliest sequence. Intended price priority requires these tie-breakers to apply only to genuinely equal prices. `AsyncMatching._bookPair` selects orders for both automatic matching through `AsyncSwap.matchNewOrder` and permissionless continuation through `matchBook`. `_matchPair` settles at the older selected order's exact limit, determined by `createdSequence`. Book matches charge no private-fill fee and distribute proceeds and refunds as PoolManager claims. `bestOrder` uses the same bucket-head selection.\n\n```solidity\nbidId = book.bestAtPrice(true, bidPrice);\naskId = book.bestAtPrice(false, askPrice);\nif (_crosses(bidPrice, askPrice, self.orders[bidId], self.orders[askId])) return (bidId, askId);\n```\n\nRoot cause: `_priceKey` computes `floor(raw quote/asset ratio * PRICE_SCALE)` with `PRICE_SCALE = 1e18`, maps zero to `1`, and saturates values above `type(uint128).max`. Unequal exact limits therefore share a price level. The fixed scale does not account for token decimals or price magnitude: for an 18-decimal asset quoted in six-decimal USDC, the key is approximately `floor(priceUSD * 1e6)`. One key interval represents about 0.1% at $0.001, but about 10% at $0.00001. Prices truncating to zero share key `1` with prices truncating to one; the upper saturation boundary also merges distinct limits.\n\nWithin these buckets, `bestAtPrice` ignores exact price and selects only by fee and sequence. `_bookPair` immediately returns those heads when `_crosses` succeeds. That check establishes compatibility, not whether the selected ask is the cheapest or the selected bid is the highest-priced available order. If the heads do not cross, the `exactBounds`/`EligiblePrice` fallback finds priority-ranked crossing alternatives rather than ranking all eligible orders by exact price. It avoids a noncrossing-head obstruction but does not restore best-price execution.\n\nA worse-priced maker can consequently preempt better liquidity either by paying a slightly higher `priorityFee` or, at equal fees, by having an earlier `sequence`. This applies symmetrically to competing asks and bids. The representation is used at creation, by `updatePrice`, and during partial-fill reindexing in `_reduceAfterMatch`, which has its own `_priceKey` implementation. An attacker can therefore enter the shared bucket by creating an order or repricing an existing one. Repricing resets queue sequence but does not defeat a higher-fee advantage, and it preserves `createdSequence`, which determines settlement age.\n\nThe affected execution routes include `Router.swap` or another authorized executor's swap/admission path followed by `matchNewOrder`, and continuation through `Router.matchBook`/`AsyncSwap.matchBook`. The same ordering also makes `bestOrder` report a worse exact limit as best.\n\nSeverity note: outside the clamped key boundaries, the exact-price gap inside one bucket is less than one raw key interval, so the loss is material only when that interval is large relative to price or the filled quantity is large. Inventory-neutral capture of the spread requires the displaced better order to remain open until a later repurchase; competing fills, cancellations, or repricing can remove that leg. The worse fill itself does not depend on the repurchase.",
+      "evidence": "Unchanged in current code: AsyncMatching._bookPair (src/libraries/AsyncMatching.sol:176-199) still returns `bestAtPrice` heads (priorityKey = fee<<64 | ~sequence, AsyncFiller.sol:406) as soon as `_crosses` succeeds (line 186); the EligiblePrice fallback is only used when heads don't cross. `_priceKey` still floors to PRICE_SCALE=1e18, clamps 0→1 and saturates at uint128 max (AsyncFiller.sol:446, AsyncMatching.sol:426).",
+      "id": "F-01",
+      "impact": "Takers lose available price improvement, better-priced makers are skipped and may never fill, and an attacker can capture the difference by selling ahead of cheaper liquidity and subsequently repurchasing it. Examples: (1) Ordinary bucket: asks selling 1e27 asset units for 10,100 USDC and 10,800 USDC both map to key 10; the worse ask wins by earlier submission at equal fees or by a 110_000 vs 100_000 priority fee; a later 10,800-USDC buyer executes against the worse ask, and the attacker repurchases the honest ask for a ~700 USDC spread (699.79 after priority payments, before gas). (2) Clamped key 1: asks at 100 and 1,000 USDC for the same quantity share key 1; with fees 100_000/110_000 a later bid pays the attacker 1,000 USDC, capturing ~900 USDC (899.79 after fees). (3) Bid side: in an 18-dec PEPE / 6-dec USDC pool, bid A (100 USDC for ~9,174,311 PEPE, 0.10 fee) and bid B (100 USDC for 10,000,000 PEPE, 0.20 fee) share key 10; a seller fills B first, losing ~826,000 PEPE (~8%) of price improvement. (4) Dust closure: asks at 1,100 and 1,800 USDC (fees 100_000/100_001) share key 1; a 1,900-USDC buyer with minOrder 1,000 USDC executes against the worse ask and gets 100 USDC refunded as dust instead of 800 USDC, paying 700 USDC more. Individual exact limits remain respected; no escrow shortfall, insolvency or minimum-output bypass.",
+      "locations": [
+        {
+          "file": "src/libraries/AsyncMatching.sol",
+          "line": 176
+        },
+        {
+          "file": "src/libraries/AsyncMatching.sol",
+          "line": 426
+        },
+        {
+          "file": "src/libraries/AsyncFiller.sol",
+          "line": 446
+        },
+        {
+          "file": "src/libraries/AsyncFiller.sol",
+          "line": 406
+        },
+        {
+          "file": "src/AsyncSwap.sol",
+          "line": 261
+        },
+        {
+          "file": "src/Router.sol"
+        }
+      ],
+      "recommendation": "The report gives no explicit recommendation; implied: rank orders within a shared price bucket by exact price (e.g. via the EligiblePrice exact bounds) before fee/time priority, or use a key with enough resolution that distinct exact limits do not share a level.",
+      "reportStatus": "Reported (no status given)",
+      "severity": "medium",
+      "status": "open",
+      "title": "Coarse `_priceKey` buckets let fee and time priority override better exact limit prices"
+    },
+    {
+      "description": "Context: `AsyncMatching.addOrder` checks minimum order size before `AsyncFiller.addOrder` escrows the priority bid. For sells, the required bid is `minPriorityFee(amountOutMin)`: the lesser of 0.1% of the minimum output and 100,000 USDC base units ($0.10). Makers can subsequently reprice through `AsyncSwap.updatePrice` or authorize a relayer through `updatePriceWithSig`; both reach `AsyncFiller.updatePrice`. Bids are non-refundable: direct matches settle them proportionally, while fills and cancellations settle the remaining bid to `FeeVault`.\n\n```solidity\ncheckMinimum(self, book, order.key.toId(), info.isBuy, info.zeroForOne, info.amountIn, newAmountOutMin);\nuint256 old = info.amountOutMin;\n_remove(self, book, id);\ninfo.amountOutMin = newAmountOutMin;\ninfo.price = _priceKey(info.isBuy, info.amountIn, newAmountOutMin);\n```\n\nRoot cause: `AsyncFiller.updatePrice` validates ownership, order liveness, a positive new minimum, and `checkMinimum`, but never checks whether the retained `priorityFee` satisfies `minPriorityFee(newAmountOutMin)`. It changes the sell's minimum output and price and reinserts the order with fresh time priority without increasing its escrowed bid. Both direct and signed repricing inherit this omission.\n\nWith `book.minOrder == 0`, including pools initialized while `defaultMinOrder` remains unset, a maker can create a sell with `amountOutMin = 1` or `999` USDC base units and `priorityFee = 0`, because the tiered bid rounds down to zero. Repricing to `100_000_000` base units (100 USDC), or to 1,000 USDC, retains that zero bid, although either final notional requires 100,000 base units at admission. A nonzero minimum can still allow partial underpayment: under the deployment's configured 10-USDC minimum, an initial 10-USDC sell requires 10,000 base units ($0.01), but repricing to 1,000 USDC does not collect the additional 90,000 base units ($0.09).\n\nThrough the ordinary Router route, the initially cheap order must survive placement matching—for example, with no opposing buy or active LP liquidity. After obtaining its assigned salt, the maker can call `updatePrice`, or anyone can relay a valid maker-signed `updatePriceWithSig` for the live order.\n\nAlternatively, a maker controlling a custom executor can perform the bypass atomically. A maker contract can authorize itself through `setExecutor`, create and fund the order through `PoolManager.swap` during an unlock, and call `updatePrice` before the separate `matchNewOrder` call. `_beforeSwap` creates the order but does not match it. The executor may then permit matching or omit `matchNewOrder` and leave the repriced order resting, so this route does not expose the temporary low minimum to execution.",
+      "evidence": "AsyncFiller.updatePrice (src/libraries/AsyncFiller.sol:255-276) still only checks owner, newAmountOutMin != 0, liveness and checkMinimum, then rewrites amountOutMin/price/sequence; there is no check of info.priorityFee against minPriorityFee(newAmountOutMin) and no top-up.",
+      "id": "F-02",
+      "impact": "Qualifying sell orders can subsequently be matched, filled—including against LP liquidity when their terms are met—or cancelled while paying less than the mandatory priority bid for their final terms. FeeVault loses up to 100,000 USDC base units ($0.10) per order; the 10-to-1,000-USDC example avoids $0.09. Repetition reduces protocol revenue and weakens the mandatory bid's anti-spam and cancellation deterrent. Depends on pool minimums permitting an initial bid below the final requirement; makers still fund input and gas. It grants no higher queue priority, does not touch other makers' escrow or bypass the filler output fee.",
+      "locations": [
+        {
+          "file": "src/libraries/AsyncFiller.sol",
+          "line": 255
+        },
+        {
+          "file": "src/AsyncSwap.sol",
+          "line": 415
+        },
+        {
+          "file": "src/AsyncSwap.sol",
+          "line": 553
+        },
+        {
+          "file": "src/libraries/AsyncMatching.sol",
+          "line": 139
+        }
+      ],
+      "recommendation": "The report gives no explicit recommendation; implied: in `AsyncFiller.updatePrice`, require (or top up) `priorityFee >= minPriorityFee(newAmountOutMin)` for sell orders.",
+      "reportStatus": "Reported (no status given)",
+      "severity": "low",
+      "status": "open",
+      "title": "`updatePrice` lets sell orders retain a priority bid below the minimum required for their new terms"
+    },
+    {
+      "description": "Context: `Router.cancelWithSig` lets anyone holding a maker's EIP-712 `CancelOrder` signature cancel that maker's order. The digest commits to the maker, the directional tokens, the `orderId`, the live stored `amountIn`, a maker-scoped `nonce` and a `deadline`. Replay is meant to be blocked by `cancelNonceUsed[maker][nonce]`. `OrderSignatures.hashCancel` states the nonce exists because \"order ids can recur (identical order re-placed in the same block after a cancel), so order deletion alone does not stop a signed cancel from being replayed.\" The project summary also says makers can \"Invalidate unused signature nonces (`AsyncSwap.invalidateNonce`)\".\n\n```solidity\nfunction cancelWithSig(AsyncOrder calldata order, uint256 nonce, uint256 deadline, bytes calldata signature) external {\n    if (block.timestamp > deadline) revert SignatureExpired();\n    if (cancelNonceUsed[order.owner][nonce]) revert NonceAlreadyUsed();\n    cancelNonceUsed[order.owner][nonce] = true;\n    bytes32 id = _orderId(order);\n    (uint256 amountIn,) = HOOK.asyncOrderInfo(order.key.toId(), id);\n    bytes32 digest = _hashTypedDataV4(OrderSignatures.hashCancel(order, id, amountIn, nonce, deadline));\n```\n\nRoot cause: `cancelNonceUsed` is written in exactly one place: inside `cancelWithSig` itself. The Router has no function that lets a maker mark a cancel nonce as used or revoke a signed cancel. `AsyncSwap.invalidateNonce` lives in the hook's own storage. The Router never reads it, so it cannot affect Router cancel nonces.\n\nSeveral paths close an order without consuming the outstanding signed-cancel nonce: a direct `cancelOrder`, a full `fillOrder`, a full book match, a pool-liquidity fill. After any of these, a previously issued `CancelOrder` signature stays valid until `deadline`. `updatePrice` does not invalidate it either, because the digest binds `orderId` and `amountIn`, not `amountOutMin`. The nonce therefore only prevents replay when the cancel was executed through `cancelWithSig`. That is narrower than the replay protection the `hashCancel` comment describes.",
+      "evidence": "Router.cancelWithSig (src/Router.sol:200-211) is still the only writer of cancelNonceUsed (footprint: writes [cancelNonceUsed]); no other Router function writes it, and Router does not read AsyncSwap.nonceUsed. The digest still binds orderId, amountIn, nonce, deadline only.",
+      "id": "F-03",
+      "impact": "A maker who handed a signed cancel to a relayer cannot take it back. The relayer, or anyone who saw the signature, can cancel the order at any point up to `deadline` while the stored `amountIn` equals the signed amount, even after the maker calls `AsyncSwap.invalidateNonce`. The same applies if an identical order id recurs with the same `amountIn` before the deadline (closed by another path and re-placed in the same block). The maker loses the order's book position and time priority and the remaining escrowed `priorityFee`, forfeited to FeeVault; the input amount is refunded, so principal is not stolen.",
+      "locations": [
+        {
+          "file": "src/Router.sol",
+          "line": 200
+        },
+        {
+          "file": "src/libraries/OrderSignatures.sol",
+          "line": 126
+        },
+        {
+          "file": "src/AsyncSwap.sol",
+          "line": 578
+        }
+      ],
+      "recommendation": "The report gives no explicit recommendation; implied: add a Router function letting makers invalidate cancel nonces (or have the Router consult the hook's nonceUsed / AsyncSwap.invalidateNonce), and/or bind signed cancels to a per-order state that changes when the order closes.",
+      "reportStatus": "Reported (no status given)",
+      "severity": "low",
+      "status": "open",
+      "title": "Signed cancellations cannot be revoked and stay valid after the order is closed by other means"
+    }
+  ],
+  "kind": "external",
+  "repository": "asyncswap/contracts",
+  "schema": "formalmind.audit/v1",
+  "scope": [
+    "src/AsyncSwap.sol",
+    "src/BaseHook.sol",
+    "src/FeeVault.sol",
+    "src/ImmutableState.sol",
+    "src/MatchingEngine.sol",
+    "src/NativeClaims.sol",
+    "src/Router.sol",
+    "src/TokenClaims.sol",
+    "src/interfaces/ISignatureTransfer.sol",
+    "src/libraries/AsyncFiller.sol",
+    "src/libraries/AsyncMatching.sol",
+    "src/libraries/CurrencySettler.sol",
+    "src/libraries/EligiblePrice.sol",
+    "src/libraries/OrderSignatures.sol",
+    "src/libraries/RadixPriceTree.sol",
+    "src/types/AsyncOrder.sol",
+    "script/00_DeployMatchingLibrary.s.sol",
+    "script/00_DeployPoolManager.s.sol",
+    "script/01_DeployHook.s.sol",
+    "script/02_InitializePool.s.sol",
+    "script/03_Swap.s.sol",
+    "script/04_CancelOrder.s.sol",
+    "script/05_ExecuteOrder.s.sol",
+    "script/DeployNativeClaims.s.sol",
+    "script/DeployTokenClaims.s.sol",
+    "script/FFIHelper.sol",
+    "script/InitPool.s.sol",
+    "script/Trade.s.sol"
+  ],
+  "source": "audit/auditagent_report_2_e73aa801-4ee2-4796-9bf6-5ee08d526d36.md",
+  "summary": "Automated auditor scan of AsyncSwap, a Uniswap v4 hook that turns exact-input swaps into escrowed limit orders settled by book matching, pool liquidity or external fillers. It reports one medium issue (coarse price buckets letting fee/time priority override better exact prices) and two low issues (updatePrice not topping up the priority bid, and irrevocable signed cancellations).",
+  "title": "AuditAgent report - Scan ID e73aa801-4ee2-4796-9bf6-5ee08d526d36"
+}

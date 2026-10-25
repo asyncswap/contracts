@@ -51,6 +51,11 @@ contract AsyncSwap is BaseHook, EIP712 {
     /// @notice Chain-specific USDC address. Every pool must include this exact currency.
     Currency public immutable numeraire;
 
+    /// @notice The only swap caller the hook accepts, fixed at deployment. Only the Router settles a new order's input
+    ///         and hands it to `matchNewOrder`, so an order opened through any other caller would leave the
+    ///         transient pending-match id set for the rest of the transaction, and `matchBook` would skip that pool.
+    address public immutable router;
+
     /// @notice Unordered nonces consumed by signed maker actions (`setExecutorWithSig`, `updatePriceWithSig`).
     mapping(address maker => mapping(uint256 nonce => bool)) public nonceUsed;
 
@@ -79,6 +84,7 @@ contract AsyncSwap is BaseHook, EIP712 {
     error NumeraireRequired();
     error DynamicFeeRequired();
     error NotSelf();
+    error NotTrustedRouter();
 
     /// @notice Emitted when ownership is transferred.
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
@@ -141,13 +147,16 @@ contract AsyncSwap is BaseHook, EIP712 {
 
     /// @param _owner Explicit protocol owner. Not `msg.sender`: CREATE2 deployments run the
     ///               constructor from the deterministic deployer, which could never act as owner.
-    constructor(IPoolManager _poolManager, Currency _numeraire, address _owner)
+    /// @param _router The Router, deployed after the hook (it takes the hook in its constructor): pass its
+    ///                predicted address.
+    constructor(IPoolManager _poolManager, Currency _numeraire, address _owner, address _router)
         BaseHook(_poolManager)
         EIP712("AsyncSwap", "1")
     {
         if (Currency.unwrap(_numeraire).code.length == 0) revert InvalidNumeraire();
-        if (_owner == address(0)) revert ZeroAddress();
+        if (_owner == address(0) || _router == address(0)) revert ZeroAddress();
         numeraire = _numeraire;
+        router = _router;
         owner = _owner;
         feeVault = new FeeVault(_poolManager);
         emit OwnershipTransferred(address(0), _owner);
@@ -291,6 +300,11 @@ contract AsyncSwap is BaseHook, EIP712 {
     {
         AsyncFiller.OrderInfo storage info = asyncOrders[poolId].orders[orderId];
         return (info.owner, info.amountIn, info.amountOutMin, info.price, info.isBuy, info.sequence, info.priorityFee);
+    }
+
+    /// @notice Immutable incarnation of a live order, used to bind cancellation signatures.
+    function orderCreatedSequence(PoolId poolId, bytes32 id) external view returns (uint64) {
+        return asyncOrders[poolId].orders[id].createdSequence;
     }
 
     function isExecutor(PoolId poolId, address maker, address executor) external view returns (bool) {
@@ -443,8 +457,10 @@ contract AsyncSwap is BaseHook, EIP712 {
         PoolId poolId = key.toId();
         uint256 amountTaken = uint256(-params.amountSpecified);
         UserParams memory hookData = abi.decode(hookParams, (UserParams));
-        // Bind the declared executor to the actual swap caller so nobody can open orders
-        // attributed to a maker through an executor they do not control.
+        // Only the Router opens orders: it settles the input and hands the order to `matchNewOrder` in the same
+        // unlock, which clears the pending-match id. Then bind the declared executor to the actual swap caller so
+        // nobody can open orders attributed to a maker through an executor they do not control.
+        if (sender != router) revert NotTrustedRouter();
         if (sender != hookData.executor) revert AsyncFiller.NotAuthorizedExecutor();
 
         Currency specified = params.zeroForOne ? key.currency0 : key.currency1;
@@ -562,7 +578,9 @@ contract AsyncSwap is BaseHook, EIP712 {
         uint256 amountIn = asyncOrders[poolId].orders[id].amountIn;
         _verify(
             order.owner,
-            OrderSignatures.hashUpdatePrice(order, id, amountIn, newAmountOutMin, nonce, deadline),
+            OrderSignatures.hashUpdatePrice(
+                order, id, amountIn, newAmountOutMin, asyncOrders[poolId].orders[id].createdSequence, nonce, deadline
+            ),
             nonce,
             deadline,
             signature
@@ -576,9 +594,15 @@ contract AsyncSwap is BaseHook, EIP712 {
 
     /// @notice Revoke a signed action before a relayer submits it.
     function invalidateNonce(uint256 nonce) external {
-        if (nonceUsed[msg.sender][nonce]) revert NonceAlreadyUsed();
-        nonceUsed[msg.sender][nonce] = true;
-        emit NonceInvalidated(msg.sender, nonce);
+        _useNonce(msg.sender, nonce);
+    }
+
+    /// @notice Burns `maker`'s nonce for a signature the calling executor verified itself (the
+    ///         Router's `cancelWithSig`). Every maker signature shares this one nonce space, so
+    ///         `invalidateNonce` revokes those signatures too.
+    function useNonce(PoolId poolId, address maker, uint256 nonce) external {
+        if (!asyncOrders[poolId].isExecutor[maker][msg.sender]) revert AsyncFiller.NotAuthorizedExecutor();
+        _useNonce(maker, nonce);
     }
 
     /// @notice EIP-712 domain separator for this hook's signed actions.
@@ -592,12 +616,16 @@ contract AsyncSwap is BaseHook, EIP712 {
         private
     {
         if (block.timestamp > deadline) revert SignatureExpired();
-        if (nonceUsed[maker][nonce]) revert NonceAlreadyUsed();
-        nonceUsed[maker][nonce] = true;
-        emit NonceInvalidated(maker, nonce);
+        _useNonce(maker, nonce);
         if (!SignatureChecker.isValidSignatureNow(maker, _hashTypedDataV4(structHash), signature)) {
             revert InvalidSignature();
         }
+    }
+
+    function _useNonce(address maker, uint256 nonce) private {
+        if (nonceUsed[maker][nonce]) revert NonceAlreadyUsed();
+        nonceUsed[maker][nonce] = true;
+        emit NonceInvalidated(maker, nonce);
     }
 
     /// @notice Accept ETH transfers. The Router (or any caller paying for a native-output

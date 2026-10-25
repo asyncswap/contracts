@@ -536,12 +536,20 @@ contract SpecSigFormalTest is FormalProbesA {
         return keccak256(
             _leanPreimage(
                 _leanDomainSep("AsyncSwap Router", address(router)),
-                OrderSignatures.hashCancel(o, _routerOrderId(o), amountIn, nonce, deadline)
+                OrderSignatures.hashCancel(
+                    o,
+                    _routerOrderId(o),
+                    amountIn,
+                    hook.orderCreatedSequence(o.key.toId(), _routerOrderId(o)),
+                    nonce,
+                    deadline
+                )
             )
         );
     }
 
     function _mockInfo(AsyncOrder memory o, uint256 amountIn) internal {
+        _authRouter(o);
         vm.mockCall(
             address(hook),
             abi.encodeCall(AsyncSwap.asyncOrderInfo, (o.key.toId(), _routerOrderId(o))),
@@ -599,7 +607,7 @@ contract SpecSigFormalTest is FormalProbesA {
             false, "", true, 0, keccak256(_leanCalldata(_routerCancelDigest(o, amountIn, nonce, deadline), sig)), false
         );
         router.cancelWithSig(o, nonce, deadline, sig);
-        assertEq(vm.load(address(router), _cancelNonceSlot(o.owner, nonce)), bytes32(uint256(1)));
+        assertEq(vm.load(address(hook), _cancelNonceSlot(o.owner, nonce)), bytes32(uint256(1)));
     }
 
     /// @notice formal/Refinement/Swarm/SpecSigRouter.lean:174 — tryRecover_5888_ok: any signature bytes for

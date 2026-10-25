@@ -55,9 +55,9 @@ contract AsyncSwapMatchNewOrderFormalTest is HookUnlockBase {
         if (liquidity) _addPoolLiquidity(1e24);
         AsyncOrder memory o = _bid();
         bytes32 id = _idOf(o);
-        vm.assume(other != address(this));
+        vm.assume(other != address(this) && other != address(router));
         if (!ownerMatches) o.owner = other;
-        Call[] memory cs = _createThenMatch(asExecutor ? address(this) : other, o);
+        Call[] memory cs = _createThenMatch(asExecutor ? address(router) : other, o);
         if (!asExecutor) {
             vm.expectRevert(AsyncFiller.NotAuthorizedExecutor.selector);
             _run(cs);
@@ -85,7 +85,7 @@ contract AsyncSwapMatchNewOrderFormalTest is HookUnlockBase {
             vm.expectRevert(AsyncFiller.NotAuthorizedExecutor.selector);
             hook.matchNewOrder(any);
         } else {
-            vm.assume(caller != address(this));
+            vm.assume(caller != address(router));
             vm.expectRevert(AsyncFiller.NotAuthorizedExecutor.selector);
             _run(_createThenMatch(caller, _bid()));
         }
@@ -96,9 +96,9 @@ contract AsyncSwapMatchNewOrderFormalTest is HookUnlockBase {
         vm.assume(owner_ != address(this));
         AsyncOrder memory o = _bid();
         o.owner = owner_;
-        address c = asExecutor ? address(this) : caller;
+        address c = asExecutor ? address(router) : caller;
         vm.expectRevert(
-            c == address(this) ? AsyncFiller.OrderNotFound.selector : AsyncFiller.NotAuthorizedExecutor.selector
+            c == address(router) ? AsyncFiller.OrderNotFound.selector : AsyncFiller.NotAuthorizedExecutor.selector
         );
         _run(_createThenMatch(c, o));
     }
@@ -107,7 +107,7 @@ contract AsyncSwapMatchNewOrderFormalTest is HookUnlockBase {
     function _cancelledThenMatch(AsyncOrder memory o, AsyncOrder memory passed) internal view returns (Call[] memory) {
         Call[] memory cs = _createCalls(key, false, BID, BID, 100_000);
         cs = _push(cs, _c(address(hook), abi.encodeCall(hook.cancelOrder, (o))));
-        return _push(cs, _matchCall(address(this), passed));
+        return _push(cs, _matchCall(address(router), passed));
     }
 
     /// @notice formal/Refinement/Swarm/AsyncSwapMatchNewOrder.lean:181 — matchIncoming reverts (OrderNotFound) when the incoming order has amountIn = 0 (reached: the pending order was cancelled in the same unlock and the passed owner equals the cleared stored owner, 0).
@@ -132,7 +132,7 @@ contract AsyncSwapMatchNewOrderFormalTest is HookUnlockBase {
     function testFuzz_matchNewOrder_reentry_reverts(address caller, AsyncOrder memory any, uint8 k) public {
         _restingAsks(bound(k, 0, 2));
         AsyncOrder memory o = _bid();
-        Call[] memory cs = _push(_createThenMatch(address(this), o), _matchCall(caller, any));
+        Call[] memory cs = _push(_createThenMatch(address(router), o), _matchCall(caller, any));
         vm.expectRevert(AsyncFiller.NotAuthorizedExecutor.selector);
         _run(cs);
     }
@@ -141,7 +141,7 @@ contract AsyncSwapMatchNewOrderFormalTest is HookUnlockBase {
     function testFuzz_matchIncoming_le(uint8 k) public {
         k = uint8(bound(k, 0, 12));
         _restingAsks(k);
-        bytes[] memory r = _runR(_createThenMatch(address(this), _bid()));
+        bytes[] memory r = _runR(_createThenMatch(address(router), _bid()));
         uint8 n = abi.decode(r[r.length - 1], (uint8));
         assertLe(n, 8);
     }
@@ -152,11 +152,11 @@ contract AsyncSwapMatchNewOrderFormalTest is HookUnlockBase {
         _restingAsks(k);
         AsyncOrder memory o = _bid();
         if (!own) o.owner = owner_;
-        address c = exec ? address(this) : caller;
+        address c = exec ? address(router) : caller;
         try manager.unlock(abi.encode(_createThenMatch(c, o))) returns (bytes memory raw) {
             bytes[] memory r = abi.decode(raw, (bytes[]));
             uint8 n = abi.decode(r[r.length - 1], (uint8));
-            assertEq(c, address(this), "sender = pending executor");
+            assertEq(c, address(router), "sender = pending executor");
             assertEq(o.owner, address(this), "stored owner = order.owner");
             assertLe(n, 8);
         } catch {}

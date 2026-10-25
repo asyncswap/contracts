@@ -236,6 +236,62 @@ contract MinimumOrderTest is SetupHook {
         this.submitExternal(bid);
     }
 
+    /// A sell admitted with a bid that rounds to zero cannot be repriced to terms that need a bid.
+    function test_RevertWhen_updatePrice_raisesSellBidFloor() public {
+        AsyncOrder memory ask = _order(alice, true, 100e6, 999, 0);
+        _submit(ask);
+        vm.prank(alice);
+        vm.expectRevert(AsyncFiller.PriorityFeeTooSmall.selector);
+        hook.updatePrice(ask, 100e6);
+    }
+
+    /// A $10 sell holds a $0.01 bid; repricing it to $1,000 needs the full $0.10.
+    function test_RevertWhen_updatePrice_raisesSellBidFloor_withMinimum() public {
+        hook.setMinOrder(key, 10e6);
+        AsyncOrder memory ask = _order(alice, true, 1_000e6, 10e6, 10_000);
+        _submit(ask);
+        vm.prank(alice);
+        vm.expectRevert(AsyncFiller.PriorityFeeTooSmall.selector);
+        hook.updatePrice(ask, 1_000e6);
+    }
+
+    function test_updatePrice_withinSellBidFloor() public {
+        AsyncOrder memory ask = _order(alice, true, 100e6, 50e6, 50_000);
+        _submit(ask);
+        vm.startPrank(alice);
+        hook.updatePrice(ask, 40e6);
+        hook.updatePrice(ask, 50e6);
+        vm.stopPrank();
+        (, uint256 out) = hook.asyncOrderInfo(poolId, _id(ask));
+        assertEq(out, 50e6);
+    }
+
+    /// Half a $1,000 sell fills, leaving a pro-rated $0.05 bid under the $0.10 cap; it can still reprice.
+    function test_updatePrice_partiallyFilledSellKeepsProRatedBid() public {
+        AsyncOrder memory ask = _order(alice, true, 1_000e6, 1_000e6, 100_000);
+        _submit(ask);
+        _submit(_order(bob, false, 500e6, 500e6, 100_000));
+        bytes32 id = _id(ask);
+        assertEq(hook.asyncOrderPriorityFee(poolId, id), 50_000);
+        vm.prank(alice);
+        hook.updatePrice(ask, 400e6);
+        vm.prank(alice);
+        vm.expectRevert(AsyncFiller.PriorityFeeTooSmall.selector);
+        hook.updatePrice(ask, 600e6);
+        (, uint256 out) = hook.asyncOrderInfo(poolId, id);
+        assertEq(out, 400e6);
+    }
+
+    /// Buys' bid floor follows their input, which a reprice never changes.
+    function test_updatePrice_buyUnaffectedBySellBidFloor() public {
+        AsyncOrder memory bid = _order(bob, false, 50e6, 1, 50_000);
+        _submit(bid);
+        vm.prank(bob);
+        hook.updatePrice(bid, 1_000e6);
+        (, uint256 out) = hook.asyncOrderInfo(poolId, _id(bid));
+        assertEq(out, 1_000e6);
+    }
+
     /// @dev External hop so `vm.expectRevert` sees the Router call as one call.
     function submitExternal(AsyncOrder memory order) external {
         _submit(order);

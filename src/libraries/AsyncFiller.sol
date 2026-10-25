@@ -10,6 +10,7 @@ import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {RadixPriceTree} from "@async-swap/libraries/RadixPriceTree.sol";
 import {EligiblePrice} from "@async-swap/libraries/EligiblePrice.sol";
+import {TickPrice} from "@async-swap/libraries/TickPrice.sol";
 import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
 
 /// @title AsyncFiller
@@ -27,7 +28,6 @@ library AsyncFiller {
     using RadixPriceTree for RadixPriceTree.Tree;
     using StateLibrary for IPoolManager;
 
-    uint256 private constant PRICE_SCALE = 1e18;
     uint64 internal constant MAX_PRIORITY_FEE = type(uint64).max;
     /// @dev $0.10 in six-decimal USDC base units. Async Swap pools are configured with USDC as numeraire.
     uint64 internal constant MIN_PRIORITY_FEE = 100_000;
@@ -147,7 +147,7 @@ library AsyncFiller {
         // PoolManager, so the unlock that creates the order cannot end until the bid is paid
         // (the Router does `settleFor(hook)`), exactly as the swap delta makes it pay the input.
         if (priorityFee != 0) self.numeraire.take(self.poolManager, address(this), priorityFee, true);
-        uint128 price = _priceKey(isBuy, amountIn, amountOutMin);
+        uint128 price = _priceKey(isBuy, zeroForOne, amountIn, amountOutMin);
         uint64 sequence = ++book.nextSequence;
         self.orders[id] = OrderInfo({
             owner: owner,
@@ -214,8 +214,7 @@ library AsyncFiller {
     ) internal {
         if (amount == 0) return;
         // Priority bids fund the protocol independently of instantaneous LP liquidity.
-        self.numeraire.settle(self.poolManager, hook, amount, true);
-        self.numeraire.take(self.poolManager, self.feeVault, amount, true);
+        self.poolManager.transfer(self.feeVault, self.numeraire.toId(), amount);
         emit PriorityFeeForfeited(key.toId(), id, maker, amount);
     }
 
@@ -245,13 +244,12 @@ library AsyncFiller {
     }
 
     function bestAtPrice(Book storage book, bool isBuy, uint128 price) internal view returns (bytes32 id) {
-        PriceLevel storage priceLevel = isBuy ? book.bidLevels[price] : book.askLevels[price];
-        (, uint128 priorityKey) = priceLevel.priorityOrders.best(true);
-        return priceLevel.priorityOrderIds[priorityKey];
+        // The exact extremum comes first; fee and age break exact-price ties.
+        return eligibleAtPrice(book, isBuy, price, mostPermissiveAtPrice(book, isBuy, price));
     }
 
-    /// @notice Maker-only price update. The executor (router) is required to be authorized by
-    ///         the maker, AND `caller` must equal `order.owner` — both checked here.
+    /// @notice Maker-only price update: `caller` must equal `order.owner` (the maker directly, or the
+    ///         owner whose signature `updatePriceWithSig` verified). No executor is involved.
     function updatePrice(
         State storage self,
         Book storage book,
@@ -266,9 +264,15 @@ library AsyncFiller {
         if (info.amountIn == 0) revert OrderNotFound();
         checkMinimum(self, book, order.key.toId(), info.isBuy, info.zeroForOne, info.amountIn, newAmountOutMin);
         uint256 old = info.amountOutMin;
+        // A sell's bid floor follows its minimum output. Increasing the requested notional must
+        // meet the new floor; unchanged or reduced terms may retain a pro-rated bid.
+        if (!info.isBuy) {
+            uint256 required = minPriorityFee(newAmountOutMin);
+            if (newAmountOutMin > old && info.priorityFee < required) revert PriorityFeeTooSmall();
+        }
         _remove(self, book, id);
         info.amountOutMin = newAmountOutMin;
-        info.price = _priceKey(info.isBuy, info.amountIn, newAmountOutMin);
+        info.price = _priceKey(info.isBuy, info.zeroForOne, info.amountIn, newAmountOutMin);
         // A maker price update re-enters the queue with fresh time priority.
         info.sequence = ++book.nextSequence;
         _append(self, book, id);
@@ -439,13 +443,13 @@ library AsyncFiller {
         return l.exactBounds[l.priorityOrders.root];
     }
 
-    /// @dev WAD-scaled price ratio bounded to the radix key range: a ratio that rounds to zero
-    ///      maps to 1 and a ratio above uint128 saturates at the maximum.
-    function _priceKey(bool isBuy, uint256 amountIn, uint256 amountOut) private pure returns (uint128) {
-        uint256 price =
-            isBuy ? Math.mulDiv(amountIn, PRICE_SCALE, amountOut) : Math.mulDiv(amountOut, PRICE_SCALE, amountIn);
-        if (price == 0) return 1;
-        if (price > type(uint128).max) return type(uint128).max;
-        return uint128(price);
+    /// @dev The order's book level: the v4 tick of its exact limit, ordered by numeraire per asset
+    ///      (see `TickPrice.key`). The exact limit is kept on the order and decides crossing.
+    function _priceKey(bool isBuy, bool zeroForOne, uint256 amountIn, uint256 amountOut)
+        internal
+        pure
+        returns (uint128)
+    {
+        return TickPrice.key(isBuy, zeroForOne, amountIn, amountOut);
     }
 }

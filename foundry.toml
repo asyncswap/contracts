@@ -8,10 +8,9 @@ fs_permissions = [
   { access = "read-write", path = "./deployments/" },
 ]
 solc_version = "0.8.26"
-# Keep linked continuous matching deployable under EIP-170 while retaining more optimization than
-# the minimum-size setting.
+# Favor lower execution gas; runtime sizes remain below EIP-170 with linked TickPrice.
 optimizer = true
-optimizer_runs = 1_000
+optimizer_runs = 43_690
 # Tests named `*_finding_*` are counterexamples the bytecode gives to a Formal Mind theorem (see
 # test/formal/README.md, "Findings"). They fail by design until the model is fixed, so the default run
 # skips them; `FOUNDRY_PROFILE=findings forge test` runs exactly those.
@@ -40,3 +39,6 @@ uniswap-v4-core = "4"
 solmate = "6.8.0"
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+
+[rpc_endpoints]
+unichain = "https://mainnet.unichain.org"

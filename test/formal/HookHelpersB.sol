@@ -10,11 +10,13 @@ import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 
 /// @notice Checks of the AsyncSwap-only helper theorems whose functions are private to their library:
 ///         `AsyncFiller._priorityKey` (read back from the stored `priorityKey`), `AsyncMatching._crosses`
-///         (whether `matchBook` matches two resting orders), `AsyncMatching._priceKey` (the stored key of
+///         (whether `matchBook` matches two resting orders), `AsyncFiller._priceKey` (the stored key of
 ///         an order a match left partly filled) and `RadixPriceTree._bitSet` / `_freeNode` (through the
 ///         library's `insert` / `remove` on a harness tree).
 abstract contract HookHelpersCasesB is HookUnlockBase, LibHelpersCasesB {
     uint256 constant WAD = 1e18;
+    /// @dev `TickPrice.key` runs from 1 to 2 * MAX_TICK + 1.
+    uint256 constant MAX_PRICE_KEY = 2 * 887272 + 1;
 
     // ------------------------------------------------------------ _priorityKey
 
@@ -112,12 +114,10 @@ abstract contract HookHelpersCasesB is HookUnlockBase, LibHelpersCasesB {
 
     // ------------------------------------------------------------ _priceKey
 
-    /// @dev `clamp(mulDiv(isBuy ? a : o, 1e18, isBuy ? o : a), 1, 2^128 - 1)` (amounts here keep the
-    ///      product below 2^256).
-    function _expectedPriceKey(bool isBuy, uint256 a, uint256 o) internal pure returns (uint256 p) {
-        p = isBuy ? a * WAD / o : o * WAD / a;
-        if (p == 0) p = 1;
-        if (p > type(uint128).max) p = type(uint128).max;
+    /// @dev The v4 tick key of the exact limit (`TickPrice.key`). Asks here sell currency0 and bids
+    ///      sell currency1, so `zeroForOne == !isBuy`.
+    function _expectedPriceKey(bool isBuy, uint256 a, uint256 o) internal pure returns (uint256) {
+        return AsyncFiller._priceKey(isBuy, !isBuy, a, o);
     }
 
     /// @dev After a match, a partly filled order's stored key is `_priceKey(isBuy, amountIn, amountOutMin)`
@@ -131,7 +131,7 @@ abstract contract HookHelpersCasesB is HookUnlockBase, LibHelpersCasesB {
             ++checked;
             assertEq(uint256(k), _expectedPriceKey(isBuy, a, o), "stored key = _priceKey(remaining)");
             assertGe(k, 1);
-            assertLe(uint256(k), type(uint128).max);
+            assertLe(uint256(k), MAX_PRICE_KEY);
         }
     }
 

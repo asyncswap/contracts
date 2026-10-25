@@ -5,7 +5,6 @@ import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 import {AsyncMatching} from "@async-swap/libraries/AsyncMatching.sol";
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {Currency} from "v4-core/types/Currency.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @notice Runs the real `AsyncFiller.addOrder` / `_append` / `_remove` and `AsyncMatching.addOrder`
 ///         (linked, reached by DELEGATECALL as from the hook) on its own `pid → State` / `pid → Book`
@@ -44,10 +43,14 @@ contract AsyncFillerBookHarness {
         AsyncFiller._append(pools[pid], books[pid], id);
     }
 
-    /// @dev The `Math.mulDiv` call `_priceKey` makes (PRICE_SCALE = 1e18), so a test can tell whether
-    ///      the theorem's hypothesis "`_priceKey` succeeds" holds and with which revert data it fails.
-    function priceKeyMulDiv(bool isBuy, uint256 amountIn, uint256 amountOut) external pure returns (uint256) {
-        return isBuy ? Math.mulDiv(amountIn, 1e18, amountOut) : Math.mulDiv(amountOut, 1e18, amountIn);
+    /// @dev Evaluate the actual price helper for the theorem's opaque pricing precondition.
+    ///      Tick pricing depends on swap direction as well as the numeraire side.
+    function priceKey(bool isBuy, bool zeroForOne, uint256 amountIn, uint256 amountOut)
+        external
+        pure
+        returns (uint128)
+    {
+        return AsyncFiller._priceKey(isBuy, zeroForOne, amountIn, amountOut);
     }
 
     // ------------------------------------------------------------ state setup

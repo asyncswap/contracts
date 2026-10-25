@@ -1,0 +1,18 @@
+Compiling 1 files with Solc 0.8.26
+Solc 0.8.26 finished in 3.28s
+Compiler run successful!
+
+Ran 1 test for test/SignedOrders.t.sol:SignedOrdersTest
+[FAIL: next call did not revert as expected] test_updatePriceWithSig_rejectsUnusedSignatureOnReplacement() (gas: 2180127)
+Suite result: FAILED. 0 passed; 1 failed; 0 skipped; finished in 16.91ms (6.10ms CPU time)
+
+Ran 1 test suite in 22.99ms (16.91ms CPU time): 0 tests passed, 1 failed, 0 skipped (1 total tests)
+
+Failing tests:
+Encountered 1 failing test in test/SignedOrders.t.sol:SignedOrdersTest
+[FAIL: next call did not revert as expected] test_updatePriceWithSig_rejectsUnusedSignatureOnReplacement() (gas: 2180127)
+
+Encountered a total of 1 failing tests, 0 tests succeeded
+
+Tip: Run `forge test --rerun` to retry only the 1 failed test
+Tip: Run `forge test --debug --match-test <TEST_NAME>` to inspect one failing test in the debugger

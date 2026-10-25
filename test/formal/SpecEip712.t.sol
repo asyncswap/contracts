@@ -281,7 +281,7 @@ abstract contract SpecEip712DomainChecks is SpecEip712Constants, FormalImmutable
         _setUpShortStrings();
         manager = new PoolManager(address(this));
         usdc = new MockERC20("USD Coin", "USDC", 6);
-        hook = new DomainHarness(manager, Currency.wrap(address(usdc)), address(this));
+        hook = new DomainHarness(manager, Currency.wrap(address(usdc)), address(this), address(0xCAFE));
         router =
             new RouterDomainHarness(manager, AsyncSwap(payable(address(hook))), ISignatureTransfer(address(0xBEEF)));
     }
@@ -444,7 +444,7 @@ contract AsyncSwapCtorSpecFormalTest is SpecEip712Constants, FormalImmutablesC {
         vm.chainId(chainId);
         address num = _withCode(which);
         vm.record();
-        h = new CtorHarness(IPoolManager(pm), Currency.wrap(num), owner_);
+        h = new CtorHarness(IPoolManager(pm), Currency.wrap(num), owner_, address(0xCAFE));
         (, bytes32[] memory writes) = vm.accesses(address(h));
         for (uint256 i; i < writes.length; i++) {
             assertEq(writes[i], bytes32(OWNER_SLOT), "storage: only owner is written");
@@ -458,7 +458,7 @@ contract AsyncSwapCtorSpecFormalTest is SpecEip712Constants, FormalImmutablesC {
 
     /// @notice formal/Refinement/Swarm/SpecEip712AsyncSwap.lean:50 `CtorSpec` — every field: the storage effect
     ///         (`owner := _owner` only; the guards are `AsyncSwapConstructor.t.sol`'s tests), the immutables
-    ///         (`poolManager = pm`, `numeraire = num`, cached address / chain id / separator), the EIP-712 ones
+    ///         (`poolManager = pm`, `numeraire = num`, `router`, cached address / chain id / separator), the EIP-712 ones
     ///         (`_name` / `_version` short strings, `_hashedName = keccak256("AsyncSwap")`, `_hashedVersion =
     ///         keccak256("1")`), and `feeVault` has code. The deployed code's immutables are exactly these.
     function testFuzz_CtorSpec(address pm, uint8 which, address owner_, uint64 chainId) public {
@@ -468,8 +468,9 @@ contract AsyncSwapCtorSpecFormalTest is SpecEip712Constants, FormalImmutablesC {
         assertGt(vault.code.length, 0, "feeVault_code");
         assertEq(address(h.poolManager()), pm, "poolManager");
         assertEq(Currency.unwrap(h.numeraire()), _withCode(which), "numeraire");
+        assertEq(h.router(), address(0xCAFE), "router");
         bytes32 sep = _sep(HASH_ASYNCSWAP, HASH_ONE, block.chainid, self);
-        bytes32[] memory expected = new bytes32[](10);
+        bytes32[] memory expected = new bytes32[](11);
         expected[0] = bytes32(uint256(uint160(pm)));
         expected[1] = bytes32(uint256(uint160(_withCode(which))));
         expected[2] = bytes32(uint256(uint160(vault)));
@@ -480,6 +481,7 @@ contract AsyncSwapCtorSpecFormalTest is SpecEip712Constants, FormalImmutablesC {
         expected[7] = bytes32(uint256(block.chainid));
         expected[8] = bytes32(uint256(uint160(self)));
         expected[9] = sep;
+        expected[10] = bytes32(uint256(uint160(address(0xCAFE))));
         _assertImmutables(_immutables("AsyncSwapConstructor.t.sol:CtorHarness", self), expected);
         assertEq(h.domainSeparatorV4(), sep, "cached separator in the deployment environment");
     }

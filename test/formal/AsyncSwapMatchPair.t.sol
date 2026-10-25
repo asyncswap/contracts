@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
+import {IERC6909Claims} from "v4-core/interfaces/external/IERC6909Claims.sol";
 
 import {FormalMatchD} from "./FormalMatchD.sol";
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
@@ -55,7 +56,7 @@ contract AsyncSwapMatchPairFormalTest is FormalMatchD {
             assertEq(r.matched, 0, "zero spec amount: false");
             assertEq(writes.length, 0, "world unchanged");
         } else {
-            Op memory m = r.ops[r.ops.length - 1];
+            Op memory m = _matchedOp(r.ops);
             assertEq(m.kind, OP_MATCHED, "match event");
             assertEq(m.amount, r.asset, "assetAmount = amountsOf");
             assertEq(m.amount2, r.quote, "quoteAmount = amountsOf");
@@ -107,7 +108,7 @@ contract AsyncSwapMatchPairFormalTest is FormalMatchD {
         bool skip = mode % 5 != 4;
         if (skip) _makeSkip(c, mode);
         bytes memory reason = abi.encodeWithSignature("MockedBurn(uint256)", tag);
-        vm.mockCallRevert(address(manager), abi.encodeWithSelector(IPoolManager.burn.selector), reason);
+        vm.mockCallRevert(address(manager), abi.encodeWithSelector(IERC6909Claims.transfer.selector), reason);
         (uint256 asset, uint256 quote) = _spec(
             _info(c.pid, c.sellId).amountIn,
             _info(c.pid, c.sellId).amountOutMin,

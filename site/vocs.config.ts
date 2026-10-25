@@ -11,7 +11,7 @@ export default defineConfig({
   baseUrl: process.env.DOCS_BASE_URL,
   // Static HTML for every page, so the site is served from GitHub Pages.
   renderStrategy: 'full-static',
-  // Brand kit: three-bar mark lockups, monochrome palette (Carbon #111111 / Paper #F2F2F2).
+  // Brand kit: octagonal mark + wordmark lockup, monochrome palette (Carbon #111111 / Paper #F2F2F2).
   iconUrl: '/favicon.ico',
   logoUrl: { light: '/logo-light.svg', dark: '/logo-dark.svg' },
   accentColor: 'light-dark(#111111, #F2F2F2)',

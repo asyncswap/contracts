@@ -135,7 +135,7 @@ sequenceDiagram
     H->>PM: take(input, hook, amountIn, claims = true)
     H->>AM: addOrder(id, owner, amountIn, amountOutMin, isBuy, priorityFee)
     AM->>PM: mint numeraire bid claims to hook, hook owes bid
-    Note over AM: salt assigned by the hook, priceKey = WAD ratio,<br/>order linked into the bid or ask level
+    Note over AM: salt assigned by the hook, priceKey = v4 tick of the limit,<br/>order linked into the bid or ask level
     H-->>PM: BeforeSwapDelta consumes the whole input
     R->>PM: settle input from maker (ERC-20 transferFrom or forwarded ETH)
     opt priorityFee > 0
@@ -210,9 +210,9 @@ flowchart LR
     end
 ```
 
-Signed maker actions use unordered nonces: `AsyncSwap.nonceUsed` for `SetExecutor` and
-`UpdatePrice`, `Router.cancelNonceUsed` for `CancelOrder`, and Permit2's own nonces for order
-witnesses. The Permit2 witness binds maker, both tokens, amounts, bid and pool; it leaves out
+Signed maker actions use unordered nonces: `AsyncSwap.nonceUsed` for `SetExecutor`,
+`UpdatePrice` and `CancelOrder` (the Router burns cancel nonces through `AsyncSwap.useNonce`, so
+`invalidateNonce` revokes any of them), and Permit2's own nonces for order witnesses. The Permit2 witness binds maker, both tokens, amounts, bid and pool; it leaves out
 `sqrtPrice` (never read, the hook consumes the whole swap) and `salt` (assigned by the hook).
 
 ## 6. Deployment shape
@@ -236,3 +236,9 @@ normal ERC-20 asset.
 
 See also [`price-key-crossing.md`](/protocol/price-key-crossing) for how truncated price keys decide
 whether two orders cross, and [mainnet readiness](https://github.com/asyncswap/contracts/blob/main/MAINNET_READINESS.md) for the release gate.
+
+Signed repricing and cancellation typed data include `uint64 createdSequence` after `orderId`. Read it through
+`orderCreatedSequence(poolId, orderId)` when signing. This binds each signature to the current
+incarnation; replacing an identically identified order does not revive its old signatures.
+Same-block repricing remains allowed. Repricing signatures made without this field must be signed again.
+`invalidateNonce` revokes the shared grant, reprice, and cancel nonce space.

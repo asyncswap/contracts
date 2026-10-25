@@ -1,6 +1,6 @@
 # Router
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e31f7066f60bba1d310850060188cecf69bae54c/src/Router.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/df7699a9fd97d8204e03a4824be95235e1634e86/src/Router.sol)
 
 **Inherits:** EIP712
 
@@ -69,16 +69,6 @@ bytes32 constant ASYNC_FILLER_LOCATION = 0xd972a937b59dc5cb8c692dd9f211e85afa8de
 
 ```solidity
 bytes32 constant MAX_PRICE_LOCATION = 0x6b4f8e2c9d5a0b7e1f3c2a8d4e9f0b6c5a1d8e7f2b3c4d5e6a7f8b9c0d1e2f30;
-```
-
-## State Variables
-
-### cancelNonceUsed
-
-Unordered nonces consumed by signed cancels (`cancelWithSig`).
-
-```solidity
-mapping(address maker => mapping(uint256 nonce => bool)) public cancelNonceUsed;
 ```
 
 ## Functions
@@ -195,6 +185,7 @@ function swapWithSig(AsyncOrder calldata order, PermitData calldata permit, Exec
 ### cancelWithSig
 
 Relayer submits a maker's signed EIP-712 `CancelOrder`. Input returns to the maker.
+The nonce is burnt in the hook's store, so `AsyncSwap.invalidateNonce` revokes it.
 
 ```solidity
 function cancelWithSig(AsyncOrder calldata order, uint256 nonce, uint256 deadline, bytes calldata signature)
@@ -406,12 +397,6 @@ error SignatureExpired();
 
 ```solidity
 error InvalidSignature();
-```
-
-### NonceAlreadyUsed
-
-```solidity
-error NonceAlreadyUsed();
 ```
 
 ## Structs

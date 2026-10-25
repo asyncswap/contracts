@@ -1,6 +1,6 @@
 # OrderSignatures
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e31f7066f60bba1d310850060188cecf69bae54c/src/libraries/OrderSignatures.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/df7699a9fd97d8204e03a4824be95235e1634e86/src/libraries/OrderSignatures.sol)
 
 **Title:** OrderSignatures
 
@@ -69,7 +69,7 @@ bytes32 internal constant SET_EXECUTOR_TYPEHASH = keccak256(
 
 ```solidity
 bytes32 internal constant UPDATE_PRICE_TYPEHASH = keccak256(
-        "UpdatePrice(address maker,address tokenIn,address tokenOut,uint256 amountIn,uint256 newAmountOutMin,bytes32 orderId,uint256 nonce,uint256 deadline)"
+        "UpdatePrice(address maker,address tokenIn,address tokenOut,uint256 amountIn,uint256 newAmountOutMin,bytes32 orderId,uint64 createdSequence,uint256 nonce,uint256 deadline)"
     );
 ```
 
@@ -77,7 +77,7 @@ bytes32 internal constant UPDATE_PRICE_TYPEHASH = keccak256(
 
 ```solidity
 bytes32 internal constant CANCEL_ORDER_TYPEHASH = keccak256(
-        "CancelOrder(address maker,address tokenIn,address tokenOut,uint256 amountIn,bytes32 orderId,uint256 nonce,uint256 deadline)"
+        "CancelOrder(address maker,address tokenIn,address tokenOut,uint256 amountIn,bytes32 orderId,uint64 createdSequence,uint256 nonce,uint256 deadline)"
     );
 ```
 
@@ -180,7 +180,7 @@ function hashSetExecutor(
 | ---- | ---- | ----------- |
 | \<none> | `bytes32` |  |
 
-<a id="hashupdateprice-asyncorder-bytes32-uint256-uint256-uint256-uint256" />
+<a id="hashupdateprice-asyncorder-bytes32-uint256-uint256-uint64-uint256-uint256" />
 
 ### hashUpdatePrice
 
@@ -190,6 +190,7 @@ function hashUpdatePrice(
         bytes32 orderId,
         uint256 amountIn,
         uint256 newAmountOutMin,
+        uint64 createdSequence,
         uint256 nonce,
         uint256 deadline
     ) internal pure returns (bytes32);
@@ -203,6 +204,7 @@ function hashUpdatePrice(
 | orderId | `bytes32` |  |
 | amountIn | `uint256` | the order's stored input, so the maker sees the size of the order they reprice. |
 | newAmountOutMin | `uint256` |  |
+| createdSequence | `uint64` | Immutable incarnation; an identical replacement cannot reuse this signature. |
 | nonce | `uint256` |  |
 | deadline | `uint256` |  |
 
@@ -212,7 +214,7 @@ function hashUpdatePrice(
 | ---- | ---- | ----------- |
 | \<none> | `bytes32` |  |
 
-<a id="hashcancel-asyncorder-bytes32-uint256-uint256-uint256" />
+<a id="hashcancel-asyncorder-bytes32-uint256-uint64-uint256-uint256" />
 
 ### hashCancel
 
@@ -222,10 +224,14 @@ function hashUpdatePrice(
 </i>
 
 ```solidity
-function hashCancel(AsyncOrder memory order, bytes32 orderId, uint256 amountIn, uint256 nonce, uint256 deadline)
-        internal
-        pure
-        returns (bytes32);
+function hashCancel(
+        AsyncOrder memory order,
+        bytes32 orderId,
+        uint256 amountIn,
+        uint64 createdSequence,
+        uint256 nonce,
+        uint256 deadline
+    ) internal pure returns (bytes32);
 ```
 
 **Parameters**
@@ -235,6 +241,7 @@ function hashCancel(AsyncOrder memory order, bytes32 orderId, uint256 amountIn, 
 | order | `AsyncOrder` |  |
 | orderId | `bytes32` |  |
 | amountIn | `uint256` |  |
+| createdSequence | `uint64` |  |
 | nonce | `uint256` |  |
 | deadline | `uint256` |  |
 

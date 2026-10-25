@@ -1,6 +1,6 @@
 # AsyncFiller
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e31f7066f60bba1d310850060188cecf69bae54c/src/libraries/AsyncFiller.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/df7699a9fd97d8204e03a4824be95235e1634e86/src/libraries/AsyncFiller.sol)
 
 **Title:** AsyncFiller
 
@@ -17,12 +17,6 @@ Stores open async orders and settles fills against them.
 </i>
 
 ## Constants
-
-### PRICE_SCALE
-
-```solidity
-uint256 private constant PRICE_SCALE = 1e18;
-```
 
 ### MAX_PRIORITY_FEE
 
@@ -262,8 +256,8 @@ function bestAtPrice(Book storage book, bool isBuy, uint128 price) internal view
 
 ### updatePrice
 
-Maker-only price update. The executor (router) is required to be authorized by
-the maker, AND `caller` must equal `order.owner` — both checked here.
+Maker-only price update: `caller` must equal `order.owner` (the maker directly, or the
+owner whose signature `updatePriceWithSig` verified). No executor is involved.
 
 ```solidity
 function updatePrice(
@@ -543,17 +537,20 @@ function mostPermissiveAtPrice(Book storage book, bool isBuy, uint128 price)
 | ---- | ---- | ----------- |
 | \<none> | `EligiblePrice.Ratio` |  |
 
-<a id="_pricekey-bool-uint256-uint256" />
+<a id="_pricekey-bool-bool-uint256-uint256" />
 
 ### \_priceKey
 
 <i>
-  WAD-scaled price ratio bounded to the radix key range: a ratio that rounds to zero
-  maps to 1 and a ratio above uint128 saturates at the maximum.
+  The order's book level: the v4 tick of its exact limit, ordered by numeraire per asset
+  (see `TickPrice.key`). The exact limit is kept on the order and decides crossing.
 </i>
 
 ```solidity
-function _priceKey(bool isBuy, uint256 amountIn, uint256 amountOut) private pure returns (uint128);
+function _priceKey(bool isBuy, bool zeroForOne, uint256 amountIn, uint256 amountOut)
+        internal
+        pure
+        returns (uint128);
 ```
 
 **Parameters**
@@ -561,6 +558,7 @@ function _priceKey(bool isBuy, uint256 amountIn, uint256 amountOut) private pure
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | isBuy | `bool` |  |
+| zeroForOne | `bool` |  |
 | amountIn | `uint256` |  |
 | amountOut | `uint256` |  |
 

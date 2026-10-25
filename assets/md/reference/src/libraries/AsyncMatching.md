@@ -1,6 +1,6 @@
 # AsyncMatching
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e31f7066f60bba1d310850060188cecf69bae54c/src/libraries/AsyncMatching.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/df7699a9fd97d8204e03a4824be95235e1634e86/src/libraries/AsyncMatching.sol)
 
 Linked matching module operating on the hook's order and radix-book storage.
 
@@ -9,12 +9,6 @@ Linked matching module operating on the hook's order and radix-book storage.
 </i>
 
 ## Constants
-
-### PRICE_SCALE
-
-```solidity
-uint256 private constant PRICE_SCALE = 1e18;
-```
 
 ### MAX_MATCHES_PER_CALL
 
@@ -317,7 +311,7 @@ function _swapAgainstPool(
 | ---- | ---- | ----------- |
 | amountOut | `uint256` |  |
 
-<a id="_matchpair-asyncfiller-state-asyncfiller-book-poolkey-bytes32-bytes32-address" />
+<a id="_matchpair-asyncfiller-state-asyncfiller-book-poolkey-bytes32-bytes32-claimtransfers-batch" />
 
 ### \_matchPair
 
@@ -333,7 +327,7 @@ function _matchPair(
         PoolKey calldata key,
         bytes32 buyId,
         bytes32 sellId,
-        address hook
+        ClaimTransfers.Batch memory batch
     ) private returns (bool);
 ```
 
@@ -346,7 +340,7 @@ function _matchPair(
 | key | `PoolKey` |  |
 | buyId | `bytes32` |  |
 | sellId | `bytes32` |  |
-| hook | `address` |  |
+| batch | `ClaimTransfers.Batch` |  |
 
 **Returns**
 
@@ -405,7 +399,7 @@ function _payouts(AsyncFiller.State storage self, PoolKey calldata key, bytes32 
 | ---- | ---- | ----------- |
 | payouts | `Payouts` |  |
 
-<a id="_settletransfers-ipoolmanager-payouts-asyncfiller-matchamounts-address" />
+<a id="_settletransfers-ipoolmanager-payouts-asyncfiller-matchamounts-claimtransfers-batch" />
 
 ### \_settleTransfers
 
@@ -414,7 +408,7 @@ function _settleTransfers(
         IPoolManager manager,
         Payouts memory payouts,
         AsyncFiller.MatchAmounts memory amounts,
-        address hook
+        ClaimTransfers.Batch memory batch
     ) private;
 ```
 
@@ -425,9 +419,9 @@ function _settleTransfers(
 | manager | `IPoolManager` |  |
 | payouts | `Payouts` |  |
 | amounts | `AsyncFiller.MatchAmounts` |  |
-| hook | `address` |  |
+| batch | `ClaimTransfers.Batch` |  |
 
-<a id="_reducematchedorders-asyncfiller-state-asyncfiller-book-poolkey-bytes32-bytes32-asyncfiller-matchamounts-address" />
+<a id="_reducematchedorders-asyncfiller-state-asyncfiller-book-poolkey-bytes32-bytes32-asyncfiller-matchamounts-claimtransfers-batch" />
 
 ### \_reduceMatchedOrders
 
@@ -439,7 +433,7 @@ function _reduceMatchedOrders(
         bytes32 buyId,
         bytes32 sellId,
         AsyncFiller.MatchAmounts memory amounts,
-        address hook
+        ClaimTransfers.Batch memory batch
     ) private returns (uint256 sellRefund, uint256 buyRefund);
 ```
 
@@ -453,7 +447,7 @@ function _reduceMatchedOrders(
 | buyId | `bytes32` |  |
 | sellId | `bytes32` |  |
 | amounts | `AsyncFiller.MatchAmounts` |  |
-| hook | `address` |  |
+| batch | `ClaimTransfers.Batch` |  |
 
 **Returns**
 
@@ -462,13 +456,18 @@ function _reduceMatchedOrders(
 | sellRefund | `uint256` |  |
 | buyRefund | `uint256` |  |
 
-<a id="_transferescrow-ipoolmanager-currency-address-uint256-address" />
+<a id="_transferescrow-ipoolmanager-currency-address-uint256-claimtransfers-batch" />
 
 ### \_transferEscrow
 
 ```solidity
-function _transferEscrow(IPoolManager manager, Currency currency, address recipient, uint256 amount, address hook)
-        private;
+function _transferEscrow(
+        IPoolManager manager,
+        Currency currency,
+        address recipient,
+        uint256 amount,
+        ClaimTransfers.Batch memory batch
+    ) private;
 ```
 
 **Parameters**
@@ -479,9 +478,9 @@ function _transferEscrow(IPoolManager manager, Currency currency, address recipi
 | currency | `Currency` |  |
 | recipient | `address` |  |
 | amount | `uint256` |  |
-| hook | `address` |  |
+| batch | `ClaimTransfers.Batch` |  |
 
-<a id="_reduceaftermatch-asyncfiller-state-asyncfiller-book-poolkey-reductionparams-address" />
+<a id="_reduceaftermatch-asyncfiller-state-asyncfiller-book-poolkey-reductionparams-claimtransfers-batch" />
 
 ### \_reduceAfterMatch
 
@@ -491,7 +490,7 @@ function _reduceAfterMatch(
         AsyncFiller.Book storage book,
         PoolKey calldata key,
         ReductionParams memory params,
-        address hook
+        ClaimTransfers.Batch memory batch
     ) private returns (uint256);
 ```
 
@@ -503,7 +502,7 @@ function _reduceAfterMatch(
 | book | `AsyncFiller.Book` |  |
 | key | `PoolKey` |  |
 | params | `ReductionParams` |  |
-| hook | `address` |  |
+| batch | `ClaimTransfers.Batch` |  |
 
 **Returns**
 
@@ -511,7 +510,7 @@ function _reduceAfterMatch(
 | ---- | ---- | ----------- |
 | \<none> | `uint256` |  |
 
-<a id="_settlematchedpriorityfee-asyncfiller-state-poolkey-bytes32-uint256-uint256-address" />
+<a id="_settlematchedpriorityfee-asyncfiller-state-poolkey-bytes32-uint256-uint256-claimtransfers-batch" />
 
 ### \_settleMatchedPriorityFee
 
@@ -522,7 +521,7 @@ function _settleMatchedPriorityFee(
         bytes32 id,
         uint256 inputUsed,
         uint256 oldInput,
-        address hook
+        ClaimTransfers.Batch memory batch
     ) private returns (uint256 unfilledPriorityFee);
 ```
 
@@ -535,7 +534,7 @@ function _settleMatchedPriorityFee(
 | id | `bytes32` |  |
 | inputUsed | `uint256` |  |
 | oldInput | `uint256` |  |
-| hook | `address` |  |
+| batch | `ClaimTransfers.Batch` |  |
 
 **Returns**
 
@@ -543,27 +542,31 @@ function _settleMatchedPriorityFee(
 | ---- | ---- | ----------- |
 | unfilledPriorityFee | `uint256` |  |
 
-<a id="_pricekey-bool-uint256-uint256" />
+<a id="_creditpriorityfee-asyncfiller-state-poolkey-bytes32-address-uint256-claimtransfers-batch" />
 
-### \_priceKey
+### \_creditPriorityFee
 
 ```solidity
-function _priceKey(bool isBuy, uint256 amountIn, uint256 amountOut) private pure returns (uint128);
+function _creditPriorityFee(
+        AsyncFiller.State storage self,
+        PoolKey calldata key,
+        bytes32 id,
+        address maker,
+        uint256 amount,
+        ClaimTransfers.Batch memory batch
+    ) private;
 ```
 
 **Parameters**
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| isBuy | `bool` |  |
-| amountIn | `uint256` |  |
-| amountOut | `uint256` |  |
-
-**Returns**
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| \<none> | `uint128` |  |
+| self | `AsyncFiller.State` |  |
+| key | `PoolKey` |  |
+| id | `bytes32` |  |
+| maker | `address` |  |
+| amount | `uint256` |  |
+| batch | `ClaimTransfers.Batch` |  |
 
 <a id="_crosses-uint128-uint128-asyncfiller-orderinfo-asyncfiller-orderinfo" />
 
@@ -573,10 +576,10 @@ Decide whether a buy and a sell order cross, i.e. a price exists that satisfies 
 makers' limits.
 
 <i>
-  The `uint128` price keys on the book are truncated WAD ratios, so two distinct prices
-  can share a key. Strictly ordered keys decide the result directly, since truncation
-  cannot invert a strict inequality. Equal keys are decided by a full-precision
-  cross-multiply:
+  Keys are the floor ticks of the exact limits, ordered by numeraire per asset, so two
+  distinct prices can share a key. Strictly ordered keys decide the result directly,
+  since a monotone key cannot invert a strict inequality. Equal keys are decided by a
+  full-precision cross-multiply:
 </i>
 
 cross  \<=>  buyIn/buyOut >= sellOut/sellIn  \<=>  buyIn*sellIn >= sellOut*buyOut

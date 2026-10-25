@@ -66,3 +66,8 @@ For each book match, the settled share is `floor(remainingBid * inputUsed / rema
 Bids always go to the FeeVault, whatever liquidity is in range, so liquidity added for the moment of settlement captures none of them. A failed LP self-call rolls back that attempt, including its fee and bid changes, while preserving prior successful book matches in the surrounding transaction. A revert of the surrounding transaction rolls everything back.
 
 Sources: [`_reduceAfterMatch` and `_settleMatchedPriorityFee`](https://github.com/asyncswap/contracts/blob/main/src/libraries/AsyncMatching.sol), [`settlePriorityFee`, `fill`, and `cancel`](https://github.com/asyncswap/contracts/blob/main/src/libraries/AsyncFiller.sol). The [original chat diagrams](https://github.com/asyncswap/contracts/blob/main/docs/historical-matching-diagrams.md) are retained as historical references.
+
+Raising a sell's minimum output requires its remaining bid to meet the new notional's bid floor.
+A partially filled sell can retain its prorated bid when repricing to unchanged or lower terms.
+Book selection compares exact prices first, even within a shared tick; fee and queue age only
+break exact-price ties. Settlement age remains the immutable creation sequence.

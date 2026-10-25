@@ -1,6 +1,6 @@
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e31f7066f60bba1d310850060188cecf69bae54c/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/df7699a9fd97d8204e03a4824be95235e1634e86/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -481,6 +481,29 @@ function orderBookOrder(PoolId poolId, bytes32 orderId)
 | sequence | `uint64` |  |
 | priorityFee | `uint64` |  |
 
+<a id="ordercreatedsequence-poolid-bytes32" />
+
+### orderCreatedSequence
+
+Immutable incarnation of a live order, used to bind cancellation signatures.
+
+```solidity
+function orderCreatedSequence(PoolId poolId, bytes32 id) external view returns (uint64);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| id | `bytes32` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint64` |  |
+
 <a id="isexecutor-poolid-address-address" />
 
 ### isExecutor
@@ -845,6 +868,26 @@ function invalidateNonce(uint256 nonce) external;
 | ---- | ---- | ----------- |
 | nonce | `uint256` |  |
 
+<a id="usenonce-poolid-address-uint256" />
+
+### useNonce
+
+Burns `maker`'s nonce for a signature the calling executor verified itself (the
+Router's `cancelWithSig`). Every maker signature shares this one nonce space, so
+`invalidateNonce` revokes those signatures too.
+
+```solidity
+function useNonce(PoolId poolId, address maker, uint256 nonce) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| maker | `address` |  |
+| nonce | `uint256` |  |
+
 <a id="domain_separator" />
 
 ### DOMAIN_SEPARATOR
@@ -883,6 +926,21 @@ function _verify(address maker, bytes32 structHash, uint256 nonce, uint256 deadl
 | nonce | `uint256` |  |
 | deadline | `uint256` |  |
 | signature | `bytes` |  |
+
+<a id="_usenonce-address-uint256" />
+
+### \_useNonce
+
+```solidity
+function _useNonce(address maker, uint256 nonce) private;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| maker | `address` |  |
+| nonce | `uint256` |  |
 
 <a id="receive" />
 

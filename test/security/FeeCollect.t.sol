@@ -6,7 +6,6 @@ import {Permit2Bytecode} from "../utils/Permit2Bytecode.sol";
 import {AsyncSwap} from "@async-swap/AsyncSwap.sol";
 import {FeeVault} from "@async-swap/FeeVault.sol";
 import {Router} from "@async-swap/Router.sol";
-import {CurrencySettler} from "@async-swap/libraries/CurrencySettler.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {MockERC20} from "../utils/MockERC20.sol";
 import {Test, stdError} from "forge-std/Test.sol";
@@ -18,46 +17,42 @@ import {SafeCast} from "v4-core/libraries/SafeCast.sol";
 import {PoolId} from "v4-core/types/PoolId.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 
-/// @dev Maker that is also its own executor. Creates an order and fills it in one unlock, paying
-///      exactly `pay` of the output currency. Used to show the fee is enforced by the hook, not
-///      only by the Router.
+/// @dev Maker that is also its own fill executor. Opens an order through the Router (the only way to open one),
+///      then fills it itself in its own unlock, paying exactly `pay` of the output currency. Used to show the fee
+///      is enforced by the hook, not only by the Router.
 contract SelfExecutor {
-    using CurrencySettler for Currency;
-
     IPoolManager pm;
     AsyncSwap hook;
+    Router router;
     PoolKey key;
 
-    constructor(IPoolManager _pm, AsyncSwap _hook, PoolKey memory _key) {
+    constructor(IPoolManager _pm, AsyncSwap _hook, Router _router, PoolKey memory _key, MockERC20 erc20) {
         pm = _pm;
         hook = _hook;
+        router = _router;
         key = _key;
+        hook.setExecutor(PoolIdLibrary.toId(_key), address(_router), true);
         hook.setExecutor(PoolIdLibrary.toId(_key), address(this), true);
+        erc20.approve(address(_router), type(uint256).max);
     }
 
     function run(bool zeroForOne, uint256 amountIn, uint256 amountOutMin, uint256 pay) external {
+        Currency input = zeroForOne ? key.currency0 : key.currency1;
+        router.swap{value: input.isAddressZero() ? amountIn : 0}(
+            AsyncOrder(key, address(this), zeroForOne, amountIn, amountOutMin, 100_000, 2 ** 96, bytes32(0)),
+            abi.encode(
+                AsyncSwap.UserParams({
+                    user: address(this), executor: address(router), amountOutMin: amountOutMin, priorityFee: 100_000
+                })
+            )
+        );
         pm.unlock(abi.encode(zeroForOne, amountIn, amountOutMin, pay));
     }
 
     function unlockCallback(bytes calldata data) external returns (bytes memory) {
         (bool zfo, uint256 amountIn, uint256 amountOutMin, uint256 pay) =
             abi.decode(data, (bool, uint256, uint256, uint256));
-        Currency input = zfo ? key.currency0 : key.currency1;
         Currency output = zfo ? key.currency1 : key.currency0;
-
-        pm.swap(
-            key,
-            SwapParams(zfo, -int256(amountIn), 2 ** 96),
-            abi.encode(
-                AsyncSwap.UserParams({
-                    user: address(this), executor: address(this), amountOutMin: amountOutMin, priorityFee: 100_000
-                })
-            )
-        );
-        input.settle(pm, address(this), amountIn, false);
-        pm.sync(key.currency1);
-        MockERC20(Currency.unwrap(key.currency1)).transfer(address(pm), 100_000);
-        pm.settleFor(address(hook));
 
         bytes32 salt = keccak256(
             abi.encode(block.timestamp, block.number, address(pm), address(this), amountIn, amountOutMin, 100_000)
@@ -180,10 +175,10 @@ contract FeeCollectTest is Test {
             Hooks.BEFORE_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG
                 | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
         );
-        deployCodeTo("AsyncSwap.sol", abi.encode(manager, tok, address(this)), address(flags));
+        router = new Router(manager, AsyncSwap(payable(address(flags))), ISignatureTransfer(Permit2Bytecode.PERMIT2));
+        deployCodeTo("AsyncSwap.sol", abi.encode(manager, tok, address(this), address(router)), address(flags));
         hook = AsyncSwap(payable(address(flags)));
         vault = hook.feeVault();
-        router = new Router(manager, hook, ISignatureTransfer(Permit2Bytecode.PERMIT2));
         key = PoolKey({currency0: eth, currency1: tok, fee: LPFeeLibrary.DYNAMIC_FEE_FLAG, tickSpacing: 1, hooks: hook});
         poolId = key.toId();
         manager.initialize(key, 2 ** 96);
@@ -201,7 +196,7 @@ contract FeeCollectTest is Test {
     /* ---------------- fee is enforced by the hook, not just the Router ---------------- */
 
     function test_customExecutor_underpayingFee_ERC20Output_reverts() public {
-        SelfExecutor s = new SelfExecutor(manager, hook, key);
+        SelfExecutor s = new SelfExecutor(manager, hook, router, key, erc20);
         vm.deal(address(s), 1 ether);
         erc20.mint(address(s), 10 ether);
         uint256 amountOutMin = 1 ether;
@@ -223,7 +218,7 @@ contract FeeCollectTest is Test {
     }
 
     function test_customExecutor_underpayingFee_nativeOutput_reverts() public {
-        SelfExecutor s = new SelfExecutor(manager, hook, key);
+        SelfExecutor s = new SelfExecutor(manager, hook, router, key, erc20);
         vm.deal(address(s), 10 ether);
         erc20.mint(address(s), 1 ether + 100_000);
         uint256 amountOutMin = 1 ether;

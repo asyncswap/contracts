@@ -143,7 +143,8 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
     function _guards(Call memory c) internal view returns (bool) {
         int256 a = c.params.amountSpecified;
         return c.caller == address(manager) && a <= 0 && a != type(int256).min && c.hd.length >= 128
-            && _word(c.hd, 0) < 2 ** 160 && _word(c.hd, 32) < 2 ** 160 && uint256(uint160(c.sender)) == _word(c.hd, 32);
+            && _word(c.hd, 0) < 2 ** 160 && _word(c.hd, 32) < 2 ** 160 && c.sender == hook.router()
+            && uint256(uint160(c.sender)) == _word(c.hd, 32);
     }
 
     /// @dev The model's `delta params` = toSigned 256 ((toUnsigned 256 (wrapI 128 (-a))) << 128).
@@ -170,6 +171,7 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
         if (x.steerAmount) a = -int256(bound(uint256(a < 0 ? -(a + 1) : a), 0, 2 ** 127 - 1));
         c.params = SwapParams({zeroForOne: x.zeroForOne, amountSpecified: a, sqrtPriceLimitX96: x.sqrtPriceLimit});
         uint256 pf = x.zeroPriorityFee ? 0 : x.priorityFee;
+        if (x.senderIsExecutor) x.executor = address(router); // the one sender that can pass the guards
         c.hd = x.validHd ? _hd(x.user, x.executor, x.amountOutMin, pf, x.extra) : x.extra;
         c.sender = x.senderIsExecutor ? x.executor : x.sender;
         if (x.authorize) {
@@ -321,7 +323,36 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
         assertEq(ret.length, 0, "abi.decode reverts with empty data");
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeSwap.lean:143 — past decode, `sender != hookData.executor` reverts (model: empty reason; bytecode: `NotAuthorizedExecutor()`).
+    /// @notice Past decode, a sender other than the hook's trusted Router reverts `NotTrustedRouter()`.
+    function testFuzz_beforeSwap_notTrustedRouter(
+        address sender,
+        address c0,
+        address c1,
+        uint24 fee,
+        int24 ts,
+        bool zeroForOne,
+        int256 a,
+        address user,
+        address executor,
+        uint256 aom,
+        uint256 pf,
+        bytes memory extra
+    ) public {
+        vm.assume(a <= 0 && a != type(int256).min);
+        vm.assume(sender != address(router));
+        Call memory c = Call(
+            address(manager),
+            sender,
+            _rawKey(c0, c1, fee, ts),
+            SwapParams(zeroForOne, a, 0),
+            _hd(user, executor, aom, pf, extra)
+        );
+        (bool ok, bytes memory ret) = _direct(c);
+        assertFalse(ok);
+        assertEq(ret, abi.encodeWithSelector(AsyncSwap.NotTrustedRouter.selector));
+    }
+
+    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeSwap.lean:143 — past decode, from the Router, `sender != hookData.executor` reverts (model: empty reason; bytecode: `NotAuthorizedExecutor()`).
     function testFuzz_beforeSwap_notExecutor(
         address sender,
         address c0,
@@ -337,6 +368,7 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
         bytes memory extra
     ) public {
         vm.assume(a <= 0 && a != type(int256).min);
+        sender = address(router);
         vm.assume(sender != executor);
         Call memory c = Call(
             address(manager),
@@ -363,6 +395,7 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
     ) public {
         amt = bound(amt, 1, 2 ** 127 - 1);
         aom = bound(aom, 1, type(uint128).max);
+        executor = address(router);
         vm.prank(user);
         hook.setExecutor(poolId, executor, true);
         Call memory c = Call(
@@ -392,6 +425,7 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
     ) public {
         amt = bound(amt, 0, uint256(type(int256).max));
         aom = bound(aom, 0, type(uint128).max);
+        executor = address(router);
         if (authorize) {
             vm.prank(user);
             hook.setExecutor(poolId, executor, true);

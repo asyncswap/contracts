@@ -190,9 +190,13 @@ contract MatchingInvariantTest is StdInvariant, Test {
             Hooks.BEFORE_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG
                 | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
         );
-        deployCodeTo("AsyncSwap.sol", abi.encode(manager, Currency.wrap(address(usdc)), address(this)), address(flags));
+        Router router = new Router(manager, AsyncSwap(payable(address(flags))), ISignatureTransfer(address(0)));
+        deployCodeTo(
+            "AsyncSwap.sol",
+            abi.encode(manager, Currency.wrap(address(usdc)), address(this), address(router)),
+            address(flags)
+        );
         hook = AsyncSwap(payable(address(flags)));
-        Router router = new Router(manager, hook, ISignatureTransfer(address(0)));
         key = PoolKey(Currency.wrap(address(0)), Currency.wrap(address(usdc)), LPFeeLibrary.DYNAMIC_FEE_FLAG, 1, hook);
         manager.initialize(key, initialSqrtPrice());
         _seedLiquidity();

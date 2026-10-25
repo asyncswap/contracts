@@ -208,6 +208,7 @@ contract SpecCoreFormalTest is FormalSlotsB, IUnlockCallback {
         uint256 aom,
         bool grantOther
     ) public {
+        executor = address(router); // the hook's one trusted swap caller
         amt = bound(amt, 0, 2 ** 127 - 1);
         aom = bound(aom, 0, type(uint128).max);
         Swap memory s = _swap(user, executor, zfo, amt, aom, 100_000);
@@ -234,6 +235,7 @@ contract SpecCoreFormalTest is FormalSlotsB, IUnlockCallback {
         bool zeroIn,
         uint256 pf
     ) public {
+        executor = address(router); // the hook's one trusted swap caller
         amt = zeroIn ? 0 : bound(amt, 0, 2 ** 127 - 1);
         aom = zeroIn ? bound(aom, 0, type(uint128).max) : 0;
         // The zero check comes before addOrder's priority-fee checks.
@@ -326,9 +328,9 @@ contract SpecCoreFormalTest is FormalSlotsB, IUnlockCallback {
         uint256 k,
         uint256 seed
     ) public {
-        Swap memory s = _swap(
-            user, executor, zfo, bound(amt, 1, 2 ** 127 - 1), bound(aom, 1, type(uint128).max), 100_000
-        );
+        executor = address(router); // the hook's one trusted swap caller
+        Swap memory s =
+            _swap(user, executor, zfo, bound(amt, 1, 2 ** 127 - 1), bound(aom, 1, type(uint128).max), 100_000);
         _checkRun(s, bound(k, 0, 4), seed);
     }
 
@@ -371,9 +373,9 @@ contract SpecCoreFormalTest is FormalSlotsB, IUnlockCallback {
         uint256 k,
         uint256 seed
     ) public {
-        Swap memory s = _swap(
-            user, executor, zfo, bound(amt, 1, 2 ** 127 - 1), bound(aom, 1, type(uint128).max), 100_000
-        );
+        executor = address(router); // the hook's one trusted swap caller
+        Swap memory s =
+            _swap(user, executor, zfo, bound(amt, 1, 2 ** 127 - 1), bound(aom, 1, type(uint128).max), 100_000);
         _checkRun(s, bound(k, 0, 4), seed);
     }
 
@@ -387,9 +389,9 @@ contract SpecCoreFormalTest is FormalSlotsB, IUnlockCallback {
         uint256 k,
         uint256 seed
     ) public {
-        Swap memory s = _swap(
-            user, executor, zfo, bound(amt, 1, 2 ** 127 - 1), bound(aom, 1, type(uint128).max), 100_000
-        );
+        executor = address(router); // the hook's one trusted swap caller
+        Swap memory s =
+            _swap(user, executor, zfo, bound(amt, 1, 2 ** 127 - 1), bound(aom, 1, type(uint128).max), 100_000);
         PoolId other = PoolId.wrap(keccak256(abi.encode(seed, "other pool")));
         bytes32 otherState = _stateSlot(other);
         bytes32 otherBook = _bookSlot(other);
@@ -406,6 +408,7 @@ contract SpecCoreFormalTest is FormalSlotsB, IUnlockCallback {
     function testFuzz_CreateOrderSpec_run_repeat(address user, address executor, bool zfo, uint256 amt, uint256 aom)
         public
     {
+        executor = address(router); // the hook's one trusted swap caller
         amt = bound(amt, 1, 2 ** 120);
         aom = bound(aom, 1, type(uint128).max);
         Swap memory s = _swap(user, executor, zfo, amt, aom, 100_000);
@@ -431,6 +434,7 @@ contract SpecCoreFormalTest is FormalSlotsB, IUnlockCallback {
         uint256 pf,
         bool priority
     ) public {
+        executor = address(router); // the hook's one trusted swap caller
         amt = bound(amt, 1, 2 ** 127 - 1);
         aom = bound(aom, 1, type(uint128).max);
         Swap memory s = _swap(user, executor, zfo, amt, aom, pf);

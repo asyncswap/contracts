@@ -51,6 +51,11 @@ contract AsyncSwap is BaseHook, EIP712 {
     /// @notice Chain-specific USDC address. Every pool must include this exact currency.
     Currency public immutable numeraire;
 
+    /// @notice The only swap caller the hook accepts, fixed at deployment. Only the Router settles a new order's input
+    ///         and hands it to `matchNewOrder`, so an order opened through any other caller would leave the
+    ///         transient pending-match id set for the rest of the transaction, and `matchBook` would skip that pool.
+    address public immutable router;
+
     /// @notice Unordered nonces consumed by signed maker actions (`setExecutorWithSig`, `updatePriceWithSig`).
     mapping(address maker => mapping(uint256 nonce => bool)) public nonceUsed;
 
@@ -79,6 +84,7 @@ contract AsyncSwap is BaseHook, EIP712 {
     error NumeraireRequired();
     error DynamicFeeRequired();
     error NotSelf();
+    error NotTrustedRouter();
 
     /// @notice Emitted when ownership is transferred.
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
@@ -141,13 +147,16 @@ contract AsyncSwap is BaseHook, EIP712 {
 
     /// @param _owner Explicit protocol owner. Not `msg.sender`: CREATE2 deployments run the
     ///               constructor from the deterministic deployer, which could never act as owner.
-    constructor(IPoolManager _poolManager, Currency _numeraire, address _owner)
+    /// @param _router The Router, deployed after the hook (it takes the hook in its constructor): pass its
+    ///                predicted address.
+    constructor(IPoolManager _poolManager, Currency _numeraire, address _owner, address _router)
         BaseHook(_poolManager)
         EIP712("AsyncSwap", "1")
     {
         if (Currency.unwrap(_numeraire).code.length == 0) revert InvalidNumeraire();
-        if (_owner == address(0)) revert ZeroAddress();
+        if (_owner == address(0) || _router == address(0)) revert ZeroAddress();
         numeraire = _numeraire;
+        router = _router;
         owner = _owner;
         feeVault = new FeeVault(_poolManager);
         emit OwnershipTransferred(address(0), _owner);
@@ -448,8 +457,10 @@ contract AsyncSwap is BaseHook, EIP712 {
         PoolId poolId = key.toId();
         uint256 amountTaken = uint256(-params.amountSpecified);
         UserParams memory hookData = abi.decode(hookParams, (UserParams));
-        // Bind the declared executor to the actual swap caller so nobody can open orders
-        // attributed to a maker through an executor they do not control.
+        // Only the Router opens orders: it settles the input and hands the order to `matchNewOrder` in the same
+        // unlock, which clears the pending-match id. Then bind the declared executor to the actual swap caller so
+        // nobody can open orders attributed to a maker through an executor they do not control.
+        if (sender != router) revert NotTrustedRouter();
         if (sender != hookData.executor) revert AsyncFiller.NotAuthorizedExecutor();
 
         Currency specified = params.zeroForOne ? key.currency0 : key.currency1;

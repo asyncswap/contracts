@@ -26,8 +26,8 @@ contract CoarsePriceBlockingTest is SetupHook {
         token1 = MockERC20(address(0x200000));
         currency0 = Currency.wrap(address(token0));
         currency1 = Currency.wrap(address(token1));
-        _deployHook();
         _deployRouter();
+        _deployHook();
         _createKey();
         // 1,000 USDC per 18-decimal asset: raw token1/token0 ratio = 1e-9.
         manager.initialize(key, 2505414483750479311864138);

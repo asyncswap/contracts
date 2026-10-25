@@ -23,7 +23,9 @@ interface IEip712Probe {
 
 /// @dev AsyncSwap with hook-address mining bypassed, exposing the internal `_EIP712Name` / `_EIP712Version`.
 contract DomainHarness is AsyncSwap {
-    constructor(IPoolManager manager, Currency quote, address owner_) AsyncSwap(manager, quote, owner_) {}
+    constructor(IPoolManager manager, Currency quote, address owner_, address router_)
+        AsyncSwap(manager, quote, owner_, router_)
+    {}
 
     function validateHookAddress(BaseHook) internal pure override {}
 
@@ -68,7 +70,7 @@ abstract contract Eip712DomainChecks is Test {
     function setUp() public {
         manager = new PoolManager(address(this));
         usdc = new MockERC20("USD Coin", "USDC", 6);
-        hook = new DomainHarness(manager, Currency.wrap(address(usdc)), address(this));
+        hook = new DomainHarness(manager, Currency.wrap(address(usdc)), address(this), address(0xCAFE));
         router =
             new RouterDomainHarness(manager, AsyncSwap(payable(address(hook))), ISignatureTransfer(address(0xBEEF)));
     }

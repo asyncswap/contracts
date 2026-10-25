@@ -115,24 +115,42 @@ contract PriorityFeeOnlyTest is SetupHook {
         assertEq(best, _orderIdFor(bob, true, higher.salt), "the higher bid is first at its price");
     }
 
-    /// An executor that declares a bid and does not pay it cannot finish its unlock.
+    /// @dev A second hook (same permission flags, a high address bit set) whose one trusted swap caller is a
+    ///      custom executor: the bid rules are the hook's own, whoever the trusted caller is.
+    function _hookTrustingExecutor() internal returns (AsyncSwap h, PoolKey memory k, BidSkippingExecutor e) {
+        address at = address(uint160(_hookAddress()) | (uint160(1) << 159));
+        h = AsyncSwap(payable(at));
+        k = PoolKey(key.currency0, key.currency1, key.fee, key.tickSpacing, h);
+        e = new BidSkippingExecutor(manager, h, k);
+        deployCodeTo("AsyncSwap.sol", abi.encode(manager, currency1, address(this), address(e)), at);
+        manager.initialize(k, 2 ** 96);
+        topUp(address(e), 10 ether);
+    }
+
+    /// The hook's trusted caller that declares a bid and does not pay it cannot finish its unlock.
     function test_RevertWhen_ExecutorSkipsTheBid() public {
-        BidSkippingExecutor executor = new BidSkippingExecutor(manager, hook, key);
-        topUp(address(executor), 10 ether);
+        (,, BidSkippingExecutor executor) = _hookTrustingExecutor();
         vm.expectRevert(IPoolManager.CurrencyNotSettled.selector);
         executor.place(false);
     }
 
     function test_customExecutor_canRestOrderWhenBidIsPaid() public {
-        BidSkippingExecutor executor = new BidSkippingExecutor(manager, hook, key);
-        topUp(address(executor), 10 ether);
+        (AsyncSwap h, PoolKey memory k, BidSkippingExecutor executor) = _hookTrustingExecutor();
         executor.place(true);
-        (bool found,, bytes32 id, address maker) = hook.bestOrder(poolId, false);
+        (bool found,, bytes32 id, address maker) = h.bestOrder(k.toId(), false);
         assertTrue(found);
         assertEq(maker, address(executor));
-        assertEq(hook.asyncOrder(poolId, id), 1 ether);
-        assertEq(hook.asyncOrderPriorityFee(poolId, id), 100_000);
-        assertEq(manager.balanceOf(address(hook), currency1.toId()), 100_000);
+        assertEq(h.asyncOrder(k.toId(), id), 1 ether);
+        assertEq(h.asyncOrderPriorityFee(k.toId(), id), 100_000);
+        assertEq(manager.balanceOf(address(h), currency1.toId()), 100_000);
+    }
+
+    /// A custom executor is not the hook's trusted Router: it can't open an order at all.
+    function test_RevertWhen_UntrustedExecutorOpensOrder() public {
+        BidSkippingExecutor executor = new BidSkippingExecutor(manager, hook, key);
+        topUp(address(executor), 10 ether);
+        vm.expectRevert(_notTrustedRouter());
+        executor.place(true);
     }
 
     function test_equalBids_keepSubmissionOrder() public {

@@ -68,14 +68,17 @@ contract HookBalanceIsolationTest is Test {
             Hooks.BEFORE_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG
                 | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
         );
-        deployCodeTo("AsyncSwap.sol", abi.encode(manager, Currency.wrap(address(t1)), address(this)), address(flags));
         AsyncSwap hook = AsyncSwap(payable(address(flags)));
         PoolKey memory key =
             PoolKey(Currency.wrap(address(t0)), Currency.wrap(address(t1)), LPFeeLibrary.DYNAMIC_FEE_FLAG, 1, hook);
+        // The worst case: the self-executing maker is the hook's one trusted swap caller.
+        SelfExecutingMaker d = new SelfExecutingMaker(manager, hook, key);
+        deployCodeTo(
+            "AsyncSwap.sol", abi.encode(manager, Currency.wrap(address(t1)), address(this), address(d)), address(flags)
+        );
         manager.initialize(key, 2 ** 96);
 
         t1.mint(address(hook), 500 ether); // stranded / mistakenly sent tokens
-        SelfExecutingMaker d = new SelfExecutingMaker(manager, hook, key);
         t0.mint(address(d), 1);
         t1.mint(address(d), 100_000);
         t1.mint(address(manager), 500 ether); // reserves allow payout; unpaid output must fail unlock accounting

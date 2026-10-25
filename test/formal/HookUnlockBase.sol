@@ -89,18 +89,21 @@ abstract contract HookUnlockBase is FormalBase, IUnlockCallback {
         return _cat(a, _one(b));
     }
 
-    /// @dev Calls (inside an unlock) that create an order owned by and executed by this contract:
-    ///      `PoolManager.swap` with `UserParams(this, this, ...)`, then settle the ERC20 input, then
-    ///      (if any) pay the priority bid to the hook's credit, exactly as `Router` does. Leaves the
-    ///      pending-match hand-off set; the caller appends `matchNewOrder`.
+    /// @dev Calls (inside an unlock) that create an order owned by this contract and executed by the Router (the
+    ///      hook's one trusted swap caller): authorize the Router, `PoolManager.swap` as the Router with
+    ///      `UserParams(this, router, ...)`, then settle the ERC20 input for the Router, then (if any) pay the priority
+    ///      bid to the hook's credit, exactly as `Router` does. Leaves the pending-match hand-off set to the Router; the
+    ///      caller appends `matchNewOrder` as the Router.
     function _createCalls(PoolKey memory k, bool zeroForOne, uint256 amountIn, uint256 amountOutMin, uint256 bid)
         internal
         view
         returns (Call[] memory cs)
     {
         Currency input = zeroForOne ? k.currency0 : k.currency1;
-        cs = new Call[](bid == 0 ? 4 : 7);
-        cs[0] = _c(
+        cs = new Call[](bid == 0 ? 5 : 8);
+        cs[0] = _c(address(hook), abi.encodeCall(hook.setExecutor, (k.toId(), address(router), true)));
+        cs[1] = _cAs(
+            address(router),
             address(manager),
             abi.encodeCall(
                 manager.swap,
@@ -109,20 +112,20 @@ abstract contract HookUnlockBase is FormalBase, IUnlockCallback {
                     SwapParams(zeroForOne, -int256(amountIn), uint160(2 ** 96)),
                     abi.encode(
                         AsyncSwap.UserParams({
-                            user: address(this), executor: address(this), amountOutMin: amountOutMin, priorityFee: bid
+                            user: address(this), executor: address(router), amountOutMin: amountOutMin, priorityFee: bid
                         })
                     )
                 )
             )
         );
-        cs[1] = _c(address(manager), abi.encodeCall(manager.sync, (input)));
-        cs[2] = _c(Currency.unwrap(input), abi.encodeCall(MockERC20.transfer, (address(manager), amountIn)));
-        cs[3] = _c(address(manager), abi.encodeWithSignature("settle()"));
+        cs[2] = _c(address(manager), abi.encodeCall(manager.sync, (input)));
+        cs[3] = _c(Currency.unwrap(input), abi.encodeCall(MockERC20.transfer, (address(manager), amountIn)));
+        cs[4] = _c(address(manager), abi.encodeCall(manager.settleFor, (address(router))));
         if (bid != 0) {
             Currency num = currency1; // the fixture hook's numeraire (no external call: keeps vm.expectRevert aimed at the unlock)
-            cs[4] = _c(address(manager), abi.encodeCall(manager.sync, (num)));
-            cs[5] = _c(Currency.unwrap(num), abi.encodeCall(MockERC20.transfer, (address(manager), bid)));
-            cs[6] = _c(address(manager), abi.encodeCall(manager.settleFor, (address(hook))));
+            cs[5] = _c(address(manager), abi.encodeCall(manager.sync, (num)));
+            cs[6] = _c(Currency.unwrap(num), abi.encodeCall(MockERC20.transfer, (address(manager), bid)));
+            cs[7] = _c(address(manager), abi.encodeCall(manager.settleFor, (address(hook))));
         }
     }
 

@@ -12,7 +12,9 @@ import {Currency} from "v4-core/types/Currency.sol";
 /// @dev Bypasses hook-address mining only, so the real constructor runs at an arbitrary address, and
 ///      exposes the internal `_domainSeparatorV4`.
 contract CtorHarness is AsyncSwap {
-    constructor(IPoolManager manager, Currency quote, address owner_) AsyncSwap(manager, quote, owner_) {}
+    constructor(IPoolManager manager, Currency quote, address owner_, address router_)
+        AsyncSwap(manager, quote, owner_, router_)
+    {}
 
     function validateHookAddress(BaseHook) internal pure override {}
 
@@ -52,7 +54,7 @@ contract AsyncSwapConstructorFormalTest is Test {
     }
 
     function _deploy(address pm, address num, address owner_) internal returns (bool ok, address a) {
-        try new CtorHarness(IPoolManager(pm), Currency.wrap(num), owner_) returns (CtorHarness h) {
+        try new CtorHarness(IPoolManager(pm), Currency.wrap(num), owner_, address(0xCAFE)) returns (CtorHarness h) {
             return (true, address(h));
         } catch {
             return (false, address(0));
@@ -60,7 +62,7 @@ contract AsyncSwapConstructorFormalTest is Test {
     }
 
     function _newHook(address owner_) internal returns (CtorHarness) {
-        return new CtorHarness(manager, Currency.wrap(address(usdc)), owner_);
+        return new CtorHarness(manager, Currency.wrap(address(usdc)), owner_, address(0xCAFE));
     }
 
     /// @notice formal/Refinement/Swarm/AsyncSwapConstructor.lean:76 — a numeraire without code reverts
@@ -68,14 +70,14 @@ contract AsyncSwapConstructorFormalTest is Test {
     function testFuzz_ctor_invalidNumeraire(address pm, address num, address owner_) public {
         vm.assume(num.code.length == 0);
         vm.expectRevert(AsyncSwap.InvalidNumeraire.selector);
-        new CtorHarness(IPoolManager(pm), Currency.wrap(num), owner_);
+        new CtorHarness(IPoolManager(pm), Currency.wrap(num), owner_, address(0xCAFE));
     }
 
     /// @notice formal/Refinement/Swarm/AsyncSwapConstructor.lean:82 — a numeraire with code and a zero owner
     ///         reverts `ZeroAddress`.
     function testFuzz_ctor_zeroOwner(address pm, uint8 which) public {
         vm.expectRevert(AsyncSwap.ZeroAddress.selector);
-        new CtorHarness(IPoolManager(pm), Currency.wrap(_withCode(which)), address(0));
+        new CtorHarness(IPoolManager(pm), Currency.wrap(_withCode(which)), address(0), address(0xCAFE));
     }
 
     /// @notice formal/Refinement/Swarm/AsyncSwapConstructor.lean:88 — reverts iff the numeraire has no code or

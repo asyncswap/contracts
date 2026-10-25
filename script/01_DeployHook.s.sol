@@ -12,8 +12,8 @@ import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {Currency} from "v4-core/types/Currency.sol";
 import {Hooks} from "v4-core/libraries/Hooks.sol";
 
-/// @notice Deploys the AsyncSwap hook (with the required permission flags + 0x91 prefix) and the
-///         Router, then records both into the deployments registry. Salt mining is offline via FFI
+/// @notice Deploys the Router (the one swap caller the hook accepts) and then the AsyncSwap hook (with the
+///         required permission flags + 0x91 prefix) at the address the Router was built with, then records both into the deployments registry. Salt mining is offline via FFI
 ///         to `script/mine-hook-salt.ts`.
 contract DeployHookScript is FFIHelper {
     IPoolManager manager;
@@ -40,8 +40,11 @@ contract DeployHookScript is FFIHelper {
         // It is intentionally not a user-editable .env value.
         Currency numeraire = Currency.wrap(vm.envAddress("DEPLOY_NUMERAIRE_ADDRESS"));
         require(Currency.unwrap(numeraire).code.length > 0, "Configured USDC must be a deployed token");
+        // The hook trusts only the Router as swap caller, and the Router takes the hook in its constructor: the
+        // Router goes first, as OWNER's next CREATE, pointing at the hook's mined address.
+        address predictedRouter = vm.computeCreateAddress(OWNER, vm.getNonce(OWNER));
         bytes memory creationCode = type(AsyncSwap).creationCode;
-        bytes memory constructorArgs = abi.encode(address(manager), numeraire, OWNER);
+        bytes memory constructorArgs = abi.encode(address(manager), numeraire, OWNER, predictedRouter);
         bytes32 initCodeHash = keccak256(abi.encodePacked(creationCode, constructorArgs));
 
         bytes32 salt = _readSaltEnv();
@@ -59,13 +62,14 @@ contract DeployHookScript is FFIHelper {
         console.log("predicted hook address:", predicted);
 
         vm.startBroadcast(OWNER);
-        hook = new AsyncSwap{salt: salt}(manager, numeraire, OWNER);
+        router = new Router(manager, AsyncSwap(payable(predicted)), ISignatureTransfer(PERMIT2));
+        require(address(router) == predictedRouter, "deployed router address mismatch");
+        hook = new AsyncSwap{salt: salt}(manager, numeraire, OWNER, predictedRouter);
         require(address(hook) == predicted, "deployed hook address mismatch");
         require(hook.owner() == OWNER, "hook owner mismatch");
         // Pools start with a $10 minimum order (DEPLOY_MIN_ORDER_USD), in the numeraire's base units.
         uint256 minOrderUsd = vm.envOr("DEPLOY_MIN_ORDER_USD", uint256(10));
         hook.setDefaultMinOrder(minOrderUsd * 10 ** IERC20Metadata(Currency.unwrap(numeraire)).decimals());
-        router = new Router(manager, hook, ISignatureTransfer(PERMIT2));
         vm.stopBroadcast();
 
         if (!vm.envOr("DEPLOY_DRY_RUN", false)) {

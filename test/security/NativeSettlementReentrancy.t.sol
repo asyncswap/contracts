@@ -142,9 +142,9 @@ contract NativeSettlementReentrancyTest is Test {
             Hooks.BEFORE_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG
                 | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
         );
-        deployCodeTo("AsyncSwap.sol", abi.encode(manager, currency1, address(this)), address(flags));
+        router = new Router(manager, AsyncSwap(payable(address(flags))), ISignatureTransfer(Permit2Bytecode.PERMIT2));
+        deployCodeTo("AsyncSwap.sol", abi.encode(manager, currency1, address(this), address(router)), address(flags));
         hook = AsyncSwap(payable(address(flags)));
-        router = new Router(manager, hook, ISignatureTransfer(Permit2Bytecode.PERMIT2));
 
         key = PoolKey({
             currency0: currency0,

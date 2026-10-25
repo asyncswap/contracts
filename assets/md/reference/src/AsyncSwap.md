@@ -1,6 +1,6 @@
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/961879f26c96b50496eca8bbfc58db86aacc2b9f/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/e31f7066f60bba1d310850060188cecf69bae54c/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -31,6 +31,16 @@ Chain-specific USDC address. Every pool must include this exact currency.
 
 ```solidity
 Currency public immutable numeraire;
+```
+
+### router
+
+The only swap caller the hook accepts, fixed at deployment. Only the Router settles a new order's input
+and hands it to `matchNewOrder`, so an order opened through any other caller would leave the
+transient pending-match id set for the rest of the transaction, and `matchBook` would skip that pool.
+
+```solidity
+address public immutable router;
 ```
 
 ### PENDING_NATIVE_DEPOSIT_SLOT
@@ -124,12 +134,12 @@ Restricts a call to the protocol owner.
 modifier onlyOwner();
 ```
 
-<a id="constructor-ipoolmanager-currency-address" />
+<a id="constructor-ipoolmanager-currency-address-address" />
 
 ### constructor
 
 ```solidity
-constructor(IPoolManager _poolManager, Currency _numeraire, address _owner)
+constructor(IPoolManager _poolManager, Currency _numeraire, address _owner, address _router)
         BaseHook(_poolManager)
         EIP712("AsyncSwap", "1");
 ```
@@ -141,6 +151,7 @@ constructor(IPoolManager _poolManager, Currency _numeraire, address _owner)
 | \_poolManager | `IPoolManager` |  |
 | \_numeraire | `Currency` |  |
 | \_owner | `address` | Explicit protocol owner. Not `msg.sender`: CREATE2 deployments run the<br />constructor from the deterministic deployer, which could never act as owner. |
+| \_router | `address` | The Router, deployed after the hook (it takes the hook in its constructor): pass its<br />predicted address. |
 
 <a id="transferownership-address" />
 
@@ -1111,6 +1122,12 @@ error DynamicFeeRequired();
 
 ```solidity
 error NotSelf();
+```
+
+### NotTrustedRouter
+
+```solidity
+error NotTrustedRouter();
 ```
 
 ## Structs

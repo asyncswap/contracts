@@ -22,7 +22,15 @@ contract RouterCancelWithSigFormalTest is FormalProbesA {
         returns (bytes32)
     {
         return _digest(
-            router.DOMAIN_SEPARATOR(), OrderSignatures.hashCancel(o, _routerOrderId(o), amountIn, nonce, deadline)
+            router.DOMAIN_SEPARATOR(),
+            OrderSignatures.hashCancel(
+                o,
+                _routerOrderId(o),
+                amountIn,
+                hook.orderCreatedSequence(o.key.toId(), _routerOrderId(o)),
+                nonce,
+                deadline
+            )
         );
     }
 
@@ -32,6 +40,7 @@ contract RouterCancelWithSigFormalTest is FormalProbesA {
     }
 
     function _mockInfo(AsyncOrder memory o, uint256 amountIn) internal {
+        _authRouter(o);
         vm.mockCall(
             address(hook),
             abi.encodeCall(AsyncSwap.asyncOrderInfo, (o.key.toId(), _routerOrderId(o))),
@@ -58,7 +67,7 @@ contract RouterCancelWithSigFormalTest is FormalProbesA {
     ) public {
         vm.assume(deadline < type(uint256).max);
         vm.warp(bound(ts, deadline + 1, type(uint256).max));
-        if (used) vm.store(address(router), _cancelNonceSlot(o.owner, nonce), bytes32(uint256(1)));
+        if (used) vm.store(address(hook), _cancelNonceSlot(o.owner, nonce), bytes32(uint256(1)));
         vm.prank(caller);
         vm.expectRevert(Router.SignatureExpired.selector);
         router.cancelWithSig(o, nonce, deadline, sig);
@@ -76,9 +85,10 @@ contract RouterCancelWithSigFormalTest is FormalProbesA {
     ) public {
         ts = bound(ts, 0, deadline);
         vm.warp(ts);
-        vm.store(address(router), _cancelNonceSlot(o.owner, nonce), bytes32(uint256(1)));
+        _authRouter(o);
+        vm.store(address(hook), _cancelNonceSlot(o.owner, nonce), bytes32(uint256(1)));
         vm.prank(caller);
-        vm.expectRevert(Router.NonceAlreadyUsed.selector);
+        vm.expectRevert(AsyncSwap.NonceAlreadyUsed.selector);
         router.cancelWithSig(o, nonce, deadline, sig);
     }
 
@@ -93,6 +103,7 @@ contract RouterCancelWithSigFormalTest is FormalProbesA {
         bytes memory err
     ) public {
         vm.assume(deadline >= block.timestamp);
+        _authRouter(o);
         vm.mockCallRevert(
             address(hook), abi.encodeCall(AsyncSwap.asyncOrderInfo, (o.key.toId(), _routerOrderId(o))), err
         );
@@ -167,7 +178,7 @@ contract RouterCancelWithSigFormalTest is FormalProbesA {
         uint256 pk = _keyed(o, s.pkSeed);
         uint8 b = s.bad & s.noise;
         if (b & 1 == 0) s.deadline = bound(s.deadline, block.timestamp, type(uint256).max);
-        if (b & 2 != 0) vm.store(address(router), _cancelNonceSlot(o.owner, s.nonce), bytes32(uint256(1)));
+        if (b & 2 != 0) vm.store(address(hook), _cancelNonceSlot(o.owner, s.nonce), bytes32(uint256(1)));
         if (b & 4 == 0) s.otherSeed = s.pkSeed;
         if (b & 8 == 0) s.signedAmountIn = s.amountIn;
         if (b & 16 == 0) s.signedNonce = s.nonce;
@@ -175,7 +186,7 @@ contract RouterCancelWithSigFormalTest is FormalProbesA {
         pk;
         _mockInfo(o, s.amountIn);
         bytes memory sig = _sig(_pk(s.otherSeed), _cancelDigest(o, s.signedAmountIn, s.signedNonce, s.signedDeadline));
-        bool freshBefore = vm.load(address(router), _cancelNonceSlot(o.owner, s.nonce)) == bytes32(0);
+        bool freshBefore = vm.load(address(hook), _cancelNonceSlot(o.owner, s.nonce)) == bytes32(0);
         _mockUnlockOk();
         vm.prank(s.caller);
         (bool ok,) = address(router).call(abi.encodeCall(Router.cancelWithSig, (o, s.nonce, s.deadline, sig)));
@@ -190,7 +201,8 @@ contract RouterCancelWithSigFormalTest is FormalProbesA {
     }
 
     /// @notice formal/Refinement/Swarm/RouterCancelWithSig.lean:224 — on success the only write before
-    ///         `unlock` is `cancelNonceUsed[owner][nonce] = true` (fresh before); no transient slot is written.
+    ///         `unlock` is the hook's `nonceUsed[owner][nonce] = true` (fresh before); the Router writes no
+    ///         storage and no transient slot.
     function testFuzz_cancelWithSig_ok_state(
         address caller,
         AsyncOrder memory o,
@@ -208,17 +220,19 @@ contract RouterCancelWithSigFormalTest is FormalProbesA {
         bytes memory sig = _sig(pk, _cancelDigest(o, amountIn, nonce, deadline));
         bytes32 slot = _cancelNonceSlot(o.owner, nonce);
         bytes32 otherSlot = _cancelNonceSlot(otherMaker, otherNonce);
-        bytes32 otherBefore = vm.load(address(router), otherSlot);
+        bytes32 otherBefore = vm.load(address(hook), otherSlot);
         _mockUnlockOk();
         vm.record();
         vm.prank(caller);
         router.cancelWithSig(o, nonce, deadline, sig);
-        (, bytes32[] memory writes) = vm.accesses(address(router));
+        (, bytes32[] memory routerWrites) = vm.accesses(address(router));
+        assertEq(routerWrites.length, 0, "the Router writes no storage");
+        (, bytes32[] memory writes) = vm.accesses(address(hook));
         for (uint256 i; i < writes.length; i++) {
-            assertEq(writes[i], slot, "only cancelNonceUsed[owner][nonce] is written");
+            assertEq(writes[i], slot, "only the hook's nonceUsed[owner][nonce] is written");
         }
-        assertEq(uint256(vm.load(address(router), slot)), 1, "nonce burnt");
-        assertEq(vm.load(address(router), otherSlot), otherBefore, "other nonces unchanged");
+        assertEq(uint256(vm.load(address(hook), slot)), 1, "nonce burnt");
+        assertEq(vm.load(address(hook), otherSlot), otherBefore, "other nonces unchanged");
         // Fresh transaction: USER and FILLER are still 0 (cancelWithSig writes no transient slot).
         _assertTransient(address(0), address(0));
     }
@@ -234,7 +248,7 @@ contract RouterCancelWithSigFormalTest is FormalProbesA {
         bytes memory sig
     ) public {
         vm.warp(ts);
-        vm.store(address(router), _cancelNonceSlot(o.owner, nonce), bytes32(uint256(1)));
+        vm.store(address(hook), _cancelNonceSlot(o.owner, nonce), bytes32(uint256(1)));
         _mockUnlockOk();
         vm.prank(caller);
         (bool ok,) = address(router).call(abi.encodeCall(Router.cancelWithSig, (o, nonce, deadline, sig)));

@@ -135,7 +135,7 @@ contract AsyncSwapMatchAmountsFormalTest is FormalMatchD {
             assertEq(writes.length, 0, "zero spec amount: no hook SSTORE");
         } else {
             assertEq(r.matched, 1, "non-zero spec amounts: _matchPair is true");
-            Op memory last = r.ops[r.ops.length - 1];
+            Op memory last = _matchedOp(r.ops);
             assertEq(last.kind, OP_MATCHED, "match event");
             assertEq(last.amount, r.asset, "assetAmount = spec");
             assertEq(last.amount2, r.quote, "quoteAmount = spec");
@@ -161,7 +161,7 @@ contract AsyncSwapMatchAmountsFormalTest is FormalMatchD {
     function testFuzz_matchAmounts_ok_sound(uint256[6] memory s, bool rb, uint8 flags) public {
         Run memory r = _checkSpec(s, rb, flags);
         if (r.matched == 0) return;
-        Op memory m = r.ops[r.ops.length - 1];
+        Op memory m = _matchedOp(r.ops);
         assertLe(m.amount, r.sell0.amountIn, "asset <= sell escrow");
         assertLe(m.amount2, r.buy0.amountIn, "quote <= buy escrow");
         assertLe(m.amount * r.sell0.amountOutMin, m.amount2 * r.sell0.amountIn, "seller limit");

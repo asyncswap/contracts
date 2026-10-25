@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
+import {ClaimTransfers} from "@async-swap/libraries/ClaimTransfers.sol";
 import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {CurrencySettler} from "@async-swap/libraries/CurrencySettler.sol";
@@ -28,7 +29,6 @@ library AsyncMatching {
     using SafeCast for *;
     using StateLibrary for IPoolManager;
 
-    uint256 private constant PRICE_SCALE = 1e18;
     uint8 public constant MAX_MATCHES_PER_CALL = 8;
 
     struct ReductionParams {
@@ -163,14 +163,16 @@ library AsyncMatching {
         address hook
     ) public returns (uint8 matched) {
         if (maxMatches == 0 || maxMatches > MAX_MATCHES_PER_CALL) revert InvalidMatchBound();
+        ClaimTransfers.Batch memory batch;
         while (matched < maxMatches) {
             (bytes32 bidId, bytes32 askId) = _bookPair(self, book);
             if (bidId == bytes32(0)) break;
-            if (!_matchPair(self, book, key, bidId, askId, hook)) break;
+            if (!_matchPair(self, book, key, bidId, askId, batch)) break;
             unchecked {
                 ++matched;
             }
         }
+        ClaimTransfers.flush(batch, self.poolManager);
     }
 
     function _bookPair(AsyncFiller.State storage self, AsyncFiller.Book storage book)
@@ -184,18 +186,7 @@ library AsyncMatching {
         bidId = book.bestAtPrice(true, bidPrice);
         askId = book.bestAtPrice(false, askPrice);
         if (_crosses(bidPrice, askPrice, self.orders[bidId], self.orders[askId])) return (bidId, askId);
-        // The only ambiguous boundary is a shared bucket. Maximize buy priority among
-        // buys crossing any ask, then sell priority conditional on that selected buy.
-        EligiblePrice.Ratio memory cheapestAsk = book.mostPermissiveAtPrice(false, askPrice);
-        // The head bid is already the highest priority. If it crosses any ask,
-        // retain it rather than traversing its priority tree a second time.
-        if (!EligiblePrice.le(cheapestAsk, AsyncFiller.exactPrice(self.orders[bidId]))) {
-            bidId = book.eligibleAtPrice(true, bidPrice, cheapestAsk);
-            if (bidId == bytes32(0)) return (bytes32(0), bytes32(0));
-        }
-        askId = book.eligibleAtPrice(false, askPrice, AsyncFiller.exactPrice(self.orders[bidId]));
-        // A feasible bid has an eligible ask by the summary invariant. The
-        // match-pair guard also rejects an empty record before any settlement.
+        return (bytes32(0), bytes32(0));
     }
 
     /// @notice Execute an order against active v4 LP positions if they meet the signed minimum.
@@ -261,7 +252,7 @@ library AsyncMatching {
         PoolKey calldata key,
         bytes32 buyId,
         bytes32 sellId,
-        address hook
+        ClaimTransfers.Batch memory batch
     ) private returns (bool) {
         AsyncFiller.OrderInfo storage buy = self.orders[buyId];
         AsyncFiller.OrderInfo storage sell = self.orders[sellId];
@@ -271,11 +262,11 @@ library AsyncMatching {
         AsyncFiller.MatchAmounts memory amounts = _matchAmounts(sell, buy, makerBuy);
         if (amounts.assetAmount == 0 || amounts.quoteAmount == 0) return false;
 
-        // Read who is paid, then reduce both orders before any payout: an ERC20 transfer can run
-        // recipient code, which must find both records already settled.
+        // Capture recipients before reducing the orders. Claim credits are combined and
+        // transferred after the bounded match loop; no underlying token transfer occurs.
         Payouts memory payouts = _payouts(self, key, buyId, sellId);
-        (payouts.sellRefund, payouts.buyRefund) = _reduceMatchedOrders(self, book, key, buyId, sellId, amounts, hook);
-        _settleTransfers(self.poolManager, payouts, amounts, hook);
+        (payouts.sellRefund, payouts.buyRefund) = _reduceMatchedOrders(self, book, key, buyId, sellId, amounts, batch);
+        _settleTransfers(self.poolManager, payouts, amounts, batch);
         emit AsyncOrdersMatched(key.toId(), sellId, buyId, amounts.assetAmount, amounts.quoteAmount);
         return true;
     }
@@ -286,8 +277,9 @@ library AsyncMatching {
         returns (AsyncFiller.MatchAmounts memory amounts)
     {
         if (restingBuy) {
-            amounts.quoteAmount = Math.mulDiv(sell.amountIn, buy.amountIn, buy.amountOutMin);
-            if (amounts.quoteAmount > buy.amountIn) amounts.quoteAmount = buy.amountIn;
+            amounts.quoteAmount = buy.amountOutMin != 0 && sell.amountIn >= buy.amountOutMin
+                ? buy.amountIn
+                : Math.mulDiv(sell.amountIn, buy.amountIn, buy.amountOutMin);
             if (amounts.quoteAmount == 0) return amounts;
             amounts.assetAmount = Math.mulDiv(amounts.quoteAmount, buy.amountOutMin, buy.amountIn, Math.Rounding.Ceil);
             if (amounts.assetAmount > sell.amountIn) return AsyncFiller.MatchAmounts(0, 0);
@@ -295,8 +287,9 @@ library AsyncMatching {
                 Math.mulDiv(amounts.assetAmount, sell.amountOutMin, sell.amountIn, Math.Rounding.Ceil);
             if (amounts.quoteAmount < sellerMinimum) return AsyncFiller.MatchAmounts(0, 0);
         } else {
-            amounts.assetAmount = Math.mulDiv(buy.amountIn, sell.amountIn, sell.amountOutMin);
-            if (amounts.assetAmount > sell.amountIn) amounts.assetAmount = sell.amountIn;
+            amounts.assetAmount = sell.amountOutMin != 0 && buy.amountIn >= sell.amountOutMin
+                ? sell.amountIn
+                : Math.mulDiv(buy.amountIn, sell.amountIn, sell.amountOutMin);
             if (amounts.assetAmount == 0) return amounts;
             amounts.quoteAmount = Math.mulDiv(amounts.assetAmount, sell.amountOutMin, sell.amountIn, Math.Rounding.Ceil);
             if (amounts.quoteAmount > buy.amountIn) return AsyncFiller.MatchAmounts(0, 0);
@@ -322,15 +315,15 @@ library AsyncMatching {
         IPoolManager manager,
         Payouts memory payouts,
         AsyncFiller.MatchAmounts memory amounts,
-        address hook
+        ClaimTransfers.Batch memory batch
     ) private {
-        _transferEscrow(manager, payouts.sellInput, payouts.buyOwner, amounts.assetAmount, hook);
-        _transferEscrow(manager, payouts.buyInput, payouts.sellOwner, amounts.quoteAmount, hook);
+        _transferEscrow(manager, payouts.sellInput, payouts.buyOwner, amounts.assetAmount, batch);
+        _transferEscrow(manager, payouts.buyInput, payouts.sellOwner, amounts.quoteAmount, batch);
         if (payouts.sellRefund != 0) {
-            _transferEscrow(manager, payouts.sellInput, payouts.sellOwner, payouts.sellRefund, hook);
+            _transferEscrow(manager, payouts.sellInput, payouts.sellOwner, payouts.sellRefund, batch);
         }
         if (payouts.buyRefund != 0) {
-            _transferEscrow(manager, payouts.buyInput, payouts.buyOwner, payouts.buyRefund, hook);
+            _transferEscrow(manager, payouts.buyInput, payouts.buyOwner, payouts.buyRefund, batch);
         }
     }
 
@@ -341,22 +334,23 @@ library AsyncMatching {
         bytes32 buyId,
         bytes32 sellId,
         AsyncFiller.MatchAmounts memory amounts,
-        address hook
+        ClaimTransfers.Batch memory batch
     ) private returns (uint256 sellRefund, uint256 buyRefund) {
         sellRefund = _reduceAfterMatch(
-            self, book, key, ReductionParams(sellId, amounts.assetAmount, amounts.quoteAmount), hook
+            self, book, key, ReductionParams(sellId, amounts.assetAmount, amounts.quoteAmount), batch
         );
         buyRefund =
-            _reduceAfterMatch(self, book, key, ReductionParams(buyId, amounts.quoteAmount, amounts.assetAmount), hook);
+            _reduceAfterMatch(self, book, key, ReductionParams(buyId, amounts.quoteAmount, amounts.assetAmount), batch);
     }
 
-    function _transferEscrow(IPoolManager manager, Currency currency, address recipient, uint256 amount, address hook)
-        private
-    {
-        currency.settle(manager, hook, amount, true);
-        // Matching and dust refunds credit claims in every currency. Redemption is
-        // separate, so a token rejection cannot stall other orders in the book.
-        currency.take(manager, recipient, amount, true);
+    function _transferEscrow(
+        IPoolManager manager,
+        Currency currency,
+        address recipient,
+        uint256 amount,
+        ClaimTransfers.Batch memory batch
+    ) private {
+        ClaimTransfers.credit(batch, manager, currency, recipient, amount);
     }
 
     function _reduceAfterMatch(
@@ -364,13 +358,13 @@ library AsyncMatching {
         AsyncFiller.Book storage book,
         PoolKey calldata key,
         ReductionParams memory params,
-        address hook
+        ClaimTransfers.Batch memory batch
     ) private returns (uint256) {
         AsyncFiller.OrderInfo storage info = self.orders[params.id];
         uint256 oldInput = info.amountIn;
         uint256 remainingInput = oldInput - params.inputUsed;
         uint256 oldPriorityFee = info.priorityFee;
-        uint256 unfilledPriorityFee = _settleMatchedPriorityFee(self, key, params.id, params.inputUsed, oldInput, hook);
+        uint256 unfilledPriorityFee = _settleMatchedPriorityFee(self, key, params.id, params.inputUsed, oldInput, batch);
         // The unfilled input keeps the maker's own limit: price improvement on the filled part is
         // not credited against it. Rounding up never asks less than that limit, and leaves a
         // nonzero minimum for any nonzero remainder.
@@ -380,7 +374,7 @@ library AsyncMatching {
         // pool minimum by the order's own terms (no pool price involved); the caller then returns
         // the remaining input after both reductions. Settling the unfilled bid calls no maker code.
         if (remainingInput == 0 || (info.isBuy ? remainingInput : remainingMinimum) < book.minOrder) {
-            AsyncFiller.settlePriorityFee(self, key, params.id, info.owner, unfilledPriorityFee, hook);
+            _creditPriorityFee(self, key, params.id, info.owner, unfilledPriorityFee, batch);
             AsyncFiller._remove(self, book, params.id);
             delete self.orders[params.id];
             return remainingInput;
@@ -389,7 +383,7 @@ library AsyncMatching {
         info.amountIn = remainingInput;
         info.amountOutMin = remainingMinimum;
         info.priorityFee = uint64(unfilledPriorityFee);
-        uint128 updatedPrice = _priceKey(info.isBuy, remainingInput, remainingMinimum);
+        uint128 updatedPrice = AsyncFiller._priceKey(info.isBuy, info.zeroForOne, remainingInput, remainingMinimum);
         bool priceChanged = updatedPrice != info.price;
         if (priceChanged || unfilledPriorityFee != oldPriorityFee) {
             AsyncFiller._remove(self, book, params.id);
@@ -408,7 +402,7 @@ library AsyncMatching {
         bytes32 id,
         uint256 inputUsed,
         uint256 oldInput,
-        address hook
+        ClaimTransfers.Batch memory batch
     ) private returns (uint256 unfilledPriorityFee) {
         AsyncFiller.OrderInfo storage info = self.orders[id];
         // Every stored bid is escrowed; a zero remainder needs no settlement.
@@ -416,25 +410,30 @@ library AsyncMatching {
         if (oldPriorityFee == 0) return 0;
         uint256 filledPriorityFee = Math.mulDiv(oldPriorityFee, inputUsed, oldInput);
         unfilledPriorityFee = oldPriorityFee - filledPriorityFee;
-        // A proportional share is earned only for the input that actually filled. The
-        // donation is in this unlock, so a failed fill reverts the bid settlement too.
-        AsyncFiller.settlePriorityFee(self, key, id, info.owner, filledPriorityFee, hook);
+        // Credit only the share for input that filled. The final claim transfers are in
+        // this unlock, so a failed settlement reverts all matching and credits.
+        _creditPriorityFee(self, key, id, info.owner, filledPriorityFee, batch);
     }
 
-    function _priceKey(bool isBuy, uint256 amountIn, uint256 amountOut) private pure returns (uint128) {
-        uint256 price =
-            isBuy ? Math.mulDiv(amountIn, PRICE_SCALE, amountOut) : Math.mulDiv(amountOut, PRICE_SCALE, amountIn);
-        if (price == 0) return 1;
-        if (price > type(uint128).max) return type(uint128).max;
-        return uint128(price);
+    function _creditPriorityFee(
+        AsyncFiller.State storage self,
+        PoolKey calldata key,
+        bytes32 id,
+        address maker,
+        uint256 amount,
+        ClaimTransfers.Batch memory batch
+    ) private {
+        if (amount == 0) return;
+        ClaimTransfers.credit(batch, self.poolManager, self.numeraire, self.feeVault, amount);
+        emit AsyncFiller.PriorityFeeForfeited(key.toId(), id, maker, amount);
     }
 
     /// @notice Decide whether a buy and a sell order cross, i.e. a price exists that satisfies both
     ///         makers' limits.
-    /// @dev The `uint128` price keys on the book are truncated WAD ratios, so two distinct prices
-    ///      can share a key. Strictly ordered keys decide the result directly, since truncation
-    ///      cannot invert a strict inequality. Equal keys are decided by a full-precision
-    ///      cross-multiply:
+    /// @dev Keys are the floor ticks of the exact limits, ordered by numeraire per asset, so two
+    ///      distinct prices can share a key. Strictly ordered keys decide the result directly,
+    ///      since a monotone key cannot invert a strict inequality. Equal keys are decided by a
+    ///      full-precision cross-multiply:
     ///
     ///      cross  <=>  buyIn/buyOut >= sellOut/sellIn  <=>  buyIn*sellIn >= sellOut*buyOut
     ///             <=>  floor(buyIn*sellIn / sellOut) >= buyOut   (sellOut, buyOut are nonzero).

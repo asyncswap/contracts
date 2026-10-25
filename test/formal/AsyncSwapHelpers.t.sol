@@ -8,7 +8,7 @@ import {RadixPriceTree} from "@async-swap/libraries/RadixPriceTree.sol";
 
 /// @notice Bytecode checks of `formal/Refinement/Swarm/AsyncSwapHelpers.lean`. Library internals run on the
 ///         real library code in a harness (`LibHelpersB.sol`); the private `AsyncFiller._priorityKey`,
-///         `AsyncMatching._crosses` / `_priceKey` are observed on the real hook (stored keys, and whether
+///         `AsyncMatching._crosses` / `AsyncFiller._priceKey` are observed on the real hook (stored keys, and whether
 ///         `matchBook` matches two resting orders), and `RadixPriceTree._bitSet` / `_freeNode` through
 ///         the library's `insert` / `remove` on a harness tree.
 contract AsyncSwapHelpersFormalTest is HookHelpersCasesB {
@@ -175,11 +175,13 @@ contract AsyncSwapHelpersFormalTest is HookHelpersCasesB {
     /// @notice formal/Refinement/Swarm/AsyncSwapHelpers.lean:250 — equal price keys: the buy crosses iff `b.amountIn * s.amountIn / s.amountOutMin >= b.amountOutMin`.
     function testFuzz_crosses_eq(uint256 sIn, uint256 sOut, uint256 bOut, uint256 bIn) public {
         sIn = bound(sIn, 1e6, 1e24);
-        sOut = bound(sOut, sIn / WAD + 1, sIn * 1e6 < 1e24 ? sIn * 1e6 : 1e24); // 1 <= key <= 1e24
-        uint256 k = sOut * WAD / sIn;
+        sOut = bound(sOut, sIn / WAD + 1, sIn * 1e6 < 1e24 ? sIn * 1e6 : 1e24);
+        uint256 k = _expectedPriceKey(false, sIn, sOut);
         bOut = bound(bOut, 1e18, 1e24);
-        // Every bIn here gives the buy the same truncated key k.
-        bIn = bound(bIn, (k * bOut + WAD - 1) / WAD, ((k + 1) * bOut - 1) / WAD);
+        // A buy within one tick of the ask's price; keep the ones that share its tick.
+        uint256 mid = sOut * bOut / sIn;
+        bIn = bound(bIn, mid - mid / 10_000, mid + mid / 10_000);
+        vm.assume(_expectedPriceKey(true, bIn, bOut) == k);
         (,, uint128 sk, uint128 bk) = _restPair(sIn, sOut, bIn, bOut);
         assertEq(uint256(sk), k, "sell key");
         assertEq(bk, sk, "equal keys");
@@ -190,35 +192,39 @@ contract AsyncSwapHelpersFormalTest is HookHelpersCasesB {
 
     // ------------------------------------------------------------ AsyncMatching._priceKey
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapHelpers.lean:279 — `_priceKey(isBuy, a, o)` is the floored `mulDiv(isBuy ? a : o, 1e18, isBuy ? o : a)` clamped into [1, 2^128 - 1] (the stored key of an order a match left partly filled).
+    /// @notice formal/Refinement/Swarm/AsyncSwapHelpers.lean:279 (stale: was the clamped WAD ratio) — `_priceKey(isBuy, zfo, a, o)` is `TickPrice.key`, the v4 floor tick of the exact limit ordered by numeraire per asset (the stored key of an order a match left partly filled).
     function testFuzz_priceKey_eq(uint256 sIn, uint256 sOut, uint256 bOut, uint256 bIn) public {
         (sIn, sOut, bOut, bIn) = _crossingAmounts(sIn, sOut, bOut, bIn);
         _checkPriceKeyAfterMatch(sIn, sOut, bIn, bOut, false);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapHelpers.lean:279 — `_priceKey` saturates at 2^128 - 1: a buy left with 1e30 - 1 input for a minimum of 1.
-    function test_priceKey_eq_clampHigh() public {
+    /// @notice A buy left with 1e30 - 1 input for a minimum of 1 saturated the WAD key at 2^128 - 1; its
+    ///         ratio is inside the v4 range, so it now has its own tick.
+    function test_priceKey_eq_formerHighClamp() public {
         (, bytes32 bidId,,) = _restPair(1, 1, 1e30, 1);
         assertEq(_matchOne(), 1);
         (, uint256 a, uint256 o, uint128 k, bool isBuy,,) = hook.orderBookOrder(poolId, bidId);
         assertTrue(isBuy);
         assertEq(a, 1e30 - 1);
         assertEq(o, 1, "ceil(1 * (1e30 - 1) / 1e30)");
-        assertEq(k, type(uint128).max, "clamped high");
+        assertEq(k, _expectedPriceKey(true, a, o), "tick key");
+        assertLt(k, MAX_PRICE_KEY, "below the top key");
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapHelpers.lean:279 — a ratio that floors to 0 gives key 1: a sell left with ~6.7e29 input for a minimum of 3.
-    function test_priceKey_eq_clampLow() public {
+    /// @notice A sell left with ~6.7e29 input for a minimum of 3 floored the WAD key to 1; its ratio is
+    ///         inside the v4 range, so it now has its own tick.
+    function test_priceKey_eq_formerLowClamp() public {
         (bytes32 askId,,,) = _restPair(1e30, 3, 1, 1);
         assertEq(_matchOne(), 1);
         (, uint256 a, uint256 o, uint128 k, bool isBuy,,) = hook.orderBookOrder(poolId, askId);
         assertFalse(isBuy);
         assertEq(o, 3, "ceil(3 * remIn / 1e30)");
         assertGt(a, 2 * WAD);
-        assertEq(k, 1, "clamped low");
+        assertEq(k, _expectedPriceKey(false, a, o), "tick key");
+        assertGt(k, 1, "above the bottom key");
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapHelpers.lean:296 — the key is always in [1, 2^128 - 1].
+    /// @notice formal/Refinement/Swarm/AsyncSwapHelpers.lean:296 (stale: was [1, 2^128 - 1]) — the key is always in [1, 2 * MAX_TICK + 1].
     function testFuzz_priceKey_range(uint256 sIn, uint256 sOut, uint256 bOut, uint256 bIn) public {
         (sIn, sOut, bOut, bIn) = _crossingAmounts(sIn, sOut, bOut, bIn);
         _checkPriceKeyAfterMatch(sIn, sOut, bIn, bOut, false);

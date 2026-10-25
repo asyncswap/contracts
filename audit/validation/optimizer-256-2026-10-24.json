@@ -1,0 +1,20 @@
+{
+  "optimizer_runs": 256,
+  "runtime_bytes": {
+    "AsyncMatching": 18158,
+    "AsyncSwap": 18484,
+    "Router": 16597,
+    "TickPrice": 2825,
+    "TokenClaims": 1586
+  },
+  "baseline_runs": 43690,
+  "events_match_baseline": true,
+  "receipts": "optimizer-256-receipts-2026-10-24.json",
+  "adopted_as_default": false,
+  "selected_runs": 43690,
+  "full_solidity_tests": {
+    "passed": 859,
+    "failed": 0,
+    "skipped": 1
+  }
+}

@@ -82,7 +82,7 @@ contract AsyncSwapAddOrderFormalTest is FormalSlotsB {
     }
 
     /// @dev The order `addOrder` is called with. `amtKind` mixes raw amounts (zero divisors, mulDiv
-    ///      overflow) with ones at the pre-placed orders' price (1e18), so levels are shared.
+    ///      overflow) with ones at the pre-placed orders' 1:1 ratio (tick zero), so levels are shared.
     function _shape(In memory x) internal pure returns (AsyncFiller.NewOrder memory o) {
         o.id = x.idKind % 4 == 3 && x.nPre % 4 != 0 ? _preId(x.seed, 0) : x.id;
         o.owner = x.owner;
@@ -153,14 +153,14 @@ contract AsyncSwapAddOrderFormalTest is FormalSlotsB {
     }
 
     /// @dev `addOrder_run`'s case split on the pre-state of `a`: the revert data it predicts, or
-    ///      `ok = true`. `_priceKey`'s outcome is its `Math.mulDiv` call's (run in the harness).
+    ///      `ok = true`. The harness evaluates the current tick-price helper, including direction.
     function _predict(AsyncFiller.NewOrder memory o) internal view returns (bool ok, bytes memory err) {
         uint256 fee = o.priorityFee;
         if (fee < _minFee(o)) {
             return (false, abi.encodeWithSelector(AsyncFiller.PriorityFeeTooSmall.selector));
         }
         if (fee > MAX_FEE) return (false, abi.encodeWithSelector(AsyncFiller.PriorityFeeTooLarge.selector));
-        try a.priceKeyMulDiv(o.isBuy, o.amountIn, o.amountOutMin) {}
+        try a.priceKey(o.isBuy, o.zeroForOne, o.amountIn, o.amountOutMin) {}
         catch (bytes memory e) {
             return (false, e);
         }
@@ -218,6 +218,45 @@ contract AsyncSwapAddOrderFormalTest is FormalSlotsB {
         seq = seq0 + 1;
         b.writeThenAppend(PID, o.id, _newOrder(o, p, seq), seq);
         _assertSameStorage();
+    }
+
+    /// @dev These are internal-library boundary cases. Public creation rejects zero amounts.
+    ///      A zero numerator clamps, while a zero denominator panics, independently of isBuy.
+    function test_addOrder_tickDirectionZeroBoundary() public {
+        for (uint256 matching; matching < 2; ++matching) {
+            for (uint256 side; side < 2; ++side) {
+                In memory x;
+                x.id = keccak256(abi.encode("tick-zero", matching, side));
+                x.owner = address(0xBEEF);
+                x.amountIn = 1 ether;
+                x.isBuy = side == 1;
+                x.zeroForOne = true;
+                x.feeKind = 2;
+                _checkRun(x, matching == 1);
+                assertEq(a.order(PID, x.id).price, x.isBuy ? 1_774_545 : 1);
+                x.zeroForOne = false;
+                _checkRun(x, matching == 1);
+                // Pricing fails before sequence increment, even at the sequence boundary.
+                x.seqKind = 2;
+                _checkRun(x, matching == 1);
+            }
+        }
+    }
+
+    /// @dev The old WAD mulDiv overflowed here; tick pricing saturates at the end key.
+    function test_addOrder_tickExtremeRatioClamps() public {
+        for (uint256 matching; matching < 2; ++matching) {
+            In memory x;
+            x.id = keccak256(abi.encode("tick-extreme", matching));
+            x.owner = address(0xBEEF);
+            x.amountIn = type(uint256).max;
+            x.amountOutMin = 1;
+            x.isBuy = true;
+            x.zeroForOne = false;
+            x.feeKind = 2;
+            _checkRun(x, matching == 1);
+            assertEq(a.order(PID, x.id).price, 1_774_545);
+        }
     }
 
     // ================================================================ AsyncFiller.addOrder
@@ -288,7 +327,7 @@ contract AsyncSwapAddOrderFormalTest is FormalSlotsB {
         x.feeKind = 2;
         x.seqKind = 2;
         AsyncFiller.NewOrder memory o = _setup(x, mode);
-        try a.priceKeyMulDiv(o.isBuy, o.amountIn, o.amountOutMin) {}
+        try a.priceKey(o.isBuy, o.zeroForOne, o.amountIn, o.amountOutMin) {}
         catch {
             vm.assume(false); // hypothesis: _priceKey succeeds
         }
@@ -315,7 +354,7 @@ contract AsyncSwapAddOrderFormalTest is FormalSlotsB {
         assertLe(fee, MAX_FEE, "guard 3 passed");
         assertLt(uint256(seq0) + 1, 2 ** 64, "seq fits uint64");
         // _priceKey succeeded (and is pure, so it left storage alone)
-        a.priceKeyMulDiv(o.isBuy, o.amountIn, o.amountOutMin);
+        assertEq(a.order(PID, o.id).price, a.priceKey(o.isBuy, o.zeroForOne, o.amountIn, o.amountOutMin));
         _assertAddState(o, seq0);
     }
 

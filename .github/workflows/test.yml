@@ -37,9 +37,13 @@ jobs:
       - name: Run Forge fmt
         run: forge fmt --check
 
-      # Fails when a contract goes over the EIP-170 limit (24,576 bytes); the hook has little room left.
-      - name: Run Forge build (with contract sizes)
-        run: forge build --sizes
+      # Compile everything, then enforce deployment limits for every artifact owned by src/.
+      # Test harnesses and vendor fixtures (including PoolManager at our optimizer setting)
+      # are not deployed protocol modules; keep their compilation without imposing our size budget.
+      - name: Build and check production contract sizes
+        run: |
+          forge build
+          python3 script/check-contract-sizes.py
 
       # The invariant suites run at the depth MAINNET_READINESS.md records (foundry.toml), failing on any
       # unexpected revert.

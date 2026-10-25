@@ -1,0 +1,100 @@
+{
+  "date": "2026-10-24",
+  "git_head": "961879f26c96b50496eca8bbfc58db86aacc2b9f",
+  "working_tree_changes": true,
+  "compiler": {
+    "solc": "0.8.26",
+    "optimizer_runs": 43690
+  },
+  "audit_2": {
+    "exact_price_priority": "fixed",
+    "reprice_bid_floor": "fixed",
+    "cancellation_revocation_and_incarnation": "fixed"
+  },
+  "solidity": {
+    "passed": 859,
+    "failed": 0,
+    "skipped": 1,
+    "suites": 142,
+    "skip_reason": "Unichain fork requires RPC"
+  },
+  "python": {
+    "passed": 42,
+    "failed": 0
+  },
+  "differential": {
+    "seed": 20261023,
+    "campaigns": 8,
+    "operations": 514,
+    "matches": 128,
+    "state_checks": 8109,
+    "wallet_checks": 8109
+  },
+  "proofs": {
+    "path": "/Users/meek/developer/asyncswap/contracts-validation-proofs/current",
+    "build": "passed",
+    "jobs": 9068,
+    "generation_deterministic": true,
+    "scope": "Focused generated-code properties and capped-fill arithmetic; not end-to-end protocol verification. External helpers remain explicit boundaries.",
+    "historical_source": "/Users/meek/developer/asyncswap/contracts-validation-proofs/formal",
+    "retired_in_commit": "f243b0bb40abeec1734cc1d3eb105c87331038b6"
+  },
+  "runtime_bytes": {
+    "AsyncMatching": 22924,
+    "AsyncSwap": 22229,
+    "Router": 20609,
+    "TickPrice": 3331,
+    "TokenClaims": 2110
+  },
+  "sha256": {
+    "/Users/meek/developer/asyncswap/contracts/src/AsyncSwap.sol": "834b0b0b855931eea63fac48558305f74653b3a2550dd86bbcd8a529e7435d08",
+    "/Users/meek/developer/asyncswap/contracts/src/TokenClaims.sol": "7d087a18c541658df2ebfa2af9469dbc00c1e70b8c7d9c82e58a090a8b2a59fa",
+    "/Users/meek/developer/asyncswap/contracts/src/MatchingEngine.sol": "e6e63450d77a1af80c075eb34d113604734e35d75985b94ab177d58f6d603ddd",
+    "/Users/meek/developer/asyncswap/contracts/src/ImmutableState.sol": "81780a696bbff93efda8c21052c04b2b98cc97fb0af5ca7c23d30a37adcbfb8e",
+    "/Users/meek/developer/asyncswap/contracts/src/NativeClaims.sol": "b02920e5ddb1d06c862a16cf1b4f740e37d23d14159f960e7a5196833e976d7d",
+    "/Users/meek/developer/asyncswap/contracts/src/FeeVault.sol": "7f8ccecc58e131b4b0712ec0721ae7042400ed7073af4017cfad08f2aa9e4bda",
+    "/Users/meek/developer/asyncswap/contracts/src/BatchClaims.sol": "4f6ac06957bf30563359f5834e3a383a094a76f6278e07855098faf1c0785b9d",
+    "/Users/meek/developer/asyncswap/contracts/src/BatchCancels.sol": "5a95537872ff5206f85850a94696db2767039d1b62c7e2ed1ddadc8f6f69d4a9",
+    "/Users/meek/developer/asyncswap/contracts/src/Router.sol": "8b8da44f6ce7607efbc28fa03d3bf16db9bc4f459a8e285845ffb0ed3b3bc0e9",
+    "/Users/meek/developer/asyncswap/contracts/src/BatchActions.sol": "85f3c672fc0774254e01651cd3573d5eaf3aba879d26fa8b15f3a6e642ac8539",
+    "/Users/meek/developer/asyncswap/contracts/src/BaseHook.sol": "e910e8e809f50335b1bd0da2109e417ae87213b517c0d1d8720e3bf0a1259ab9",
+    "/Users/meek/developer/asyncswap/contracts/src/types/AsyncOrder.sol": "9e95ddd736e597cbf4c8dde2145fe86e94bc0d08a1c01215e16a6df1dea256d9",
+    "/Users/meek/developer/asyncswap/contracts/src/libraries/RadixPriceTree.sol": "b2a672b6629caf28aa30df3a727b9026ddf3271ca422623a284f459db525dc53",
+    "/Users/meek/developer/asyncswap/contracts/src/libraries/TickPrice.sol": "04fd6e95e3e9c720c9fc0ad8b555a5842e3d90e1fce0c4d4f525ff70d08c0467",
+    "/Users/meek/developer/asyncswap/contracts/src/libraries/CurrencySettler.sol": "35fa91cd314c39fa825192ab2ceae2561ce14ff6b57a9be09fe4b1c3d652340d",
+    "/Users/meek/developer/asyncswap/contracts/src/libraries/OrderSignatures.sol": "4251e14455028c6d7e42c1eb29e37f8a829555e86ccecf2a360066b2c4bc6a6f",
+    "/Users/meek/developer/asyncswap/contracts/src/libraries/AsyncFiller.sol": "72f3770efadac9b9d389fb51c15807d474ee02667091bb247027a11b17b7b7ae",
+    "/Users/meek/developer/asyncswap/contracts/src/libraries/AsyncMatching.sol": "ac6e7ca4601f2d57bfc125ca5fa1755295b4eef2612f236f65a0f9b18fa4c7c9",
+    "/Users/meek/developer/asyncswap/contracts/src/libraries/EligiblePrice.sol": "aa6b6c739440bdf4ee628b4dd4245db5af168e977380c4d30f1f30a23fd7ace7",
+    "/Users/meek/developer/asyncswap/contracts/src/interfaces/ISignatureTransfer.sol": "fdd4edd4221ad8df5968da0d0f8aed1127e9bfe56bcb1c8cb77ea7e66875f54b",
+    "/Users/meek/developer/asyncswap/contracts/foundry.toml": "c5b5971d9e21a893ff042fe20f57227a92b262bc42f62785f484bf3d8ed2ade4",
+    "/Users/meek/developer/asyncswap/contracts/script/deploy.sh": "17771bc6bf317a0f0dcdbc0076e81056164ee8d697b3b57982eb0d970edcc578",
+    "/Users/meek/developer/asyncswap/contracts/script/00_DeployTickPrice.s.sol": "846f1f5b05a524369bc16a272f7e1b916221f5f88879fc164ce88d42702b3f10",
+    "/Users/meek/developer/mmsaki/uv4/src/uv4/priority_protocol/scenarios.py": "9e40f920d742f1185341859c86861bedd16da06900db474dc114d4ec8a535eb6",
+    "/Users/meek/developer/mmsaki/uv4/src/uv4/priority_protocol/arithmetic.py": "86ef502999e3918cf902974bd7d6fbd7c035c6848772732a7aa297ff042ec833",
+    "/Users/meek/developer/mmsaki/uv4/src/uv4/priority_protocol/ledger.py": "2cc8d1ff0ce081e35a919679eec8e378949b158629e2f1744380d440a734b140",
+    "/Users/meek/developer/mmsaki/uv4/src/uv4/priority_protocol/__init__.py": "f01c19328bd375c0c25f7f818be862e01e8aa9bde432876b75d8a5ae70ace39c",
+    "/Users/meek/developer/mmsaki/uv4/src/uv4/priority_protocol/model.py": "6e04dbf422c0285045c06437dd0a6929d71b45cba819b384d69ac774b77d9c0d",
+    "/Users/meek/developer/mmsaki/uv4/src/uv4/priority_protocol/signatures.py": "8d2a6fdff5e692da93f2a60c3deaf10a3eb12ab8091592c99750713b3201707e",
+    "/Users/meek/developer/mmsaki/uv4/src/uv4/priority_protocol/identity.py": "63dc3a4e452fe132586a1e625c4e28c5a7573b86de50089b82a94062e2a82708",
+    "/Users/meek/developer/asyncswap/contracts-validation-proofs/current/Generated/NativeClaims.lean": "d355517a7417d4db799887b6c2bce212ed603f18e40b4abde957c3aa2f569154",
+    "/Users/meek/developer/asyncswap/contracts-validation-proofs/current/Generated/Router.lean": "60ef196b554fee4eb5d5731edd1cf918ef1d4956c1b10cd2113ae34ed8fd4b21",
+    "/Users/meek/developer/asyncswap/contracts-validation-proofs/current/Generated/TokenClaims.lean": "6c46550a827bd6ab70b3712b6c31a8d5498b284f8f37effca6640fcf5d55e340",
+    "/Users/meek/developer/asyncswap/contracts-validation-proofs/current/Generated/FeeVault.lean": "1b243f730cb853b95693660c5b22971a2e8e38d29cd1dcac062840c13e87698a",
+    "/Users/meek/developer/asyncswap/contracts-validation-proofs/current/Generated/AsyncSwap.lean": "bb018356a6a8a441b2ffa8cded861dea9496e2a1f5ed40e954682c73dd4c317e",
+    "/Users/meek/developer/asyncswap/contracts-validation-proofs/current/Refinement/Settlement.lean": "b81086c39614f7e9961c56e933d55e11a5f4c5e3d927ffdcbf364accb622a3d5",
+    "/Users/meek/developer/asyncswap/contracts-validation-proofs/current/Refinement/Monad.lean": "f6c4485f5925b1e56f420527d21ba82e7e2eaf288ce368a0520026dba1f37036",
+    "/Users/meek/developer/asyncswap/contracts-validation-proofs/current/Refinement/Claims.lean": "2e2f8631fae8691ff87a1256aede3d596b85bdd84939c2df4442ab799dab838b",
+    "/Users/meek/developer/asyncswap/contracts-validation-proofs/current/Refinement/FillCap.lean": "671ec5141c30c35a9c0779c70d6248845a74929f4eebc16c56f06234e46e871d",
+    "/Users/meek/developer/asyncswap/contracts-validation-proofs/current/Refinement/Fees.lean": "7cd2ce915a3c3f126ee42590da04fc43f3989816f96747ccb79ee538490f0acc",
+    "/Users/meek/developer/asyncswap/contracts-validation-proofs/current/Refinement/Cancellation.lean": "bd1a832bbda698b1c3752722be008e33c217841b12405d453aa342ec52857b0d"
+  },
+  "gas_receipts": "matching-receipts-2026-10-24.json",
+  "logs": {
+    "solidity": "/tmp/finish-solidity-verified.log",
+    "python": "/tmp/finish-python-final4.log",
+    "lean": "/tmp/finish-lean-confirm.log",
+    "sizes": "/tmp/finish-protocol-sizes.log",
+    "gas": "/tmp/finish-gas-fixture.log"
+  }
+}

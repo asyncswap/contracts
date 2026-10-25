@@ -4,22 +4,29 @@ import {FormalMatchD} from "../formal/FormalMatchD.sol";
 
 contract EligibleRemainderTest is FormalMatchD {
     function test_refreshWhenPriceKeyAndFeeAreUnchanged() public {
-        uint256 size = 1e21;
-        bytes32 first = _rest(key, alice, true, size, 3, 0);
-        _rest(key, bob, false, 1, size / 3, 0);
+        // A small fill of a large ask: its bid share rounds to zero and the ceiling nudges its
+        // exact ask by about 3e-13, inside its tick.
+        uint256 size = 1e30;
+        uint256 minimum = 3e12 + 1;
+        uint256 quote = 3e6;
+        uint256 asset = quote * size / minimum;
+        bytes32 first = _rest(key, alice, true, size, minimum, 100_000);
+        uint128 tick = _info(poolId, first).price;
+        _rest(key, bob, false, quote, asset, 100_000);
         _run(_matchCalls(key));
-        uint256 remaining = size - size / 3;
+        uint256 remaining = size - asset;
         assertEq(_info(poolId, first).amountIn, remaining);
-        assertEq(_info(poolId, first).amountOutMin, 3);
-        assertEq(_info(poolId, first).priorityFee, 0);
-        assertEq(_info(poolId, first).price, 1);
-        // Ceiling increased its exact ask despite an unchanged bucket, rank and sequence.
-        bytes32 eligible = _rest(key, alice, true, size, 3, 0);
-        bytes32 buy = _rest(key, bob, false, 1, size / 3, 0);
+        assertGt(_info(poolId, first).amountOutMin * size, minimum * remaining, "ceiling raised the exact ask");
+        assertEq(_info(poolId, first).priorityFee, 100_000, "bid unchanged");
+        assertEq(_info(poolId, first).price, tick, "same tick");
+        // The raised exact ask no longer crosses an identical buy, though its tick, rank and
+        // sequence are unchanged; a fresh ask at the original price does.
+        bytes32 eligible = _rest(key, alice, true, size, minimum, 100_000);
+        bytes32 buy = _rest(key, bob, false, quote, asset, 100_000);
         vm.recordLogs();
         _run(_matchCalls(key));
         Op[] memory ops = _ops(vm.getRecordedLogs());
-        Op memory trade = ops[ops.length - 1];
+        Op memory trade = _matchedOp(ops);
         assertEq(trade.kind, OP_MATCHED);
         assertEq(trade.tag, eligible);
         assertEq(trade.tag2, buy);

@@ -32,7 +32,9 @@ contract AsyncSwapUpdatePriceWithSigFormalTest is HookUnlockBase {
     }
 
     function _sig(AsyncOrder memory o, uint256 storedIn, U memory u, uint256 pk) internal view returns (bytes memory) {
-        bytes32 sh = OrderSignatures.hashUpdatePrice(o, _idOf(o), storedIn, u.n, u.nonce, u.deadline);
+        bytes32 sh = OrderSignatures.hashUpdatePrice(
+            o, _idOf(o), storedIn, u.n, hook.orderCreatedSequence(poolId, _idOf(o)), u.nonce, u.deadline
+        );
         (uint8 v, bytes32 r, bytes32 s) =
             vm.sign(pk, keccak256(abi.encodePacked("\x19\x01", hook.DOMAIN_SEPARATOR(), sh)));
         return abi.encodePacked(r, s, v);

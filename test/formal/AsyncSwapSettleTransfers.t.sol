@@ -1,16 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
+import {IERC6909Claims} from "v4-core/interfaces/external/IERC6909Claims.sol";
 
 import {FormalMatchD} from "./FormalMatchD.sol";
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {Currency} from "v4-core/types/Currency.sol";
 
-/// @notice Bytecode checks of `formal/Refinement/Swarm/AsyncSwapSettleTransfers.lean`. `_settleTransfers` is
-///         private; `_matchPair` runs it once per matched pair, reached through `matchBook(key, 1)`
-///         (`FormalMatchD`), after both orders are reduced. Its effects are the four PoolManager events
-///         just before the match event. The sides
-///         are read from the stored orders: the sell is alice's `zeroForOne` order (input currency0), the
-///         buy is bob's (input currency1, the numeraire).
+/// @notice Runtime checks for direct ERC-6909 claim settlement, event order, and failure rollback.
 contract AsyncSwapSettleTransfersFormalTest is FormalMatchD {
     function _reason(uint256 tag) internal pure returns (bytes memory) {
         return abi.encodeWithSignature("MockedPoolManagerCall(uint256)", tag);
@@ -21,7 +17,7 @@ contract AsyncSwapSettleTransfersFormalTest is FormalMatchD {
         return zeroForOne ? c.k.currency0 : c.k.currency1;
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapSettleTransfers.lean:57 — the asset leg (sell input → buy owner, assetAmount), then the quote leg (buy input → sell owner, quoteAmount), with parties and currencies read at entry.
+    /// @notice Check the direct claim-transfer path and its observable result.
     function testFuzz_settleTransfers_run(uint256[6] memory s, uint8 flags) public {
         Case memory c = _mkCase(s, flags);
         Run memory r = _exec(c);
@@ -34,7 +30,7 @@ contract AsyncSwapSettleTransfersFormalTest is FormalMatchD {
         assertEq(r.sell0.owner, alice);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapSettleTransfers.lean:79 — it reverts exactly when the asset leg reverts, or that leg succeeds and the quote leg reverts, each with its own reason.
+    /// @notice Check the direct claim-transfer path and its observable result.
     function testFuzz_settleTransfers_reverts_iff(uint256[6] memory s, uint8 flags, uint8 mode, uint256 tag) public {
         Case memory c = _mkCase(s, flags);
         (bool matches, uint256 asset, uint256 quote) = _pre(c);
@@ -50,40 +46,37 @@ contract AsyncSwapSettleTransfersFormalTest is FormalMatchD {
         }
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapSettleTransfers.lean:104 — success is exactly four PoolManager calls in order: burn(hook, sellInput, asset), payout of asset to the buyer, burn(hook, buyInput, quote), payout of quote to the seller; each burn equals the payout in the same currency.
+    /// @notice Check the direct claim-transfer path and its observable result.
     function testFuzz_settleTransfers_ok(uint256[6] memory s, uint8 flags) public {
         Case memory c = _mkCase(s, flags);
         Run memory r = _exec(c);
         if (r.matched == 0) return;
-        assertGe(r.ops.length, 5);
         Op[] memory legs = _legsOf(r.ops);
-        assertEq(legs[0].kind, OP_BURN);
-        assertEq(legs[2].kind, OP_BURN);
-        assertEq(legs[0].cur, _inputOf(c, true).toId(), "asset leg burns the sell input");
-        assertEq(legs[2].cur, _inputOf(c, false).toId(), "quote leg burns the buy input");
+        assertEq(legs.length, 2);
+        assertEq(legs[0].kind, OP_TRANSFER);
+        assertEq(legs[1].kind, OP_TRANSFER);
+        assertEq(legs[0].cur, _inputOf(c, true).toId());
+        assertEq(legs[1].cur, _inputOf(c, false).toId());
         assertEq(legs[0].amount, r.asset);
-        assertEq(legs[2].amount, r.quote);
-        assertEq(legs[1].amount, legs[0].amount, "asset burned = asset paid");
-        assertEq(legs[3].amount, legs[2].amount, "quote burned = quote paid");
-        assertEq(legs[1].who, bob, "asset to the buyer");
-        assertEq(legs[3].who, alice, "quote to the seller");
-        // the ops before the legs belong to `_reduceMatchedOrders`, the last one is the match event
+        assertEq(legs[1].amount, r.quote);
+        assertEq(legs[0].who, bob);
+        assertEq(legs[1].who, alice);
         Trace memory t = _newTrace();
         _escrowLeg(t, c.k.currency0, bob, r.asset);
         _escrowLeg(t, c.k.currency1, alice, r.quote);
         _assertOps(legs, _done(t));
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapSettleTransfers.lean:132 — `self.poolManager` is unchanged by the first leg, so both legs go to the same PoolManager.
+    /// @notice Check the direct claim-transfer path and its observable result.
     function testFuzz_settleTransfers_ok_same_manager(uint256[6] memory s, uint8 flags) public {
         Case memory c = _mkCase(s, flags);
         (bool matches, uint256 asset, uint256 quote) = _pre(c);
         if (!matches) return;
         (IPoolManager pm0,,) = hook.asyncOrders(c.pid);
         assertEq(address(pm0), address(manager));
-        // both legs' burns are calls to that one PoolManager
-        vm.expectCall(address(manager), abi.encodeCall(IPoolManager.burn, (address(hook), c.k.currency0.toId(), asset)));
-        vm.expectCall(address(manager), abi.encodeCall(IPoolManager.burn, (address(hook), c.k.currency1.toId(), quote)));
+        // Both claim transfers use the configured PoolManager.
+        vm.expectCall(address(manager), abi.encodeCall(IERC6909Claims.transfer, (bob, c.k.currency0.toId(), asset)));
+        vm.expectCall(address(manager), abi.encodeCall(IERC6909Claims.transfer, (alice, c.k.currency1.toId(), quote)));
         Run memory r = _exec(c);
         assertEq(r.matched, 1);
         (IPoolManager pm1,,) = hook.asyncOrders(c.pid);

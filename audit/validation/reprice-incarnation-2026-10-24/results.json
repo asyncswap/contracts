@@ -1,0 +1,38 @@
+{
+  "date": "2026-10-24",
+  "regression": "unused signed price change rejected after same-ID recreation; fresh signature accepted with same nonce",
+  "before_fix": "regression failed in Solidity, Huff, and Python because the old signature was accepted",
+  "solidity": {
+    "passed": 860,
+    "failed": 0,
+    "skipped": 1
+  },
+  "huff_current": {
+    "passed": 238,
+    "failed": 0,
+    "skipped": 1,
+    "excluded": "test/formal/** historical fixtures"
+  },
+  "python_passed": 43,
+  "shared_vectors": {
+    "stateful_campaigns": 8,
+    "operations": 514,
+    "matches": 128,
+    "matching_vectors": 100,
+    "huff_tick_vectors": 174
+  },
+  "lean_build": "passed; generated encoder binds sequence; distinct-sequence preimages differ, cryptographic assumptions remain external",
+  "sha256": {
+    "/Users/meek/developer/asyncswap/contracts/src/AsyncSwap.sol": "f35084163c3d83619e165b9c160c324f9f7ca750562195543c640588ed74f847",
+    "/Users/meek/developer/asyncswap/contracts/src/libraries/OrderSignatures.sol": "de8b02c38fecfd72938407d29041e0b0ec274a90667b5078ec693e2b4e247828",
+    "/Users/meek/developer/asyncswap/contracts/test/SignedOrders.t.sol": "0f3509379a1909019f965f3bcec30b3413423c298b3579ca76927738108846a9",
+    "/Users/meek/developer/asyncswap/v2-raff/src/AsyncSwap.huff": "0fae529c473e26eafd3793d5643cce4f46808c40bc43afcd3cb3ac3422f2b250",
+    "/Users/meek/developer/asyncswap/v2-raff/test/utils/OrderSignatures.sol": "213982b36a5697cb648accbe96a73cce76378af12122e56351ed076aef8605c3",
+    "/Users/meek/developer/asyncswap/v2-raff/test/SignedOrders.t.sol": "671501206aac612a9237ba60c53634418ec4ea1a532ed937df5b3579a862a4ea",
+    "/Users/meek/developer/mmsaki/uv4/src/uv4/priority_protocol/signatures.py": "a9fbd95821dc9e6c67594d13311c2f101c59eb7e3871e5a7e6fd379f20641573",
+    "/Users/meek/developer/mmsaki/uv4/tests/priority_protocol/test_protocol.py": "8aeaac8c5b3f69c764859bb4fc14c9c3d71669e95cfb4c7b1c37e02c342287eb",
+    "/Users/meek/developer/mmsaki/uv4/examples/export_priority_vectors.py": "aa65cec744e2e93a6bf6e9816d5843aa1395bef6ff0c9e4fe3baae93d27930a3",
+    "/Users/meek/developer/asyncswap/contracts-validation-proofs/current/Generated/AsyncSwap.lean": "54f095f53ee415253e7c496fb752c43a4eb10635d3fa1a2c32a4d201de0956d9",
+    "/Users/meek/developer/asyncswap/contracts-validation-proofs/current/Refinement/Repricing.lean": "8aa5a3102fd12683aef8bb6a711bce07e3960e8d3d9520f442f7a926455da6fa"
+  }
+}

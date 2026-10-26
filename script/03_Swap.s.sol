@@ -96,7 +96,7 @@ contract SwapScript is FFIHelper {
 
     /// @dev Find the `AsyncOrderCreated` log in the broadcast and return the salt
     ///      from its data field. Layout matches the event signature in AsyncFiller.
-    function _extractSalt() private returns (bytes32) {
+    function _extractSalt() private view returns (bytes32) {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bytes32 sig = AsyncFiller.AsyncOrderCreated.selector;
         for (uint256 i = logs.length; i > 0; i--) {

@@ -18,11 +18,11 @@ contract AsyncSwapReduceMatchedOrdersFormalTest is FormalMatchD {
         returns (Op[] memory)
     {
         Trace memory t = _newTrace();
-        _reduceOps(t, c, id, sell ? r.sell0 : r.buy0, used);
+        _reduceOps(t, _newTrace(), c, id, sell ? r.sell0 : r.buy0, used); // the notices; credits are batched
         return _done(t);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapReduceMatchedOrders.lean:68 — the reduction of the sell order (asset in, quote out) followed by that of the buy order (quote in, asset out), sides and input currencies read at entry; nothing else.
+    /// @notice formal/Refinement/Swarm/AsyncSwapReduceMatchedOrders.lean:68 — the reduction of the sell order (asset in, quote out) followed by that of the buy order (quote in, asset out), sides and input currencies read at entry; nothing else. Each reduction also credits the FeeVault its matched input-fee share in its input currency and keeps the rest in `inputFee`. (semantics changed by the 0.03% trade fee; Lean statement needs updating)
     function testFuzz_reduceMatchedOrders_eq(uint256[6] memory s, uint8 flags) public {
         Case memory c = _mkCase(s, flags | 4 | 16 | 32);
         Run memory r = _exec(c);
@@ -39,7 +39,7 @@ contract AsyncSwapReduceMatchedOrdersFormalTest is FormalMatchD {
         _assertReductions(c, r);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapReduceMatchedOrders.lean:127 — the call succeeds exactly when the sell reduction succeeds and then the buy reduction succeeds (a PoolManager call of the buy reduction is mocked to revert).
+    /// @notice formal/Refinement/Swarm/AsyncSwapReduceMatchedOrders.lean:127 — the call succeeds exactly when the sell reduction succeeds and then the buy reduction succeeds (a PoolManager call of the buy reduction is mocked to revert). The mocked FeeVault numeraire credit now also carries the buy side's input-fee share. (semantics changed by the 0.03% trade fee; Lean statement needs updating)
     function testFuzz_reduceMatchedOrders_ok_iff(uint256[6] memory s, uint8 flags, bool failBuy, uint256 tag) public {
         Case memory c = _mkCase(s, flags);
         if (!failBuy) {
@@ -55,6 +55,7 @@ contract AsyncSwapReduceMatchedOrdersFormalTest is FormalMatchD {
         AsyncFiller.OrderInfo memory buy0 = _info(c.pid, c.buyId);
         uint256 fees = (_closes(sell0, asset) ? _paid(sell0) : _filled(sell0, asset))
             + (_closes(buy0, quote) ? _paid(buy0) : _filled(buy0, quote));
+        fees += _filledFee(buy0, quote); // the buy pays its input fee in the numeraire too
         if (fees == 0) return;
         address vault = address(hook.feeVault());
         uint256 vaultBefore = _claims(vault, currency1);

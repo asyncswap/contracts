@@ -52,7 +52,7 @@ contract AsyncSwapAsyncOrderInfoFormalTest is FormalSlotsB {
         uint256 amt = bound(amountIn, 2, 50 ether);
         (, bytes32 id) = _placeOrder(alice, true, amt, amt / 2);
         (a, b) = hook.asyncOrderInfo(poolId, id);
-        assertEq(a, amt);
+        assertEq(a, _inNet(amt), "the deposit net of the input fee");
         assertEq(b, amt / 2);
     }
 

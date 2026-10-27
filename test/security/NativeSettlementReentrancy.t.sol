@@ -7,6 +7,7 @@ import {AsyncSwap} from "@async-swap/AsyncSwap.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {Router} from "@async-swap/Router.sol";
 import {MockERC20} from "../utils/MockERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Test} from "forge-std/Test.sol";
 import {PoolManager} from "v4-core/PoolManager.sol";
 import {Currency, IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
@@ -167,6 +168,11 @@ contract NativeSettlementReentrancyTest is Test {
             );
     }
 
+    /// @dev A deposit's input net of the maker's 0.03% fee: what a filler receives and asks for.
+    function _net(uint256 amountIn) internal pure returns (uint256) {
+        return amountIn - Math.mulDiv(amountIn, 3, 10_000, Math.Rounding.Ceil);
+    }
+
     /* ------------------------------------------------------------------ *
      *  Reentrancy on native-OUTPUT fill (maker receives ETH)             *
      * ------------------------------------------------------------------ */
@@ -187,7 +193,7 @@ contract NativeSettlementReentrancyTest is Test {
             key: key,
             owner: address(maker),
             zeroForOne: false,
-            amountIn: amountIn,
+            amountIn: _net(amountIn),
             amountOutMin: amountOutMin,
             priorityFee: 100_000,
             sqrtPrice: 2 ** 96,
@@ -310,6 +316,7 @@ contract NativeSettlementReentrancyTest is Test {
         );
         vm.stopPrank();
         order.salt = _expectedSalt(alice, amountIn, amountOutMin);
+        order.amountIn = _net(amountIn);
 
         uint256 aliceEthBefore = alice.balance;
         uint256 fee = hook.calculatePoolFee(order.key.fee, amountOutMin);

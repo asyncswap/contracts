@@ -7,6 +7,7 @@ import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {Hooks} from "v4-core/libraries/Hooks.sol";
 import {PoolModifyLiquidityTest} from "v4-core/test/PoolModifyLiquidityTest.sol";
 import {ModifyLiquidityParams} from "v4-core/types/PoolOperation.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @notice Shared scaffold for the bytecode checks of Formal Mind's Lean theorems (`formal/Refinement`).
 ///         Each test in `test/formal/` states one theorem's single-call outcome on the compiled
@@ -110,6 +111,16 @@ contract FormalBase is SetupHook {
             sqrtPrice: 2 ** 96,
             salt: bytes32(0)
         });
+    }
+
+    /// @dev The maker's 0.03% input fee set aside from a `deposit` at order creation, rounded up.
+    function _inFee(uint256 deposit) internal pure returns (uint256) {
+        return Math.mulDiv(deposit, 3, 10_000, Math.Rounding.Ceil);
+    }
+
+    /// @dev The order's stored (net) `amountIn` for a `deposit`: what the book and fillers trade.
+    function _inNet(uint256 deposit) internal pure returns (uint256) {
+        return deposit - _inFee(deposit);
     }
 
     /// @dev Submit an order through the Router and return it with the hook-assigned salt, plus its id.

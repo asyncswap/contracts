@@ -8,6 +8,7 @@ import {AsyncOrder} from "src/types/AsyncOrder.sol";
 import {AsyncFiller} from "src/libraries/AsyncFiller.sol";
 import {ISignatureTransfer} from "src/interfaces/ISignatureTransfer.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {Hooks} from "v4-core/libraries/Hooks.sol";
@@ -75,6 +76,11 @@ contract UnichainForkTest is Test {
         order.salt = keccak256(abi.encode(block.timestamp, block.number, address(MANAGER), actor, amount, minimum, bid));
     }
 
+    /// @dev The deposit whose input after the maker's 0.03% fee is exactly `net`.
+    function _gross(uint256 net) internal pure returns (uint256) {
+        return Math.mulDiv(net, 10_000, 9_997, Math.Rounding.Ceil);
+    }
+
     function _remaining(AsyncOrder memory order) internal view returns (uint256) {
         return hook.asyncOrder(
             key.toId(), keccak256(abi.encode(block.chainid, key.toId(), order.owner, order.zeroForOne, order.salt))
@@ -84,20 +90,26 @@ contract UnichainForkTest is Test {
     function testFork_nativeUsdcMatchAndCancelResidual() public {
         uint256 quoteBefore = IERC20(USDC).balanceOf(seller);
         uint256 ethBefore = buyer.balance;
-        AsyncOrder memory ask = _submit(seller, true, 2 ether, 5_000e6, 100_000);
-        _submit(buyer, false, 2_500e6, 1 ether, 100_000);
+        // Both sides deposit enough that their net inputs cross exactly at 2,500 USDC per ETH.
+        uint256 askDeposit = _gross(2 ether);
+        uint256 askFee = askDeposit - 2 ether;
+        AsyncOrder memory ask = _submit(seller, true, askDeposit, 5_000e6, 100_000);
+        _submit(buyer, false, _gross(2_500e6), 1 ether, 100_000);
         assertEq(IERC20(USDC).balanceOf(seller), quoteBefore - 100_000);
         assertEq(MANAGER.balanceOf(seller, uint160(USDC)), 2_500e6);
         assertEq(buyer.balance, ethBefore);
         assertEq(MANAGER.balanceOf(buyer, 0), 1 ether);
         assertEq(_remaining(ask), 1 ether);
-        assertEq(MANAGER.balanceOf(address(hook), 0), 1 ether);
+        // Half the ask filled, so half its input fee (rounded down) went to the vault.
+        uint256 filledFee = askFee / 2;
+        assertEq(MANAGER.balanceOf(address(hook.feeVault()), 0), filledFee);
+        assertEq(MANAGER.balanceOf(address(hook), 0), 1 ether + askFee - filledFee);
         vm.prank(seller);
         router.cancelOrder(ask);
         assertEq(_remaining(ask), 0);
         assertEq(MANAGER.balanceOf(address(hook), 0), 0);
         assertEq(MANAGER.balanceOf(address(hook), uint160(USDC)), 0);
-        assertEq(seller.balance + MANAGER.balanceOf(seller, 0), 99 ether);
+        assertEq(seller.balance + MANAGER.balanceOf(seller, 0), 99 ether - filledFee);
     }
 
     function testFork_priorityBidNonRefundableWithoutActiveLp() public {
@@ -115,9 +127,9 @@ contract UnichainForkTest is Test {
         for (uint256 i; i < 10; ++i) {
             address actor = address(uint160(0xB000 + i));
             _fund(actor);
-            _submit(actor, true, 1 ether, 2_500e6, 100_000);
+            _submit(actor, true, _gross(1 ether), 2_500e6, 100_000);
         }
-        AsyncOrder memory bid = _submit(buyer, false, 25_000e6, 10 ether, 100_000);
+        AsyncOrder memory bid = _submit(buyer, false, _gross(25_000e6), 10 ether, 100_000);
         assertEq(buyer.balance + MANAGER.balanceOf(buyer, 0), 108 ether);
         assertEq(_remaining(bid), 5_000e6);
         vm.prank(makeAddr("permissionless keeper"));

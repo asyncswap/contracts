@@ -17,7 +17,7 @@ flowchart TD
     I -- "No" --> Z["Order closed; return unused input if any"]
     I -- "Yes" --> J["Try remaining input against pool liquidity"]
     J --> K{"Full remaining input consumed and minimum output met?"}
-    K -- "Yes" --> L["Settle pool fill; 30 bps LP fee; settle remaining bid"]
+    K -- "Yes" --> L["Settle pool fill; 0.02% LP fee + 0.01% protocol fee; settle remaining bid"]
     L --> Z
     K -- "No / attempt reverts" --> M["Roll back LP attempt only; keep remaining order open"]
     M -- "New crossing order or Router.matchBook" --> N["Bounded book matching; partial fills can remain open"]

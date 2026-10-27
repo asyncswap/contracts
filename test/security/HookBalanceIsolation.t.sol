@@ -31,25 +31,28 @@ contract SelfExecutingMaker {
         pm.unlock(abi.encode(amountOutMin));
     }
 
+    /// @dev Large enough that the deposit's net of the 0.03% input fee is nonzero.
+    uint256 constant DEPOSIT = 10_000;
+
     function unlockCallback(bytes calldata data) external returns (bytes memory) {
         uint256 amountOutMin = abi.decode(data, (uint256));
         pm.swap(
             key,
-            SwapParams(true, -1, 4295128740),
+            SwapParams(true, -int256(DEPOSIT), 4295128740),
             abi.encode(
                 AsyncSwap.UserParams({
                     user: address(this), executor: address(this), amountOutMin: amountOutMin, priorityFee: 100_000
                 })
             )
         );
-        key.currency0.settle(pm, address(this), 1, false);
+        key.currency0.settle(pm, address(this), DEPOSIT, false);
         pm.sync(key.currency1);
         MockERC20(Currency.unwrap(key.currency1)).transfer(address(pm), 100_000);
         pm.settleFor(address(hook));
         bytes32 salt = keccak256(
-            abi.encode(block.timestamp, block.number, address(pm), address(this), uint256(1), amountOutMin, 100_000)
+            abi.encode(block.timestamp, block.number, address(pm), address(this), DEPOSIT, amountOutMin, 100_000)
         );
-        AsyncOrder memory o = AsyncOrder(key, address(this), true, 1, amountOutMin, 100_000, 0, salt);
+        AsyncOrder memory o = AsyncOrder(key, address(this), true, DEPOSIT, amountOutMin, 100_000, 0, salt);
         // Without pre-settling output, the hook must not pay it from its own token balance.
         hook.executeOrder(o, abi.encode(address(this)));
         return "";
@@ -79,7 +82,7 @@ contract HookBalanceIsolationTest is Test {
         manager.initialize(key, 2 ** 96);
 
         t1.mint(address(hook), 500 ether); // stranded / mistakenly sent tokens
-        t0.mint(address(d), 1);
+        t0.mint(address(d), 10_000);
         t1.mint(address(d), 100_000);
         t1.mint(address(manager), 500 ether); // reserves allow payout; unpaid output must fail unlock accounting
 

@@ -274,7 +274,7 @@ contract RouterCancelWithSigFormalTest is FormalProbesA {
         token0.approve(address(router), type(uint256).max);
         (AsyncOrder memory o,) = _placeOrder(maker, true, 1 ether, 0.9 ether);
         uint256 deadline = block.timestamp + 1 hours;
-        bytes memory sig = _sig(pk, _cancelDigest(o, 1 ether, nonce, deadline));
+        bytes memory sig = _sig(pk, _cancelDigest(o, _inNet(1 ether), nonce, deadline)); // signs the stored (net) amountIn
         vm.prank(relayer);
         router.cancelWithSig(o, nonce, deadline, sig);
 

@@ -211,7 +211,8 @@ contract MatchingInvariantTest is StdInvariant, Test {
         (bytes32[] memory ids, bool[] memory sells) = handler.book();
         for (uint256 i; i < ids.length; ++i) {
             bytes32 orderId = ids[i];
-            uint256 remaining = hook.asyncOrder(key.toId(), orderId);
+            // The open net input plus the maker's still-escrowed 0.03% input fee reserve.
+            uint256 remaining = hook.asyncOrder(key.toId(), orderId) + hook.asyncOrderInputFee(key.toId(), orderId);
             if (sells[i]) ethOwed += remaining;
             else usdcOwed += remaining;
             usdcOwed += hook.asyncOrderPriorityFee(key.toId(), orderId);
@@ -328,7 +329,11 @@ contract LpMatchingInvariantTest is MatchingInvariantTest {
         assertGe(manager.balanceOf(buyer, 0), 1 ether, "buyer receives native output as claims");
 
         handler.submit(2, true, 1 ether, 3_000e6, 0);
-        assertEq(hook.asyncOrder(key.toId(), handler.id(handler.orderAt(2))), 1 ether, "sell above spot rests");
+        // The resting order holds its net input; the 0.03% maker fee is reserved beside it.
+        bytes32 rested = handler.id(handler.orderAt(2));
+        uint256 fee = AsyncFiller.tradeFee(1 ether);
+        assertEq(hook.asyncOrder(key.toId(), rested), 1 ether - fee, "sell above spot rests");
+        assertEq(hook.asyncOrderInputFee(key.toId(), rested), fee, "its fee reserve is escrowed in full");
     }
 
     /// @dev With LPs in the pool the manager also holds pool reserves, so native claims are a
@@ -355,7 +360,9 @@ contract LpMatchingInvariantTest is MatchingInvariantTest {
         (bytes32[] memory ids, bool[] memory sells) = handler.book();
         for (uint256 i; i < ids.length; ++i) {
             bytes32 orderId = ids[i];
-            if (!sells[i]) usdcOwed += hook.asyncOrder(key.toId(), orderId);
+            if (!sells[i]) {
+                usdcOwed += hook.asyncOrder(key.toId(), orderId) + hook.asyncOrderInputFee(key.toId(), orderId);
+            }
             usdcOwed += hook.asyncOrderPriorityFee(key.toId(), orderId);
         }
         assertEq(manager.balanceOf(address(hook), uint160(address(usdc))), usdcOwed);

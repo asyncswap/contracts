@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import {SetupHook} from "./SetupHook.t.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Permit2Bytecode} from "./utils/Permit2Bytecode.sol";
 import {AsyncSwap} from "@async-swap/AsyncSwap.sol";
 import {Router} from "@async-swap/Router.sol";
@@ -58,6 +59,11 @@ contract SignedOrdersTest is SetupHook {
             sqrtPrice: 2 ** 96,
             salt: bytes32(0)
         });
+    }
+
+    /// @dev The order's stored input: the deposit less the maker's 0.03% input fee (rounded up).
+    function _liveIn() internal pure returns (uint256) {
+        return AMOUNT_IN - Math.mulDiv(AMOUNT_IN, 3, 10_000, Math.Rounding.Ceil);
     }
 
     function _sign(bytes32 digest) internal view returns (bytes memory) {
@@ -158,7 +164,8 @@ contract SignedOrdersTest is SetupHook {
         AsyncOrder memory order = _createSigned();
 
         (uint256 storedIn, uint256 storedOutMin) = hook.asyncOrderInfo(poolId, _id(order));
-        assertEq(storedIn, AMOUNT_IN, "amountIn escrowed");
+        assertEq(storedIn, _liveIn(), "amountIn escrowed");
+        assertEq(hook.asyncOrderInputFee(poolId, _id(order)), AMOUNT_IN - _liveIn(), "input fee escrowed");
         assertEq(storedOutMin, AMOUNT_OUT_MIN, "amountOutMin stored");
         assertEq(token0.balanceOf(maker), makerBefore - AMOUNT_IN, "input pulled via Permit2");
         assertTrue(hook.isExecutor(poolId, maker, address(router)), "router authorized by signed grant");
@@ -172,7 +179,7 @@ contract SignedOrdersTest is SetupHook {
         router.swapWithSig(order, permit, _noGrant());
         bytes32 id = _orderIdFor(maker, true, _expectedSalt(maker, AMOUNT_IN, 0.9 ether));
         (uint256 storedIn,) = hook.asyncOrderInfo(poolId, id);
-        assertEq(storedIn, AMOUNT_IN, "second order without grant");
+        assertEq(storedIn, _liveIn(), "second order without grant");
     }
 
     function test_swapWithSig_revertsWithoutExecutorGrant() public {
@@ -205,6 +212,8 @@ contract SignedOrdersTest is SetupHook {
 
     function test_swapWithSig_thenFill() public {
         AsyncOrder memory order = _createSigned();
+        // The filler accepts the order's live (net) input.
+        order.amountIn = _liveIn();
         uint256 makerOutBefore = token1.balanceOf(maker);
 
         vm.startPrank(bob);
@@ -225,7 +234,7 @@ contract SignedOrdersTest is SetupHook {
         returns (bytes memory)
     {
         bytes32 structHash = OrderSignatures.hashUpdatePrice(
-            order, _id(order), AMOUNT_IN, newOut, hook.orderCreatedSequence(poolId, _id(order)), nonce, deadline
+            order, _id(order), _liveIn(), newOut, hook.orderCreatedSequence(poolId, _id(order)), nonce, deadline
         );
         return _sign(_digest(hook.DOMAIN_SEPARATOR(), structHash));
     }
@@ -259,7 +268,7 @@ contract SignedOrdersTest is SetupHook {
         vm.prank(relayer);
         router.swapWithSig(again, permit, _noGrant());
         assertGt(hook.orderCreatedSequence(poolId, _id(order)), generation);
-        assertEq(hook.asyncOrder(poolId, _id(order)), AMOUNT_IN, "same ID and input recreated");
+        assertEq(hook.asyncOrder(poolId, _id(order)), _liveIn(), "same ID and input recreated");
         vm.prank(relayer);
         vm.expectRevert(AsyncSwap.InvalidSignature.selector);
         hook.updatePriceWithSig(order, 0.99 ether, 29, deadline, oldSig);
@@ -278,7 +287,7 @@ contract SignedOrdersTest is SetupHook {
         AsyncOrder memory order = _createSigned();
         uint256 deadline = block.timestamp + 1 hours;
         bytes32 structHash = OrderSignatures.hashUpdatePrice(
-            order, _id(order), AMOUNT_IN, 1, hook.orderCreatedSequence(poolId, _id(order)), 1, deadline
+            order, _id(order), _liveIn(), 1, hook.orderCreatedSequence(poolId, _id(order)), 1, deadline
         );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(0xBAD, _digest(hook.DOMAIN_SEPARATOR(), structHash));
 
@@ -329,7 +338,7 @@ contract SignedOrdersTest is SetupHook {
         returns (bytes memory)
     {
         bytes32 structHash = OrderSignatures.hashCancel(
-            order, _id(order), AMOUNT_IN, hook.orderCreatedSequence(poolId, _id(order)), nonce, deadline
+            order, _id(order), _liveIn(), hook.orderCreatedSequence(poolId, _id(order)), nonce, deadline
         );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, _digest(router.DOMAIN_SEPARATOR(), structHash));
         return abi.encodePacked(r, s, v);
@@ -383,7 +392,7 @@ contract SignedOrdersTest is SetupHook {
         vm.prank(relayer);
         router.swapWithSig(again, permit, _noGrant());
         (uint256 storedIn,) = hook.asyncOrderInfo(poolId, _id(order));
-        assertEq(storedIn, AMOUNT_IN, "same order id reused");
+        assertEq(storedIn, _liveIn(), "same order id reused");
 
         vm.prank(relayer);
         vm.expectRevert(AsyncSwap.NonceAlreadyUsed.selector);
@@ -406,7 +415,7 @@ contract SignedOrdersTest is SetupHook {
         vm.prank(relayer);
         vm.expectRevert(Router.InvalidSignature.selector);
         router.cancelWithSig(order, 19, deadline, sig);
-        assertEq(hook.asyncOrder(poolId, _id(order)), AMOUNT_IN);
+        assertEq(hook.asyncOrder(poolId, _id(order)), _liveIn());
         assertFalse(hook.nonceUsed(maker, 19), "revert restores nonce");
     }
 
@@ -423,7 +432,7 @@ contract SignedOrdersTest is SetupHook {
         vm.expectRevert(AsyncSwap.NonceAlreadyUsed.selector);
         router.cancelWithSig(order, 3, deadline, sig);
         (uint256 storedIn,) = hook.asyncOrderInfo(poolId, _id(order));
-        assertEq(storedIn, AMOUNT_IN, "order still open");
+        assertEq(storedIn, _liveIn(), "order still open");
     }
 
     /// @dev A signed cancel burns the same nonce as the hook's signed actions.

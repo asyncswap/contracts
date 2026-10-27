@@ -118,7 +118,7 @@ For each spec:
 | LevelSpec.badMode (field) | [SpecBook.lean:238](../../formal/Refinement/Swarm/SpecBook.lean#L238) | SpecBook.t.sol: testFuzz_LevelSpec_badMode |
 | CreateOrderSpec.notAuthorised (spec field) | [SpecCoreAsyncSwap.lean:111](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L111) | SpecCore.t.sol: testFuzz_CreateOrderSpec_notAuthorised |
 | CreateOrderSpec.zeroAmount (spec field) | [SpecCoreAsyncSwap.lean:115](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L115) | SpecCore.t.sol: testFuzz_CreateOrderSpec_zeroAmount |
-| CreateOrderSpec.run (spec field) | [SpecCoreAsyncSwap.lean:119](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L119) | SpecCore.t.sol: testFuzz_CreateOrderSpec_run, testFuzz_CreateOrderSpec_run_repeat, testFuzz_CreateOrderSpec_run_addOrderGuards |
+| CreateOrderSpec.run (spec field) | [SpecCoreAsyncSwap.lean:119](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L119) | SpecCore.t.sol: testFuzz_CreateOrderSpec_run, testFuzz_CreateOrderSpec_run_repeat, testFuzz_CreateOrderSpec_run_addOrderGuards | (semantics changed by the 0.03% trade fee; Lean statement needs updating)
 | TransferSpec.native (spec field) | [SpecCoreAsyncSwap.lean:331](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L331) | SpecCore.t.sol: testFuzz_TransferSpec_native, testFuzz_TransferSpec_viaSweep |
 | TransferSpec.erc20 (spec field) | [SpecCoreAsyncSwap.lean:342](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L342) | SpecCore.t.sol: testFuzz_TransferSpec_erc20, testFuzz_TransferSpec_erc20_noCode, testFuzz_TransferSpec_viaSweep |
 | PoolStateSlotSpec.pure_ok (spec field) | [SpecCoreAsyncSwap.lean:402](../../formal/Refinement/Swarm/SpecCoreAsyncSwap.lean#L402) | SpecCore.t.sol: testFuzz_PoolStateSlotSpec_pure_ok |
@@ -412,24 +412,24 @@ Left out:
 | Theorem | Lean | Test | Halmos |
 |---|---|---|---|
 | `priorityKey_zero` | [AsyncSwapAddOrder.lean:68](../../formal/Refinement/Swarm/AsyncSwapAddOrder.lean#L68) | [`AsyncSwapAddOrder.t.sol`](AsyncSwapAddOrder.t.sol) `testFuzz_priorityKey_zero (stored key of a fresh unpaid order; the `seq > 2^64-1` panic branch is unreachable because `_priorityKey` takes a `uint64`)` | no |
-| `addOrder_run` | [AsyncSwapAddOrder.lean:76](../../formal/Refinement/Swarm/AsyncSwapAddOrder.lean#L76) | [`AsyncSwapAddOrder.t.sol`](AsyncSwapAddOrder.t.sol) `testFuzz_addOrder_run (+ testFuzz_note_addOrder_modeOutOfRange for mode byte >= 2)` | no |
+| `addOrder_run` | [AsyncSwapAddOrder.lean:76](../../formal/Refinement/Swarm/AsyncSwapAddOrder.lean#L76) | [`AsyncSwapAddOrder.t.sol`](AsyncSwapAddOrder.t.sol) `testFuzz_addOrder_run (+ testFuzz_note_addOrder_modeOutOfRange for mode byte >= 2)` (semantics changed by the 0.03% trade fee; Lean statement needs updating) | no |
 | `addOrder_invalidMode` | [AsyncSwapAddOrder.lean:118](../../formal/Refinement/Swarm/AsyncSwapAddOrder.lean#L118) | [`AsyncSwapAddOrder.t.sol`](AsyncSwapAddOrder.t.sol) `testFuzz_addOrder_invalidMode` | no |
 | `addOrder_feeTooSmall` | [AsyncSwapAddOrder.lean:125](../../formal/Refinement/Swarm/AsyncSwapAddOrder.lean#L125) | [`AsyncSwapAddOrder.t.sol`](AsyncSwapAddOrder.t.sol) `testFuzz_addOrder_feeTooSmall` | no |
 | `addOrder_feeTooLarge` | [AsyncSwapAddOrder.lean:133](../../formal/Refinement/Swarm/AsyncSwapAddOrder.lean#L133) | [`AsyncSwapAddOrder.t.sol`](AsyncSwapAddOrder.t.sol) `testFuzz_addOrder_feeTooLarge (+ note test for mode >= 2)` | no |
-| `addOrder_seqOverflow` | [AsyncSwapAddOrder.lean:144](../../formal/Refinement/Swarm/AsyncSwapAddOrder.lean#L144) | [`AsyncSwapAddOrder.t.sol`](AsyncSwapAddOrder.t.sol) `testFuzz_addOrder_seqOverflow (+ note test for mode >= 2)` | no |
-| `addOrder_ok` | [AsyncSwapAddOrder.lean:167](../../formal/Refinement/Swarm/AsyncSwapAddOrder.lean#L167) | [`AsyncSwapAddOrder.t.sol`](AsyncSwapAddOrder.t.sol) `testFuzz_addOrder_ok` | no |
+| `addOrder_seqOverflow` | [AsyncSwapAddOrder.lean:144](../../formal/Refinement/Swarm/AsyncSwapAddOrder.lean#L144) | [`AsyncSwapAddOrder.t.sol`](AsyncSwapAddOrder.t.sol) `testFuzz_addOrder_seqOverflow (+ note test for mode >= 2)` (semantics changed by the 0.03% trade fee; Lean statement needs updating) | no |
+| `addOrder_ok` | [AsyncSwapAddOrder.lean:167](../../formal/Refinement/Swarm/AsyncSwapAddOrder.lean#L167) | [`AsyncSwapAddOrder.t.sol`](AsyncSwapAddOrder.t.sol) `testFuzz_addOrder_ok` (semantics changed by the 0.03% trade fee; Lean statement needs updating) | no |
 | `addState_order` | [AsyncSwapAddOrder.lean:208](../../formal/Refinement/Swarm/AsyncSwapAddOrder.lean#L208) | [`AsyncSwapAddOrder.t.sol`](AsyncSwapAddOrder.t.sol) `testFuzz_addState_order` | no |
 | `addState_book` | [AsyncSwapAddOrder.lean:218](../../formal/Refinement/Swarm/AsyncSwapAddOrder.lean#L218) | [`AsyncSwapAddOrder.t.sol`](AsyncSwapAddOrder.t.sol) `testFuzz_addState_book` | no |
 | `addState_other_order` | [AsyncSwapAddOrder.lean:227](../../formal/Refinement/Swarm/AsyncSwapAddOrder.lean#L227) | [`AsyncSwapAddOrder.t.sol`](AsyncSwapAddOrder.t.sol) `testFuzz_addState_other_order` | no |
 | `addState_other_pool` | [AsyncSwapAddOrder.lean:237](../../formal/Refinement/Swarm/AsyncSwapAddOrder.lean#L237) | [`AsyncSwapAddOrder.t.sol`](AsyncSwapAddOrder.t.sol) `testFuzz_addState_other_pool` | no |
 | `addState_frame` | [AsyncSwapAddOrder.lean:244](../../formal/Refinement/Swarm/AsyncSwapAddOrder.lean#L244) | [`AsyncSwapAddOrder.t.sol`](AsyncSwapAddOrder.t.sol) `testFuzz_addState_frame (on the hook; transient not checked, see notes)` | no |
 | `matching_addOrder_eq` | [AsyncSwapAddOrder.lean:255](../../formal/Refinement/Swarm/AsyncSwapAddOrder.lean#L255) | [`AsyncSwapAddOrder.t.sol`](AsyncSwapAddOrder.t.sol) `testFuzz_matching_addOrder_eq` | no |
-| `matching_addOrder_run` | [AsyncSwapAddOrder.lean:263](../../formal/Refinement/Swarm/AsyncSwapAddOrder.lean#L263) | [`AsyncSwapAddOrder.t.sol`](AsyncSwapAddOrder.t.sol) `testFuzz_matching_addOrder_run (+ note test, `viaMatching = true`)` | no |
+| `matching_addOrder_run` | [AsyncSwapAddOrder.lean:263](../../formal/Refinement/Swarm/AsyncSwapAddOrder.lean#L263) | [`AsyncSwapAddOrder.t.sol`](AsyncSwapAddOrder.t.sol) `testFuzz_matching_addOrder_run (+ note test, `viaMatching = true`)` (semantics changed by the 0.03% trade fee; Lean statement needs updating) | no |
 | `matching_addOrder_invalidMode` | [AsyncSwapAddOrder.lean:284](../../formal/Refinement/Swarm/AsyncSwapAddOrder.lean#L284) | [`AsyncSwapAddOrder.t.sol`](AsyncSwapAddOrder.t.sol) `testFuzz_matching_addOrder_invalidMode` | no |
 | `matching_addOrder_feeTooSmall` | [AsyncSwapAddOrder.lean:291](../../formal/Refinement/Swarm/AsyncSwapAddOrder.lean#L291) | [`AsyncSwapAddOrder.t.sol`](AsyncSwapAddOrder.t.sol) `testFuzz_matching_addOrder_feeTooSmall` | no |
 | `matching_addOrder_feeTooLarge` | [AsyncSwapAddOrder.lean:299](../../formal/Refinement/Swarm/AsyncSwapAddOrder.lean#L299) | [`AsyncSwapAddOrder.t.sol`](AsyncSwapAddOrder.t.sol) `testFuzz_matching_addOrder_feeTooLarge` | no |
-| `matching_addOrder_seqOverflow` | [AsyncSwapAddOrder.lean:309](../../formal/Refinement/Swarm/AsyncSwapAddOrder.lean#L309) | [`AsyncSwapAddOrder.t.sol`](AsyncSwapAddOrder.t.sol) `testFuzz_matching_addOrder_seqOverflow` | no |
-| `matching_addOrder_ok` | [AsyncSwapAddOrder.lean:324](../../formal/Refinement/Swarm/AsyncSwapAddOrder.lean#L324) | [`AsyncSwapAddOrder.t.sol`](AsyncSwapAddOrder.t.sol) `testFuzz_matching_addOrder_ok` | no |
+| `matching_addOrder_seqOverflow` | [AsyncSwapAddOrder.lean:309](../../formal/Refinement/Swarm/AsyncSwapAddOrder.lean#L309) | [`AsyncSwapAddOrder.t.sol`](AsyncSwapAddOrder.t.sol) `testFuzz_matching_addOrder_seqOverflow` (semantics changed by the 0.03% trade fee; Lean statement needs updating) | no |
+| `matching_addOrder_ok` | [AsyncSwapAddOrder.lean:324](../../formal/Refinement/Swarm/AsyncSwapAddOrder.lean#L324) | [`AsyncSwapAddOrder.t.sol`](AsyncSwapAddOrder.t.sol) `testFuzz_matching_addOrder_ok` (semantics changed by the 0.03% trade fee; Lean statement needs updating) | no |
 
 Left out:
 
@@ -629,8 +629,8 @@ Left out:
 
 | Theorem | Lean | Test | Halmos |
 |---|---|---|---|
-| `calculatePoolFee_run` | [AsyncSwapCalculatePoolFee.lean:32](../../formal/Refinement/Swarm/AsyncSwapCalculatePoolFee.lean#L32) | [`AsyncSwapCalculatePoolFee.t.sol`](AsyncSwapCalculatePoolFee.t.sol) `testFuzz_calculatePoolFee_run` | with edits |
-| `calculatePoolFee_ok` | [AsyncSwapCalculatePoolFee.lean:46](../../formal/Refinement/Swarm/AsyncSwapCalculatePoolFee.lean#L46) | [`AsyncSwapCalculatePoolFee.t.sol`](AsyncSwapCalculatePoolFee.t.sol) `testFuzz_calculatePoolFee_ok, AsyncSwapCalculatePoolFee.t.sol: test_calculatePoolFee_ok_edges` | with edits |
+| `calculatePoolFee_run` | [AsyncSwapCalculatePoolFee.lean:32](../../formal/Refinement/Swarm/AsyncSwapCalculatePoolFee.lean#L32) | [`AsyncSwapCalculatePoolFee.t.sol`](AsyncSwapCalculatePoolFee.t.sol) `testFuzz_calculatePoolFee_run` (semantics changed by the 0.03% trade fee; Lean statement needs updating) | with edits |
+| `calculatePoolFee_ok` | [AsyncSwapCalculatePoolFee.lean:46](../../formal/Refinement/Swarm/AsyncSwapCalculatePoolFee.lean#L46) | [`AsyncSwapCalculatePoolFee.t.sol`](AsyncSwapCalculatePoolFee.t.sol) `testFuzz_calculatePoolFee_ok, AsyncSwapCalculatePoolFee.t.sol: test_calculatePoolFee_ok_edges` (semantics changed by the 0.03% trade fee; Lean statement needs updating) | with edits |
 | `calculatePoolFee_le` | [AsyncSwapCalculatePoolFee.lean:53](../../formal/Refinement/Swarm/AsyncSwapCalculatePoolFee.lean#L53) | [`AsyncSwapCalculatePoolFee.t.sol`](AsyncSwapCalculatePoolFee.t.sol) `testFuzz_calculatePoolFee_le` | with edits |
 
 Left out:
@@ -653,10 +653,10 @@ Left out:
 
 | Theorem | Lean | Test | Halmos |
 |---|---|---|---|
-| `cancelOrder_run` | [AsyncSwapCancelOrder.lean:74](../../formal/Refinement/Swarm/AsyncSwapCancelOrder.lean#L74) | [`AsyncSwapCancelOrder.t.sol`](AsyncSwapCancelOrder.t.sol) `testFuzz_cancelOrder_run` | no |
+| `cancelOrder_run` | [AsyncSwapCancelOrder.lean:74](../../formal/Refinement/Swarm/AsyncSwapCancelOrder.lean#L74) | [`AsyncSwapCancelOrder.t.sol`](AsyncSwapCancelOrder.t.sol) `testFuzz_cancelOrder_run` (semantics changed by the 0.03% trade fee; Lean statement needs updating) | no |
 | `cancelOrder_unauthorized` | [AsyncSwapCancelOrder.lean:101](../../formal/Refinement/Swarm/AsyncSwapCancelOrder.lean#L101) | [`AsyncSwapCancelOrder.t.sol`](AsyncSwapCancelOrder.t.sol) `testFuzz_cancelOrder_unauthorized` | no |
 | `cancelOrder_notFound` | [AsyncSwapCancelOrder.lean:108](../../formal/Refinement/Swarm/AsyncSwapCancelOrder.lean#L108) | [`AsyncSwapCancelOrder.t.sol`](AsyncSwapCancelOrder.t.sol) `testFuzz_cancelOrder_notFound` | no |
-| `cancelOrder_ok` | [AsyncSwapCancelOrder.lean:172](../../formal/Refinement/Swarm/AsyncSwapCancelOrder.lean#L172) | [`AsyncSwapCancelOrder.t.sol`](AsyncSwapCancelOrder.t.sol) `testFuzz_cancelOrder_ok, testFuzz_cancelOrder_ok_nativeInput, testFuzz_cancelOrder_ok_paidBid` | no |
+| `cancelOrder_ok` | [AsyncSwapCancelOrder.lean:172](../../formal/Refinement/Swarm/AsyncSwapCancelOrder.lean#L172) | [`AsyncSwapCancelOrder.t.sol`](AsyncSwapCancelOrder.t.sol) `testFuzz_cancelOrder_ok, testFuzz_cancelOrder_ok_nativeInput, testFuzz_cancelOrder_ok_paidBid` (semantics changed by the 0.03% trade fee; Lean statement needs updating) | no |
 | `cancelOrder_reentry_reverts` | [AsyncSwapCancelOrder.lean:215](../../formal/Refinement/Swarm/AsyncSwapCancelOrder.lean#L215) | [`AsyncSwapCancelOrder.t.sol`](AsyncSwapCancelOrder.t.sol) `testFuzz_cancelOrder_reentry_reverts` | no |
 
 Left out:
@@ -718,16 +718,16 @@ Left out:
 | Theorem | Lean | Test | Halmos |
 |---|---|---|---|
 | `pf_le` | [AsyncSwapExecuteOrder.lean:122](../../formal/Refinement/Swarm/AsyncSwapExecuteOrder.lean#L122) | [`AsyncSwapExecuteOrder.t.sol`](AsyncSwapExecuteOrder.t.sol) `testFuzz_pf_le` | yes |
-| `calculatePoolFee_run` | [AsyncSwapExecuteOrder.lean:124](../../formal/Refinement/Swarm/AsyncSwapExecuteOrder.lean#L124) | [`AsyncSwapExecuteOrder.t.sol`](AsyncSwapExecuteOrder.t.sol) `testFuzz_calculatePoolFee_run` | yes |
+| `calculatePoolFee_run` | [AsyncSwapExecuteOrder.lean:124](../../formal/Refinement/Swarm/AsyncSwapExecuteOrder.lean#L124) | [`AsyncSwapExecuteOrder.t.sol`](AsyncSwapExecuteOrder.t.sol) `testFuzz_calculatePoolFee_run` (semantics changed by the 0.03% trade fee; Lean statement needs updating) | yes |
 | `fill_run` | [AsyncSwapExecuteOrder.lean:137](../../formal/Refinement/Swarm/AsyncSwapExecuteOrder.lean#L137) | [`AsyncSwapExecuteOrder.t.sol`](AsyncSwapExecuteOrder.t.sol) `testFuzz_fill_run` | no |
-| `afterNative_run` | [AsyncSwapExecuteOrder.lean:162](../../formal/Refinement/Swarm/AsyncSwapExecuteOrder.lean#L162) | [`AsyncSwapExecuteOrder.t.sol`](AsyncSwapExecuteOrder.t.sol) `testFuzz_afterNative_run` | no |
+| `afterNative_run` | [AsyncSwapExecuteOrder.lean:162](../../formal/Refinement/Swarm/AsyncSwapExecuteOrder.lean#L162) | [`AsyncSwapExecuteOrder.t.sol`](AsyncSwapExecuteOrder.t.sol) `testFuzz_afterNative_run` (semantics changed by the 0.03% trade fee; Lean statement needs updating) | no |
 | `executeOrder_run` | [AsyncSwapExecuteOrder.lean:188](../../formal/Refinement/Swarm/AsyncSwapExecuteOrder.lean#L188) | [`AsyncSwapExecuteOrder.t.sol`](AsyncSwapExecuteOrder.t.sol) `testFuzz_executeOrder_run` | no |
 | `executeOrder_decode` | [AsyncSwapExecuteOrder.lean:237](../../formal/Refinement/Swarm/AsyncSwapExecuteOrder.lean#L237) | [`AsyncSwapExecuteOrder.t.sol`](AsyncSwapExecuteOrder.t.sol) `testFuzz_executeOrder_decode` | no |
 | `executeOrder_unaccountedNative` | [AsyncSwapExecuteOrder.lean:245](../../formal/Refinement/Swarm/AsyncSwapExecuteOrder.lean#L245) | [`AsyncSwapExecuteOrder.t.sol`](AsyncSwapExecuteOrder.t.sol) `testFuzz_executeOrder_unaccountedNative` | no |
 | `executeOrder_nativeOverflow` | [AsyncSwapExecuteOrder.lean:256](../../formal/Refinement/Swarm/AsyncSwapExecuteOrder.lean#L256) | [`AsyncSwapExecuteOrder.t.sol`](AsyncSwapExecuteOrder.t.sol) `testFuzz_executeOrder_nativeOverflow` | no |
 | `executeOrder_unauthorized` | [AsyncSwapExecuteOrder.lean:275](../../formal/Refinement/Swarm/AsyncSwapExecuteOrder.lean#L275) | [`AsyncSwapExecuteOrder.t.sol`](AsyncSwapExecuteOrder.t.sol) `testFuzz_executeOrder_unauthorized` | no |
 | `executeOrder_notFound` | [AsyncSwapExecuteOrder.lean:290](../../formal/Refinement/Swarm/AsyncSwapExecuteOrder.lean#L290) | [`AsyncSwapExecuteOrder.t.sol`](AsyncSwapExecuteOrder.t.sol) `testFuzz_executeOrder_notFound` | no |
-| `executeOrder_ok` | [AsyncSwapExecuteOrder.lean:323](../../formal/Refinement/Swarm/AsyncSwapExecuteOrder.lean#L323) | [`AsyncSwapExecuteOrder.t.sol`](AsyncSwapExecuteOrder.t.sol) `testFuzz_executeOrder_ok (ERC20 output), testFuzz_executeOrder_ok_native (native output; ledger decremented by exactly m + pf(m), checked by a second fill needing exactly the remainder vs. remainder + 1)` | no |
+| `executeOrder_ok` | [AsyncSwapExecuteOrder.lean:323](../../formal/Refinement/Swarm/AsyncSwapExecuteOrder.lean#L323) | [`AsyncSwapExecuteOrder.t.sol`](AsyncSwapExecuteOrder.t.sol) `testFuzz_executeOrder_ok (ERC20 output), testFuzz_executeOrder_ok_native (native output; ledger decremented by exactly m + pf(m), checked by a second fill needing exactly the remainder vs. remainder + 1)` (semantics changed by the 0.03% trade fee; Lean statement needs updating) | no |
 
 Left out:
 
@@ -744,9 +744,9 @@ Left out:
 | `fillOrderFromPoolLiquidity_notSelf` | [AsyncSwapFillOrderFromPoolLiquidity.lean:120](../../formal/Refinement/Swarm/AsyncSwapFillOrderFromPoolLiquidity.lean#L120) | [`AsyncSwapFillOrderFromPoolLiquidity.t.sol`](AsyncSwapFillOrderFromPoolLiquidity.t.sol) `testFuzz_fillOrderFromPoolLiquidity_notSelf` | yes |
 | `fillOrderFromPoolLiquidity_notFound` | [AsyncSwapFillOrderFromPoolLiquidity.lean:126](../../formal/Refinement/Swarm/AsyncSwapFillOrderFromPoolLiquidity.lean#L126) | [`AsyncSwapFillOrderFromPoolLiquidity.t.sol`](AsyncSwapFillOrderFromPoolLiquidity.t.sol) `testFuzz_fillOrderFromPoolLiquidity_notFound` | no |
 | `fillOrderFromPoolLiquidity_noLiquidity` | [AsyncSwapFillOrderFromPoolLiquidity.lean:133](../../formal/Refinement/Swarm/AsyncSwapFillOrderFromPoolLiquidity.lean#L133) | [`AsyncSwapFillOrderFromPoolLiquidity.t.sol`](AsyncSwapFillOrderFromPoolLiquidity.t.sol) `testFuzz_fillOrderFromPoolLiquidity_noLiquidity` | no |
-| `swapAgainstPool_ok` | [AsyncSwapFillOrderFromPoolLiquidity.lean:175](../../formal/Refinement/Swarm/AsyncSwapFillOrderFromPoolLiquidity.lean#L175) | [`AsyncSwapFillOrderFromPoolLiquidity.t.sol`](AsyncSwapFillOrderFromPoolLiquidity.t.sol) `testFuzz_swapAgainstPool_ok` | no |
+| `swapAgainstPool_ok` | [AsyncSwapFillOrderFromPoolLiquidity.lean:175](../../formal/Refinement/Swarm/AsyncSwapFillOrderFromPoolLiquidity.lean#L175) | [`AsyncSwapFillOrderFromPoolLiquidity.t.sol`](AsyncSwapFillOrderFromPoolLiquidity.t.sol) `testFuzz_swapAgainstPool_ok` (semantics changed by the 0.03% trade fee; Lean statement needs updating) | no |
 | `fillOrderFromPoolLiquidity_ok` | [AsyncSwapFillOrderFromPoolLiquidity.lean:261](../../formal/Refinement/Swarm/AsyncSwapFillOrderFromPoolLiquidity.lean#L261) | [`AsyncSwapFillOrderFromPoolLiquidity.t.sol`](AsyncSwapFillOrderFromPoolLiquidity.t.sol) `testFuzz_fillOrderFromPoolLiquidity_ok` | no |
-| `fillOrderFromPoolLiquidity_ok_full` | [AsyncSwapFillOrderFromPoolLiquidity.lean:293](../../formal/Refinement/Swarm/AsyncSwapFillOrderFromPoolLiquidity.lean#L293) | [`AsyncSwapFillOrderFromPoolLiquidity.t.sol`](AsyncSwapFillOrderFromPoolLiquidity.t.sol) `testFuzz_fillOrderFromPoolLiquidity_ok_full` | no |
+| `fillOrderFromPoolLiquidity_ok_full` | [AsyncSwapFillOrderFromPoolLiquidity.lean:293](../../formal/Refinement/Swarm/AsyncSwapFillOrderFromPoolLiquidity.lean#L293) | [`AsyncSwapFillOrderFromPoolLiquidity.t.sol`](AsyncSwapFillOrderFromPoolLiquidity.t.sol) `testFuzz_fillOrderFromPoolLiquidity_ok_full` (semantics changed by the 0.03% trade fee; Lean statement needs updating) | no |
 | `fillOrderFromPoolLiquidity_reentry_reverts` | [AsyncSwapFillOrderFromPoolLiquidity.lean:362](../../formal/Refinement/Swarm/AsyncSwapFillOrderFromPoolLiquidity.lean#L362) | [`AsyncSwapFillOrderFromPoolLiquidity.t.sol`](AsyncSwapFillOrderFromPoolLiquidity.t.sol) `testFuzz_fillOrderFromPoolLiquidity_reentry_reverts` | no |
 
 Left out:
@@ -998,10 +998,10 @@ Left out:
 | Theorem | Lean | Test | Halmos |
 |---|---|---|---|
 | `matchPair_skip` | [AsyncSwapMatchPair.lean:143](../../formal/Refinement/Swarm/AsyncSwapMatchPair.lean#L143) | [`AsyncSwapMatchPair.t.sol`](AsyncSwapMatchPair.t.sol) `testFuzz_matchPair_skip` | no |
-| `matchPair_eq` | [AsyncSwapMatchPair.lean:164](../../formal/Refinement/Swarm/AsyncSwapMatchPair.lean#L164) | [`AsyncSwapMatchPair.t.sol`](AsyncSwapMatchPair.t.sol) `testFuzz_matchPair_eq` | no |
+| `matchPair_eq` | [AsyncSwapMatchPair.lean:164](../../formal/Refinement/Swarm/AsyncSwapMatchPair.lean#L164) | [`AsyncSwapMatchPair.t.sol`](AsyncSwapMatchPair.t.sol) `testFuzz_matchPair_eq` (semantics changed by the 0.03% trade fee; Lean statement needs updating) | no |
 | `matchRun_ok` | [AsyncSwapMatchPair.lean:208](../../formal/Refinement/Swarm/AsyncSwapMatchPair.lean#L208) | [`AsyncSwapMatchPair.t.sol`](AsyncSwapMatchPair.t.sol) `testFuzz_matchRun_ok` | no |
-| `matchPair_ok` | [AsyncSwapMatchPair.lean:221](../../formal/Refinement/Swarm/AsyncSwapMatchPair.lean#L221) | [`AsyncSwapMatchPair.t.sol`](AsyncSwapMatchPair.t.sol) `testFuzz_matchPair_ok` | no |
-| `matchPair_true` | [AsyncSwapMatchPair.lean:273](../../formal/Refinement/Swarm/AsyncSwapMatchPair.lean#L273) | [`AsyncSwapMatchPair.t.sol`](AsyncSwapMatchPair.t.sol) `testFuzz_matchPair_true` | no |
+| `matchPair_ok` | [AsyncSwapMatchPair.lean:221](../../formal/Refinement/Swarm/AsyncSwapMatchPair.lean#L221) | [`AsyncSwapMatchPair.t.sol`](AsyncSwapMatchPair.t.sol) `testFuzz_matchPair_ok` (semantics changed by the 0.03% trade fee; Lean statement needs updating) | no |
+| `matchPair_true` | [AsyncSwapMatchPair.lean:273](../../formal/Refinement/Swarm/AsyncSwapMatchPair.lean#L273) | [`AsyncSwapMatchPair.t.sol`](AsyncSwapMatchPair.t.sol) `testFuzz_matchPair_true` (semantics changed by the 0.03% trade fee; Lean statement needs updating) | no |
 | `matchPair_error` | [AsyncSwapMatchPair.lean:319](../../formal/Refinement/Swarm/AsyncSwapMatchPair.lean#L319) | [`AsyncSwapMatchPair.t.sol`](AsyncSwapMatchPair.t.sol) `testFuzz_matchPair_error` | no |
 | `matchPair_reverts_restingZero` | [AsyncSwapMatchPair.lean:364](../../formal/Refinement/Swarm/AsyncSwapMatchPair.lean#L364) | [`AsyncSwapMatchPair.t.sol`](AsyncSwapMatchPair.t.sol) `testFuzz_matchPair_reverts_restingZero` | no |
 
@@ -1186,8 +1186,8 @@ Left out:
 | Theorem | Lean | Test | Halmos |
 |---|---|---|---|
 | `priceKey_ok` | [AsyncSwapReduceAfterMatch.lean:95](../../formal/Refinement/Swarm/AsyncSwapReduceAfterMatch.lean#L95) | [`AsyncSwapReduceAfterMatch.t.sol`](AsyncSwapReduceAfterMatch.t.sol) `testFuzz_priceKey_ok` | no |
-| `reduceAfterMatch_ok_close` | [AsyncSwapReduceAfterMatch.lean:149](../../formal/Refinement/Swarm/AsyncSwapReduceAfterMatch.lean#L149) | [`AsyncSwapReduceAfterMatch.t.sol`](AsyncSwapReduceAfterMatch.t.sol) `testFuzz_reduceAfterMatch_ok_close` | no |
-| `reduceAfterMatch_ok_partial` | [AsyncSwapReduceAfterMatch.lean:258](../../formal/Refinement/Swarm/AsyncSwapReduceAfterMatch.lean#L258) | [`AsyncSwapReduceAfterMatch.t.sol`](AsyncSwapReduceAfterMatch.t.sol) `testFuzz_reduceAfterMatch_ok_partial` | no |
+| `reduceAfterMatch_ok_close` | [AsyncSwapReduceAfterMatch.lean:149](../../formal/Refinement/Swarm/AsyncSwapReduceAfterMatch.lean#L149) | [`AsyncSwapReduceAfterMatch.t.sol`](AsyncSwapReduceAfterMatch.t.sol) `testFuzz_reduceAfterMatch_ok_close` (semantics changed by the 0.03% trade fee; Lean statement needs updating) | no |
+| `reduceAfterMatch_ok_partial` | [AsyncSwapReduceAfterMatch.lean:258](../../formal/Refinement/Swarm/AsyncSwapReduceAfterMatch.lean#L258) | [`AsyncSwapReduceAfterMatch.t.sol`](AsyncSwapReduceAfterMatch.t.sol) `testFuzz_reduceAfterMatch_ok_partial` (semantics changed by the 0.03% trade fee; Lean statement needs updating) | no |
 
 Left out:
 
@@ -1201,8 +1201,8 @@ Left out:
 
 | Theorem | Lean | Test | Halmos |
 |---|---|---|---|
-| `reduceMatchedOrders_eq` | [AsyncSwapReduceMatchedOrders.lean:68](../../formal/Refinement/Swarm/AsyncSwapReduceMatchedOrders.lean#L68) | [`AsyncSwapReduceMatchedOrders.t.sol`](AsyncSwapReduceMatchedOrders.t.sol) `testFuzz_reduceMatchedOrders_eq` | no |
-| `reduceMatchedOrders_ok_iff` | [AsyncSwapReduceMatchedOrders.lean:127](../../formal/Refinement/Swarm/AsyncSwapReduceMatchedOrders.lean#L127) | [`AsyncSwapReduceMatchedOrders.t.sol`](AsyncSwapReduceMatchedOrders.t.sol) `testFuzz_reduceMatchedOrders_ok_iff` | no |
+| `reduceMatchedOrders_eq` | [AsyncSwapReduceMatchedOrders.lean:68](../../formal/Refinement/Swarm/AsyncSwapReduceMatchedOrders.lean#L68) | [`AsyncSwapReduceMatchedOrders.t.sol`](AsyncSwapReduceMatchedOrders.t.sol) `testFuzz_reduceMatchedOrders_eq` (semantics changed by the 0.03% trade fee; Lean statement needs updating) | no |
+| `reduceMatchedOrders_ok_iff` | [AsyncSwapReduceMatchedOrders.lean:127](../../formal/Refinement/Swarm/AsyncSwapReduceMatchedOrders.lean#L127) | [`AsyncSwapReduceMatchedOrders.t.sol`](AsyncSwapReduceMatchedOrders.t.sol) `testFuzz_reduceMatchedOrders_ok_iff` (semantics changed by the 0.03% trade fee; Lean statement needs updating) | no |
 | `reduceMatchedOrders_ok_bounds` | [AsyncSwapReduceMatchedOrders.lean:148](../../formal/Refinement/Swarm/AsyncSwapReduceMatchedOrders.lean#L148) | [`AsyncSwapReduceMatchedOrders.t.sol`](AsyncSwapReduceMatchedOrders.t.sol) `testFuzz_reduceMatchedOrders_ok_bounds` | no |
 
 Left out:
@@ -1324,10 +1324,10 @@ Left out:
 | Theorem | Lean | Test | Halmos |
 |---|---|---|---|
 | `swapAgainstPool_noLiquidity` | [AsyncSwapSwapAgainstPool.lean:33](../../formal/Refinement/Swarm/AsyncSwapSwapAgainstPool.lean#L33) | [`AsyncSwapSwapAgainstPool.t.sol`](AsyncSwapSwapAgainstPool.t.sol) `testFuzz_swapAgainstPool_noLiquidity` | no |
-| `swapAgainstPool_success` | [AsyncSwapSwapAgainstPool.lean:45](../../formal/Refinement/Swarm/AsyncSwapSwapAgainstPool.lean#L45) | [`AsyncSwapSwapAgainstPool.t.sol`](AsyncSwapSwapAgainstPool.t.sol) `testFuzz_swapAgainstPool_success` | no |
+| `swapAgainstPool_success` | [AsyncSwapSwapAgainstPool.lean:45](../../formal/Refinement/Swarm/AsyncSwapSwapAgainstPool.lean#L45) | [`AsyncSwapSwapAgainstPool.t.sol`](AsyncSwapSwapAgainstPool.t.sol) `testFuzz_swapAgainstPool_success` (semantics changed by the 0.03% trade fee; Lean statement needs updating) | no |
 | `swapAgainstPool_ok_liquidity_min` | [AsyncSwapSwapAgainstPool.lean:68](../../formal/Refinement/Swarm/AsyncSwapSwapAgainstPool.lean#L68) | [`AsyncSwapSwapAgainstPool.t.sol`](AsyncSwapSwapAgainstPool.t.sol) `testFuzz_swapAgainstPool_ok_liquidity_min` | no |
 | `swapAgainstPool_amountIn_lt` | [AsyncSwapSwapAgainstPool.lean:79](../../formal/Refinement/Swarm/AsyncSwapSwapAgainstPool.lean#L79) | [`AsyncSwapSwapAgainstPool.t.sol`](AsyncSwapSwapAgainstPool.t.sol) `testFuzz_swapAgainstPool_amountIn_lt` | no |
-| `swapAgainstPool_spec` | [AsyncSwapSwapAgainstPool.lean:92](../../formal/Refinement/Swarm/AsyncSwapSwapAgainstPool.lean#L92) | [`AsyncSwapSwapAgainstPool.t.sol`](AsyncSwapSwapAgainstPool.t.sol) `testFuzz_swapAgainstPool_spec` | no |
+| `swapAgainstPool_spec` | [AsyncSwapSwapAgainstPool.lean:92](../../formal/Refinement/Swarm/AsyncSwapSwapAgainstPool.lean#L92) | [`AsyncSwapSwapAgainstPool.t.sol`](AsyncSwapSwapAgainstPool.t.sol) `testFuzz_swapAgainstPool_spec` (semantics changed by the 0.03% trade fee; Lean statement needs updating) | no |
 
 ### `Refinement/Swarm/AsyncSwapSweep.lean`
 

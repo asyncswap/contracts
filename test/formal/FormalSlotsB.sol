@@ -57,6 +57,8 @@ abstract contract FormalSlotsB is FormalBase {
             )
         );
         vm.store(address(hook), _add(s, 4), bytes32(uint256(o.priorityFee) | (uint256(o.priorityKey) << 64)));
+        // `inputFee` (uint128) opens a new slot after `createdSequence` (packed into slot 4 above)
+        vm.store(address(hook), _add(s, 5), bytes32(uint256(o.inputFee)));
     }
 
     /// @dev Perturb storage the order getters must not read: owner, pendingOwner, a nonce entry and

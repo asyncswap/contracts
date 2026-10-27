@@ -2,6 +2,7 @@
 pragma solidity 0.8.26;
 
 import {SetupHook} from "./SetupHook.t.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {BatchActions} from "src/BatchActions.sol";
 import {AsyncSwap} from "src/AsyncSwap.sol";
 import {AsyncOrder} from "src/types/AsyncOrder.sol";
@@ -45,18 +46,23 @@ contract BatchActionsTest is SetupHook {
         return new uint256[](0);
     }
 
+    /// @dev The deposit whose input after the maker's 0.03% fee is exactly `net`.
+    function _gross(uint256 net) private pure returns (uint256) {
+        return Math.mulDiv(net, 10_000, 9_997, Math.Rounding.Ceil);
+    }
+
     function _creditBoth() private {
         AsyncOrder memory order;
-        order = AsyncOrder(key, alice, true, 10 ether, 10 ether, 100_000, 2 ** 96, 0);
+        order = AsyncOrder(key, alice, true, _gross(10 ether), 10 ether, 100_000, 2 ** 96, 0);
         vm.prank(alice);
         router.swap(order, abi.encode(AsyncSwap.UserParams(alice, address(router), 10 ether, 100_000)));
-        order = AsyncOrder(key, bob, false, 10 ether, 10 ether, 100_000, 2 ** 96, 0);
+        order = AsyncOrder(key, bob, false, _gross(10 ether), 10 ether, 100_000, 2 ** 96, 0);
         vm.prank(bob);
         router.swap(order, abi.encode(AsyncSwap.UserParams(bob, address(router), 10 ether, 100_000)));
-        order = AsyncOrder(key, bob, true, 5 ether, 5 ether, 100_000, 2 ** 96, 0);
+        order = AsyncOrder(key, bob, true, _gross(5 ether), 5 ether, 100_000, 2 ** 96, 0);
         vm.prank(bob);
         router.swap(order, abi.encode(AsyncSwap.UserParams(bob, address(router), 5 ether, 100_000)));
-        order = AsyncOrder(key, alice, false, 5 ether, 5 ether, 100_000, 2 ** 96, 0);
+        order = AsyncOrder(key, alice, false, _gross(5 ether), 5 ether, 100_000, 2 ** 96, 0);
         vm.prank(alice);
         router.swap(order, abi.encode(AsyncSwap.UserParams(alice, address(router), 5 ether, 100_000)));
         assertEq(manager.balanceOf(alice, uint160(Currency.unwrap(currency0))), 5 ether);

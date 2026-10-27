@@ -33,6 +33,8 @@ library AsyncFiller {
     uint64 internal constant MIN_PRIORITY_FEE = 100_000;
     /// @dev Below a $100 order the least bid is 10 bps of the order instead: min($0.10, 0.1% of it).
     uint256 internal constant PRIORITY_FEE_BPS = 10;
+    /// @dev Protocol fee on each side of a book match or filler fill: 0.03% of that side's input.
+    uint256 internal constant TRADE_FEE_BPS = 3;
 
     /// @notice Open-order record. Filler fills are full-order; direct matches can reduce it
     ///         partially while keeping the remaining input in escrow.
@@ -49,6 +51,9 @@ library AsyncFiller {
         uint128 priorityKey;
         /// @dev Immutable settlement age; repricing only resets queue sequence.
         uint64 createdSequence;
+        /// @dev The maker's trade fee, escrowed as hook claims in the input currency on top of
+        ///      `amountIn`. It settles to the vault pro rata as input fills; the rest is refunded.
+        uint128 inputFee;
     }
 
     /// @dev Orders at one price, highest bid first, then earliest.
@@ -147,6 +152,11 @@ library AsyncFiller {
         // PoolManager, so the unlock that creates the order cannot end until the bid is paid
         // (the Router does `settleFor(hook)`), exactly as the swap delta makes it pay the input.
         if (priorityFee != 0) self.numeraire.take(self.poolManager, address(this), priorityFee, true);
+        // Set the maker's fee aside from the deposit: the book trades only the rest, so every fill
+        // still pays at least `amountOutMin` for it. Deposits fit int128, so the fee fits uint128.
+        uint256 inputFee = tradeFee(amountIn);
+        amountIn -= inputFee;
+        if (amountIn == 0) revert ZeroAmount();
         uint128 price = _priceKey(isBuy, zeroForOne, amountIn, amountOutMin);
         uint64 sequence = ++book.nextSequence;
         self.orders[id] = OrderInfo({
@@ -159,9 +169,15 @@ library AsyncFiller {
             sequence: sequence,
             priorityFee: uint64(priorityFee),
             priorityKey: _priorityKey(uint64(priorityFee), sequence),
-            createdSequence: sequence
+            createdSequence: sequence,
+            inputFee: uint128(inputFee)
         });
         _append(self, book, id);
+    }
+
+    /// @notice The protocol's 0.03% of `amount`, rounded up.
+    function tradeFee(uint256 amount) internal pure returns (uint256) {
+        return Math.mulDiv(amount, TRADE_FEE_BPS, 10_000, Math.Rounding.Ceil);
     }
 
     /// @notice The least bid for an order worth `notional` numeraire units: $0.10, or 0.1% of the
@@ -284,8 +300,9 @@ library AsyncFiller {
     ///         input. Must be invoked from inside an `IPoolManager.unlock` context.
     ///
     /// @dev Settle gross output (native only; ERC20 is pre-settled), pay the signed net minimum to the maker, and mint fee
-    ///      claims to the vault. Burn input claims and pay the full input to the filler.
-    ///      Both currency deltas net to zero. A failed fill reverts all legs.
+    ///      claims to the vault. Burn input claims and pay the full input to the filler. The hook moves
+    ///      the maker's escrowed input fee to the vault. Both currency deltas net to zero.
+    ///      A failed fill reverts all legs.
     function fill(
         State storage self,
         Book storage book,
@@ -362,6 +379,8 @@ library AsyncFiller {
         uint256 amountIn = info.amountIn;
         if (amountIn == 0) revert OrderNotFound();
         uint256 priorityFee = info.priorityFee;
+        // Nothing filled, so the escrowed input fee is refunded with the input.
+        amountIn += info.inputFee;
 
         Currency input = order.zeroForOne ? order.key.currency0 : order.key.currency1;
         _remove(self, book, id);

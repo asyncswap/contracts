@@ -84,7 +84,8 @@ library AsyncMatching {
     error LimitPriceNotMet();
     error NoActiveLiquidity();
 
-    uint24 private constant POOL_LIQUIDITY_FILL_FEE = 3_000;
+    /// @dev LP fee on a pool-liquidity fill, in v4 pips: 0.02%.
+    uint24 private constant POOL_LIQUIDITY_FILL_FEE = 200;
 
     event AsyncOrderLiquidityFilled(
         PoolId indexed poolId, bytes32 indexed orderId, address indexed maker, uint256 amountIn, uint256 amountOut
@@ -106,24 +107,12 @@ library AsyncMatching {
         );
     }
 
-    function setMinOrder(AsyncFiller.Book storage book, PoolId poolId, uint256 minimum) public {
-        book.setMinOrder(poolId, minimum);
-    }
-
     function bestOrder(AsyncFiller.State storage self, AsyncFiller.Book storage book, bool isBuy)
         public
         view
         returns (bool found, uint128 price, bytes32 orderId, address owner)
     {
         return self.bestOrder(book, isBuy);
-    }
-
-    function level(AsyncFiller.Book storage book, bool isBuy, uint128 price)
-        public
-        view
-        returns (bytes32 head, bytes32 tail, uint32 orderCount)
-    {
-        return book.level(isBuy, price);
     }
 
     function fill(AsyncFiller.State storage self, AsyncFiller.Book storage book, FillParams memory params) public {
@@ -198,12 +187,15 @@ library AsyncMatching {
         PoolKey calldata key,
         bytes32 id,
         address maker,
-        address hook
+        address hook,
+        uint256 protocolFee
     ) public {
         AsyncFiller.OrderInfo storage info = self.orders[id];
-        uint256 amountIn = info.amountIn;
+        // The pool fill spends the escrowed input fee too: the hook has already moved the protocol's
+        // 0.01% of the whole deposit to the vault, and the rest is swapped, paying the 0.02% LP fee.
+        uint256 amountIn = info.amountIn + info.inputFee - protocolFee;
         uint256 amountOutMin = info.amountOutMin;
-        if (amountIn == 0) revert AsyncFiller.OrderNotFound();
+        if (info.amountIn == 0) revert AsyncFiller.OrderNotFound();
         bool zeroForOne = info.zeroForOne;
         uint256 priorityFee = info.priorityFee;
         // Close the order before the maker's payout, which can run recipient code.
@@ -365,6 +357,7 @@ library AsyncMatching {
         uint256 remainingInput = oldInput - params.inputUsed;
         uint256 oldPriorityFee = info.priorityFee;
         uint256 unfilledPriorityFee = _settleMatchedPriorityFee(self, key, params.id, params.inputUsed, oldInput, batch);
+        uint256 unfilledInputFee = _settleMatchedInputFee(self, key, params.id, params.inputUsed, oldInput, batch);
         // The unfilled input keeps the maker's own limit: price improvement on the filled part is
         // not credited against it. Rounding up never asks less than that limit, and leaves a
         // nonzero minimum for any nonzero remainder.
@@ -377,12 +370,13 @@ library AsyncMatching {
             _creditPriorityFee(self, key, params.id, info.owner, unfilledPriorityFee, batch);
             AsyncFiller._remove(self, book, params.id);
             delete self.orders[params.id];
-            return remainingInput;
+            return remainingInput + unfilledInputFee;
         }
 
         info.amountIn = remainingInput;
         info.amountOutMin = remainingMinimum;
         info.priorityFee = uint64(unfilledPriorityFee);
+        info.inputFee = uint128(unfilledInputFee);
         uint128 updatedPrice = AsyncFiller._priceKey(info.isBuy, info.zeroForOne, remainingInput, remainingMinimum);
         bool priceChanged = updatedPrice != info.price;
         if (priceChanged || unfilledPriorityFee != oldPriorityFee) {
@@ -413,6 +407,26 @@ library AsyncMatching {
         // Credit only the share for input that filled. The final claim transfers are in
         // this unlock, so a failed settlement reverts all matching and credits.
         _creditPriorityFee(self, key, id, info.owner, filledPriorityFee, batch);
+    }
+
+    /// @dev Credit the vault the escrowed input fee's share for the input that filled, in the input
+    ///      currency, and return the rest. A fully used order pays its whole remaining fee.
+    function _settleMatchedInputFee(
+        AsyncFiller.State storage self,
+        PoolKey calldata key,
+        bytes32 id,
+        uint256 inputUsed,
+        uint256 oldInput,
+        ClaimTransfers.Batch memory batch
+    ) private returns (uint256 unfilledInputFee) {
+        AsyncFiller.OrderInfo storage info = self.orders[id];
+        unfilledInputFee = info.inputFee;
+        uint256 filledInputFee = Math.mulDiv(unfilledInputFee, inputUsed, oldInput);
+        unfilledInputFee -= filledInputFee;
+        // `credit` skips a zero amount.
+        ClaimTransfers.credit(
+            batch, self.poolManager, info.zeroForOne ? key.currency0 : key.currency1, self.feeVault, filledInputFee
+        );
     }
 
     function _creditPriorityFee(

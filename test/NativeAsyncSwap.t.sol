@@ -8,6 +8,7 @@ import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {Router} from "@async-swap/Router.sol";
 import {MockERC20} from "./utils/MockERC20.sol";
 import {Test} from "forge-std/Test.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {PoolManager} from "v4-core/PoolManager.sol";
 import {Currency, IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {Hooks} from "v4-core/libraries/Hooks.sol";
@@ -105,6 +106,16 @@ contract NativeAsyncSwapTest is Test {
         });
     }
 
+    /// @dev The maker's 0.03% input fee on a deposit, rounded up.
+    function _inputFee(uint256 deposit) internal pure returns (uint256) {
+        return Math.mulDiv(deposit, 3, 10_000, Math.Rounding.Ceil);
+    }
+
+    /// @dev The input an order trades after its input fee is set aside.
+    function _net(uint256 deposit) internal pure returns (uint256) {
+        return deposit - _inputFee(deposit);
+    }
+
     function _withAssignedSalt(AsyncOrder memory order) internal view returns (AsyncOrder memory) {
         order.salt = _expectedSalt(order.owner, order.amountIn, order.amountOutMin);
         return order;
@@ -131,7 +142,8 @@ contract NativeAsyncSwapTest is Test {
 
         bytes32 id = _orderIdFor(alice, true, _expectedSalt(alice, 1 ether, 0.95 ether));
         (uint256 storedIn, uint256 storedOutMin) = hook.asyncOrderInfo(poolId, id);
-        assertEq(storedIn, 1 ether, "amountIn stored");
+        assertEq(storedIn, _net(1 ether), "amountIn stored");
+        assertEq(hook.asyncOrderInputFee(poolId, id), _inputFee(1 ether), "input fee escrowed");
         assertEq(storedOutMin, 0.95 ether, "amountOutMin stored");
     }
 
@@ -153,6 +165,8 @@ contract NativeAsyncSwapTest is Test {
         vm.stopPrank();
 
         order = _withAssignedSalt(order);
+        // The filler takes the order's net input; the maker's input fee goes to the vault.
+        order.amountIn = _net(1 ether);
 
         uint256 bobEthBefore = bob.balance;
         uint256 bobErc20Before = erc20.balanceOf(bob);
@@ -164,14 +178,15 @@ contract NativeAsyncSwapTest is Test {
         router.fillOrder(order, type(uint256).max, "");
         vm.stopPrank();
 
-        // Bob: -0.95 TST, +1 ETH. Alice: +0.95 TST, -1 ETH (already paid).
+        // Bob: -0.95 TST, +1 ETH less the maker's input fee. Alice: +0.95 TST, -1 ETH (already paid).
         assertEq(
             bobErc20Before - erc20.balanceOf(bob),
             0.95 ether + hook.calculatePoolFee(order.key.fee, 0.95 ether),
             "filler paid TST"
         );
         assertEq(bob.balance, bobEthBefore, "no native callback during fill");
-        assertEq(manager.balanceOf(bob, 0), 1 ether, "filler received ETH claims");
+        assertEq(manager.balanceOf(bob, 0), _net(1 ether), "filler received ETH claims");
+        assertEq(manager.balanceOf(address(hook.feeVault()), 0), _inputFee(1 ether), "vault received input fee");
         assertEq(erc20.balanceOf(alice) - aliceErc20Before, 0.95 ether, "maker received real TST");
     }
 
@@ -190,7 +205,7 @@ contract NativeAsyncSwapTest is Test {
         router.fillOrder{value: gross}(order, type(uint256).max, "");
         vm.clearMockedCalls();
 
-        assertEq(hook.asyncOrder(poolId, _orderIdFor(alice, false, order.salt)), 1 ether, "order untouched");
+        assertEq(hook.asyncOrder(poolId, _orderIdFor(alice, false, order.salt)), _net(1 ether), "order untouched");
     }
 
     /* --------------------------- maker submit native output --------------------------- */
@@ -213,7 +228,8 @@ contract NativeAsyncSwapTest is Test {
 
         bytes32 id = _orderIdFor(alice, false, _expectedSalt(alice, 1 ether, 0.9 ether));
         (uint256 storedIn, uint256 storedOutMin) = hook.asyncOrderInfo(poolId, id);
-        assertEq(storedIn, 1 ether, "amountIn stored");
+        assertEq(storedIn, _net(1 ether), "amountIn stored");
+        assertEq(hook.asyncOrderInputFee(poolId, id), _inputFee(1 ether), "input fee escrowed");
         assertEq(storedOutMin, 0.9 ether, "amountOutMin stored");
     }
 
@@ -236,6 +252,8 @@ contract NativeAsyncSwapTest is Test {
         vm.stopPrank();
 
         order = _withAssignedSalt(order);
+        // The filler takes the order's net input; the maker's input fee goes to the vault.
+        order.amountIn = _net(1 ether);
 
         uint256 bobEthBefore = bob.balance;
         uint256 bobErc20Before = erc20.balanceOf(bob);
@@ -252,7 +270,7 @@ contract NativeAsyncSwapTest is Test {
         assertEq(
             bobEthBefore - bob.balance, 0.9 ether + hook.calculatePoolFee(order.key.fee, 0.9 ether), "filler paid ETH"
         );
-        assertEq(erc20.balanceOf(bob) - bobErc20Before, 1 ether, "filler received TST");
+        assertEq(erc20.balanceOf(bob) - bobErc20Before, _net(1 ether), "filler received TST");
         assertEq(alice.balance, aliceEthBefore, "no native callback during fill");
         assertEq(manager.balanceOf(alice, 0), 0.9 ether, "maker received ETH claims");
     }

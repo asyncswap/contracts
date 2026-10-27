@@ -77,8 +77,8 @@ FeeVault owns claims recorded in PoolManager. Crediting those claims does not ca
 ```mermaid
 flowchart TB
     subgraph PoolManager["PoolManager (custody)"]
-        Escrow["ERC-6909 claims owned by the hook<br/>one balance per currency<br/>= Σ open orders' remaining input<br/>+ escrowed priority bids"]
-        Fees["ERC-6909 claims owned by FeeVault<br/>= accrued 30 bps fill fees<br/>+ settled priority bids"]
+        Escrow["ERC-6909 claims owned by the hook<br/>one balance per currency<br/>= Σ open orders' remaining input<br/>+ their escrowed 0.03% input fees<br/>+ escrowed priority bids"]
+        Fees["ERC-6909 claims owned by FeeVault<br/>= accrued trade fees (both currencies)<br/>+ settled priority bids"]
         User["ERC-6909 claims owned by makers / fillers<br/>match proceeds and dust refunds (any currency),<br/>native fill proceeds (claim ID 0)"]
         Reserves["Pool reserves<br/>v4 LP positions"]
     end
@@ -93,9 +93,14 @@ flowchart TB
     User -->|TokenClaims.redeem /<br/>NativeClaims.redeem| MakerW
 ```
 
-Fees, by path: an order-to-order match charges nothing; a filler fill (`Router.fillOrder`) pays
-the maker's live minimum plus 30 bps of gross output, and that fee lands in the FeeVault as claims;
-an LP fill charges the 30 bps dynamic LP fee to the active v4 positions. `calculateHookFee` is zero.
+Fees, by path. At creation 0.03% of each deposit (rounded up) is set aside as the order's input fee;
+the book trades only the rest, so every fill still pays the maker at least its signed minimum. An
+order-to-order match charges each side 0.03% of its input: the filled share of each order's input fee
+moves to the FeeVault in that order's input currency. A filler fill (`Router.fillOrder`) moves the
+maker's remaining input fee to the FeeVault and the filler pays the maker's live minimum plus 0.03% of
+gross output, also to the FeeVault. An LP fill sends 0.01% of the maker's whole remaining deposit to the
+FeeVault and swaps the rest at a 0.02% dynamic LP fee for the active v4 positions. Cancelling, or a
+remainder closed below the pool minimum, refunds the unused input fee. `calculateHookFee` is zero.
 Priority bids are escrowed as hook claims by `addOrder` and settle to the FeeVault: the filled share
 as input fills, the rest when the order closes. They never go to LPs, so liquidity added just before
 a settlement earns none of them.
@@ -167,10 +172,10 @@ redemption and fee collection are drawn step by step in
 [`contract-call-sequences.md`](contract-call-sequences.md); the lifecycle and priority-bid flowcharts
 are in [`order-lifecycle.md`](order-lifecycle.md). Three facts to keep in mind while reading them:
 
-- An order-to-order match charges no fee. The 30 bps protocol fee is paid by the filler on top of the
-  maker's live minimum and is credited to the FeeVault as ERC-6909 claims inside the PoolManager; the
-  LP-fill path instead charges the 30 bps dynamic LP fee to active v4 positions. `calculateHookFee`
-  is zero.
+- Book matches and filler fills charge 0.03% of each side's input to the protocol, credited to the
+  FeeVault as ERC-6909 claims inside the PoolManager; the LP-fill path charges 0.02% to active v4
+  positions and 0.01% to the FeeVault. Because each maker's limit applies to its input after the fee,
+  two orders whose limits meet exactly no longer cross. `calculateHookFee` is zero.
 - `updatePrice` only re-ranks the order in the book. It needs no PoolManager unlock and triggers no
   matching; a later crossing order, `matchBook`, a filler or an LP retry has to execute it.
 - `matchNewOrder` is gated by a transient slot that `beforeSwap` writes for

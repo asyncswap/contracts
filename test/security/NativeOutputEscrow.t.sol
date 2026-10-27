@@ -57,7 +57,7 @@ contract NativeOutputEscrowTest is Test {
         manager.initialize(key, 2 ** 96);
 
         vm.deal(filler, 1 ether);
-        erc20.mint(filler, 100_001);
+        erc20.mint(filler, 110_000);
         vm.prank(filler);
         hook.setExecutor(poolId, address(router), true);
     }
@@ -84,10 +84,10 @@ contract NativeOutputEscrowTest is Test {
         uint256 STRANDED = 10 ether;
         vm.deal(address(hook), STRANDED);
 
-        AsyncOrder memory order = _order({ownerAddr: filler, zeroForOne: false, amountIn: 1, amountOutMin: STRANDED});
+        AsyncOrder memory order = _order({ownerAddr: filler, zeroForOne: false, amountIn: 10_000, amountOutMin: STRANDED});
 
         vm.startPrank(filler);
-        erc20.approve(address(router), 100_001);
+        erc20.approve(address(router), 110_000);
         router.swap(
             order,
             abi.encode(
@@ -100,8 +100,12 @@ contract NativeOutputEscrowTest is Test {
 
         // Patch salt so the fillOrder path resolves the same orderId the hook stored under.
         order.salt = keccak256(
-            abi.encode(block.timestamp, block.number, address(manager), filler, uint256(1), STRANDED, 100_000)
+            abi.encode(block.timestamp, block.number, address(manager), filler, uint256(10_000), STRANDED, 100_000)
         );
+        // The filler asks for the live input, net of the maker's 0.03% fee, so only the missing
+        // native output can make the fill revert.
+        (order.amountIn,) = hook.asyncOrderInfo(poolId, keccak256(abi.encode(block.chainid, poolId, filler, false, order.salt)));
+        assertEq(order.amountIn, 10_000 - 3);
 
         vm.prank(filler);
         vm.expectRevert();

@@ -5,6 +5,7 @@ import {FormalSlotsB} from "./FormalSlotsB.sol";
 import {AsyncFillerBookHarness, BookMintEndpoint} from "./AsyncFillerBookHarness.sol";
 import {PoolId} from "v4-core/types/PoolId.sol";
 import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @notice Bytecode checks of `formal/Refinement/Swarm/AsyncSwapAddOrder.lean`.
 ///
@@ -160,7 +161,9 @@ contract AsyncSwapAddOrderFormalTest is FormalSlotsB {
             return (false, abi.encodeWithSelector(AsyncFiller.PriorityFeeTooSmall.selector));
         }
         if (fee > MAX_FEE) return (false, abi.encodeWithSelector(AsyncFiller.PriorityFeeTooLarge.selector));
-        try a.priceKey(o.isBuy, o.zeroForOne, o.amountIn, o.amountOutMin) {}
+        // the input fee is set aside before pricing: a deposit that is all fee (0 or 1 wei) is rejected
+        if (_net(o.amountIn) == 0) return (false, abi.encodeWithSelector(AsyncFiller.ZeroAmount.selector));
+        try a.priceKey(o.isBuy, o.zeroForOne, _net(o.amountIn), o.amountOutMin) {}
         catch (bytes memory e) {
             return (false, e);
         }
@@ -185,7 +188,7 @@ contract AsyncSwapAddOrderFormalTest is FormalSlotsB {
     {
         return AsyncFiller.OrderInfo({
             owner: o.owner,
-            amountIn: o.amountIn,
+            amountIn: _net(o.amountIn),
             amountOutMin: o.amountOutMin,
             price: p,
             isBuy: o.isBuy,
@@ -193,8 +196,14 @@ contract AsyncSwapAddOrderFormalTest is FormalSlotsB {
             sequence: seq,
             priorityFee: uint64(o.priorityFee % 2 ** 64),
             priorityKey: uint128((o.priorityFee << 64) | (2 ** 64 - 1 - uint256(seq))),
-            createdSequence: seq
+            createdSequence: seq,
+            inputFee: uint128(o.amountIn - _net(o.amountIn))
         });
+    }
+
+    /// @dev The deposit left for the book after the 0.03% input fee, rounded up, is set aside.
+    function _net(uint256 amountIn) internal pure returns (uint256) {
+        return amountIn - Math.mulDiv(amountIn, 3, 10_000, Math.Rounding.Ceil);
     }
 
     /// @dev Every slot either harness wrote since `vm.record()` holds the same word in both. The two
@@ -291,6 +300,7 @@ contract AsyncSwapAddOrderFormalTest is FormalSlotsB {
         _assertAddState(o, seq0);
     }
 
+    /// @notice formal/Refinement/Swarm/AsyncSwapAddOrder.lean:76 — addOrder_run's full case split (now with a ZeroAmount case for a deposit that is all input fee, and the net amountIn / inputFee in the stored order). (semantics changed by the 0.03% trade fee; Lean statement needs updating)
     function testFuzz_addOrder_run(In memory x) public {
         _checkRun(x, false);
     }
@@ -327,7 +337,8 @@ contract AsyncSwapAddOrderFormalTest is FormalSlotsB {
         x.feeKind = 2;
         x.seqKind = 2;
         AsyncFiller.NewOrder memory o = _setup(x, mode);
-        try a.priceKey(o.isBuy, o.zeroForOne, o.amountIn, o.amountOutMin) {}
+        vm.assume(_net(o.amountIn) != 0); // hypothesis: the deposit is not all input fee
+        try a.priceKey(o.isBuy, o.zeroForOne, _net(o.amountIn), o.amountOutMin) {}
         catch {
             vm.assume(false); // hypothesis: _priceKey succeeds
         }
@@ -336,7 +347,7 @@ contract AsyncSwapAddOrderFormalTest is FormalSlotsB {
         assertEq(ret, _panic(0x11));
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapAddOrder.lean:144 — guards passing and _priceKey succeeding, nextSequence = 2^64 - 1 panics 0x11.
+    /// @notice formal/Refinement/Swarm/AsyncSwapAddOrder.lean:144 — guards passing and _priceKey succeeding, nextSequence = 2^64 - 1 panics 0x11. A new guard (the deposit net of the input fee is non-zero, else ZeroAmount) now precedes _priceKey. (semantics changed by the 0.03% trade fee; Lean statement needs updating)
     function testFuzz_addOrder_seqOverflow(In memory x) public {
         _checkSeqOverflow(x, false);
     }
@@ -354,11 +365,11 @@ contract AsyncSwapAddOrderFormalTest is FormalSlotsB {
         assertLe(fee, MAX_FEE, "guard 3 passed");
         assertLt(uint256(seq0) + 1, 2 ** 64, "seq fits uint64");
         // _priceKey succeeded (and is pure, so it left storage alone)
-        assertEq(a.order(PID, o.id).price, a.priceKey(o.isBuy, o.zeroForOne, o.amountIn, o.amountOutMin));
+        assertEq(a.order(PID, o.id).price, a.priceKey(o.isBuy, o.zeroForOne, _net(o.amountIn), o.amountOutMin));
         _assertAddState(o, seq0);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapAddOrder.lean:167 — success implies the guards passed, _priceKey gave p in [1, 2^128), seq fits uint64, and the final state is _append(addState(...newOrder(p, seq), seq)).
+    /// @notice formal/Refinement/Swarm/AsyncSwapAddOrder.lean:167 — success implies the guards passed, _priceKey gave p in [1, 2^128), seq fits uint64, and the final state is _append(addState(...newOrder(p, seq), seq)). newOrder now stores amountIn net of the 0.03% input fee (p priced on it) and the fee in inputFee, past a new ZeroAmount guard on the net amount. (semantics changed by the 0.03% trade fee; Lean statement needs updating)
     function testFuzz_addOrder_ok(In memory x) public {
         _checkOk(x, false);
     }
@@ -370,6 +381,7 @@ contract AsyncSwapAddOrderFormalTest is FormalSlotsB {
         x.amtKind = x.amtKind % 2 == 0 ? 1 : 2;
         x.seqKind = x.seqKind % 2 == 0 ? 0 : 3;
         o = _setup(x, mode);
+        if (_net(o.amountIn) == 0) o.amountIn = 2; // a 1-wei deposit is all input fee (ZeroAmount)
         vm.assume(_nextSeqOf(a) < type(uint64).max);
         seq0 = _nextSeqOf(a);
         vm.record();
@@ -382,7 +394,7 @@ contract AsyncSwapAddOrderFormalTest is FormalSlotsB {
         AsyncFiller.OrderInfo memory s = a.order(PID, o.id);
         uint64 seq = seq0 + 1;
         assertEq(s.owner, o.owner);
-        assertEq(s.amountIn, o.amountIn);
+        assertEq(s.amountIn, _net(o.amountIn));
         assertEq(s.amountOutMin, o.amountOutMin);
         assertGe(s.price, 1);
         assertEq(s.isBuy, o.isBuy);
@@ -463,7 +475,7 @@ contract AsyncSwapAddOrderFormalTest is FormalSlotsB {
             was[i] = _loadHook(slots[i]);
         }
         vm.record();
-        _placeOrder(alice, zeroForOne, bound(amountIn, 1, 50 ether), bound(amountOutMin, 1, 1e30));
+        _placeOrder(alice, zeroForOne, bound(amountIn, 2, 50 ether), bound(amountOutMin, 1, 1e30));
         bytes32[] memory w = _hookWrites();
         for (uint256 i; i < 5; ++i) {
             assertEq(_loadHook(slots[i]), was[i]);
@@ -486,7 +498,7 @@ contract AsyncSwapAddOrderFormalTest is FormalSlotsB {
         _assertSameStorage();
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapAddOrder.lean:263 — AsyncMatching.addOrder has addOrder_run's full case split on the NewOrder's fields.
+    /// @notice formal/Refinement/Swarm/AsyncSwapAddOrder.lean:263 — AsyncMatching.addOrder has addOrder_run's full case split on the NewOrder's fields (now with a ZeroAmount case for a deposit that is all input fee, and the net amountIn / inputFee in the stored order). (semantics changed by the 0.03% trade fee; Lean statement needs updating)
     function testFuzz_matching_addOrder_run(In memory x) public {
         _checkRun(x, true);
     }
@@ -501,12 +513,12 @@ contract AsyncSwapAddOrderFormalTest is FormalSlotsB {
         _checkFeeTooLarge(x, true);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapAddOrder.lean:309 — AsyncMatching.addOrder: guards passing and _priceKey succeeding, nextSequence = 2^64 - 1 panics 0x11.
+    /// @notice formal/Refinement/Swarm/AsyncSwapAddOrder.lean:309 — AsyncMatching.addOrder: guards passing and _priceKey succeeding, nextSequence = 2^64 - 1 panics 0x11. A new guard (the deposit net of the input fee is non-zero, else ZeroAmount) now precedes _priceKey. (semantics changed by the 0.03% trade fee; Lean statement needs updating)
     function testFuzz_matching_addOrder_seqOverflow(In memory x) public {
         _checkSeqOverflow(x, true);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapAddOrder.lean:324 — AsyncMatching.addOrder success implies the guards passed, p in [1, 2^128), seq fits, final state = _append(addState(...)).
+    /// @notice formal/Refinement/Swarm/AsyncSwapAddOrder.lean:324 — AsyncMatching.addOrder success implies the guards passed, p in [1, 2^128), seq fits, final state = _append(addState(...)). addState now stores the net amountIn and the inputFee. (semantics changed by the 0.03% trade fee; Lean statement needs updating)
     function testFuzz_matching_addOrder_ok(In memory x) public {
         _checkOk(x, true);
     }

@@ -83,7 +83,8 @@ sequenceDiagram
     opt Incoming order still has a remainder
         Hook->>Hook: External self-call fillOrderFromPoolLiquidity(order, id)
         Hook->>Match: fillFromPoolLiquidity(...)
-        Match->>PM: Burn remaining input claims, temporarily set 30 bps LP fee
+        Match->>Vault: Credit 0.01% of the remaining deposit as protocol fee claims
+        Match->>PM: Burn the rest of the input claims, temporarily set 0.02% LP fee
         Match->>PM: swap(remaining exact input)
         Note over Hook,PM: Hook-originated swap skips this hook's callbacks, it does not create another order.
         PM-->>Match: Actual input and output deltas

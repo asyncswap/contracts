@@ -49,7 +49,7 @@ contract AsyncSwapAsyncOrderFormalTest is FormalSlotsB {
         uint256 a = bound(amountIn, 2, 50 ether);
         (, bytes32 id) = _placeOrder(alice, true, a, a / 2);
         assertEq(hook.asyncOrder(poolId, id), uint256(_loadHook(_add(_orderSlot(poolId, id), 1))));
-        assertEq(hook.asyncOrder(poolId, id), a);
+        assertEq(hook.asyncOrder(poolId, id), _inNet(a), "the deposit net of the input fee");
     }
 
     /// @notice formal/Refinement/Swarm/AsyncSwapAsyncOrder.lean:41 — the result depends only on asyncOrders (not other

@@ -172,20 +172,22 @@ contract AsyncSwapHelpersFormalTest is HookHelpersCasesB {
         assertEq(matched, bk > sk ? 1 : 0, "matched iff buyKey > sellKey");
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapHelpers.lean:250 — equal price keys: the buy crosses iff `b.amountIn * s.amountIn / s.amountOutMin >= b.amountOutMin`.
+    /// @notice formal/Refinement/Swarm/AsyncSwapHelpers.lean:250 — equal price keys: the buy crosses iff `b.amountIn * s.amountIn / s.amountOutMin >= b.amountOutMin`
+    ///         (stored amountIn: the deposits `sIn`, `bIn` net of the input fee).
     function testFuzz_crosses_eq(uint256 sIn, uint256 sOut, uint256 bOut, uint256 bIn) public {
         sIn = bound(sIn, 1e6, 1e24);
         sOut = bound(sOut, sIn / WAD + 1, sIn * 1e6 < 1e24 ? sIn * 1e6 : 1e24);
-        uint256 k = _expectedPriceKey(false, sIn, sOut);
+        uint256 k = _expectedPriceKey(false, _inNet(sIn), sOut);
         bOut = bound(bOut, 1e18, 1e24);
-        // A buy within one tick of the ask's price; keep the ones that share its tick.
-        uint256 mid = sOut * bOut / sIn;
+        // A buy within one tick of the ask's price; keep the ones that share its tick. The deposit
+        // that leaves `mid` after the input fee is about mid * 10_000 / 9_997.
+        uint256 mid = sOut * bOut / _inNet(sIn) * 10_000 / 9_997;
         bIn = bound(bIn, mid - mid / 10_000, mid + mid / 10_000);
-        vm.assume(_expectedPriceKey(true, bIn, bOut) == k);
+        vm.assume(_expectedPriceKey(true, _inNet(bIn), bOut) == k);
         (,, uint128 sk, uint128 bk) = _restPair(sIn, sOut, bIn, bOut);
         assertEq(uint256(sk), k, "sell key");
         assertEq(bk, sk, "equal keys");
-        bool crosses = bIn * sIn / sOut >= bOut;
+        bool crosses = _inNet(bIn) * _inNet(sIn) / sOut >= bOut;
         uint8 matched = _matchOne();
         assertEq(matched, crosses ? 1 : 0, "matched iff the full-precision cross holds");
     }
@@ -200,21 +202,23 @@ contract AsyncSwapHelpersFormalTest is HookHelpersCasesB {
 
     /// @notice A buy left with 1e30 - 1 input for a minimum of 1 saturated the WAD key at 2^128 - 1; its
     ///         ratio is inside the v4 range, so it now has its own tick.
+    ///         (Deposits: the ask's 2 wei is 1 wei net of the input fee; the bid's net is _inNet(1e30).)
     function test_priceKey_eq_formerHighClamp() public {
-        (, bytes32 bidId,,) = _restPair(1, 1, 1e30, 1);
+        (, bytes32 bidId,,) = _restPair(2, 1, 1e30, 1);
         assertEq(_matchOne(), 1);
         (, uint256 a, uint256 o, uint128 k, bool isBuy,,) = hook.orderBookOrder(poolId, bidId);
         assertTrue(isBuy);
-        assertEq(a, 1e30 - 1);
-        assertEq(o, 1, "ceil(1 * (1e30 - 1) / 1e30)");
+        assertEq(a, _inNet(1e30) - 1);
+        assertEq(o, 1, "ceil(1 * (net - 1) / net)");
         assertEq(k, _expectedPriceKey(true, a, o), "tick key");
         assertLt(k, MAX_PRICE_KEY, "below the top key");
     }
 
     /// @notice A sell left with ~6.7e29 input for a minimum of 3 floored the WAD key to 1; its ratio is
     ///         inside the v4 range, so it now has its own tick.
+    ///         (Deposits: the bid's 2 wei is 1 wei net of the input fee.)
     function test_priceKey_eq_formerLowClamp() public {
-        (bytes32 askId,,,) = _restPair(1e30, 3, 1, 1);
+        (bytes32 askId,,,) = _restPair(1e30, 3, 2, 1);
         assertEq(_matchOne(), 1);
         (, uint256 a, uint256 o, uint128 k, bool isBuy,,) = hook.orderBookOrder(poolId, askId);
         assertFalse(isBuy);
@@ -236,10 +240,12 @@ contract AsyncSwapHelpersFormalTest is HookHelpersCasesB {
         pure
         returns (uint256, uint256, uint256, uint256)
     {
-        sIn = bound(sIn, 1, 1e30);
+        sIn = bound(sIn, 2, 1e30); // deposits of at least 2: 1 wei is all input fee
         sOut = bound(sOut, 1, 1e30);
         bOut = bound(bOut, 1, 1e30);
-        uint256 minIn = (bOut * sOut + sIn - 1) / sIn;
+        uint256 sNet = _inNet(sIn);
+        uint256 minIn = (bOut * sOut + sNet - 1) / sNet; // least net bid input
+        minIn += (minIn * 3 + 9_996) / 9_997 + 1; // its deposit, with the input fee on top
         if (minIn > 1e32) minIn = 1e32;
         bIn = bound(bIn, minIn, 1e32);
         return (sIn, sOut, bOut, bIn);

@@ -55,7 +55,7 @@ contract AsyncSwapFillOrderFromPoolLiquidityFormalTest is HookUnlockBase {
     function testFuzz_fillOrderFromPoolLiquidity_noLiquidity(uint256 amountIn, bool zeroForOne, uint256 amountOutMin)
         public
     {
-        amountIn = bound(amountIn, 1, 50 ether);
+        amountIn = bound(amountIn, 2, 50 ether); // a 1-wei deposit is all input fee (ZeroAmount)
         amountOutMin = bound(amountOutMin, 1, 1e30);
         (AsyncOrder memory o, bytes32 id) = _placeOrder(alice, zeroForOne, amountIn, amountOutMin);
         assertEq(manager.getLiquidity(poolId), 0);
@@ -63,7 +63,7 @@ contract AsyncSwapFillOrderFromPoolLiquidityFormalTest is HookUnlockBase {
         _run(_selfFill(o, id));
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapFillOrderFromPoolLiquidity.lean:175 — a successful pool swap: liquidity != 0, the escrowed input claims (amtIn) are burned from the hook, the swap runs at LP fee 3000 and the previous fee is restored, the full input is consumed and out >= amtOutMin.
+    /// @notice formal/Refinement/Swarm/AsyncSwapFillOrderFromPoolLiquidity.lean:175 — a successful pool swap: liquidity != 0, the escrowed input claims (amtIn) are burned from the hook, the swap runs at LP fee 3000 and the previous fee is restored, the full input is consumed and out >= amtOutMin. Now the whole deposit (amtIn + inputFee) leaves the hook's claims: the protocol's 0.01% to the FeeVault, the rest swapped at LP fee 200. (semantics changed by the 0.03% trade fee; Lean statement needs updating)
     function testFuzz_swapAgainstPool_ok(uint256 amountIn, uint256 limitBps, bool zeroForOne) public {
         amountIn = bound(amountIn, 1e6, 10 ether);
         uint256 amountOutMin = amountIn * bound(limitBps, 1, 9_900) / 10_000 + 1;
@@ -80,17 +80,17 @@ contract AsyncSwapFillOrderFromPoolLiquidityFormalTest is HookUnlockBase {
         assertEq(
             claimsBefore - _claims(address(hook), inC),
             amountIn + (zeroForOne ? 0 : 100_000),
-            "input and bid claims burned"
+            "deposit (swapped input and protocol fee) and bid claims spent"
         );
         assertEq(_lpFee(), feeBefore, "LP fee restored");
         assertEq(feeBefore, 0, "pool fee was 0 before");
-        assertGt(_inputFeeGrowth(zeroForOne) - gBefore, 0, "a non-zero (3000) LP fee was charged on the input");
+        assertGt(_inputFeeGrowth(zeroForOne) - gBefore, 0, "a non-zero (200) LP fee was charged on the input");
         assertGe(out.balanceOf(alice) - makerBefore, amountOutMin, "out >= amountOutMin");
     }
 
     /// @notice formal/Refinement/Swarm/AsyncSwapFillOrderFromPoolLiquidity.lean:261 — a success (real self-call via tryFill) was on a stored order, produced out >= stored amountOutMin, paid it to the stored maker, and cleared the order; otherwise nothing changed.
     function testFuzz_fillOrderFromPoolLiquidity_ok(uint256 amountIn, uint256 limitBps, bool zeroForOne) public {
-        amountIn = bound(amountIn, 1, 5_000 ether);
+        amountIn = bound(amountIn, 2, 5_000 ether);
         uint256 amountOutMin = amountIn * bound(limitBps, 1, 20_000) / 10_000 + 1;
         topUp(alice, 5_000 ether);
         (AsyncOrder memory o, bytes32 id) = _placeOrder(alice, zeroForOne, amountIn, amountOutMin);
@@ -103,11 +103,11 @@ contract AsyncSwapFillOrderFromPoolLiquidityFormalTest is HookUnlockBase {
             assertGe(out.balanceOf(alice) - makerBefore, amountOutMin, "out >= amountOutMin to stored maker");
         } else {
             assertEq(out.balanceOf(alice), makerBefore, "failed fill paid nothing");
-            assertEq(hook.asyncOrder(poolId, id), amountIn, "order rests");
+            assertEq(hook.asyncOrder(poolId, id), _inNet(amountIn), "order rests");
         }
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapFillOrderFromPoolLiquidity.lean:293 — full fill paid to the stored maker orders[id].owner (not the calldata owner): exact stored amountIn burned, LP fee restored, out >= amountOutMin is exactly what left the PoolManager, order cleared, escrowed bid settled.
+    /// @notice formal/Refinement/Swarm/AsyncSwapFillOrderFromPoolLiquidity.lean:293 — full fill paid to the stored maker orders[id].owner (not the calldata owner): exact stored amountIn burned, LP fee restored, out >= amountOutMin is exactly what left the PoolManager, order cleared, escrowed bid settled. Now the hook spends the whole deposit (stored amountIn + inputFee): the protocol's 0.01% moves to the FeeVault and the rest is burned into the swap. (semantics changed by the 0.03% trade fee; Lean statement needs updating)
     function testFuzz_fillOrderFromPoolLiquidity_ok_full(
         uint256 amountIn,
         address fakeOwner,
@@ -140,7 +140,7 @@ contract AsyncSwapFillOrderFromPoolLiquidityFormalTest is HookUnlockBase {
         assertGe(paid, 1, "out >= amountOutMin");
         assertEq(b[2] - a[2], paid, "out is what left the PoolManager");
         if (fakeOwner != address(manager)) assertEq(a[1], b[1], "calldata owner not paid");
-        if (zeroForOne) assertEq(b[3] - a[3], amountIn, "stored amountIn burned");
+        if (zeroForOne) assertEq(b[3] - a[3], amountIn, "the whole deposit (net amountIn + input fee) spent");
         assertEq(b[4] - a[4] - (zeroForOne ? 0 : amountIn), bid, "paid bid settled (donated)");
         assertEq(_lpFee(), 0, "fee restored");
         assertEq(hook.asyncOrder(poolId, id), 0, "orders[id] := default");

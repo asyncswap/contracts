@@ -72,8 +72,14 @@ contract AsyncSwapSettleMatchedPriorityFeeFormalTest is FormalMatchD {
             (uint256 u,) = _unfilled(sd[i], r.ops);
             assertEq(u, 0, "returns 0");
         }
+        // The FeeVault gets only the matched input-fee shares (sell in currency0, buy in currency1).
         for (uint256 i; i < r.ops.length; ++i) {
-            assertTrue(r.ops[i].who != address(hook.feeVault()), "nothing forfeited");
+            if (r.ops[i].who != address(hook.feeVault())) continue;
+            assertEq(
+                r.ops[i].amount,
+                r.ops[i].cur == c.k.currency0.toId() ? _filledFee(r.sell0, r.asset) : _filledFee(r.buy0, r.quote),
+                "nothing forfeited: only the input fee"
+            );
         }
         _assertOps(r.ops, _expected(c, r));
     }

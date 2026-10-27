@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import {SetupHook} from "./SetupHook.t.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {AsyncSwap} from "@async-swap/AsyncSwap.sol";
 import {TokenClaims} from "@async-swap/TokenClaims.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
@@ -81,6 +82,8 @@ contract TokenClaimsTest is SetupHook {
     using PoolIdLibrary for PoolKey;
 
     uint256 constant AMOUNT = 10 ether;
+    /// @dev The deposit whose input after the maker's 0.03% fee is exactly AMOUNT.
+    uint256 DEPOSIT = Math.mulDiv(AMOUNT, 10_000, 9_997, Math.Rounding.Ceil);
 
     address alice = makeAddr("alice"); // seller of token0
     address bob = makeAddr("bob"); // buyer of token0
@@ -105,12 +108,12 @@ contract TokenClaimsTest is SetupHook {
         router.swap(order, abi.encode(AsyncSwap.UserParams(maker, address(router), amountOutMin, 100_000)));
     }
 
-    /// @dev Alice sells AMOUNT token0 to Bob at 1:1: Alice is credited token1 claims, Bob token0 claims.
+    /// @dev Alice sells AMOUNT token0 (net of her input fee) to Bob at 1:1: Alice is credited token1 claims, Bob token0 claims.
     function _match() internal {
         vm.prank(alice);
-        token0.approve(address(router), AMOUNT);
-        _swap(key, alice, true, AMOUNT, AMOUNT);
-        _swap(key, bob, false, AMOUNT, AMOUNT);
+        token0.approve(address(router), DEPOSIT);
+        _swap(key, alice, true, DEPOSIT, AMOUNT);
+        _swap(key, bob, false, DEPOSIT, AMOUNT);
         assertEq(manager.balanceOf(alice, currency1.toId()), AMOUNT, "seller credited quote claims");
         assertEq(manager.balanceOf(bob, currency0.toId()), AMOUNT, "buyer credited asset claims");
     }
@@ -207,16 +210,16 @@ contract TokenClaimsTest is SetupHook {
         manager.initialize(hookedKey, 2 ** 96);
         PoolId hookedPoolId = hookedKey.toId();
 
-        hooked.mint(bob, AMOUNT);
+        hooked.mint(bob, DEPOSIT);
         vm.startPrank(bob);
         hook.setExecutor(hookedPoolId, address(router), true);
-        hooked.approve(address(router), AMOUNT);
+        hooked.approve(address(router), DEPOSIT);
         vm.stopPrank();
         vm.prank(alice);
         hook.setExecutor(hookedPoolId, address(router), true);
 
-        _swap(hookedKey, bob, hookedIsZero, AMOUNT, AMOUNT);
-        _swap(hookedKey, alice, !hookedIsZero, AMOUNT, AMOUNT);
+        _swap(hookedKey, bob, hookedIsZero, DEPOSIT, AMOUNT);
+        _swap(hookedKey, alice, !hookedIsZero, DEPOSIT, AMOUNT);
         assertEq(manager.balanceOf(alice, hookedCurrency.toId()), AMOUNT, "buyer credited hooked claims");
     }
 

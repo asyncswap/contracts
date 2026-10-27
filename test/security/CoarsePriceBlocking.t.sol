@@ -7,8 +7,10 @@ import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {MockERC20} from "../utils/MockERC20.sol";
 import {Currency} from "v4-core/types/Currency.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-/// @notice Regression for exact eligibility with real Router, hook and PoolManager.
+/// @notice Regression for exact eligibility with real Router, hook and PoolManager. Orders are built
+///         on net terms: each deposit nets exactly the stated input after the maker's 0.03% fee.
 contract CoarsePriceBlockingTest is SetupHook {
     address blocker = makeAddr("blocker");
     address seller = makeAddr("seller");
@@ -38,10 +40,20 @@ contract CoarsePriceBlockingTest is SetupHook {
         topUp(buyer, 100 ether);
     }
 
-    function submit(address maker, bool zfo, uint256 amount, uint256 minimum, uint256 bid)
+    /// @dev The deposit whose input net of the 0.03% fee is exactly `net`.
+    function _gross(uint256 net) internal pure returns (uint256 g) {
+        g = net * 10_000 / 9997;
+        while (g - Math.mulDiv(g, 3, 10_000, Math.Rounding.Ceil) < net) g++;
+        while (g - Math.mulDiv(g, 3, 10_000, Math.Rounding.Ceil) > net) g--;
+        require(g - Math.mulDiv(g, 3, 10_000, Math.Rounding.Ceil) == net, "no deposit nets to this amount");
+    }
+
+    /// @dev Rest an order whose net input on the book is `net`.
+    function submit(address maker, bool zfo, uint256 net, uint256 minimum, uint256 bid)
         internal
         returns (AsyncOrder memory order)
     {
+        uint256 amount = _gross(net);
         bytes32 salt =
             keccak256(abi.encode(block.timestamp, block.number, address(manager), maker, amount, minimum, bid));
         while (hook.asyncOrder(poolId, _orderIdFor(maker, zfo, salt)) != 0) {
@@ -99,9 +111,9 @@ contract CoarsePriceBlockingTest is SetupHook {
     /// Audit 2026-10-23 finding 1: asks of 10,100 and 10,800 USDC for 1e27 asset units shared WAD key
     /// 10, so the worse, older, higher-bid ask filled first. Their ticks differ, so price comes first.
     function test_worsePriceCannotJumpAheadWithBidOrAge() public {
-        topUp(blocker, 1e27);
-        topUp(seller, 1e27);
-        topUp(buyer, 1e27);
+        topUp(blocker, 2e27);
+        topUp(seller, 2e27);
+        topUp(buyer, 2e27);
         AsyncOrder memory worse = submit(blocker, true, 1e27, 10_800e6, 110_000);
         AsyncOrder memory better = submit(seller, true, 1e27, 10_100e6, 100_000);
         assertLt(

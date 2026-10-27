@@ -294,16 +294,18 @@ contract SpecCoreFormalTest is FormalSlotsB, IUnlockCallback {
         Out memory o = _run(s);
         assertTrue(o.ok);
         _assertWrote(_add(_orderSlot(poolId, _idAt(s, 0)), 1));
-        assertEq(hook.asyncOrder(poolId, _idAt(s, 0)), 1 ether, "_createOrder changed the hook's storage");
+        assertEq(hook.asyncOrder(poolId, _idAt(s, 0)), _inNet(1 ether), "_createOrder changed the hook's storage");
     }
 
-    /// @dev The order record `addOrder` stores for `newOrderOf id amountIn hd isBuy zfo` at sequence `seq`.
+    /// @dev The order record `addOrder` stores for `newOrderOf id amountIn hd isBuy zfo` at sequence `seq`:
+    ///      the book holds the deposit net of the 0.03% input fee, which is kept in `inputFee`.
     function _assertStored(Swap memory s, bytes32 id, uint64 seq, bytes32) internal view {
         bytes32 o = _orderSlot(poolId, id);
         bool isBuy = !s.zeroForOne; // specified == numeraire (currency1)
-        uint256 price = AsyncFiller._priceKey(isBuy, s.zeroForOne, s.amt, s.aom);
+        uint256 price = AsyncFiller._priceKey(isBuy, s.zeroForOne, _inNet(s.amt), s.aom);
         assertEq(uint256(_loadHook(o)), uint256(uint160(s.user)), "owner = hookData.user");
-        assertEq(uint256(_loadHook(_add(o, 1))), s.amt, "amountIn");
+        assertEq(uint256(_loadHook(_add(o, 1))), _inNet(s.amt), "amountIn (net of the input fee)");
+        assertEq(uint256(_loadHook(_add(o, 5))), _inFee(s.amt), "inputFee");
         assertEq(uint256(_loadHook(_add(o, 2))), s.aom, "amountOutMin = hookData.amountOutMin");
         uint256 packed = uint256(_loadHook(_add(o, 3)));
         assertEq(uint128(packed), price, "price key");
@@ -318,7 +320,7 @@ contract SpecCoreFormalTest is FormalSlotsB, IUnlockCallback {
         assertEq(tail, id, "appended at the tail");
     }
 
-    /// @notice formal/Refinement/Swarm/SpecCoreAsyncSwap.lean:119 — `CreateOrderSpec.run`: authorised with nonzero amounts and the walk stopping at step `k` (the first `k` ids occupied), `_createOrder` is `addOrder(newOrderOf (idAt k) …)` then `tstore(PENDING_MATCH_ID, id)`, `tstore(PENDING_MATCH_EXECUTOR, executor)`, and nothing else.
+    /// @notice formal/Refinement/Swarm/SpecCoreAsyncSwap.lean:119 — `CreateOrderSpec.run`: authorised with nonzero amounts and the walk stopping at step `k` (the first `k` ids occupied), `_createOrder` is `addOrder(newOrderOf (idAt k) …)` then `tstore(PENDING_MATCH_ID, id)`, `tstore(PENDING_MATCH_EXECUTOR, executor)`, and nothing else. newOrderOf now stores amountIn net of the 0.03% input fee and the fee in inputFee. (semantics changed by the 0.03% trade fee; Lean statement needs updating)
     function testFuzz_CreateOrderSpec_run(
         address user,
         address executor,
@@ -330,7 +332,7 @@ contract SpecCoreFormalTest is FormalSlotsB, IUnlockCallback {
     ) public {
         executor = address(router); // the hook's one trusted swap caller
         Swap memory s =
-            _swap(user, executor, zfo, bound(amt, 1, 2 ** 127 - 1), bound(aom, 1, type(uint128).max), 100_000);
+            _swap(user, executor, zfo, bound(amt, 2, 2 ** 127 - 1), bound(aom, 1, type(uint128).max), 100_000);
         _checkRun(s, bound(k, 0, 4), seed);
     }
 
@@ -375,7 +377,7 @@ contract SpecCoreFormalTest is FormalSlotsB, IUnlockCallback {
     ) public {
         executor = address(router); // the hook's one trusted swap caller
         Swap memory s =
-            _swap(user, executor, zfo, bound(amt, 1, 2 ** 127 - 1), bound(aom, 1, type(uint128).max), 100_000);
+            _swap(user, executor, zfo, bound(amt, 2, 2 ** 127 - 1), bound(aom, 1, type(uint128).max), 100_000);
         _checkRun(s, bound(k, 0, 4), seed);
     }
 
@@ -391,7 +393,7 @@ contract SpecCoreFormalTest is FormalSlotsB, IUnlockCallback {
     ) public {
         executor = address(router); // the hook's one trusted swap caller
         Swap memory s =
-            _swap(user, executor, zfo, bound(amt, 1, 2 ** 127 - 1), bound(aom, 1, type(uint128).max), 100_000);
+            _swap(user, executor, zfo, bound(amt, 2, 2 ** 127 - 1), bound(aom, 1, type(uint128).max), 100_000);
         PoolId other = PoolId.wrap(keccak256(abi.encode(seed, "other pool")));
         bytes32 otherState = _stateSlot(other);
         bytes32 otherBook = _bookSlot(other);
@@ -404,12 +406,12 @@ contract SpecCoreFormalTest is FormalSlotsB, IUnlockCallback {
         }
     }
 
-    /// @notice formal/Refinement/Swarm/SpecCoreAsyncSwap.lean:119 — `CreateOrderSpec.run`, natural collisions: the same maker repeating an identical order in one transaction gets ids `idAt 0`, `idAt 1`, `idAt 2`.
+    /// @notice formal/Refinement/Swarm/SpecCoreAsyncSwap.lean:119 — `CreateOrderSpec.run`, natural collisions: the same maker repeating an identical order in one transaction gets ids `idAt 0`, `idAt 1`, `idAt 2` (each holding the deposit net of the input fee). (semantics changed by the 0.03% trade fee; Lean statement needs updating)
     function testFuzz_CreateOrderSpec_run_repeat(address user, address executor, bool zfo, uint256 amt, uint256 aom)
         public
     {
         executor = address(router); // the hook's one trusted swap caller
-        amt = bound(amt, 1, 2 ** 120);
+        amt = bound(amt, 2, 2 ** 120); // a 1-wei deposit is all input fee (ZeroAmount)
         aom = bound(aom, 1, type(uint128).max);
         Swap memory s = _swap(user, executor, zfo, amt, aom, 100_000);
         s.times = 3;
@@ -418,13 +420,13 @@ contract SpecCoreFormalTest is FormalSlotsB, IUnlockCallback {
         Out memory o = _run(s);
         assertTrue(o.ok);
         for (uint256 k; k < 3; ++k) {
-            assertEq(hook.asyncOrder(poolId, _idAt(s, k)), amt, "walk step k holds the k-th copy");
+            assertEq(hook.asyncOrder(poolId, _idAt(s, k)), _inNet(amt), "walk step k holds the k-th copy");
         }
         _assertStored(s, _idAt(s, 2), seq + 3, _idAt(s, 1));
         assertEq(o.tId, uint256(_idAt(s, 2)), "the last id is handed off");
     }
 
-    /// @notice formal/Refinement/Swarm/SpecCoreAsyncSwap.lean:119 — `CreateOrderSpec.run` propagates `addOrder`'s guards: in FIFO a nonzero priority fee reverts `InvalidOrderingModeChange`; in PriorityFee mode a fee below the minimum reverts `PriorityFeeTooSmall`, above `2^64 - 1` `PriorityFeeTooLarge`, otherwise the order is stored with that fee.
+    /// @notice formal/Refinement/Swarm/SpecCoreAsyncSwap.lean:119 — `CreateOrderSpec.run` propagates `addOrder`'s guards: in FIFO a nonzero priority fee reverts `InvalidOrderingModeChange`; in PriorityFee mode a fee below the minimum reverts `PriorityFeeTooSmall`, above `2^64 - 1` `PriorityFeeTooLarge`, otherwise the order is stored with that fee. A deposit that is all input fee (1 wei) then reverts `ZeroAmount`; the stored amountIn is net of the input fee. (semantics changed by the 0.03% trade fee; Lean statement needs updating)
     function testFuzz_CreateOrderSpec_run_addOrderGuards(
         address user,
         address executor,
@@ -445,6 +447,8 @@ contract SpecCoreFormalTest is FormalSlotsB, IUnlockCallback {
             expected = abi.encodeWithSelector(AsyncFiller.PriorityFeeTooSmall.selector);
         } else if (pf > type(uint64).max) {
             expected = abi.encodeWithSelector(AsyncFiller.PriorityFeeTooLarge.selector);
+        } else if (_inNet(amt) == 0) {
+            expected = abi.encodeWithSelector(AsyncFiller.ZeroAmount.selector);
         }
         Out memory o = _run(s);
         if (expected.length != 0) {
@@ -453,7 +457,7 @@ contract SpecCoreFormalTest is FormalSlotsB, IUnlockCallback {
         } else {
             assertTrue(o.ok);
             if (!priority) _assertStored(s, _idAt(s, 0), seq, bytes32(0));
-            else assertEq(hook.asyncOrder(poolId, _idAt(s, 0)), amt);
+            else assertEq(hook.asyncOrder(poolId, _idAt(s, 0)), _inNet(amt));
             assertEq(o.tId, uint256(_idAt(s, 0)));
         }
     }

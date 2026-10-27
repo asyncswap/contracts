@@ -5,6 +5,7 @@ import {HookUnlockBase} from "./HookUnlockBase.sol";
 import {AsyncMatching} from "@async-swap/libraries/AsyncMatching.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {IPoolManager, SwapParams} from "v4-core/interfaces/IPoolManager.sol";
+import {IERC6909Claims} from "v4-core/interfaces/external/IERC6909Claims.sol";
 import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
 import {TickMath} from "v4-core/libraries/TickMath.sol";
 import {BalanceDelta, toBalanceDelta} from "v4-core/types/BalanceDelta.sol";
@@ -49,12 +50,22 @@ contract AsyncSwapSwapAgainstPoolFormalTest is HookUnlockBase {
     {
         topUp(alice, amountIn);
         (o, id) = _placeOrder(alice, zeroForOne, amountIn, amountOutMin);
-        assertEq(hook.asyncOrder(poolId, id), amountIn, "order rests (no pool liquidity at placement)");
+        assertEq(hook.asyncOrder(poolId, id), _inNet(amountIn), "order rests (no pool liquidity at placement)");
+    }
+
+    /// @dev The protocol's 0.01% of the whole `deposit` (net amountIn + escrowed input fee), rounded up.
+    function _protocolFee(uint256 deposit) internal pure returns (uint256) {
+        return (deposit + 9_999) / 10_000;
+    }
+
+    /// @dev What the pool fill swaps: the whole deposit less the protocol fee.
+    function _swapIn(uint256 deposit) internal pure returns (uint256) {
+        return deposit - _protocolFee(deposit);
     }
 
     /// @notice formal/Refinement/Swarm/AsyncSwapSwapAgainstPool.lean:33 — zero active liquidity: reverts NoActiveLiquidity before any external call (no burn).
     function testFuzz_swapAgainstPool_noLiquidity(uint256 amountIn, uint256 amountOutMin, bool zeroForOne) public {
-        amountIn = bound(amountIn, 1, 1e30);
+        amountIn = bound(amountIn, 2, 1e30); // a 1-wei deposit is all input fee (ZeroAmount)
         amountOutMin = bound(amountOutMin, 1, 1e30);
         (AsyncOrder memory o, bytes32 id) = _order(amountIn, amountOutMin, zeroForOne);
         assertEq(manager.getLiquidity(poolId), 0);
@@ -65,7 +76,7 @@ contract AsyncSwapSwapAgainstPoolFormalTest is HookUnlockBase {
         _run(_selfFill(o, id));
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapSwapAgainstPool.lean:45 — success: liquidity != 0; burn(hook, input, amountIn); LP fee 3000; one exact-input swap(key, (zfo, -amountIn, MIN+1 | MAX-1), ""); fee restored to the slot0 fee; amountIn < 2^127, full input, out = uint128(outputDelta) > 0 and >= amountOutMin.
+    /// @notice formal/Refinement/Swarm/AsyncSwapSwapAgainstPool.lean:45 — success: liquidity != 0; burn(hook, input, amountIn); LP fee 3000; one exact-input swap(key, (zfo, -amountIn, MIN+1 | MAX-1), ""); fee restored to the slot0 fee; amountIn < 2^127, full input, out = uint128(outputDelta) > 0 and >= amountOutMin. Now the swapped amount is amountIn + inputFee less the protocol's 0.01% (moved to the FeeVault first), and the LP fee is 200. (semantics changed by the 0.03% trade fee; Lean statement needs updating)
     function testFuzz_swapAgainstPool_success(uint256 amountIn, bool zeroForOne, uint24 prevFee) public {
         amountIn = bound(amountIn, 1e6, 10 ether);
         prevFee = uint24(bound(prevFee, 0, 1_000_000));
@@ -74,12 +85,17 @@ contract AsyncSwapSwapAgainstPoolFormalTest is HookUnlockBase {
         _setLpFee(prevFee);
         Currency input = zeroForOne ? currency0 : currency1;
         MockERC20 out = zeroForOne ? token1 : token0;
-        vm.expectCall(address(manager), abi.encodeCall(IPoolManager.burn, (address(hook), input.toId(), amountIn)));
-        vm.expectCall(address(manager), abi.encodeCall(IPoolManager.updateDynamicLPFee, (key, uint24(3000))));
+        uint256 swapIn = _swapIn(amountIn);
+        vm.expectCall(
+            address(manager),
+            abi.encodeCall(IERC6909Claims.transfer, (address(hook.feeVault()), input.toId(), _protocolFee(amountIn)))
+        );
+        vm.expectCall(address(manager), abi.encodeCall(IPoolManager.burn, (address(hook), input.toId(), swapIn)));
+        vm.expectCall(address(manager), abi.encodeCall(IPoolManager.updateDynamicLPFee, (key, uint24(200))));
         vm.expectCall(
             address(manager),
             abi.encodeCall(
-                IPoolManager.swap, (key, SwapParams(zeroForOne, -int256(amountIn), _limit(zeroForOne)), bytes(""))
+                IPoolManager.swap, (key, SwapParams(zeroForOne, -int256(swapIn), _limit(zeroForOne)), bytes(""))
             ),
             1
         );
@@ -92,7 +108,7 @@ contract AsyncSwapSwapAgainstPoolFormalTest is HookUnlockBase {
         assertEq(
             claimsBefore - _claims(address(hook), input),
             amountIn + (zeroForOne ? 0 : 100_000),
-            "input and bid claims burned"
+            "deposit (swapped input and protocol fee) and bid claims spent"
         );
         assertGt(got, 0, "outputDelta > 0");
         assertGe(got, 1, "out >= amountOutMin");
@@ -106,7 +122,7 @@ contract AsyncSwapSwapAgainstPoolFormalTest is HookUnlockBase {
         bool zeroForOne,
         bool withLiquidity
     ) public {
-        amountIn = bound(amountIn, 1, 1e24);
+        amountIn = bound(amountIn, 2, 1e24);
         amountOutMin = bound(amountOutMin, 1, 2 * amountIn);
         (AsyncOrder memory o, bytes32 id) = _order(amountIn, amountOutMin, zeroForOne);
         if (withLiquidity) _addPoolLiquidity(1e24);
@@ -136,17 +152,17 @@ contract AsyncSwapSwapAgainstPoolFormalTest is HookUnlockBase {
         vm.mockCall(address(manager), abi.encodeWithSelector(IPoolManager.swap.selector), abi.encode(delta));
     }
 
-    function _expectOkCalls(bool zeroForOne, uint256 amountIn, uint24 prevFee, uint256 out) internal {
-        SwapParams memory p = SwapParams(zeroForOne, -int256(amountIn), _limit(zeroForOne));
+    function _expectOkCalls(bool zeroForOne, uint256 swapIn, uint24 prevFee, uint256 out) internal {
+        SwapParams memory p = SwapParams(zeroForOne, -int256(swapIn), _limit(zeroForOne));
         vm.expectCall(address(manager), abi.encodeCall(IPoolManager.swap, (key, p, bytes(""))), 1);
-        vm.expectCall(address(manager), abi.encodeCall(IPoolManager.updateDynamicLPFee, (key, uint24(3000))));
+        vm.expectCall(address(manager), abi.encodeCall(IPoolManager.updateDynamicLPFee, (key, uint24(200))));
         vm.expectCall(address(manager), abi.encodeCall(IPoolManager.updateDynamicLPFee, (key, prevFee)));
         // the returned out = uint128(outputDelta) is what fillFromPoolLiquidity pays the maker
         Currency output = zeroForOne ? currency1 : currency0;
         vm.expectCall(address(manager), abi.encodeCall(IPoolManager.take, (output, alice, out)));
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapSwapAgainstPool.lean:92 — after the external calls succeed (amountIn < 2^127): PartialLiquidityFill unless inputDelta = -amountIn, then LimitPriceNotMet unless 0 < outputDelta and uint128(outputDelta) >= amountOutMin, else returns uint128(outputDelta). burn/swap/take are mocked; the swap returns a fuzzed delta.
+    /// @notice formal/Refinement/Swarm/AsyncSwapSwapAgainstPool.lean:92 — after the external calls succeed (amountIn < 2^127): PartialLiquidityFill unless inputDelta = -amountIn, then LimitPriceNotMet unless 0 < outputDelta and uint128(outputDelta) >= amountOutMin, else returns uint128(outputDelta). burn/swap/take are mocked; the swap returns a fuzzed delta. The swapped amount is now amountIn + inputFee less the protocol's 0.01%. (semantics changed by the 0.03% trade fee; Lean statement needs updating)
     function testFuzz_swapAgainstPool_spec(
         uint256 amountIn,
         uint256 amountOutMin,
@@ -156,25 +172,26 @@ contract AsyncSwapSwapAgainstPoolFormalTest is HookUnlockBase {
         uint8 sel,
         uint24 prevFee
     ) public {
-        amountIn = bound(amountIn, 1, 1e30);
+        amountIn = bound(amountIn, 2, 1e30);
         amountOutMin = bound(amountOutMin, 1, 2 ** 130);
         prevFee = uint24(bound(prevFee, 0, 1_000_000));
         (AsyncOrder memory o, bytes32 id) = _order(amountIn, amountOutMin, zeroForOne);
         _addPoolLiquidity(1e24);
         _setLpFee(prevFee);
-        if (sel % 3 != 0) inDelta = -int128(int256(amountIn)); // full fill
+        uint256 swapIn = _swapIn(amountIn);
+        if (sel % 3 != 0) inDelta = -int128(int256(swapIn)); // full fill
         if (sel % 3 == 2 && amountOutMin < uint128(type(int128).max)) {
             outDelta = int128(int256(bound(uint256(uint128(outDelta)), amountOutMin, uint128(type(int128).max))));
         }
         _mockPool(zeroForOne ? toBalanceDelta(inDelta, outDelta) : toBalanceDelta(outDelta, inDelta));
-        if (inDelta != -int128(int256(amountIn))) {
+        if (inDelta != -int128(int256(swapIn))) {
             vm.expectRevert(AsyncMatching.PartialLiquidityFill.selector);
             _run(_selfFill(o, id));
         } else if (outDelta <= 0 || uint256(uint128(outDelta)) < amountOutMin) {
             vm.expectRevert(AsyncMatching.LimitPriceNotMet.selector);
             _run(_selfFill(o, id));
         } else {
-            _expectOkCalls(zeroForOne, amountIn, prevFee, uint256(uint128(outDelta)));
+            _expectOkCalls(zeroForOne, swapIn, prevFee, uint256(uint128(outDelta)));
             _run(_selfFill(o, id));
             assertEq(hook.asyncOrder(poolId, id), 0, "filled");
             assertEq(_lpFee(), prevFee, "fee restored");

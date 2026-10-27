@@ -7,6 +7,7 @@ import {AsyncSwap} from "@async-swap/AsyncSwap.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {Router} from "@async-swap/Router.sol";
 import {MockERC20} from "../utils/MockERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Test} from "forge-std/Test.sol";
 import {PoolManager} from "v4-core/PoolManager.sol";
 import {Currency, IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
@@ -76,6 +77,11 @@ contract NativeFillExactPaymentTest is Test {
         return keccak256(abi.encode(block.chainid, poolId, maker, zeroForOne, salt));
     }
 
+    /// @dev A deposit's input net of the maker's 0.03% fee, rounded up: what the book holds.
+    function _net(uint256 amountIn) internal pure returns (uint256) {
+        return amountIn - Math.mulDiv(amountIn, 3, 10_000, Math.Rounding.Ceil);
+    }
+
     function _order(address maker, bool zeroForOne, uint256 amountIn, uint256 amountOutMin)
         internal
         view
@@ -94,7 +100,8 @@ contract NativeFillExactPaymentTest is Test {
     }
 
     /// @dev Maker submits a native-OUTPUT order (zeroForOne=false): deposits `amountIn` TST,
-    ///      asks `amountOutMin` ETH. Returns the order struct patched with the assigned salt.
+    ///      asks `amountOutMin` ETH. Returns the order struct patched with the assigned salt and
+    ///      the live input net of the maker's fee, which is what a filler can ask for.
     function _createNativeOutputOrder(uint256 amountIn, uint256 amountOutMin)
         internal
         returns (AsyncOrder memory order)
@@ -112,6 +119,9 @@ contract NativeFillExactPaymentTest is Test {
         );
         vm.stopPrank();
         order.salt = _expectedSalt(alice, amountIn, amountOutMin);
+        order.amountIn = _net(amountIn);
+        (uint256 live,) = hook.asyncOrderInfo(poolId, _orderIdFor(alice, false, order.salt));
+        assertEq(live, order.amountIn, "book holds the net input");
     }
 
     function _assertRejectedFill(AsyncOrder memory order, uint256 value) internal {
@@ -174,7 +184,7 @@ contract NativeFillExactPaymentTest is Test {
         assertEq(fillerBefore - bob.balance, 0.6 ether + fee, "filler pays live price");
         assertEq(alice.balance, makerBefore);
         assertEq(manager.balanceOf(alice, 0), 0.6 ether, "maker receives live price claims");
-        assertEq(erc20.balanceOf(bob) - tokensBefore, 1 ether, "filler receives input");
+        assertEq(erc20.balanceOf(bob) - tokensBefore, _net(1 ether), "filler receives net input");
         assertEq(address(hook).balance, 0, "no stranded ETH");
         assertEq(address(router).balance, 0, "no stranded ETH in router");
         (uint256 remaining,) = hook.asyncOrderInfo(poolId, _orderIdFor(alice, false, order.salt));
@@ -191,7 +201,7 @@ contract NativeFillExactPaymentTest is Test {
         assertEq(bob.balance, fillerBefore);
         assertEq(address(hook).balance, 0);
         (uint256 remaining,) = hook.asyncOrderInfo(poolId, _orderIdFor(alice, false, order.salt));
-        assertEq(remaining, 1 ether);
+        assertEq(remaining, _net(1 ether));
     }
 
     function test_control_fairFill_noStranding() public {

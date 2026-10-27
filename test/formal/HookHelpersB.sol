@@ -52,7 +52,7 @@ abstract contract HookHelpersCasesB is HookUnlockBase, LibHelpersCasesB {
             keccak256(abi.encode(block.timestamp, block.number, address(manager), maker, amountIn, amountOutMin, fee));
         id = _orderIdFor(maker, zeroForOne, order.salt);
         (, uint256 amt,,,,,) = hook.orderBookOrder(poolId, id);
-        assertEq(amt, amountIn, "order rests");
+        assertEq(amt, _inNet(amountIn), "order rests (net of the input fee)");
     }
 
     /// @dev `_priorityKey(fee, seq) = (uint128(fee) << 64) | (2^64 - 1 - seq)`; for a 64-bit fee that is
@@ -95,7 +95,8 @@ abstract contract HookHelpersCasesB is HookUnlockBase, LibHelpersCasesB {
     }
 
     /// @dev The book's best bid / ask after resting `ask = (sIn asset -> sOut quote)` and
-    ///      `bid = (bIn quote -> bOut asset)`.
+    ///      `bid = (bIn quote -> bOut asset)`. `sIn` / `bIn` are deposits: the book holds them net of
+    ///      the 0.03% input fee (`_inNet`).
     function _restPair(uint256 sIn, uint256 sOut, uint256 bIn, uint256 bOut)
         internal
         returns (bytes32 askId, bytes32 bidId, uint128 sk, uint128 bk)

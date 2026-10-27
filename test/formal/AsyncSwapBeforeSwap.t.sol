@@ -195,6 +195,7 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
         bool buy = (c.params.zeroForOne ? c.key.currency0 : c.key.currency1) == hook.numeraire();
         if (pf < AsyncFiller.minPriorityFee(buy ? amt : aom) || pf > type(uint64).max) return (true, false);
         if (pf != 0 && PoolId.unwrap(c.key.toId()) != PoolId.unwrap(poolId)) return (true, false);
+        if (_inNet(amt) == 0) return (true, false); // a 1-wei deposit is all input fee: ZeroAmount
         if (aom > type(uint128).max) return (false, false);
         return (true, true);
     }
@@ -228,7 +229,8 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
         address user = address(uint160(_word(c.hd, 0)));
         bytes32 salt = _callSalt(c);
         bytes32 id = keccak256(abi.encode(block.chainid, c.key.toId(), user, c.params.zeroForOne, salt));
-        assertEq(hook.asyncOrder(c.key.toId(), id), amt, "_createOrder(poolId, zfo, amountTaken, ...)");
+        // `_createOrder` stores the deposit net of the 0.03% input fee
+        assertEq(hook.asyncOrder(c.key.toId(), id), _inNet(amt), "_createOrder(poolId, zfo, amountTaken, ...)");
     }
 
     // ---------------------------------------------------------------- guards
@@ -393,7 +395,7 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
         uint256 aom,
         bytes memory extra
     ) public {
-        amt = bound(amt, 1, 2 ** 127 - 1);
+        amt = bound(amt, 2, 2 ** 127 - 1); // a 1-wei deposit is all input fee (ZeroAmount)
         aom = bound(aom, 1, type(uint128).max);
         executor = address(router);
         vm.prank(user);
@@ -446,6 +448,8 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
             expected = abi.encodeWithSelector(AsyncFiller.PriorityFeeTooSmall.selector);
         } else if (pf > type(uint64).max) {
             expected = abi.encodeWithSelector(AsyncFiller.PriorityFeeTooLarge.selector);
+        } else if (_inNet(amt) == 0) {
+            expected = abi.encodeWithSelector(AsyncFiller.ZeroAmount.selector); // all input fee
         }
         (bool ok, bytes memory ret) = unlocked ? _inUnlock(c) : _direct(c);
         if (expected.length == 0) {
@@ -510,6 +514,6 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
         uint256 before = _claimBalance(currency0);
         (, bytes32 id) = _placeOrder(alice, true, 1 ether, 0.5 ether);
         assertEq(_claimBalance(currency0), before + 1 ether);
-        assertEq(hook.asyncOrder(poolId, id), 1 ether);
+        assertEq(hook.asyncOrder(poolId, id), _inNet(1 ether), "the deposit net of the input fee");
     }
 }

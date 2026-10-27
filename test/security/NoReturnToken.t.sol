@@ -7,6 +7,7 @@ import {Router} from "@async-swap/Router.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {MockERC20} from "../utils/MockERC20.sol";
 import {NoReturnERC20} from "../utils/NoReturnERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Permit2Bytecode} from "../utils/Permit2Bytecode.sol";
 import {Test} from "forge-std/Test.sol";
 import {PoolManager} from "v4-core/PoolManager.sol";
@@ -102,10 +103,13 @@ contract NoReturnTokenTest is Test {
     function test_noReturnTokenAsFillerOutput_fill() public {
         AsyncOrder memory order = _place(false, 100e6, 99e6);
         uint256 gross = 99e6 + hook.calculatePoolFee(key.fee, 99e6);
+        // The filler receives the input net of the maker's 0.03% fee.
+        uint256 netIn = 100e6 - Math.mulDiv(100e6, 3, 10_000, Math.Rounding.Ceil);
+        order.amountIn = netIn;
         vm.prank(filler);
         router.fillOrder(order, type(uint256).max, "");
         assertEq(usdt.balanceOf(maker), 1000e6 + 99e6, "maker paid net output");
         assertEq(usdt.balanceOf(filler), 1000e6 - gross, "filler paid gross output");
-        assertEq(usdc.balanceOf(filler), 1000e6 + 100e6, "filler received input");
+        assertEq(usdc.balanceOf(filler), 1000e6 + netIn, "filler received net input");
     }
 }

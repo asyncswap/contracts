@@ -17,6 +17,7 @@ import {SwapParams} from "v4-core/types/PoolOperation.sol";
 import {CustomRevert} from "v4-core/libraries/CustomRevert.sol";
 import {Hooks} from "v4-core/libraries/Hooks.sol";
 import {TickMath} from "v4-core/libraries/TickMath.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract AsyncSwapTest is SetupHook {
     using CurrencyLibrary for Currency;
@@ -54,6 +55,16 @@ contract AsyncSwapTest is SetupHook {
     function _withAssignedSalt(AsyncOrder memory order) internal view returns (AsyncOrder memory) {
         order.salt = _expectedSalt(order.owner, order.amountIn, order.amountOutMin);
         return order;
+    }
+
+    /// @dev The maker's 0.03% input fee on a deposit, rounded up.
+    function _inputFee(uint256 deposit) internal pure returns (uint256) {
+        return Math.mulDiv(deposit, 3, 10_000, Math.Rounding.Ceil);
+    }
+
+    /// @dev The input an order trades after its input fee is set aside.
+    function _net(uint256 deposit) internal pure returns (uint256) {
+        return deposit - _inputFee(deposit);
     }
 
     function _withPriorityFee(AsyncOrder memory order, uint256 priorityFee) internal view returns (AsyncOrder memory) {
@@ -146,13 +157,13 @@ contract AsyncSwapTest is SetupHook {
         vm.stopPrank();
 
         bytes32 id = _orderIdFor(alice, true, _expectedSalt(alice, order.amountIn, order.amountOutMin));
-        assertEq(hook.asyncOrder(poolId, id), order.amountIn, "order rests without sufficient LP quote");
+        assertEq(hook.asyncOrder(poolId, id), _net(order.amountIn), "order rests without sufficient LP quote");
 
         _addPoolLiquidity(1e24);
         order.salt = _expectedSalt(alice, order.amountIn, order.amountOutMin);
         vm.prank(bob);
         router.fillFromPoolLiquidity(order);
-        assertEq(hook.asyncOrder(poolId, id), order.amountIn, "order remains because LP output is below limit");
+        assertEq(hook.asyncOrder(poolId, id), _net(order.amountIn), "order remains because LP output is below limit");
 
         // Tighten to a price the pool can satisfy, then retry against the same LP positions.
         vm.prank(alice);
@@ -208,7 +219,8 @@ contract AsyncSwapTest is SetupHook {
 
         bytes32 id = _orderIdFor(alice, true, _expectedSalt(alice, amountIn, amountOutMin));
         (uint256 storedIn, uint256 storedOutMin) = hook.asyncOrderInfo(poolId, id);
-        assertEq(storedIn, amountIn, "amountIn stored");
+        assertEq(storedIn, _net(amountIn), "amountIn stored");
+        assertEq(hook.asyncOrderInputFee(poolId, id), _inputFee(amountIn), "input fee escrowed");
         assertEq(storedOutMin, amountOutMin, "amountOutMin stored");
         assertTrue(hook.isExecutor(poolId, alice, address(router)), "router authorized");
     }
@@ -258,7 +270,7 @@ contract AsyncSwapTest is SetupHook {
         (address maker, uint256 amountIn, uint256 amountOutMin,, bool isBuy, uint64 sequence, uint64 bid) =
             hook.orderBookOrder(poolId, head);
         assertEq(maker, alice, "maker is readable");
-        assertEq(amountIn, 1 ether, "input amount is readable");
+        assertEq(amountIn, _net(1 ether), "input amount is readable");
         assertEq(amountOutMin, 0.9 ether, "limit output is readable");
         assertFalse(isBuy, "side is readable");
         assertEq(sequence, 1, "first sequence");
@@ -354,8 +366,9 @@ contract AsyncSwapTest is SetupHook {
         );
         vm.stopPrank();
 
-        // Patch salt for the fill leg.
+        // Patch salt for the fill leg; the filler accepts the order's net input.
         order = _withAssignedSalt(order);
+        order.amountIn = _net(amountIn);
 
         uint256 aliceToken0Before = token0.balanceOf(alice);
         uint256 aliceToken1Before = token1.balanceOf(alice);
@@ -376,8 +389,11 @@ contract AsyncSwapTest is SetupHook {
         // Maker received amountOutMin of REAL token1 — no 6909 withdrawal step needed.
         assertEq(token1.balanceOf(alice) - aliceToken1Before, amountOutMin, "maker received real token1");
         assertEq(manager.balanceOf(alice, currency1.toId()), 0, "maker has no leftover 6909 of currency1");
-        // Filler received amountIn of real token0 in exchange.
-        assertEq(token0.balanceOf(bob) - bobToken0Before, amountIn, "filler got real token0");
+        // Filler received the net amountIn of real token0 in exchange; the input fee went to the vault.
+        assertEq(token0.balanceOf(bob) - bobToken0Before, _net(amountIn), "filler got real token0");
+        assertEq(
+            manager.balanceOf(address(hook.feeVault()), currency0.toId()), _inputFee(amountIn), "vault got input fee"
+        );
         assertEq(
             bobToken1Before - token1.balanceOf(bob),
             amountOutMin + hook.calculatePoolFee(key.fee, amountOutMin),
@@ -427,19 +443,39 @@ contract AsyncSwapTest is SetupHook {
         (uint256 askLeft,) = hook.asyncOrderInfo(poolId, askId);
         (uint256 bidLeft,) = hook.asyncOrderInfo(poolId, bidId);
         assertEq(askLeft, 0, "ask completed");
-        // The bid paid the ask's better price for all 100 asset; its unspent 10 quote rests at the
-        // bid's own limit rather than being refunded.
-        assertEq(bidLeft, quoteAmount - askMinimum, "bid remainder rests");
+        // The bid paid the ask's better price for all of the ask's net asset; its unspent quote rests
+        // at the bid's own limit rather than being refunded.
+        assertEq(bidLeft, _net(quoteAmount) - askMinimum, "bid remainder rests");
         // Match proceeds are credited as PoolManager claims; only the seller's bid left in ERC20.
         assertEq(aliceQuoteBefore - token1.balanceOf(alice), 100_000, "seller paid only the bid in ERC20");
         assertEq(manager.balanceOf(alice, currency1.toId()), askMinimum, "seller receives ask minimum as claims");
         assertEq(token0.balanceOf(bob), bobAssetBefore, "buyer receives no ERC20 asset from the match");
-        assertEq(manager.balanceOf(bob, currency0.toId()), assetAmount, "buyer receives matched asset as claims");
+        assertEq(manager.balanceOf(bob, currency0.toId()), _net(assetAmount), "buyer receives matched asset as claims");
         assertEq(bobQuoteBefore - token1.balanceOf(bob), quoteAmount + 100_000, "buyer pays input and bid");
         assertEq(manager.balanceOf(address(hook), currency0.toId()), 0, "asset escrow claims consumed");
         assertEq(
+            manager.balanceOf(address(hook.feeVault()), currency0.toId()),
+            _inputFee(assetAmount),
+            "fully used ask pays its whole input fee"
+        );
+        _assertRestingBidEscrow(bidId, quoteAmount, askMinimum, bidLeft);
+    }
+
+    /// @dev The bid's priority fee and input fee settle pro rata to the input used; the rest stays escrowed.
+    function _assertRestingBidEscrow(bytes32 bidId, uint256 deposit, uint256 inputUsed, uint256 bidLeft) internal view {
+        assertEq(
+            hook.asyncOrderPriorityFee(poolId, bidId),
+            100_000 - Math.mulDiv(100_000, inputUsed, _net(deposit)),
+            "unfilled bid share"
+        );
+        assertEq(
+            hook.asyncOrderInputFee(poolId, bidId),
+            _inputFee(deposit) - Math.mulDiv(_inputFee(deposit), inputUsed, _net(deposit)),
+            "unfilled input fee share"
+        );
+        assertEq(
             manager.balanceOf(address(hook), currency1.toId()),
-            quoteAmount - askMinimum + 10_000,
+            bidLeft + hook.asyncOrderPriorityFee(poolId, bidId) + hook.asyncOrderInputFee(poolId, bidId),
             "quote escrow backs the resting remainder"
         );
     }
@@ -484,7 +520,11 @@ contract AsyncSwapTest is SetupHook {
         assertLt(askLeft, assetAmount, "ask input is reduced by partial fill");
         assertLt(askMinimumLeft, askMinimum, "ask minimum is reduced by output received");
         assertEq(bidLeft, 0, "bid completed and excess quote returned");
-        assertEq(manager.balanceOf(address(hook), currency0.toId()), askLeft, "remaining asset remains escrowed");
+        assertEq(
+            manager.balanceOf(address(hook), currency0.toId()),
+            askLeft + hook.asyncOrderInputFee(poolId, askId),
+            "remaining asset and its input fee remain escrowed"
+        );
         vm.prank(alice);
         router.cancelOrder(_withAssignedSalt(ask));
         assertEq(manager.balanceOf(address(hook), currency0.toId()), 0, "cancel releases residual escrow");
@@ -547,10 +587,10 @@ contract AsyncSwapTest is SetupHook {
         vm.stopPrank();
 
         assertEq(hook.asyncOrder(poolId, highId), 0, "higher-bid order is matched first");
-        // The taker's unspent 0.1 keeps its 1:1 limit and partly fills the lower-bid ask at 0.9.
+        // The taker's unspent net quote keeps its limit and partly fills the lower-bid ask at its price.
         assertEq(
             hook.asyncOrder(poolId, lowId),
-            1 ether - uint256(0.1 ether) * 1 ether / 0.9 ether,
+            _net(1 ether) - (_net(1 ether) - 0.9 ether) * _net(1 ether) / 0.9 ether,
             "lower-bid order matched second"
         );
         assertLt(token1.balanceOf(bob), bobNumeraireBefore, "the non-refundable bid is charged");
@@ -622,13 +662,13 @@ contract AsyncSwapTest is SetupHook {
         // Match proceeds arrive as claims; the bid was paid in ERC20.
         assertEq(
             token1.balanceOf(alice) + manager.balanceOf(alice, currency1.toId()) - usdcBefore,
-            48 ether,
+            _net(50 ether) - bidAmount,
             "the full bid remains charged after cancellation"
         );
         assertEq(
             manager.balanceOf(address(hook.feeVault()), currency1.toId()),
-            bidAmount + buyPriorityFee,
-            "filled and canceled bid portions both leave maker escrow"
+            bidAmount + buyPriorityFee + _inputFee(buy.amountIn),
+            "filled and canceled bid portions and the buyer's input fee leave maker escrow"
         );
     }
 
@@ -653,7 +693,7 @@ contract AsyncSwapTest is SetupHook {
         vm.stopPrank();
 
         (uint256 growth0After, uint256 growth1After) = manager.getFeeGrowthGlobals(poolId);
-        assertGt(growth0After, growth0Before, "active LPs earn the 30 bps fill fee in the input token");
+        assertGt(growth0After, growth0Before, "active LPs earn the 2 bps fill fee in the input token");
         assertEq(growth1After, growth1Before, "the bid is not donated to LPs");
         assertEq(manager.balanceOf(address(hook), currency1.toId()), 0, "priority bid claims leave the hook");
         assertEq(
@@ -700,7 +740,7 @@ contract AsyncSwapTest is SetupHook {
             address maker = address(1000 + i);
             bytes32 askId = _orderIdFor(maker, true, _expectedSalt(maker, askInput, askMinimum));
             (uint256 remaining,) = hook.asyncOrderInfo(poolId, askId);
-            assertEq(remaining, i == 9 ? askInput : 0, "price-time matching leaves only the ninth order");
+            assertEq(remaining, i == 9 ? _net(askInput) : 0, "price-time matching leaves only the ninth order");
         }
         router.matchBook(key, 1);
         (found,,,) = hook.bestOrder(poolId, false);
@@ -858,6 +898,7 @@ contract AsyncSwapTest is SetupHook {
         vm.stopPrank();
 
         order = _withAssignedSalt(order);
+        order.amountIn = _net(amountIn);
 
         uint256 bobToken0Before = token0.balanceOf(bob);
         uint256 bobToken1Before = token1.balanceOf(bob);
@@ -876,7 +917,12 @@ contract AsyncSwapTest is SetupHook {
             amountOutMin + hook.calculatePoolFee(key.fee, amountOutMin),
             "filler paid token0"
         );
-        assertEq(token1.balanceOf(bob) - bobToken1Before, amountIn, "filler received token1");
+        assertEq(token1.balanceOf(bob) - bobToken1Before, _net(amountIn), "filler received token1");
+        assertEq(
+            manager.balanceOf(address(hook.feeVault()), currency1.toId()),
+            _inputFee(amountIn) + 100_000,
+            "vault got the maker's input fee and the priority bid"
+        );
     }
 
     /* ------------------------- multiple orders per maker ------------------------- */
@@ -911,8 +957,8 @@ contract AsyncSwapTest is SetupHook {
         bytes32 id2 = _orderIdFor(alice, true, _expectedSalt(alice, 0.5 ether, 0.45 ether));
         (uint256 in1,) = hook.asyncOrderInfo(poolId, id1);
         (uint256 in2,) = hook.asyncOrderInfo(poolId, id2);
-        assertEq(in1, 1 ether, "order 1 stored");
-        assertEq(in2, 0.5 ether, "order 2 stored");
+        assertEq(in1, _net(1 ether), "order 1 stored");
+        assertEq(in2, _net(0.5 ether), "order 2 stored");
     }
 
     /// @notice With contract-assigned salts, duplicate (user, amountIn, amountOutMin) tuples in the
@@ -950,8 +996,8 @@ contract AsyncSwapTest is SetupHook {
         assertTrue(id1 != id2, "salt-walk produced distinct ids");
         (uint256 in1,) = hook.asyncOrderInfo(poolId, id1);
         (uint256 in2,) = hook.asyncOrderInfo(poolId, id2);
-        assertEq(in1, 1 ether, "first order stored");
-        assertEq(in2, 1 ether, "second order stored after salt walk");
+        assertEq(in1, _net(1 ether), "first order stored");
+        assertEq(in2, _net(1 ether), "second order stored after salt walk");
     }
 
     /* ----------------------- updated price affects fill ----------------------- */
@@ -974,6 +1020,7 @@ contract AsyncSwapTest is SetupHook {
         // Maker raises price after submission.
         hook.updatePrice(order, 1.1 ether);
         vm.stopPrank();
+        order.amountIn = _net(amountIn);
 
         uint256 bobToken1Before = token1.balanceOf(bob);
         uint256 aliceToken1Before = token1.balanceOf(alice);
@@ -1036,6 +1083,7 @@ contract AsyncSwapTest is SetupHook {
         vm.stopPrank();
 
         order = _withAssignedSalt(order);
+        order.amountIn = _net(amountIn);
 
         vm.startPrank(bob);
         token1.approve(address(router), type(uint256).max);

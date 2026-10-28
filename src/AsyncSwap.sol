@@ -5,6 +5,7 @@ import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 import {AsyncMatching} from "@async-swap/libraries/AsyncMatching.sol";
 import {OrderSignatures} from "@async-swap/libraries/OrderSignatures.sol";
 import {RadixPriceTree} from "@async-swap/libraries/RadixPriceTree.sol";
+import {TickPrice} from "@async-swap/libraries/TickPrice.sol";
 import {AsyncOrder, AsyncOrderLibrary} from "@async-swap/types/AsyncOrder.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
@@ -399,7 +400,7 @@ contract AsyncSwap is BaseHook, EIP712 {
         (bool poolFirst, uint160 bookLimit) = _poolBeatsBook(order.key, state.orders[id].isBuy);
         for (uint256 step; step < 2 && state.orders[id].amountIn != 0; ++step) {
             if ((step == 0) == poolFirst) {
-                try this.fillOrderFromPoolLiquidityWithin(order, id, bookLimit) {} catch {}
+                try this.fillOrderFromPoolLiquidity(order, id, bookLimit) {} catch {}
             } else {
                 matched = AsyncMatching.matchIncoming(state, priceBooks[order.key.toId()], order.key, id, address(this));
             }
@@ -408,25 +409,15 @@ contract AsyncSwap is BaseHook, EIP712 {
 
     /// @dev True when the pool has active liquidity and its current price is strictly better for an
     ///      incoming order than the best resting order on the other side: below the best ask for a
-    ///      buy, above the best bid for a sell. Both are compared as `TickPrice` keys, which order
-    ///      numeraire per asset. An empty opposite side or an equal level leaves the book first.
+    ///      buy, above the best bid for a sell (`TickPrice.poolBeatsLevel`). An empty opposite side or an equal level leaves the book first.
     ///      The spot price excludes the pool fill's fees and price impact, so this is a heuristic.
-    ///      With it, the pool price at that best level, as the limit a pool-first swap may not cross.
+    ///      With it, the best level as a sqrt price: the limit a pool-first swap may not cross.
     function _poolBeatsBook(PoolKey calldata key, bool isBuy) private view returns (bool, uint160) {
         PoolId poolId = key.toId();
-        (bool found, uint128 bookKey) = isBuy ? priceBooks[poolId].asks.best(false) : priceBooks[poolId].bids.best(true);
-        if (!found || poolManager.getLiquidity(poolId) == 0) return (false, 0);
-        (, int24 tick,,) = poolManager.getSlot0(poolId);
-        // The pool's tick prices currency1 per currency0; flip it when the numeraire is currency0.
-        bool quote1 = key.currency1 == numeraire;
-        uint128 poolKey =
-            quote1 ? uint128(uint24(tick - TickMath.MIN_TICK)) + 1 : uint128(uint24(TickMath.MAX_TICK - tick)) + 1;
-        if (isBuy ? poolKey >= bookKey : poolKey <= bookKey) return (false, 0);
-        // The same mapping backwards: the book level as a pool tick.
-        int24 bookTick = quote1
-            ? int24(int256(uint256(bookKey)) - 1) + TickMath.MIN_TICK
-            : TickMath.MAX_TICK - int24(int256(uint256(bookKey)) - 1);
-        return (true, TickMath.getSqrtPriceAtTick(bookTick));
+        AsyncFiller.Book storage book = priceBooks[poolId];
+        (bool found, uint128 bookKey) = (isBuy ? book.asks : book.bids).best(!isBuy);
+        if (!found) return (false, 0);
+        return TickPrice.poolBeatsLevel(poolManager, poolId, key.currency1 == numeraire, isBuy, bookKey);
     }
 
     /// @notice Permissionless executor entry for retrying a resting order against current pool LPs.
@@ -437,7 +428,7 @@ contract AsyncSwap is BaseHook, EIP712 {
         }
         bytes32 id = order.orderId();
         if (asyncOrders[order.key.toId()].orders[id].amountIn == 0) revert AsyncFiller.OrderNotFound();
-        try this.fillOrderFromPoolLiquidity(order, id) {
+        try this.fillOrderFromPoolLiquidity(order, id, 0) {
             return true;
         } catch {
             return false;
@@ -447,21 +438,10 @@ contract AsyncSwap is BaseHook, EIP712 {
     /// @dev The self-call boundary makes a failed AMM attempt atomic while preserving the resting
     ///      order. PoolManager skips hook callbacks when the hook itself is the swap caller, so this
     ///      swap does not create an order.
-    function fillOrderFromPoolLiquidity(AsyncOrder calldata order, bytes32 id) external {
+    ///      `sqrtPriceLimitX96` is a price the swap may not cross (0 for none): the whole order fills
+    ///      before it, or the call reverts.
+    function fillOrderFromPoolLiquidity(AsyncOrder calldata order, bytes32 id, uint160 sqrtPriceLimitX96) external {
         if (msg.sender != address(this)) revert NotSelf();
-        _fillFromPool(order, id, 0);
-    }
-
-    /// @dev `fillOrderFromPoolLiquidity` with a price the swap may not cross (0 for none): the whole
-    ///      order fills before it, or the self-call reverts and the order rests.
-    function fillOrderFromPoolLiquidityWithin(AsyncOrder calldata order, bytes32 id, uint160 sqrtPriceLimitX96)
-        external
-    {
-        if (msg.sender != address(this)) revert NotSelf();
-        _fillFromPool(order, id, sqrtPriceLimitX96);
-    }
-
-    function _fillFromPool(AsyncOrder calldata order, bytes32 id, uint160 sqrtPriceLimitX96) private {
         PoolId poolId = order.key.toId();
         AsyncFiller.State storage state = asyncOrders[poolId];
         // The protocol's 0.01% of the maker's input, rounded up; the library swaps the rest.

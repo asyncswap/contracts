@@ -5,7 +5,7 @@
 | Severity | Medium |
 | Status | ✅ Fixed in this branch |
 | Found by | Formal Mind swarm (assistant, Pashov lenses), confirmed by hand |
-| Location | `src/AsyncSwap.sol` `matchNewOrder` and `_poolBeatsBook`; `src/libraries/AsyncMatching.sol` `_swapAgainstPool` |
+| Location | `src/AsyncSwap.sol` `matchNewOrder` and `_poolBeatsBook`; `src/libraries/AsyncMatching.sol` `_swapAgainstPool`; `src/libraries/TickPrice.sol` |
 | PoC | `test/formal/RoutingPoolImpact.t.sol` |
 
 ## Summary
@@ -39,16 +39,17 @@ swap at the book's price.
 
 When the pool goes first, its swap is limited at the best book level:
 
-- `_poolBeatsBook` also returns that level as a sqrt price, mapping the book key back to a pool tick (the inverse of
-  the mapping it already uses) and taking `TickMath.getSqrtPriceAtTick`.
-- `matchNewOrder` calls a new self-only `fillOrderFromPoolLiquidityWithin(order, id, sqrtPriceLimitX96)`, which
-  passes the limit through `AsyncMatching.fillFromPoolLiquidity` to `_swapAgainstPool` (0 keeps the old MIN/MAX
-  limit).
+- The comparison moves from `AsyncSwap._poolBeatsBook` into the linked library as
+  `TickPrice.poolBeatsLevel`. It also returns that level as a sqrt price, mapping the book key back to a pool tick
+  (the inverse of the mapping it already used) and taking `TickMath.getSqrtPriceAtTick`. Moving it out keeps
+  `AsyncSwap` under EIP-170: 24,107 bytes, against 24,551 before the fix.
+- `fillOrderFromPoolLiquidity(order, id, sqrtPriceLimitX96)` (self-only) takes the limit and passes it through
+  `AsyncMatching.fillFromPoolLiquidity` to `_swapAgainstPool`. 0 keeps the old MIN/MAX limit.
 - A swap that reaches the limit stops short and reverts as `PartialLiquidityFill` (the pool fill stays
   all-or-nothing). `matchNewOrder` already catches it, so the book matches the order instead.
 
-`fillOrderFromPoolLiquidity(order, id)` keeps its signature and behaviour for the Router's and executors' retries. So
-does the pool-second path, which runs only after the book has taken what it can.
+The pool-second path and `tryFillOrderFromPoolLiquidity` (the Router's and executors' retries) pass 0 and behave as
+before.
 
 ## Residual
 
@@ -64,5 +65,5 @@ it needs a partial pool fill, which this change deliberately leaves out.
   filled by the pool, and the ask is left alone.
 - `forge test`: 885 passed, 0 failed.
 
-The Lean spec of `_poolBeatsBook` (`formal/Proofs/Swarm/AsyncSwapPoolBeatsBook.lean`) proves the old return type;
-the swarm re-proves it from the new source on its next run.
+The Lean proofs of `_poolBeatsBook` and `fillOrderFromPoolLiquidity` cover the old code; the swarm re-proves the
+changed functions from the new source on its next run.

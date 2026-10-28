@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
+import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
+import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
 import {TickMath} from "v4-core/libraries/TickMath.sol";
+import {PoolId} from "v4-core/types/PoolId.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @notice Book levels on Uniswap v4 ticks: an order sits at the floor tick (spacing 1, 0.01% steps)
@@ -17,6 +20,26 @@ library TickPrice {
         return isBuy != zeroForOne
             ? uint128(uint24(tick - TickMath.MIN_TICK)) + 1
             : uint128(uint24(TickMath.MAX_TICK - tick)) + 1;
+    }
+
+    /// @notice Whether the pool has active liquidity and its current price is strictly better for an
+    ///         incoming order than the best opposite level `levelKey` (below the best ask for a buy,
+    ///         above the best bid for a sell), compared as keys; if so, also that level's sqrt price,
+    ///         the limit a pool-first swap may not cross. `quote1`: the numeraire is currency1, so the
+    ///         tick's price is already numeraire per asset; otherwise it is flipped.
+    function poolBeatsLevel(IPoolManager manager, PoolId poolId, bool quote1, bool isBuy, uint128 levelKey)
+        public
+        view
+        returns (bool, uint160)
+    {
+        if (StateLibrary.getLiquidity(manager, poolId) == 0) return (false, 0);
+        (, int24 tick,,) = StateLibrary.getSlot0(manager, poolId);
+        uint128 poolKey =
+            quote1 ? uint128(uint24(tick - TickMath.MIN_TICK)) + 1 : uint128(uint24(TickMath.MAX_TICK - tick)) + 1;
+        if (isBuy ? poolKey >= levelKey : poolKey <= levelKey) return (false, 0);
+        // The same mapping backwards: the level as a pool tick.
+        int24 offset = int24(int256(uint256(levelKey)) - 1);
+        return (true, TickMath.getSqrtPriceAtTick(quote1 ? offset + TickMath.MIN_TICK : TickMath.MAX_TICK - offset));
     }
 
     /// @notice Largest tick whose price is at most num/den, clamped to the v4 tick range. Monotone in

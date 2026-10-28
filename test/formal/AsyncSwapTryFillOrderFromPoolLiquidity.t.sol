@@ -28,12 +28,12 @@ contract AsyncSwapTryFillOrderFromPoolLiquidityFormalTest is HookUnlockBase {
         return abi.decode(_runR(_tryCall(caller, o))[0], (bool));
     }
 
-    /// @dev Would the self-call `fillOrderFromPoolLiquidity(o, id)` succeed from the current state?
+    /// @dev Would the self-call `fillOrderFromPoolLiquidity(o, id, 0)` succeed from the current state?
     ///      Runs it (pranked as the hook) and rolls the state back.
     function _selfFillSucceeds(AsyncOrder memory o, bytes32 id) internal returns (bool ok) {
         uint256 snap = vm.snapshotState();
         Call[] memory cs =
-            _one(_cAs(address(hook), address(hook), abi.encodeCall(hook.fillOrderFromPoolLiquidity, (o, id))));
+            _one(_cAs(address(hook), address(hook), abi.encodeCall(hook.fillOrderFromPoolLiquidity, (o, id, 0))));
         try manager.unlock(abi.encode(cs)) {
             ok = true;
         } catch {

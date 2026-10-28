@@ -1,6 +1,6 @@
 # FeeVault
 
-[Git Source](https://github.com/asyncswap/contracts/blob/550b463d7a76a7954a95bc55a3ee0f16207ed4b2/src/FeeVault.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/19bb8dcdd03f03343b1b3af3ad1415292420077b/src/FeeVault.sol)
 
 Holds and redeems protocol fee claims, never maker escrow.
 

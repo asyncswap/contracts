@@ -1,6 +1,6 @@
 # Router
 
-[Git Source](https://github.com/asyncswap/contracts/blob/550b463d7a76a7954a95bc55a3ee0f16207ed4b2/src/Router.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/19bb8dcdd03f03343b1b3af3ad1415292420077b/src/Router.sol)
 
 **Inherits:** EIP712
 
@@ -133,13 +133,14 @@ function swap(AsyncOrder calldata order, bytes memory userData) external payable
 
 ### fillOrder
 
-Filler completes an open order, paying the maker's net minimum plus the protocol fee.
-For ERC20 output, approve the router for that gross amount. For native output,
-`msg.value` must equal the live net price plus the protocol fee;
+Filler completes an open order, paying exactly the maker's live minimum. The maker
+receives it less the 0.02% trade fee, and the filler the input less 0.02%.
+For ERC20 output, approve the router for that amount. For native output,
+`msg.value` must equal the live minimum;
 a stale or excessive deposit reverts rather than stranding the difference.
 Native output is currency1 for zeroForOne, otherwise currency0.
 
-`maxPrice` caps total output paid, including the fee —
+`maxPrice` caps the output the filler pays —
 it protects fillers from a maker who front-runs them with `updatePrice` to
 bump the order's stored price. Pass `type(uint256).max` to disable the check.
 `order.amountIn` is the least input the filler accepts: the fill reverts if the

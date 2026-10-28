@@ -28,7 +28,7 @@ contract AsyncSwapReduceAfterMatchFormalTest is FormalMatchD {
         assertLe(raw, uint256(2 * uint256(int256(TickMath.MAX_TICK)) + 1), "key <= 2 * MAX_TICK + 1");
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapReduceAfterMatch.lean:149 — closed order (no input or no minimum left): matched fee share settled, `_remove`, `orders[id]` deleted, the unfilled share settled for the owner, then (if input remains) exactly remIn refunded to the owner. The matched input-fee share is credited to the FeeVault in the input currency, and a closed order refunds remIn plus the unfilled input fee. (semantics changed by the 0.03% trade fee; Lean statement needs updating)
+    /// @notice formal/Refinement/Swarm/AsyncSwapReduceAfterMatch.lean:149 — closed order (no input or no minimum left): matched fee share settled, `_remove`, `orders[id]` deleted, the unfilled share settled for the owner, then (if input remains) exactly remIn refunded to the owner.
     function testFuzz_reduceAfterMatch_ok_close(uint256[6] memory s, uint8 flags) public {
         Case memory c = _mkCase(s, flags);
         Run memory r = _exec(c);
@@ -64,7 +64,7 @@ contract AsyncSwapReduceAfterMatchFormalTest is FormalMatchD {
         assertEq(fees.length, k, "no other fee settlement");
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapReduceAfterMatch.lean:258 — partial (input and minimum left): amountIn := remIn, amountOutMin := remainingMinimum, priorityFee := unfilled; re-keyed (`_remove`, new price, fresh sequence iff the price moved, `_append`) exactly when the price moved or, in PriorityFee mode, the fee changed. Also inputFee := its unfilled share, the matched share credited to the FeeVault. (semantics changed by the 0.03% trade fee; Lean statement needs updating)
+    /// @notice formal/Refinement/Swarm/AsyncSwapReduceAfterMatch.lean:258 — partial (input and minimum left): amountIn := remIn, amountOutMin := remainingMinimum, priorityFee := unfilled; re-keyed (`_remove`, new price, fresh sequence iff the price moved, `_append`) exactly when the price moved or, in PriorityFee mode, the fee changed.
     function testFuzz_reduceAfterMatch_ok_partial(uint256[6] memory s, uint8 flags) public {
         Case memory c = _mkCase(s, flags);
         Run memory r = _exec(c);

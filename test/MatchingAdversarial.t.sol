@@ -8,17 +8,14 @@ import {Router} from "src/Router.sol";
 import {MockERC20} from "./utils/MockERC20.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 
-/// @dev A 1 ether deposit's net input after the maker's 0.03% fee (rounded up).
-uint256 constant NET_ONE = 1 ether - (uint256(1 ether) * 3 + 9_999) / 10_000;
-
 contract RejectingNativeBuyer {
     using PoolIdLibrary for PoolKey;
 
     function place(Router router, AsyncSwap hook, MockERC20 token, PoolKey calldata key) external {
         hook.setExecutor(key.toId(), address(router), true);
         token.approve(address(router), 1 ether + 100_000);
-        AsyncOrder memory order = AsyncOrder(key, address(this), false, 1 ether, NET_ONE, 100_000, 2 ** 96, bytes32(0));
-        router.swap(order, abi.encode(AsyncSwap.UserParams(address(this), address(router), NET_ONE, 100_000)));
+        AsyncOrder memory order = AsyncOrder(key, address(this), false, 1 ether, 1 ether, 100_000, 2 ** 96, bytes32(0));
+        router.swap(order, abi.encode(AsyncSwap.UserParams(address(this), address(router), 1 ether, 100_000)));
     }
 
     receive() external payable {
@@ -36,17 +33,15 @@ contract MatchingAdversarialTest is NativeAsyncSwapTest {
         vm.deal(alice, 2 ether);
         vm.prank(alice);
         hook.setExecutor(poolId, address(router), true);
-        // Both sides trade their net input at price 1, so the books cross exactly.
-        AsyncOrder memory sell = _order(alice, true, 1 ether, NET_ONE);
-        bytes memory data = abi.encode(AsyncSwap.UserParams(alice, address(router), NET_ONE, 100_000));
+        AsyncOrder memory sell = _order(alice, true, 1 ether, 1 ether);
+        bytes memory data = abi.encode(AsyncSwap.UserParams(alice, address(router), 1 ether, 100_000));
         vm.prank(alice);
         router.swap{value: 1 ether}(sell, data);
         assertEq(alice.balance, 1 ether);
-        assertEq(manager.balanceOf(address(rejector), 0), NET_ONE);
+        assertEq(manager.balanceOf(address(rejector), 0), 1 ether - _fee(1 ether));
+        assertEq(manager.balanceOf(address(hook.feeVault()), 0), _fee(1 ether), "vault received the ETH trade fee");
         assertEq(address(rejector).balance, 0);
         assertEq(manager.balanceOf(address(hook), 0), 0);
-        // The seller's native fee reserve went to the FeeVault in full.
-        assertEq(manager.balanceOf(address(hook.feeVault()), 0), 1 ether - NET_ONE);
         (bool found,,,) = hook.bestOrder(poolId, true);
         assertFalse(found, "bid fully matched");
     }

@@ -253,11 +253,6 @@ contract AsyncSwap is BaseHook, EIP712 {
         return asyncOrders[poolId].orders[orderId].priorityFee;
     }
 
-    /// @notice The maker's trade fee still escrowed for an order's open input.
-    function asyncOrderInputFee(PoolId poolId, bytes32 orderId) external view returns (uint256) {
-        return asyncOrders[poolId].orders[orderId].inputFee;
-    }
-
     /// @notice Set a pool's minimum order, in numeraire base units (0: none).
     function setMinOrder(PoolKey calldata key, uint256 minimum) external onlyOwner {
         AsyncFiller.setMinOrder(priceBooks[key.toId()], key.toId(), minimum);
@@ -320,11 +315,10 @@ contract AsyncSwap is BaseHook, EIP712 {
         return 0;
     }
 
-    /// @notice Filler's fee added to the maker's net output: 0.03% of gross output, rounded down.
-    function calculatePoolFee(uint24, uint256 amount) public pure virtual returns (uint256) {
-        // net * 3 / 9997 is equivalent to 3 bps of gross (net + fee), rounded down.
-        // Split the calculation to avoid overflowing for large uint256 amounts.
-        return (amount / 9997) * 3 + ((amount % 9997) * 3) / 9997;
+    /// @notice Surcharge a filler pays on top of the maker's minimum: none. The 0.02% trade fee comes
+    ///         out of what each side receives instead (`AsyncFiller.tradeFee`).
+    function calculatePoolFee(uint24, uint256) public pure virtual returns (uint256) {
+        return 0;
     }
 
     /// @notice Fill `order` in full. Must be called from an authorized executor (router) that has
@@ -351,7 +345,6 @@ contract AsyncSwap is BaseHook, EIP712 {
         }
         AsyncFiller.State storage state = asyncOrders[order.key.toId()];
         uint256 fee = calculatePoolFee(order.key.fee, state.orders[id].amountOutMin);
-        uint256 inputFee = state.orders[id].inputFee;
         AsyncMatching.fill(
             state,
             priceBooks[order.key.toId()],
@@ -365,8 +358,6 @@ contract AsyncSwap is BaseHook, EIP712 {
                 fee: fee
             })
         );
-        // The fill closed the order: its maker's escrowed input fee is now earned.
-        _accrueFee(id, order.zeroForOne ? order.key.currency0 : order.key.currency1, inputFee);
     }
 
     /// @notice Match the order just created by the current Router unlock callback.
@@ -414,19 +405,16 @@ contract AsyncSwap is BaseHook, EIP712 {
         if (msg.sender != address(this)) revert NotSelf();
         PoolId poolId = order.key.toId();
         AsyncFiller.State storage state = asyncOrders[poolId];
-        // The protocol's 0.01% of the maker's whole remaining deposit, rounded up; the library swaps the rest.
-        uint256 protocolFee = (state.orders[id].amountIn + state.orders[id].inputFee + 9_999) / 10_000;
-        _accrueFee(id, order.zeroForOne ? order.key.currency0 : order.key.currency1, protocolFee);
+        // The protocol's 0.01% of the maker's input, rounded up; the library swaps the rest.
+        uint256 protocolFee = (state.orders[id].amountIn + 9_999) / 10_000;
+        if (protocolFee != 0) {
+            Currency input = order.zeroForOne ? order.key.currency0 : order.key.currency1;
+            poolManager.transfer(address(feeVault), input.toId(), protocolFee);
+            emit AsyncFiller.OrderFeeAccrued(id, input, protocolFee);
+        }
         AsyncMatching.fillFromPoolLiquidity(
             state, priceBooks[poolId], order.key, id, state.orders[id].owner, address(this), protocolFee
         );
-    }
-
-    /// @dev Move `amount` of the hook's escrowed claims to the vault as a protocol fee.
-    function _accrueFee(bytes32 id, Currency currency, uint256 amount) private {
-        if (amount == 0) return;
-        poolManager.transfer(address(feeVault), currency.toId(), amount);
-        emit AsyncFiller.OrderFeeAccrued(id, currency, amount);
     }
 
     /// @notice Permissionlessly continue a crossed book inside a PoolManager unlock.

@@ -41,8 +41,7 @@ abstract contract FormalMatchD is HookUnlockBase {
     }
 
     /// @dev One crossed pair: sell = alice (input currency0, the asset), buy = bob (input currency1,
-    ///      the numeraire). `a`/`q` are the sell's deposit/amountOutMin, `Q`/`A` the buy's. The book
-    ///      holds each deposit net of its 0.03% input fee (`_inNet`).
+    ///      the numeraire). `a`/`q` are the sell's amountIn/amountOutMin, `Q`/`A` the buy's.
     struct Case {
         PoolKey k;
         PoolId pid;
@@ -137,7 +136,6 @@ abstract contract FormalMatchD is HookUnlockBase {
         o.priorityFee = uint64(w4);
         o.priorityKey = uint128(w4 >> 64);
         o.createdSequence = uint64(w4 >> 192);
-        o.inputFee = uint128(uint256(_loadHook(bytes32(_orderSlot(pid, id) + 5))));
     }
 
     function _storeWord(PoolId pid, bytes32 id, uint256 i, uint256 v) internal {
@@ -146,7 +144,7 @@ abstract contract FormalMatchD is HookUnlockBase {
 
     function _isEmpty(AsyncFiller.OrderInfo memory o) internal pure returns (bool) {
         return o.owner == address(0) && o.amountIn == 0 && o.amountOutMin == 0 && o.price == 0 && !o.isBuy
-            && !o.zeroForOne && o.sequence == 0 && o.priorityFee == 0 && o.priorityKey == 0 && o.inputFee == 0;
+            && !o.zeroForOne && o.sequence == 0 && o.priorityFee == 0 && o.priorityKey == 0;
     }
 
     /// @dev Every bid is escrowed when its order is created.
@@ -228,16 +226,14 @@ abstract contract FormalMatchD is HookUnlockBase {
             cs = _cat(cs, _payToHookCalls(currency1, bid));
         }
         _run(cs);
-        // the book holds the deposit net of the maker's 0.03% input fee
-        require(hook.asyncOrder(k.toId(), id) == _inNet(amountIn), "order not created at the predicted id");
+        require(hook.asyncOrder(k.toId(), id) == amountIn, "order not created at the predicted id");
     }
 
     /// @dev Build the pair. `s` seeds: [0..3] amounts, [4] sell bid, [5] buy bid. `flags` bits:
     ///      0 restingBuy, 1 native, 2 random bids >= $0.10 (else each order bids its tiered minimum,
-    ///      0 for tiny amounts), 3 pool liquidity, 6 tiny amounts (deposits 2..13, net 1..12), 7 rewrite
-    ///      the stored amounts after creation. Bits 4 and 5 (bids paid) no longer apply: every bid is paid.
-    ///      Deposits are at least 2 (a 1-wei deposit is all input fee). The buy limit `A` is drawn below
-    ///      `net(Q)·net(a)/q` so that most pairs cross.
+    ///      0 for tiny amounts), 3 pool liquidity, 6 tiny amounts (1..12), 7 rewrite the stored
+    ///      amounts after creation. Bits 4 and 5 (bids paid) no longer apply: every bid is paid.
+    ///      The buy limit `A` is drawn below `Q·a/q` so that most pairs cross.
     function _mkCase(uint256[6] memory s, uint256 flags) internal returns (Case memory c) {
         c.restingBuy = flags & 1 != 0;
         c.native = flags & 2 != 0;
@@ -245,17 +241,15 @@ abstract contract FormalMatchD is HookUnlockBase {
         c.liq = !c.native && flags & 8 != 0;
         if (flags & 64 != 0) {
             // tiny amounts: rounding decides, so zero-amount results occur
-            c.a = 2 + (s[0] % 12);
+            c.a = 1 + (s[0] % 12);
             c.q = 1 + (s[1] % 12);
-            c.Q = 2 + (s[2] % 12);
+            c.Q = 1 + (s[2] % 12);
         } else {
             c.a = _amt(s[0]);
             c.q = _amt(s[1]);
             c.Q = _amt(s[2]);
-            if (c.a == 1) c.a = 2;
-            if (c.Q == 1) c.Q = 2;
         }
-        uint256 maxA = (_inNet(c.Q) * _inNet(c.a)) / c.q;
+        uint256 maxA = (c.Q * c.a) / c.q;
         c.A = 1 + (uint256(keccak256(abi.encode(s[3]))) % _min(maxA == 0 ? 1 : maxA, 2 ** 120));
         if (flags & 4 != 0) {
             c.sellBid = 100_000 + (s[4] % (uint256(type(uint64).max) - 100_000));
@@ -277,11 +271,11 @@ abstract contract FormalMatchD is HookUnlockBase {
         }
         if (flags & 128 != 0) {
             // Arbitrary stored state: keep the book (crossed keys) and the escrow, rewrite the
-            // amounts (amountIn within the net escrow, any positive amountOutMin).
+            // amounts (amountIn within the escrow, any positive amountOutMin).
             uint256 h = uint256(keccak256(abi.encode(s, "rewrite")));
-            _storeWord(c.pid, c.sellId, 1, 1 + (h % _inNet(c.a)));
+            _storeWord(c.pid, c.sellId, 1, 1 + (h % c.a));
             _storeWord(c.pid, c.sellId, 2, _amt(h >> 1));
-            _storeWord(c.pid, c.buyId, 1, 1 + ((h >> 2) % _inNet(c.Q)));
+            _storeWord(c.pid, c.buyId, 1, 1 + ((h >> 2) % c.Q));
             _storeWord(c.pid, c.buyId, 2, _amt(h >> 3));
         }
     }
@@ -417,6 +411,33 @@ abstract contract FormalMatchD is HookUnlockBase {
         _add(t, Op(OP_TRANSFER, to, c.toId(), amount, 0, 0, 0));
     }
 
+    /// @dev `AsyncFiller.tradeFee`: the 0.02% each side of a match pays out of what it receives, rounded up.
+    function _tradeFee(uint256 x) internal pure returns (uint256) {
+        return x == 0 ? 0 : (x * 2 - 1) / 10_000 + 1;
+    }
+
+    /// @dev `ClaimTransfers.credit`: skip zero, else add to the first credit with the same (currency, recipient),
+    ///      else append. The batch flushes in first-credit order.
+    function _credit(Trace memory t, Currency c, address to, uint256 amount) internal view {
+        if (amount == 0) return;
+        uint256 id = c.toId();
+        for (uint256 i; i < t.n; ++i) {
+            if (t.ops[i].kind == OP_TRANSFER && t.ops[i].cur == id && t.ops[i].who == to) {
+                t.ops[i].amount += amount;
+                return;
+            }
+        }
+        _escrowLeg(t, c, to, amount);
+    }
+
+    /// @dev `_settleTransfers`' credits: buyer asset net, seller quote net, vault asset fee, vault quote fee.
+    function _settleCredits(Trace memory t, Case memory c, Run memory r) internal view {
+        _credit(t, c.k.currency0, r.buy0.owner, r.asset - _tradeFee(r.asset));
+        _credit(t, c.k.currency1, r.sell0.owner, r.quote - _tradeFee(r.quote));
+        _credit(t, c.k.currency0, address(hook.feeVault()), _tradeFee(r.asset));
+        _credit(t, c.k.currency1, address(hook.feeVault()), _tradeFee(r.quote));
+    }
+
     /// @dev `AsyncFiller.settlePriorityFee(amount)` (nothing when `amount == 0`).
     function _feeOps(Trace memory t, Case memory c, bytes32 id, address maker, uint256 amount) internal view {
         if (amount == 0) return;
@@ -427,24 +448,6 @@ abstract contract FormalMatchD is HookUnlockBase {
     function _filled(AsyncFiller.OrderInfo memory o, uint256 used) internal pure returns (uint256) {
         uint256 fee = _paid(o);
         return fee == 0 ? 0 : (fee * used) / o.amountIn;
-    }
-
-    /// @dev Matched share `inputFee·used/oldIn` of the escrowed input fee (all of it when `used` is all the input).
-    function _filledFee(AsyncFiller.OrderInfo memory o, uint256 used) internal pure returns (uint256) {
-        return (uint256(o.inputFee) * used) / o.amountIn;
-    }
-
-    /// @dev `ClaimTransfers.credit` on the expected trace: a zero amount is skipped, and a repeated
-    ///      (currency, recipient) adds to its first credit, which keeps its place in the flush order.
-    function _credit(Trace memory t, Currency c, address to, uint256 amount) internal pure {
-        if (amount == 0) return;
-        for (uint256 i; i < t.n; ++i) {
-            if (t.ops[i].kind == OP_TRANSFER && t.ops[i].cur == c.toId() && t.ops[i].who == to) {
-                t.ops[i].amount += amount;
-                return;
-            }
-        }
-        _add(t, Op(OP_TRANSFER, to, c.toId(), amount, 0, 0, 0));
     }
 
     /// @dev The remainder keeps the order's own limit: `ceil(amountOutMin · remIn / amountIn)`, 0 when
@@ -459,34 +462,22 @@ abstract contract FormalMatchD is HookUnlockBase {
         return o.amountIn - used == 0;
     }
 
-    /// @dev `_reduceAfterMatch` on one side: matched bid share, then (closed) the unfilled share.
-    ///      Fee notices go to `t`; the FeeVault credits (bid shares in the numeraire, the matched
-    ///      input-fee share in the side's input currency) go to the claim batch `b`.
-    function _reduceOps(
-        Trace memory t,
-        Trace memory b,
-        Case memory c,
-        bytes32 id,
-        AsyncFiller.OrderInfo memory o,
-        uint256 used
-    ) internal view {
-        address vault = address(hook.feeVault());
+    /// @dev `_reduceAfterMatch` on one side: matched fee share, then (closed) the unfilled share.
+    function _reduceOps(Trace memory t, Case memory c, bytes32 id, AsyncFiller.OrderInfo memory o, uint256 used)
+        internal
+        view
+    {
         uint256 filled = _filled(o, used);
         _feeOps(t, c, id, o.owner, filled);
-        _credit(b, currency1, vault, filled);
-        _credit(b, o.zeroForOne ? c.k.currency0 : c.k.currency1, vault, _filledFee(o, used));
-        if (_closes(o, used)) {
-            _feeOps(t, c, id, o.owner, _paid(o) - filled);
-            _credit(b, currency1, vault, _paid(o) - filled);
-        }
+        if (_closes(o, used)) _feeOps(t, c, id, o.owner, _paid(o) - filled);
     }
 
-    /// @dev The two escrow legs, as `_settleTransfers` runs them: (currency0 → buyer, asset), then
-    ///      (currency1 → seller, quote).
+    /// @dev The two escrow legs, as `_settleTransfers` runs them: (currency0 → buyer, asset less its trade fee),
+    ///      then (currency1 → seller, quote less its trade fee); a zero net credit is skipped.
     function _legOps(Case memory c, Run memory r) internal view returns (Op[] memory) {
         Trace memory t = _newTrace();
-        _escrowLeg(t, c.k.currency0, r.buy0.owner, r.asset);
-        _escrowLeg(t, c.k.currency1, r.sell0.owner, r.quote);
+        _credit(t, c.k.currency0, r.buy0.owner, r.asset - _tradeFee(r.asset));
+        _credit(t, c.k.currency1, r.sell0.owner, r.quote - _tradeFee(r.quote));
         return _done(t);
     }
 
@@ -499,20 +490,17 @@ abstract contract FormalMatchD is HookUnlockBase {
         return _done(t);
     }
 
-    /// @dev Fee notices, match event, then the claim batch in first-credit order: FeeVault credits
-    ///      (bids in the numeraire, input-fee shares in each side's input currency), then the makers.
+    /// @dev Fee notices, match event, then the batch's claim transfers: the bid share to the FeeVault (credited during
+    ///      the reductions), then `_settleCredits`, merged by (currency, recipient) in first-credit order.
     function _expected(Case memory c, Run memory r) internal view returns (Op[] memory) {
         Trace memory t = _newTrace();
-        Trace memory b = _newTrace();
-        _reduceOps(t, b, c, c.sellId, r.sell0, r.asset);
-        _reduceOps(t, b, c, c.buyId, r.buy0, r.quote);
+        _reduceOps(t, c, c.sellId, r.sell0, r.asset);
+        _reduceOps(t, c, c.buyId, r.buy0, r.quote);
         _add(t, Op(OP_MATCHED, address(0), 0, r.asset, r.quote, c.sellId, c.buyId));
-        _credit(b, c.k.currency0, r.buy0.owner, r.asset);
-        _credit(b, c.k.currency1, r.sell0.owner, r.quote);
-        Op[] memory batch = _done(b);
-        for (uint256 i; i < batch.length; ++i) {
-            _add(t, batch[i]);
-        }
+        uint256 fee = (_closes(r.sell0, r.asset) ? _paid(r.sell0) : _filled(r.sell0, r.asset))
+            + (_closes(r.buy0, r.quote) ? _paid(r.buy0) : _filled(r.buy0, r.quote));
+        _credit(t, currency1, address(hook.feeVault()), fee);
+        _settleCredits(t, c, r);
         return _done(t);
     }
 
@@ -553,7 +541,6 @@ abstract contract FormalMatchD is HookUnlockBase {
     ) internal view returns (uint64) {
         uint256 u = _paid(o0) - _filled(o0, used);
         assertEq(o1.amountIn, o0.amountIn - used, "amountIn := remIn");
-        assertEq(o1.inputFee, o0.inputFee - _filledFee(o0, used), "inputFee := unfilled input-fee share");
         assertEq(o1.amountOutMin, _remMin(o0, used), "amountOutMin := remainingMinimum");
         assertEq(o1.priorityFee, uint64(u), "priorityFee := uint64(unfilled)");
         assertEq(
@@ -647,9 +634,10 @@ abstract contract FormalMatchD is HookUnlockBase {
     /// @dev Make one PoolManager call of `_settleTransfers` revert with `reason` (exact calldata):
     ///      1 the asset leg's burn, 2 its payout to the buyer, 3 the quote leg's burn, 4 its payout to the
     ///      seller; 0 nothing.
+    ///      The payouts are net of the trade fee.
     function _mockLeg(Case memory c, uint256 asset, uint256 quote, uint256 mode, bytes memory reason) internal {
-        if (mode == 1 || mode == 2) _mockPayoutRevert(c.k.currency0, bob, asset, reason);
-        else if (mode == 3 || mode == 4) _mockPayoutRevert(c.k.currency1, alice, quote, reason);
+        if (mode == 1 || mode == 2) _mockPayoutRevert(c.k.currency0, bob, asset - _tradeFee(asset), reason);
+        else if (mode == 3 || mode == 4) _mockPayoutRevert(c.k.currency1, alice, quote - _tradeFee(quote), reason);
     }
 
     function _matchedOp(Op[] memory ops) internal pure returns (Op memory) {

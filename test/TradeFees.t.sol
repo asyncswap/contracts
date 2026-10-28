@@ -12,8 +12,8 @@ import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
 import {PoolModifyLiquidityTest} from "v4-core/test/PoolModifyLiquidityTest.sol";
 import {ModifyLiquidityParams} from "v4-core/types/PoolOperation.sol";
 
-/// @notice The fee schedule end to end: 0.03% of each side's input to the protocol on book matches
-///         and filler fills, and 0.02% to LPs plus 0.01% to the protocol on pool-liquidity fills.
+/// @notice The fee schedule end to end: 0.02% of what each side receives on book matches and filler
+///         fills, and 0.02% to LPs plus 0.01% to the protocol on pool-liquidity fills.
 contract TradeFeesTest is SetupHook {
     using StateLibrary for IPoolManager;
 
@@ -29,7 +29,7 @@ contract TradeFeesTest is SetupHook {
     /* ----------------------------------- helpers ----------------------------------- */
 
     function _fee(uint256 amount) internal pure returns (uint256) {
-        return Math.mulDiv(amount, 3, 10_000, Math.Rounding.Ceil);
+        return Math.mulDiv(amount, 2, 10_000, Math.Rounding.Ceil);
     }
 
     function _vault(Currency currency) internal view returns (uint256) {
@@ -60,78 +60,58 @@ contract TradeFeesTest is SetupHook {
 
     /* ------------------------------------ tests ------------------------------------ */
 
-    function test_admissionSetsAsideTheMakersFee() public {
-        AsyncOrder memory ask = _submit(alice, true, 10 ether, 9 ether);
-        (uint256 amountIn, uint256 amountOutMin) = hook.asyncOrderInfo(poolId, _id(ask));
-        assertEq(amountIn, 10 ether - _fee(10 ether), "the book trades the deposit less the fee");
-        assertEq(amountOutMin, 9 ether, "the signed minimum is unchanged");
-        assertEq(hook.asyncOrderInputFee(poolId, _id(ask)), _fee(10 ether), "fee escrowed with the order");
-        assertEq(_escrow(currency0), 10 ether, "the whole deposit is escrowed");
-        assertEq(_vault(currency0), 0, "no fee is earned before a fill");
-    }
-
     function test_cancelRefundsTheWholeDeposit() public {
         AsyncOrder memory ask = _submit(alice, true, 10 ether, 9 ether);
+        assertEq(hook.asyncOrder(poolId, _id(ask)), 10 ether, "the book holds the whole deposit");
         uint256 before = token0.balanceOf(alice);
         vm.prank(alice);
         router.cancelOrder(ask);
-        assertEq(token0.balanceOf(alice) - before, 10 ether, "net input and fee both refunded");
+        assertEq(token0.balanceOf(alice) - before, 10 ether, "the whole deposit is refunded");
         assertEq(_escrow(currency0), 0);
         assertEq(_vault(currency0), 0, "cancel charges no trade fee");
     }
 
     function test_fillerFillChargesMakerAndFiller() public {
         AsyncOrder memory ask = _submit(alice, true, 10 ether, 9 ether);
-        uint256 net = 10 ether - _fee(10 ether);
-        uint256 fillerFee = hook.calculatePoolFee(key.fee, 9 ether);
-        uint256 gross = 9 ether + fillerFee;
-        assertEq(fillerFee, gross * 3 / 10_000, "the filler pays 0.03% of gross output");
+        assertEq(hook.calculatePoolFee(key.fee, 9 ether), 0, "no surcharge on top of the minimum");
 
         uint256 aliceOut = token1.balanceOf(alice);
         uint256 bobIn = token0.balanceOf(bob);
         uint256 bobOut = token1.balanceOf(bob);
-        ask.amountIn = net; // a filler accepts the live input, which excludes the maker's fee
         vm.prank(bob);
-        router.fillOrder(ask, gross, "");
+        router.fillOrder(ask, 9 ether, "");
 
-        assertEq(token1.balanceOf(alice) - aliceOut, 9 ether, "maker receives exactly the signed minimum");
-        assertEq(bobOut - token1.balanceOf(bob), gross, "filler pays minimum plus 0.03%");
-        assertEq(token0.balanceOf(bob) - bobIn, net, "filler receives the input less the maker's fee");
-        assertEq(_vault(currency0), _fee(10 ether), "maker's 0.03% in the input token");
-        assertEq(_vault(currency1), fillerFee + 100_000, "filler's 0.03% plus the bid in the output token");
+        assertEq(token1.balanceOf(alice) - aliceOut, 9 ether - _fee(9 ether), "maker receives its minimum less 0.02%");
+        assertEq(bobOut - token1.balanceOf(bob), 9 ether, "filler pays exactly the minimum");
+        assertEq(token0.balanceOf(bob) - bobIn, 10 ether - _fee(10 ether), "filler receives the input less 0.02%");
+        assertEq(_vault(currency0), _fee(10 ether), "filler's 0.02% in the input token");
+        assertEq(_vault(currency1), _fee(9 ether) + 100_000, "maker's 0.02% plus the bid in the output token");
         assertEq(_escrow(currency0), 0);
     }
 
     function test_bookMatchChargesBothSides() public {
         AsyncOrder memory ask = _submit(alice, true, 100 ether, 90 ether);
         AsyncOrder memory bid = _submit(bob, false, 100 ether, 90 ether);
-        uint256 askNet = 100 ether - _fee(100 ether);
-        uint256 bidNet = 100 ether - _fee(100 ether);
-        // The older ask sets the price: all of its net asset for its 90 quote minimum.
-        uint256 quoteUsed = 90 ether;
-        uint256 bidFeePaid = Math.mulDiv(_fee(100 ether), quoteUsed, bidNet);
-        uint256 bidBidPaid = Math.mulDiv(100_000, quoteUsed, bidNet);
+        // The older ask sets the price: all of its asset for its 90 quote minimum.
+        uint256 bidBidPaid = Math.mulDiv(100_000, 90 ether, 100 ether);
 
         assertEq(hook.asyncOrder(poolId, _id(ask)), 0, "ask fully used");
-        assertEq(manager.balanceOf(bob, currency0.toId()), askNet, "buyer receives the ask's net input");
-        assertEq(manager.balanceOf(alice, currency1.toId()), quoteUsed, "seller receives its minimum");
-        assertEq(_vault(currency0), _fee(100 ether), "seller's whole fee in the asset");
-        assertEq(_vault(currency1), bidFeePaid + 100_000 + bidBidPaid, "buyer's pro-rata fee plus both bids");
-
-        (uint256 bidLeft,) = hook.asyncOrderInfo(poolId, _id(bid));
-        uint256 bidFeeLeft = hook.asyncOrderInputFee(poolId, _id(bid));
-        assertEq(bidLeft, bidNet - quoteUsed, "unused quote rests");
-        assertEq(bidFeeLeft, _fee(100 ether) - bidFeePaid, "the rest of the buyer's fee stays escrowed");
-        assertEq(_escrow(currency1), bidLeft + bidFeeLeft + (100_000 - bidBidPaid), "escrow backs the remainder");
+        assertEq(hook.asyncOrder(poolId, _id(bid)), 10 ether, "unused quote rests");
+        assertEq(manager.balanceOf(bob, currency0.toId()), 100 ether - _fee(100 ether), "buyer: asset less 0.02%");
+        assertEq(manager.balanceOf(alice, currency1.toId()), 90 ether - _fee(90 ether), "seller: minimum less 0.02%");
+        assertEq(_vault(currency0), _fee(100 ether), "buyer's fee in the asset");
+        assertEq(_vault(currency1), _fee(90 ether) + 100_000 + bidBidPaid, "seller's fee plus both bids' filled shares");
+        assertEq(_escrow(currency1), 10 ether + (100_000 - bidBidPaid), "escrow backs the resting remainder");
     }
 
-    /// Limits that meet exactly crossed when matches were free; each side's fee now has to fit in the spread.
-    function test_exactlyTouchingLimitsRest() public {
+    /// The fee comes out of proceeds, so limits that meet exactly still cross on the signed terms.
+    function test_exactlyTouchingLimitsMatch() public {
         AsyncOrder memory ask = _submit(alice, true, 100 ether, 100 ether);
         AsyncOrder memory bid = _submit(bob, false, 100 ether, 100 ether);
-        assertEq(hook.asyncOrder(poolId, _id(ask)), 100 ether - _fee(100 ether), "ask rests");
-        assertEq(hook.asyncOrder(poolId, _id(bid)), 100 ether - _fee(100 ether), "bid rests");
-        assertEq(_vault(currency0) + _vault(currency1), 0, "no fee without a trade");
+        assertEq(hook.asyncOrder(poolId, _id(ask)), 0, "ask filled");
+        assertEq(hook.asyncOrder(poolId, _id(bid)), 0, "bid filled");
+        assertEq(manager.balanceOf(alice, currency1.toId()), 100 ether - _fee(100 ether));
+        assertEq(manager.balanceOf(bob, currency0.toId()), 100 ether - _fee(100 ether));
     }
 
     function test_lpFillPaysLpsTwoBpsAndProtocolOneBp() public {
@@ -150,14 +130,14 @@ contract TradeFeesTest is SetupHook {
 
         assertEq(hook.asyncOrder(poolId, _id(ask)), 0, "filled from the pool");
         assertEq(_escrow(currency0), 0, "the whole deposit left escrow");
-        assertEq(_vault(currency0), protocolFee, "protocol takes 0.01% of the deposit");
+        assertEq(_vault(currency0), protocolFee, "protocol takes 0.01% of the input");
         assertEq(_vault(currency1), 100_000, "the bid goes to the FeeVault");
         (uint256 feeGrowth0, uint256 feeGrowth1) = manager.getFeeGrowthGlobals(poolId);
         uint256 expectedGrowth0 = (swapped * 200 / 1e6) * (2 ** 128) / 1e24; // 0.02% LP fee * Q128 / liquidity
         assertApproxEqRel(feeGrowth0, expectedGrowth0, 0.001e18, "0.02% of the swapped input accrues to LPs");
         assertEq(feeGrowth1, 0);
         // The maker paid its 100_000 bid in token1 when submitting.
-        assertGe(token1.balanceOf(alice) + 100_000 - aliceOut, 9 ether, "maker receives at least the minimum");
+        assertGe(token1.balanceOf(alice) + 100_000 - aliceOut, 9 ether, "pool fills still pay the full minimum");
         (,,, uint24 feeAfter) = manager.getSlot0(poolId);
         assertEq(feeAfter, feeBefore, "temporary LP fee restored");
     }

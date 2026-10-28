@@ -4,7 +4,6 @@ pragma solidity ^0.8.26;
 import {SetupHook} from "../SetupHook.t.sol";
 import {AsyncSwap} from "@async-swap/AsyncSwap.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @notice Crossing is decided exactly. Book price keys are truncated WAD ratios, so two orders
 ///         can share a key without crossing; `AsyncMatching._crosses` resolves equal keys with a
@@ -26,18 +25,7 @@ contract PriceKeyCrossingTest is SetupHook {
         topUp(bob, 100 ether);
     }
 
-    /// @dev The deposit whose net of the 0.03% input fee is exactly `net`: the book prices and
-    ///      crosses orders on their net input, so each pair below is built on net amounts.
-    function _gross(uint256 net) internal pure returns (uint256 g) {
-        g = net * 10_000 / 9997;
-        while (g - Math.mulDiv(g, 3, 10_000, Math.Rounding.Ceil) < net) g++;
-        while (g - Math.mulDiv(g, 3, 10_000, Math.Rounding.Ceil) > net) g--;
-        require(g - Math.mulDiv(g, 3, 10_000, Math.Rounding.Ceil) == net, "no deposit nets to this amount");
-    }
-
-    /// @dev Rest an order whose net input is `net`.
-    function _submit(address o, bool zeroForOne, uint256 net, uint256 amtOutMin) internal {
-        uint256 amtIn = _gross(net);
+    function _submit(address o, bool zeroForOne, uint256 amtIn, uint256 amtOutMin) internal {
         AsyncOrder memory ord = AsyncOrder(key, o, zeroForOne, amtIn, amtOutMin, 100_000, 2 ** 96, bytes32(0));
         bytes memory data = abi.encode(AsyncSwap.UserParams(o, address(router), amtOutMin, 100_000));
         vm.startPrank(o);
@@ -47,9 +35,8 @@ contract PriceKeyCrossingTest is SetupHook {
         vm.stopPrank();
     }
 
-    /// @dev Live net input of the order `_submit(o, zeroForOne, net, amtOutMin)` created.
-    function _remaining(address o, bool zeroForOne, uint256 net, uint256 amtOutMin) internal view returns (uint256) {
-        bytes32 id = _orderIdFor(o, zeroForOne, _expectedSalt(o, _gross(net), amtOutMin));
+    function _remaining(address o, bool zeroForOne, uint256 amtIn, uint256 amtOutMin) internal view returns (uint256) {
+        bytes32 id = _orderIdFor(o, zeroForOne, _expectedSalt(o, amtIn, amtOutMin));
         return hook.asyncOrder(poolId, id);
     }
 

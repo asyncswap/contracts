@@ -10,7 +10,8 @@ import {Currency} from "v4-core/types/Currency.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 
 /// @notice Fills the most-recently-submitted async order (loaded from the deployments sidecar) as it
-///         stands now. The Router charges the order's live minimum plus the filler's 0.03% protocol fee, and
+///         stands now. The Router charges the order's live minimum (the 0.02% trade fees come out of what
+///         maker and filler receive), and
 ///         the order may have been repriced or partly matched since it was saved, so the script
 ///         reads the live amounts from the hook, pays exactly that gross amount (approving it for
 ///         ERC-20 output, sending it as `msg.value` for native output) and caps the fill at it.
@@ -49,6 +50,6 @@ contract ExecuteAsyncOrderScript is FFIHelper {
         console.log("Async order filled. salt:");
         console.logBytes32(order.salt);
         console.log("Input received:", liveIn);
-        console.log("Paid (minimum + 0.03% fee):", gross);
+        console.log("Paid (live minimum):", gross);
     }
 }

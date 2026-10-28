@@ -2,7 +2,6 @@
 pragma solidity ^0.8.26;
 import {FormalMatchD} from "../formal/FormalMatchD.sol";
 import {AsyncMatching} from "@async-swap/libraries/AsyncMatching.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @notice Gross execution gas around the real unlock; refunds and transaction intrinsic gas excluded.
 ///         Storage touched by a dry run is explicitly cooled before measurement.
@@ -11,15 +10,6 @@ contract EligibleGasTest is FormalMatchD {
         address target;
         bytes32[] reads;
         bytes32[] writes;
-    }
-
-    /// @dev The deposit whose input net of the maker's 0.03% fee is exactly `net`: the bench's
-    ///      pairs are built on net terms, so each sell and buy still meet at exactly the same price.
-    function _depositForNet(uint256 net) internal pure returns (uint256 g) {
-        g = net * 10_000 / 9997;
-        while (g - Math.mulDiv(g, 3, 10_000, Math.Rounding.Ceil) < net) g++;
-        while (g - Math.mulDiv(g, 3, 10_000, Math.Rounding.Ceil) > net) g--;
-        require(g - Math.mulDiv(g, 3, 10_000, Math.Rounding.Ceil) == net, "no deposit nets to this amount");
     }
 
     function _measure(uint8 count) internal returns (uint256 used) {
@@ -62,13 +52,13 @@ contract EligibleGasTest is FormalMatchD {
     function _bench(uint256 blockers, bool distinctOwners) internal {
         emit log_named_uint("distinct_owners", distinctOwners ? 1 : 0);
         for (uint256 i; i < blockers; ++i) {
-            _rest(key, address(uint160(0x1000 + i)), true, _depositForNet(2e15 - 1), 2_000_000, 100001 + i);
+            _rest(key, address(uint160(0x1000 + i)), true, 2e15 - 1, 2_000_000, 100001 + i);
         }
         for (uint256 i; i < 32; ++i) {
-            _rest(key, distinctOwners ? address(uint160(0x10000 + i)) : alice, true, _depositForNet(1e18), 1e9, 100000);
+            _rest(key, distinctOwners ? address(uint160(0x10000 + i)) : alice, true, 1e18, 1e9, 100000);
         }
         for (uint256 i; i < 32; ++i) {
-            _rest(key, distinctOwners ? address(uint160(0x20000 + i)) : bob, false, _depositForNet(1e9), 1e18, 100000);
+            _rest(key, distinctOwners ? address(uint160(0x20000 + i)) : bob, false, 1e9, 1e18, 100000);
         }
         if (blockers == 128 && vm.envOr("EXPORT_GAS_FIXTURE", false)) {
             // dumpState exports touched accounts; ensure the Router's immutable runtime is included.

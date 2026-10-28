@@ -16,9 +16,7 @@ contract AsyncSwapMatchBookFormalTest is HookUnlockBase {
         for (uint256 i; i < k; ++i) {
             _placeOrder(alice, true, 1 ether + i, 1 ether + i);
         }
-        // Each side's limit is on its input net of the 0.03% input fee, so a 1:1 bid would no
-        // longer cross 1:1 asks: the bid asks for a little less asset.
-        _placeOrder(bob, false, 50 ether, 49 ether);
+        _placeOrder(bob, false, 50 ether, 50 ether);
         (bool hasBid,,,) = hook.bestOrder(poolId, true);
         (bool hasAsk,,,) = hook.bestOrder(poolId, false);
         assertTrue(hasBid, "bid rests");

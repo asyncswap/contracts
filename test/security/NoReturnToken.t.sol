@@ -6,8 +6,8 @@ import {AsyncSwap} from "@async-swap/AsyncSwap.sol";
 import {Router} from "@async-swap/Router.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {MockERC20} from "../utils/MockERC20.sol";
-import {NoReturnERC20} from "../utils/NoReturnERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {NoReturnERC20} from "../utils/NoReturnERC20.sol";
 import {Permit2Bytecode} from "../utils/Permit2Bytecode.sol";
 import {Test} from "forge-std/Test.sol";
 import {PoolManager} from "v4-core/PoolManager.sol";
@@ -66,6 +66,11 @@ contract NoReturnTokenTest is Test {
         }
     }
 
+    /// @dev The 0.02% trade fee, rounded up.
+    function _fee(uint256 x) internal pure returns (uint256) {
+        return Math.mulDiv(x, 2, 10_000, Math.Rounding.Ceil);
+    }
+
     function _place(bool usdtIn, uint256 amountIn, uint256 amountOutMin) internal returns (AsyncOrder memory order) {
         bool zeroForOne = usdtIn == usdtIsZero;
         order = AsyncOrder({
@@ -103,13 +108,17 @@ contract NoReturnTokenTest is Test {
     function test_noReturnTokenAsFillerOutput_fill() public {
         AsyncOrder memory order = _place(false, 100e6, 99e6);
         uint256 gross = 99e6 + hook.calculatePoolFee(key.fee, 99e6);
-        // The filler receives the input net of the maker's 0.03% fee.
-        uint256 netIn = 100e6 - Math.mulDiv(100e6, 3, 10_000, Math.Rounding.Ceil);
-        order.amountIn = netIn;
         vm.prank(filler);
         router.fillOrder(order, type(uint256).max, "");
-        assertEq(usdt.balanceOf(maker), 1000e6 + 99e6, "maker paid net output");
+        assertEq(usdt.balanceOf(maker), 1000e6 + 99e6 - _fee(99e6), "maker paid net output");
         assertEq(usdt.balanceOf(filler), 1000e6 - gross, "filler paid gross output");
-        assertEq(usdc.balanceOf(filler), 1000e6 + netIn, "filler received net input");
+        assertEq(usdc.balanceOf(filler), 1000e6 + 100e6 - _fee(100e6), "filler received input less the trade fee");
+        address vault = address(hook.feeVault());
+        assertEq(manager.balanceOf(vault, Currency.wrap(address(usdt)).toId()), _fee(99e6), "vault got output fee");
+        assertEq(
+            manager.balanceOf(vault, Currency.wrap(address(usdc)).toId()),
+            _fee(100e6) + 100_000,
+            "vault got input fee and bid"
+        );
     }
 }

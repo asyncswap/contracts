@@ -216,7 +216,7 @@ contract AsyncSwapUpdatePriceWithSigFormalTest is HookUnlockBase {
         _submit(relayer, o, u, sig);
         (uint256 inA, uint256 out) = hook.asyncOrderInfo(poolId, id);
         assertEq(out, u.n);
-        assertEq(inA, _inNet(1 ether), "stored amountIn (the deposit net of the input fee) unchanged");
+        assertEq(inA, 1 ether);
         (,,, uint128 p,,,) = hook.orderBookOrder(poolId, id);
         assertGe(p, 1);
         assertEq(_sequenceOf(poolId, id), seq + 1);

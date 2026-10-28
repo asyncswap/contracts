@@ -6,16 +6,15 @@ import {AsyncSwap} from "@async-swap/AsyncSwap.sol";
 import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {MockERC20} from "../utils/MockERC20.sol";
-import {LPFeeLibrary} from "v4-core/libraries/LPFeeLibrary.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {LPFeeLibrary} from "v4-core/libraries/LPFeeLibrary.sol";
 import {Currency} from "v4-core/types/Currency.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 
 /// @notice Every order is worth at least the pool's minimum, in numeraire (token1) base units: a buy's
 ///         input, a sell's minimum output, and a sell's input at the pool's current price. A partial
 ///         match that leaves less than the minimum refunds the remainder. In PriorityFee mode the
-///         least bid is min($0.10, 0.1% of the order). Admission checks the gross deposit; the
-///         book and the remainder check use the input net of the maker's 0.03% fee.
+///         least bid is min($0.10, 0.1% of the order).
 contract MinimumOrderTest is SetupHook {
     using PoolIdLibrary for PoolKey;
 
@@ -28,24 +27,6 @@ contract MinimumOrderTest is SetupHook {
         super.setUp();
         topUp(alice, 1_000 ether);
         topUp(bob, 1_000 ether);
-    }
-
-    /// @dev The maker's input fee escrowed from a deposit: 0.03%, rounded up.
-    function _inFee(uint256 gross) internal pure returns (uint256) {
-        return Math.mulDiv(gross, 3, 10_000, Math.Rounding.Ceil);
-    }
-
-    /// @dev The input a deposit leaves on the book.
-    function _net(uint256 gross) internal pure returns (uint256) {
-        return gross - _inFee(gross);
-    }
-
-    /// @dev The deposit whose net input is exactly `net`, so a pair can be built on net terms.
-    function _gross(uint256 net) internal pure returns (uint256 g) {
-        g = net * 10_000 / 9997;
-        while (_net(g) < net) g++;
-        while (_net(g) > net) g--;
-        require(_net(g) == net, "no deposit nets to this amount");
     }
 
     function _order(address maker, bool zeroForOne, uint256 amountIn, uint256 amountOutMin, uint256 fee)
@@ -104,8 +85,7 @@ contract MinimumOrderTest is SetupHook {
         hook.setMinOrder(key, MIN);
         AsyncOrder memory bid = _order(bob, false, MIN, MIN, 100_000);
         _submit(bid);
-        assertEq(hook.asyncOrder(poolId, _id(bid)), _net(MIN));
-        assertEq(hook.asyncOrderInputFee(poolId, _id(bid)), _inFee(MIN));
+        assertEq(hook.asyncOrder(poolId, _id(bid)), MIN);
     }
 
     function test_RevertWhen_SellAsksBelowMinimum() public {
@@ -127,8 +107,7 @@ contract MinimumOrderTest is SetupHook {
         hook.setMinOrder(key, MIN);
         AsyncOrder memory ask = _order(alice, true, MIN, MIN, 100_000);
         _submit(ask);
-        assertEq(hook.asyncOrder(poolId, _id(ask)), _net(MIN));
-        assertEq(hook.asyncOrderInputFee(poolId, _id(ask)), _inFee(MIN));
+        assertEq(hook.asyncOrder(poolId, _id(ask)), MIN);
     }
 
     function test_RevertWhen_UpdatePriceBelowMinimum() public {
@@ -142,45 +121,47 @@ contract MinimumOrderTest is SetupHook {
 
     /* ------------------------------------------------------------------ remainders */
 
-    /// The ask is matched down to 5, below the minimum of 10: the order closes and the 5 return to alice,
-    /// with the input fee still escrowed for them.
+    /// The ask is matched down to 5, below the minimum of 10: the order closes and the 5 return to alice.
     function test_partialMatchRemainderBelowMinimum_refunded() public {
         hook.setMinOrder(key, MIN);
-        uint256 gross = _gross(15 ether);
-        AsyncOrder memory ask = _order(alice, true, gross, 15 ether, 100_000);
+        AsyncOrder memory ask = _order(alice, true, 15 ether, 15 ether, 100_000);
         uint256 aliceToken0Before = token0.balanceOf(alice);
         _submit(ask);
-        _submit(_order(bob, false, _gross(MIN), MIN, 100_000));
+        _submit(_order(bob, false, MIN, MIN, 100_000));
 
-        uint256 filledFee = _inFee(gross) * MIN / 15 ether;
         assertEq(hook.asyncOrder(poolId, _id(ask)), 0, "remainder below the minimum closes the order");
-        assertEq(token0.balanceOf(alice), aliceToken0Before - gross, "the full input was escrowed");
-        assertEq(
-            manager.balanceOf(alice, currency0.toId()),
-            5 ether + _inFee(gross) - filledFee,
-            "the unmatched 5 and their input fee are refunded as claims"
-        );
-        assertEq(manager.balanceOf(address(hook.feeVault()), currency0.toId()), filledFee, "fee on the matched 10");
+        assertEq(token0.balanceOf(alice), aliceToken0Before - 15 ether, "the full input was escrowed");
+        assertEq(manager.balanceOf(alice, currency0.toId()), 5 ether, "the unmatched 5 are refunded as claims");
     }
 
     /// The resting bid is matched down to 5 of numeraire, below the minimum: it closes and the 5 return to bob.
+    /// @dev The 0.02% trade fee, rounded up.
+    function _fee(uint256 x) internal pure returns (uint256) {
+        return Math.mulDiv(x, 2, 10_000, Math.Rounding.Ceil);
+    }
+
     function test_partialMatchBuyRemainderBelowMinimum_refunded() public {
         hook.setMinOrder(key, MIN);
-        uint256 gross = _gross(15 ether);
-        AsyncOrder memory bid = _order(bob, false, gross, 15 ether, 100_000);
+        AsyncOrder memory bid = _order(bob, false, 15 ether, 15 ether, 100_000);
         uint256 bobToken1Before = token1.balanceOf(bob);
         _submit(bid);
-        _submit(_order(alice, true, _gross(MIN), MIN, 100_000));
+        _submit(_order(alice, true, MIN, MIN, 100_000));
 
-        uint256 unfilledFee = _inFee(gross) - _inFee(gross) * MIN / 15 ether;
         assertEq(hook.asyncOrder(poolId, _id(bid)), 0, "remainder below the minimum closes the order");
-        assertEq(bobToken1Before - token1.balanceOf(bob), gross + 100_000, "full input and bid were paid");
+        assertEq(bobToken1Before - token1.balanceOf(bob), 15 ether + 100_000, "full input and bid were paid");
+        assertEq(manager.balanceOf(bob, currency1.toId()), 5 ether, "the unmatched 5 are refunded as claims");
         assertEq(
-            manager.balanceOf(bob, currency1.toId()),
-            5 ether + unfilledFee,
-            "the unmatched 5 and their input fee are refunded as claims"
+            manager.balanceOf(bob, currency0.toId()),
+            MIN - _fee(MIN),
+            "the matched 10 asset arrive as claims, less the fee"
         );
-        assertEq(manager.balanceOf(bob, currency0.toId()), MIN, "the matched 10 asset arrive as claims");
+        address vault = address(hook.feeVault());
+        assertEq(manager.balanceOf(vault, currency0.toId()), _fee(MIN), "vault got the asset trade fee");
+        assertEq(
+            manager.balanceOf(vault, currency1.toId()),
+            _fee(MIN) + 2 * 100_000,
+            "vault got the quote fee and both bids; the refund is not charged"
+        );
     }
 
     /* --------------------------------------------- numeraire as currency0 */
@@ -263,7 +244,7 @@ contract MinimumOrderTest is SetupHook {
     function test_priorityFee_smallOrderPaysTenBps() public {
         AsyncOrder memory bid = _order(bob, false, 50e6, 50e6, 50_000);
         _submit(bid);
-        assertEq(hook.asyncOrder(poolId, _id(bid)), _net(50e6));
+        assertEq(hook.asyncOrder(poolId, _id(bid)), 50e6);
     }
 
     function test_RevertWhen_priorityFee_smallOrderBelowTenBps() public {
@@ -304,10 +285,9 @@ contract MinimumOrderTest is SetupHook {
 
     /// Half a $1,000 sell fills, leaving a pro-rated $0.05 bid under the $0.10 cap; it can still reprice.
     function test_updatePrice_partiallyFilledSellKeepsProRatedBid() public {
-        // Built on net terms, so the pair meets exactly at 1:1 as the bid floor arithmetic assumes.
-        AsyncOrder memory ask = _order(alice, true, _gross(1_000e6), 1_000e6, 100_000);
+        AsyncOrder memory ask = _order(alice, true, 1_000e6, 1_000e6, 100_000);
         _submit(ask);
-        _submit(_order(bob, false, _gross(500e6), 500e6, 100_000));
+        _submit(_order(bob, false, 500e6, 500e6, 100_000));
         bytes32 id = _id(ask);
         assertEq(hook.asyncOrderPriorityFee(poolId, id), 50_000);
         vm.prank(alice);

@@ -181,10 +181,8 @@ contract SpecBookFormalTest is Test {
     /// @dev Price key of `addOrder(amountIn = k ether, amountOutMin = 1 ether)`: k·1e18 for a bid,
     ///      floor(1e36 / (k·1e18)) for an ask.
     /// @dev The level of a built order with `k` ether in for 1 ether out (`_build` sets `zeroForOne = !isBuy`).
-    /// @dev The level price of a `_build` order with a `k` ether deposit: the book prices the deposit
-    ///      net of the 0.03% input fee, `k * 0.9997 ether` exactly.
     function _priceFor(bool isBuy, uint256 k) internal pure returns (uint128) {
-        return AsyncFiller._priceKey(isBuy, !isBuy, k * 0.9997 ether, 1 ether);
+        return AsyncFiller._priceKey(isBuy, !isBuy, k * 1 ether, 1 ether);
     }
 
     /// @dev Build paid orders, optionally removing and reinserting some to exercise tree reuse.
@@ -518,8 +516,7 @@ contract SpecBookFormalTest is Test {
                 sequence: x.seq,
                 priorityFee: x.fee,
                 priorityKey: uint128(x.junk >> 11),
-                createdSequence: x.seq,
-                inputFee: 0
+                createdSequence: x.seq
             })
         );
         if (!perturb) return id;

@@ -27,7 +27,7 @@ contract AsyncSwapMatchPairFormalTest is FormalMatchD {
         assertEq(writes.length, 0, "no hook SSTORE");
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapMatchPair.lean:164 — a non-skipped pair is `_matchAmounts` (older side resting), then false with no effect on a zero amount, else `_settleTransfers` then `_reduceMatchedOrders`, then true. The reductions also credit the FeeVault the matched input-fee shares. (semantics changed by the 0.03% trade fee; Lean statement needs updating)
+    /// @notice formal/Refinement/Swarm/AsyncSwapMatchPair.lean:164 — a non-skipped pair is `_matchAmounts` (older side resting), then false with no effect on a zero amount, else `_settleTransfers` then `_reduceMatchedOrders`, then true.
     function testFuzz_matchPair_eq(uint256[6] memory s, uint8 flags) public {
         Case memory c = _mkCase(s, flags);
         if (!_strictCross(c)) return;
@@ -63,7 +63,7 @@ contract AsyncSwapMatchPairFormalTest is FormalMatchD {
         }
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapMatchPair.lean:221 — every successful run is a skip (false, no effect), a zero spec amount (false, no effect), or non-zero spec amounts: true after `_settleTransfers` then `_reduceMatchedOrders` with those amounts. The reductions also credit the FeeVault the matched input-fee shares. (semantics changed by the 0.03% trade fee; Lean statement needs updating)
+    /// @notice formal/Refinement/Swarm/AsyncSwapMatchPair.lean:221 — every successful run is a skip (false, no effect), a zero spec amount (false, no effect), or non-zero spec amounts: true after `_settleTransfers` then `_reduceMatchedOrders` with those amounts.
     function testFuzz_matchPair_ok(uint256[6] memory s, uint8 flags, uint8 mode) public {
         Case memory c = _mkCase(s, flags);
         if (!_strictCross(c)) return;
@@ -83,7 +83,7 @@ contract AsyncSwapMatchPairFormalTest is FormalMatchD {
         }
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapMatchPair.lean:273 — a true result: non-zero spec amounts within both escrows and both limits; burn/payout of the asset leg, burn/payout of the quote leg, then the sell and buy reductions consuming exactly assetAmount and quoteAmount, each crediting the FeeVault its matched input-fee share. (semantics changed by the 0.03% trade fee; Lean statement needs updating)
+    /// @notice formal/Refinement/Swarm/AsyncSwapMatchPair.lean:273 — a true result: non-zero spec amounts within both escrows and both limits; burn/payout of the asset leg, burn/payout of the quote leg, then the sell and buy reductions consuming exactly assetAmount and quoteAmount.
     function testFuzz_matchPair_true(uint256[6] memory s, uint8 flags) public {
         Case memory c = _mkCase(s, flags);
         Run memory r = _exec(c);

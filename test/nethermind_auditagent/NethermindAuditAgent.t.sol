@@ -4,8 +4,6 @@ pragma solidity ^0.8.26;
 import {SetupHook} from "../SetupHook.t.sol";
 import {AsyncSwap} from "@async-swap/AsyncSwap.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
-import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {MockERC20} from "../utils/MockERC20.sol";
 import {Currency} from "v4-core/types/Currency.sol";
 import {LPFeeLibrary} from "v4-core/libraries/LPFeeLibrary.sol";
@@ -15,6 +13,7 @@ import {PoolModifyLiquidityTest} from "v4-core/test/PoolModifyLiquidityTest.sol"
 import {ModifyLiquidityParams} from "v4-core/types/PoolOperation.sol";
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 interface ITransferObserver {
     function onTokenReceived() external;
@@ -141,11 +140,6 @@ contract NethermindAuditAgentTest is SetupHook {
 
     /* ----------------------------------- main pool helpers ----------------------------------- */
 
-    /// @dev What the book trades of a deposit: the maker's 0.03% input fee is reserved beside it.
-    function _net(uint256 deposit) internal pure returns (uint256) {
-        return deposit - AsyncFiller.tradeFee(deposit);
-    }
-
     function _order(address who, bool zeroForOne, uint256 amountIn, uint256 amountOutMin)
         internal
         view
@@ -256,8 +250,6 @@ contract NethermindAuditAgentTest is SetupHook {
         AsyncOrder memory order = _buy(address(maker), 100 ether, 100 ether);
         _submitMaker(order);
 
-        // The filler accepts the live net input; the maker's fee reserve goes to the FeeVault.
-        order.amountIn = _net(100 ether);
         vm.prank(bob);
         router.fillOrder(order, type(uint256).max, "");
 
@@ -292,21 +284,16 @@ contract NethermindAuditAgentTest is SetupHook {
         AsyncOrder memory resting = _buy(address(maker), 100 ether, 100 ether);
         _submitMaker(resting);
 
-        // Bob's limit sits below the resting bid's net price, so his whole net input crosses.
-        _submitBob(_sell(bob, 40 ether, 39 ether));
+        _submitBob(_sell(bob, 40 ether, 40 ether));
 
         assertEq(asset.balanceOf(address(maker)), 0, "no ERC20 transfer during the match");
         assertEq(
             manager.balanceOf(address(maker), Currency.wrap(address(asset)).toId()),
-            _net(40 ether),
+            40 ether - _fee(40 ether),
             "partial match credited the maker in claims"
         );
         assertFalse(maker.observed(), "match payout ran no token code");
-        // The resting bid (the maker) pays its own price for Bob's net input.
-        assertEq(
-            hook.asyncOrder(assetPoolId, _assetId(resting)),
-            _net(100 ether) - Math.mulDiv(_net(40 ether), _net(100 ether), 100 ether)
-        );
+        assertEq(hook.asyncOrder(assetPoolId, _assetId(resting)), 60 ether);
     }
 
     /* ------------------------------------------------------------------------------------------ *
@@ -315,10 +302,9 @@ contract NethermindAuditAgentTest is SetupHook {
      *  match before the fill cannot leave the filler paying a full price for a remainder.        *
      * ------------------------------------------------------------------------------------------ */
 
-    /// @dev Alice's 1:1 ask (on its net input) is matched down to a tenth and repriced to 100
-    ///      before Bob's fill lands.
+    /// @dev Alice's 100:100 ask is matched down to 10 and repriced to 100 before Bob's fill lands.
     function _shrinkAndReprice() internal returns (AsyncOrder memory ask) {
-        ask = _order(alice, true, 100 ether, _net(100 ether));
+        ask = _order(alice, true, 100 ether, 100 ether);
         ask.priorityFee = 1_000_000; // 10% remains after the fill, enough for the raised minimum.
         ask.salt = keccak256(
             abi.encode(
@@ -326,7 +312,7 @@ contract NethermindAuditAgentTest is SetupHook {
             )
         );
         _submit(ask);
-        _submit(_order(carol, false, 90 ether, _net(90 ether)));
+        _submit(_order(carol, false, 90 ether, 90 ether));
         vm.prank(alice);
         hook.updatePrice(ask, 100 ether);
     }
@@ -334,7 +320,7 @@ contract NethermindAuditAgentTest is SetupHook {
     function test_M5_RevertWhen_LiveInputBelowFillerExpectation() public {
         AsyncOrder memory ask = _shrinkAndReprice();
         (uint256 liveIn,) = hook.asyncOrderInfo(poolId, _id(ask));
-        assertEq(liveIn, _net(100 ether) - _net(90 ether));
+        assertEq(liveIn, 10 ether);
 
         uint256 maxPrice = 100 ether + hook.calculatePoolFee(key.fee, 100 ether);
         vm.startPrank(bob);
@@ -346,7 +332,7 @@ contract NethermindAuditAgentTest is SetupHook {
 
     function test_M5_fillSucceeds_WhenFillerAcceptsLiveInput() public {
         AsyncOrder memory ask = _shrinkAndReprice();
-        ask.amountIn = _net(100 ether) - _net(90 ether);
+        ask.amountIn = 10 ether;
 
         uint256 gross = 100 ether + hook.calculatePoolFee(key.fee, 100 ether);
         uint256 bobToken0Before = token0.balanceOf(bob);
@@ -354,7 +340,7 @@ contract NethermindAuditAgentTest is SetupHook {
         token1.approve(address(router), gross);
         router.fillOrder(ask, gross, "");
         vm.stopPrank();
-        assertEq(token0.balanceOf(bob) - bobToken0Before, _net(100 ether) - _net(90 ether));
+        assertEq(token0.balanceOf(bob) - bobToken0Before, 10 ether - _fee(10 ether));
     }
 
     /* ------------------------------------------------------------------------------------------ *
@@ -362,27 +348,27 @@ contract NethermindAuditAgentTest is SetupHook {
      *  improvement on the filled part is not credited against the remainder's minimum.           *
      * ------------------------------------------------------------------------------------------ */
 
-    /// Seller asks >= 1 token1 per net token0 and sells 50 at about 1.5: the rest still needs 1 per token0.
+    /// Seller asks >= 1 token1 per token0 and sells half at 1.5: the other half still needs 1 per token0.
     function test_M6_favorablePartialFill_keepsRemainderLimit() public {
         _submit(_order(buyer, false, 75 ether, 50 ether));
-        AsyncOrder memory sell = _order(seller, true, 100 ether, _net(100 ether));
+        AsyncOrder memory sell = _order(seller, true, 100 ether, 100 ether);
         _submit(sell);
 
         (uint256 amountIn, uint256 amountOutMin) = hook.asyncOrderInfo(poolId, _id(sell));
-        assertEq(amountIn, _net(100 ether) - 50 ether, "half the input remains");
-        assertEq(amountOutMin, _net(100 ether) - 50 ether, "remainder keeps the seller's 1:1 limit");
+        assertEq(amountIn, 50 ether, "half the input remains");
+        assertEq(amountOutMin, 50 ether, "remainder keeps the seller's 1:1 limit");
     }
 
     /// A partial fill that alone pays the whole original minimum still leaves the remainder resting.
     function test_M6_partialFillMeetingWholeMinimum_keepsRemainderResting() public {
         _submit(_order(buyer, false, 120 ether, 50 ether));
-        AsyncOrder memory sell = _order(seller, true, 100 ether, _net(100 ether));
+        AsyncOrder memory sell = _order(seller, true, 100 ether, 100 ether);
         uint256 sellerToken0Before = token0.balanceOf(seller);
         _submit(sell);
 
         (uint256 amountIn, uint256 amountOutMin) = hook.asyncOrderInfo(poolId, _id(sell));
-        assertEq(amountIn, _net(100 ether) - 50 ether, "unfilled input stays on the book");
-        assertEq(amountOutMin, _net(100 ether) - 50 ether, "remainder keeps the seller's 1:1 limit");
+        assertEq(amountIn, 50 ether, "unfilled input stays on the book");
+        assertEq(amountOutMin, 50 ether, "remainder keeps the seller's 1:1 limit");
         assertEq(token0.balanceOf(seller), sellerToken0Before - 100 ether, "no unrequested refund");
     }
 
@@ -428,7 +414,7 @@ contract NethermindAuditAgentTest is SetupHook {
         }
         _submit(_order(bob, false, 20 ether, 20 ether));
         bytes32 backlogAsk = _id(_order(lastMaker, true, 1 ether, 0.9 ether));
-        assertEq(hook.asyncOrder(poolId, backlogAsk), _net(1 ether), "precondition: the cap left a crossed ask");
+        assertEq(hook.asyncOrder(poolId, backlogAsk), 1 ether, "precondition: the cap left a crossed ask");
 
         // A newer ask at a worse price (0.95) arrives.
         AsyncOrder memory newer = _order(carol, true, 1 ether, 0.95 ether);
@@ -448,16 +434,12 @@ contract NethermindAuditAgentTest is SetupHook {
         _submitMaker(resting);
         asset.setBlocked(address(maker), true);
 
-        _submitBob(_sell(bob, 40 ether, 39 ether));
+        _submitBob(_sell(bob, 40 ether, 40 ether));
 
-        assertEq(
-            hook.asyncOrder(assetPoolId, _assetId(resting)),
-            _net(100 ether) - Math.mulDiv(_net(40 ether), _net(100 ether), 100 ether),
-            "the match went through"
-        );
+        assertEq(hook.asyncOrder(assetPoolId, _assetId(resting)), 60 ether, "the match went through");
         assertEq(
             manager.balanceOf(address(maker), Currency.wrap(address(asset)).toId()),
-            _net(40 ether),
+            40 ether - _fee(40 ether),
             "the blocked maker is credited claims"
         );
     }
@@ -474,14 +456,20 @@ contract NethermindAuditAgentTest is SetupHook {
         _submit(_order(seller, true, 10 ether, 11 ether));
         uint256 sellerQuoteBefore = _quoteOf(seller);
 
-        // The older buy reprices to 1.2 (on net amounts), crossing the sell, and the book is cleared.
+        // The older buy reprices to 1.2, crossing the sell, and the book is cleared.
         vm.prank(buyer);
-        hook.updatePrice(bid, _net(10 ether));
+        hook.updatePrice(bid, 10 ether);
         router.matchBook(key, 1);
 
-        // The buy is still the maker, so the trade is at its 1.2: the sell's whole net asset for the
-        // buy's whole net quote. With the maker flipped to the sell it would be 1.1: 11 quote.
-        assertEq(_quoteOf(seller) - sellerQuoteBefore, _net(12 ether), "price set by the older order");
+        // The buy is still the maker, so the trade is at its 1.2: 10 asset for 12 quote.
+        // With the maker flipped to the sell it would be 1.1: 10 asset for 11 quote. The seller receives it less
+        // the 0.02% trade fee.
+        assertEq(_quoteOf(seller) - sellerQuoteBefore, 12 ether - _fee(12 ether), "price set by the older order");
+    }
+
+    /// @dev The 0.02% trade fee, rounded up.
+    function _fee(uint256 x) internal pure returns (uint256) {
+        return Math.mulDiv(x, 2, 10_000, Math.Rounding.Ceil);
     }
 
     /// @dev Quote received in any form: ERC-20 balance plus PoolManager claims.
@@ -492,11 +480,11 @@ contract NethermindAuditAgentTest is SetupHook {
     /// Buyer side: a cheap partial fill does not loosen the buyer's maximum price for the rest.
     function test_M6_favorablePartialFill_keepsBuyerRemainderLimit() public {
         _submit(_order(seller, true, 20 ether, 10 ether));
-        AsyncOrder memory bid = _order(buyer, false, 100 ether, _net(100 ether));
+        AsyncOrder memory bid = _order(buyer, false, 100 ether, 100 ether);
         _submit(bid);
 
         (uint256 amountIn, uint256 amountOutMin) = hook.asyncOrderInfo(poolId, _id(bid));
-        assertEq(amountIn, _net(100 ether) - 10 ether, "buyer spent 10 for the seller's net 20");
-        assertEq(amountOutMin, _net(100 ether) - 10 ether, "remainder keeps the buyer's 1:1 limit");
+        assertEq(amountIn, 90 ether, "buyer spent 10 for 20");
+        assertEq(amountOutMin, 90 ether, "remainder keeps the buyer's 1:1 limit");
     }
 }

@@ -161,16 +161,16 @@ contract NativeSettlementReentrancyTest is Test {
         erc20.mint(bob, 100 ether);
     }
 
+    /// @dev The 0.02% trade fee, rounded up.
+    function _fee(uint256 x) internal pure returns (uint256) {
+        return Math.mulDiv(x, 2, 10_000, Math.Rounding.Ceil);
+    }
+
     function _expectedSalt(address user, uint256 amountIn, uint256 amountOutMin) internal view returns (bytes32) {
         return
             keccak256(
                 abi.encode(block.timestamp, block.number, address(manager), user, amountIn, amountOutMin, 100_000)
             );
-    }
-
-    /// @dev A deposit's input net of the maker's 0.03% fee: what a filler receives and asks for.
-    function _net(uint256 amountIn) internal pure returns (uint256) {
-        return amountIn - Math.mulDiv(amountIn, 3, 10_000, Math.Rounding.Ceil);
     }
 
     /* ------------------------------------------------------------------ *
@@ -193,7 +193,7 @@ contract NativeSettlementReentrancyTest is Test {
             key: key,
             owner: address(maker),
             zeroForOne: false,
-            amountIn: _net(amountIn),
+            amountIn: amountIn,
             amountOutMin: amountOutMin,
             priorityFee: 100_000,
             sqrtPrice: 2 ** 96,
@@ -217,9 +217,10 @@ contract NativeSettlementReentrancyTest is Test {
         assertEq(maker.reentrySuccesses(), 0, "no re-entry succeeded");
         assertEq(
             address(maker).balance - makerEthBefore + manager.balanceOf(address(maker), 0),
-            amountOutMin,
+            amountOutMin - _fee(amountOutMin),
             "maker paid exactly once, no double-spend"
         );
+        assertEq(manager.balanceOf(address(hook.feeVault()), 0), _fee(amountOutMin), "vault got the output trade fee");
 
         // Order is gone.
         bytes32 id = keccak256(abi.encode(block.chainid, poolId, address(maker), false, order.salt));
@@ -316,7 +317,6 @@ contract NativeSettlementReentrancyTest is Test {
         );
         vm.stopPrank();
         order.salt = _expectedSalt(alice, amountIn, amountOutMin);
-        order.amountIn = _net(amountIn);
 
         uint256 aliceEthBefore = alice.balance;
         uint256 fee = hook.calculatePoolFee(order.key.fee, amountOutMin);
@@ -326,9 +326,10 @@ contract NativeSettlementReentrancyTest is Test {
         emit log_named_uint("maker ETH received", alice.balance - aliceEthBefore);
         assertEq(
             alice.balance - aliceEthBefore + manager.balanceOf(alice, 0),
-            amountOutMin,
-            "honest fill pays maker exactly the live price"
+            amountOutMin - _fee(amountOutMin),
+            "honest fill pays maker exactly the live price less the trade fee"
         );
+        assertEq(manager.balanceOf(address(hook.feeVault()), 0), _fee(amountOutMin), "vault got the output trade fee");
         assertEq(address(hook).balance, 0, "no stranded ETH on fair honest fill");
     }
 }

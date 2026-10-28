@@ -29,11 +29,11 @@ contract AsyncSwapCancelOrderFormalTest is HookUnlockBase {
         return order.zeroForOne ? token0 : token1;
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapCancelOrder.lean:74 — cancelOrder is exactly: NotAuthorizedExecutor unless sender = owner or owner's executor; else OrderNotFound if stored amountIn = 0; else the refund tail, which now refunds stored amountIn + the escrowed inputFee (the whole deposit). (semantics changed by the 0.03% trade fee; Lean statement needs updating)
+    /// @notice formal/Refinement/Swarm/AsyncSwapCancelOrder.lean:74 — cancelOrder is exactly: NotAuthorizedExecutor unless sender = owner or owner's executor; else OrderNotFound if stored amountIn = 0; else the refund tail.
     function testFuzz_cancelOrder_run(uint8 callerKind, bool exists, bool zeroForOne, uint256 amountIn, uint256 fakeIn)
         public
     {
-        amountIn = bound(amountIn, 2, 50 ether); // a 1-wei deposit is all input fee (ZeroAmount)
+        amountIn = bound(amountIn, 1, 50 ether);
         (AsyncOrder memory order, bytes32 id) = _placeOrder(alice, zeroForOne, amountIn, 1 ether);
         if (!exists) order.salt = keccak256(abi.encode(order.salt));
         order.amountIn = fakeIn; // calldata amount is never used
@@ -52,9 +52,7 @@ contract AsyncSwapCancelOrderFormalTest is HookUnlockBase {
         uint256 makerBefore = input.balanceOf(alice);
         uint256 claimsBefore = _claims(address(hook), Currency.wrap(address(input)));
         _cancelAs(caller, order);
-        assertEq(
-            input.balanceOf(alice) - makerBefore, amountIn, "owner refunded stored amountIn + inputFee (the deposit)"
-        );
+        assertEq(input.balanceOf(alice) - makerBefore, amountIn, "owner refunded stored amountIn");
         assertEq(
             claimsBefore - _claims(address(hook), Currency.wrap(address(input))),
             amountIn + (zeroForOne ? 0 : 100_000),
@@ -81,9 +79,9 @@ contract AsyncSwapCancelOrderFormalTest is HookUnlockBase {
         _cancelAs(asOwner ? alice : carol, order);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapCancelOrder.lean:172 — a successful cancel was authorised, had stored amt != 0, burned amt input claims from the hook, paid the same amt of the same currency to order.owner (claims if native), and settled the escrowed bid. amt is now stored amountIn + the escrowed inputFee (the whole deposit). (semantics changed by the 0.03% trade fee; Lean statement needs updating)
+    /// @notice formal/Refinement/Swarm/AsyncSwapCancelOrder.lean:172 — a successful cancel was authorised, had stored amt != 0, burned amt input claims from the hook, paid the same amt of the same currency to order.owner (claims if native), and settled the escrowed bid.
     function testFuzz_cancelOrder_ok(uint256 amountIn, bool zeroForOne, bool asOwner, uint256 fakeIn) public {
-        amountIn = bound(amountIn, 2, 50 ether); // a 1-wei deposit is all input fee (ZeroAmount)
+        amountIn = bound(amountIn, 1, 50 ether);
         (AsyncOrder memory order, bytes32 id) = _placeOrder(alice, zeroForOne, amountIn, 1 ether);
         order.amountIn = fakeIn;
         MockERC20 input = _input(order);
@@ -93,7 +91,7 @@ contract AsyncSwapCancelOrderFormalTest is HookUnlockBase {
         uint256 claimsBefore = _claims(address(hook), inC);
         uint256 pmBefore = input.balanceOf(address(manager));
         _cancelAs(asOwner ? alice : carol, order);
-        assertEq(input.balanceOf(alice) - makerBefore, amountIn, "owner paid stored amountIn + inputFee (the deposit)");
+        assertEq(input.balanceOf(alice) - makerBefore, amountIn, "owner paid stored amountIn");
         assertEq(input.balanceOf(carol), callerBefore, "executor paid nothing");
         assertEq(
             claimsBefore - _claims(address(hook), inC),
@@ -106,12 +104,11 @@ contract AsyncSwapCancelOrderFormalTest is HookUnlockBase {
         for (uint256 i; i < 5; ++i) {
             assertEq(w[i], bytes32(0), "orders[id] := default");
         }
-        assertEq(_loadHook(bytes32(uint256(_orderSlot(poolId, id)) + 5)), bytes32(0), "orders[id].inputFee := 0");
     }
 
     /// @notice formal/Refinement/Swarm/AsyncSwapCancelOrder.lean:172 — (native-input branch) the refund of a native-input order is minted as ERC-6909 claims (id 0) to order.owner.
     function testFuzz_cancelOrder_ok_nativeInput(uint256 amountIn) public {
-        amountIn = bound(amountIn, 2, 50 ether); // a 1-wei deposit is all input fee (ZeroAmount)
+        amountIn = bound(amountIn, 1, 50 ether);
         PoolKey memory nk = _initNativePool();
         vm.deal(alice, amountIn);
         vm.prank(alice);
@@ -148,7 +145,7 @@ contract AsyncSwapCancelOrderFormalTest is HookUnlockBase {
     /// @notice formal/Refinement/Swarm/AsyncSwapCancelOrder.lean:172 — (bid branch) cancelling an order whose bid was escrowed settles exactly that bid (no active LP: forfeited to the FeeVault) besides refunding the stored input.
     function testFuzz_cancelOrder_ok_paidBid(uint256 bid, uint256 amountIn) public {
         bid = bound(bid, 100_000, 10 ether);
-        amountIn = bound(amountIn, 2, 50 ether); // a 1-wei deposit is all input fee (ZeroAmount)
+        amountIn = bound(amountIn, 1, 50 ether);
         AsyncOrder memory order = _orderFromMaker(alice, true, amountIn, 1 ether);
         order.priorityFee = bid;
         vm.prank(alice);

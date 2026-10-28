@@ -27,7 +27,7 @@ contract AsyncSwapUpdatePriceFormalTest is HookUnlockBase {
 
     /// @dev Live order with an amountOutMin that keeps the sell-side price mulDiv in range for any n we use.
     function _live(bool zeroForOne, uint256 amountIn) internal returns (AsyncOrder memory o, bytes32 id) {
-        (o, id) = _placeOrder(alice, zeroForOne, bound(amountIn, 2, 50 ether), 1 ether); // 1 wei is all input fee
+        (o, id) = _placeOrder(alice, zeroForOne, bound(amountIn, 1, 50 ether), 1 ether);
     }
 
     /// @dev Largest n for which the order's `_priceKey` mulDiv cannot overflow.

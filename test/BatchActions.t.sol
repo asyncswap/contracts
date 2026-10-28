@@ -2,11 +2,11 @@
 pragma solidity 0.8.26;
 
 import {SetupHook} from "./SetupHook.t.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {BatchActions} from "src/BatchActions.sol";
 import {AsyncSwap} from "src/AsyncSwap.sol";
 import {AsyncOrder} from "src/types/AsyncOrder.sol";
 import {Currency} from "v4-core/types/Currency.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract BatchActionsTest is SetupHook {
     address alice = makeAddr("alice");
@@ -25,6 +25,11 @@ contract BatchActionsTest is SetupHook {
         actions = new BatchActions(manager, hook);
         vm.prank(alice);
         hook.setExecutor(poolId, address(actions), true);
+    }
+
+    /// @dev The 0.02% trade fee, rounded up.
+    function _fee(uint256 x) private pure returns (uint256) {
+        return Math.mulDiv(x, 2, 10_000, Math.Rounding.Ceil);
     }
 
     function _open(uint256 amount) private returns (AsyncOrder memory order) {
@@ -46,27 +51,22 @@ contract BatchActionsTest is SetupHook {
         return new uint256[](0);
     }
 
-    /// @dev The deposit whose input after the maker's 0.03% fee is exactly `net`.
-    function _gross(uint256 net) private pure returns (uint256) {
-        return Math.mulDiv(net, 10_000, 9_997, Math.Rounding.Ceil);
-    }
-
     function _creditBoth() private {
         AsyncOrder memory order;
-        order = AsyncOrder(key, alice, true, _gross(10 ether), 10 ether, 100_000, 2 ** 96, 0);
+        order = AsyncOrder(key, alice, true, 10 ether, 10 ether, 100_000, 2 ** 96, 0);
         vm.prank(alice);
         router.swap(order, abi.encode(AsyncSwap.UserParams(alice, address(router), 10 ether, 100_000)));
-        order = AsyncOrder(key, bob, false, _gross(10 ether), 10 ether, 100_000, 2 ** 96, 0);
+        order = AsyncOrder(key, bob, false, 10 ether, 10 ether, 100_000, 2 ** 96, 0);
         vm.prank(bob);
         router.swap(order, abi.encode(AsyncSwap.UserParams(bob, address(router), 10 ether, 100_000)));
-        order = AsyncOrder(key, bob, true, _gross(5 ether), 5 ether, 100_000, 2 ** 96, 0);
+        order = AsyncOrder(key, bob, true, 5 ether, 5 ether, 100_000, 2 ** 96, 0);
         vm.prank(bob);
         router.swap(order, abi.encode(AsyncSwap.UserParams(bob, address(router), 5 ether, 100_000)));
-        order = AsyncOrder(key, alice, false, _gross(5 ether), 5 ether, 100_000, 2 ** 96, 0);
+        order = AsyncOrder(key, alice, false, 5 ether, 5 ether, 100_000, 2 ** 96, 0);
         vm.prank(alice);
         router.swap(order, abi.encode(AsyncSwap.UserParams(alice, address(router), 5 ether, 100_000)));
-        assertEq(manager.balanceOf(alice, uint160(Currency.unwrap(currency0))), 5 ether);
-        assertEq(manager.balanceOf(alice, uint160(Currency.unwrap(currency1))), 10 ether);
+        assertEq(manager.balanceOf(alice, uint160(Currency.unwrap(currency0))), 5 ether - _fee(5 ether));
+        assertEq(manager.balanceOf(alice, uint160(Currency.unwrap(currency1))), 10 ether - _fee(10 ether));
     }
 
     function test_cancelTwoOrdersInOneUnlock() public {
@@ -88,8 +88,8 @@ contract BatchActionsTest is SetupHook {
         currencies[0] = currency0;
         currencies[1] = currency1;
         uint256[] memory amounts = new uint256[](2);
-        amounts[0] = 5 ether;
-        amounts[1] = 10 ether;
+        amounts[0] = 5 ether - _fee(5 ether);
+        amounts[1] = 10 ether - _fee(10 ether);
 
         vm.prank(alice);
         vm.expectRevert();
@@ -104,8 +104,8 @@ contract BatchActionsTest is SetupHook {
 
         assertEq(manager.balanceOf(alice, uint160(Currency.unwrap(currency0))), 0);
         assertEq(manager.balanceOf(alice, uint160(Currency.unwrap(currency1))), 0);
-        assertEq(token0.balanceOf(recipient) - before0, 5 ether);
-        assertEq(token1.balanceOf(recipient) - before1, 10 ether);
+        assertEq(token0.balanceOf(recipient) - before0, 5 ether - _fee(5 ether));
+        assertEq(token1.balanceOf(recipient) - before1, 10 ether - _fee(10 ether));
     }
 
     function test_cancelAndRedeemInOneUnlock() public {
@@ -115,7 +115,7 @@ contract BatchActionsTest is SetupHook {
         Currency[] memory currencies = new Currency[](1);
         currencies[0] = currency0;
         uint256[] memory amounts = new uint256[](1);
-        amounts[0] = 5 ether;
+        amounts[0] = 5 ether - _fee(5 ether);
         vm.prank(alice);
         manager.setOperator(address(actions), true);
 
@@ -125,7 +125,7 @@ contract BatchActionsTest is SetupHook {
 
         assertEq(hook.asyncOrder(poolId, _orderIdFor(alice, true, orders[0].salt)), 0);
         assertEq(manager.balanceOf(alice, uint160(Currency.unwrap(currency0))), 0);
-        assertEq(token0.balanceOf(recipient) - beforeBalance, 5 ether);
+        assertEq(token0.balanceOf(recipient) - beforeBalance, 5 ether - _fee(5 ether));
     }
 
     function test_rejectsOtherMakersOrders() public {

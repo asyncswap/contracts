@@ -9,7 +9,6 @@ import {IPoolManager, SwapParams} from "v4-core/interfaces/IPoolManager.sol";
 import {Currency} from "v4-core/types/Currency.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 import {TickMath} from "v4-core/libraries/TickMath.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @notice A custom executor that creates an order declaring a bid, and settles only the order's input.
 contract BidSkippingExecutor {
@@ -141,10 +140,7 @@ contract PriorityFeeOnlyTest is SetupHook {
         (bool found,, bytes32 id, address maker) = h.bestOrder(k.toId(), false);
         assertTrue(found);
         assertEq(maker, address(executor));
-        // The book holds the deposit net of the maker's 0.03% input fee, which stays escrowed.
-        uint256 inputFee = Math.mulDiv(1 ether, 3, 10_000, Math.Rounding.Ceil);
-        assertEq(h.asyncOrder(k.toId(), id), 1 ether - inputFee);
-        assertEq(h.asyncOrderInputFee(k.toId(), id), inputFee);
+        assertEq(h.asyncOrder(k.toId(), id), 1 ether);
         assertEq(h.asyncOrderPriorityFee(k.toId(), id), 100_000);
         assertEq(manager.balanceOf(address(h), currency1.toId()), 100_000);
     }

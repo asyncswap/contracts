@@ -20,16 +20,10 @@ import {Hooks} from "v4-core/libraries/Hooks.sol";
 import {LPFeeLibrary} from "v4-core/libraries/LPFeeLibrary.sol";
 import {PoolId} from "v4-core/types/PoolId.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-/// @dev What the book trades of a deposit: the maker's 0.03% input fee is reserved beside it.
-function netOf(uint256 deposit) pure returns (uint256) {
-    return deposit - AsyncFiller.tradeFee(deposit);
-}
-
-/// @dev The protocol's 0.01% of a pool-liquidity fill's gross input (net + reserve), rounded up.
-function poolProtocolFee(uint256 gross) pure returns (uint256) {
-    return Math.mulDiv(gross, 1, 10_000, Math.Rounding.Ceil);
+/// @dev The protocol's 0.01% of a pool-filled order's input, rounded up; the rest is swapped at the 0.02% LP fee.
+function protocolFeeOf(uint256 amountIn) pure returns (uint256) {
+    return (amountIn + 9_999) / 10_000;
 }
 
 /// @notice Edge cases of the guarded pool-liquidity fill path (`AsyncMatching.fillFromPoolLiquidity`).
@@ -140,10 +134,6 @@ contract PoolLiquidityFillTest is SetupHook {
         return manager.balanceOf(address(hook), currency.toId());
     }
 
-    function _vault(Currency currency) internal view returns (uint256) {
-        return manager.balanceOf(address(hook.feeVault()), currency.toId());
-    }
-
     function _countTopic(Vm.Log[] memory logs, bytes32 topic) internal pure returns (uint256 n) {
         for (uint256 i; i < logs.length; ++i) {
             if (logs[i].topics[0] == topic) ++n;
@@ -167,17 +157,15 @@ contract PoolLiquidityFillTest is SetupHook {
         order = _submit(order);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        assertEq(hook.asyncOrder(poolId, _id(order)), netOf(1 ether), "order rests");
-        assertEq(hook.asyncOrderInputFee(poolId, _id(order)), AsyncFiller.tradeFee(1 ether), "fee reserve kept");
-        assertEq(_escrow(currency0), 1 ether, "maker input (net + fee reserve) stays escrowed as hook claims");
-        assertEq(_vault(currency0), 0, "no protocol fee taken");
+        assertEq(hook.asyncOrder(poolId, _id(order)), 1 ether, "order rests");
+        assertEq(_escrow(currency0), 1 ether, "maker input stays escrowed as hook claims");
         assertEq(_countTopic(logs, LIQUIDITY_FILLED_TOPIC), 0, "no liquidity-fill event");
         _assertPoolUntouched(2 ** 96);
 
         // A permissionless retry on the still-empty pool is a no-op, not a revert.
         vm.prank(bob);
         router.fillFromPoolLiquidity(order);
-        assertEq(hook.asyncOrder(poolId, _id(order)), netOf(1 ether), "retry leaves the order resting");
+        assertEq(hook.asyncOrder(poolId, _id(order)), 1 ether, "retry leaves the order resting");
         assertEq(_escrow(currency0), 1 ether, "retry leaves escrow intact");
     }
 
@@ -187,7 +175,7 @@ contract PoolLiquidityFillTest is SetupHook {
         assertEq(manager.getLiquidity(poolId), 0, "precondition: nothing active at tick 0");
 
         AsyncOrder memory order = _submit(_order(alice, true, 1 ether, 1));
-        assertEq(hook.asyncOrder(poolId, _id(order)), netOf(1 ether), "order rests when active liquidity is zero");
+        assertEq(hook.asyncOrder(poolId, _id(order)), 1 ether, "order rests when active liquidity is zero");
         assertEq(_escrow(currency0), 1 ether);
         _assertPoolUntouched(2 ** 96);
     }
@@ -204,9 +192,8 @@ contract PoolLiquidityFillTest is SetupHook {
         order = _submit(order);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        assertEq(hook.asyncOrder(poolId, _id(order)), netOf(amountIn), "oversized order rests");
+        assertEq(hook.asyncOrder(poolId, _id(order)), amountIn, "oversized order rests");
         assertEq(_escrow(currency0), amountIn, "full input remains escrowed");
-        assertEq(_vault(currency0), 0, "the rolled-back attempt took no protocol fee");
         assertEq(_countTopic(logs, LIQUIDITY_FILLED_TOPIC), 0);
         _assertPoolUntouched(2 ** 96);
 
@@ -216,19 +203,18 @@ contract PoolLiquidityFillTest is SetupHook {
         router.fillFromPoolLiquidity(order);
         assertEq(hook.asyncOrder(poolId, _id(order)), 0, "deeper pool fills the resting order");
         assertEq(_escrow(currency0), 0, "escrow fully released");
-        assertEq(_vault(currency0), poolProtocolFee(amountIn), "protocol's 0.01% of the whole deposit");
     }
 
     /// Limit-price failure must leave the dynamic fee and the price exactly where they were.
     function test_limitFailureRestoresFeeAndPrice() public {
         _addPoolLiquidity(1e24);
         AsyncOrder memory order = _submit(_order(alice, true, 1 ether, 1.5 ether));
-        assertEq(hook.asyncOrder(poolId, _id(order)), netOf(1 ether), "limit above pool price rests");
+        assertEq(hook.asyncOrder(poolId, _id(order)), 1 ether, "limit above pool price rests");
         _assertPoolUntouched(2 ** 96);
 
         vm.prank(bob);
         router.fillFromPoolLiquidity(order);
-        assertEq(hook.asyncOrder(poolId, _id(order)), netOf(1 ether));
+        assertEq(hook.asyncOrder(poolId, _id(order)), 1 ether);
         _assertPoolUntouched(2 ** 96);
     }
 
@@ -244,10 +230,7 @@ contract PoolLiquidityFillTest is SetupHook {
         order = _submit(order); // no liquidity: the LP attempt fails
 
         bytes32 id = _id(order);
-        assertEq(hook.asyncOrder(poolId, id), netOf(1 ether), "order rests");
-        assertEq(hook.asyncOrderInputFee(poolId, id), AsyncFiller.tradeFee(1 ether), "fee reserve still attached");
-        assertEq(_escrow(currency0), 1 ether, "input and fee reserve still held as hook claims");
-        assertEq(_vault(currency0), 0, "no protocol fee taken");
+        assertEq(hook.asyncOrder(poolId, id), 1 ether, "order rests");
         assertEq(hook.asyncOrderPriorityFee(poolId, id), bid, "bid still attached to the order");
         assertEq(_escrow(currency1), bid, "bid still held as hook claims");
         assertEq(manager.balanceOf(address(hook.feeVault()), currency1.toId()), 0, "nothing forfeited");
@@ -255,9 +238,8 @@ contract PoolLiquidityFillTest is SetupHook {
 
     /* ------------------------------ successful fills ------------------------------ */
 
-    /// A fill burns exactly the maker's escrow (0.01% of it to the FeeVault, the rest swapped),
-    /// pays the maker in ERC20 (not claims), moves the pool price in the swap direction and
-    /// reports the real amounts in the event.
+    /// A fill burns exactly the maker's escrow, pays the maker in ERC20 (not claims), moves the
+    /// pool price in the swap direction and reports the real amounts in the event.
     function test_fillAccountingAndEvent() public {
         _addPoolLiquidity(1e24);
         uint256 amountIn = 2 ether;
@@ -272,23 +254,27 @@ contract PoolLiquidityFillTest is SetupHook {
         assertLt(received, amountIn, "pool fee and impact reduce output below 1:1");
         assertEq(hook.asyncOrder(poolId, _id(order)), 0, "order removed");
         assertEq(_escrow(currency0), 0, "input escrow burned");
-        assertEq(_vault(currency0), poolProtocolFee(amountIn), "protocol's 0.01% of the deposit, in the input token");
         assertEq(_escrow(currency1), 0, "hook holds no output claims");
         assertEq(manager.balanceOf(alice, currency1.toId()), 0, "ERC20 output is transferred, not minted as claims");
 
         (uint160 sqrtPriceAfter,,, uint24 feeAfter) = manager.getSlot0(poolId);
         assertLt(sqrtPriceAfter, 2 ** 96, "zeroForOne fill lowers the pool price");
-        assertEq(feeAfter, 0, "temporary 0.02% LP fee restored");
+        assertEq(feeAfter, 0, "temporary 0.02% fee restored");
 
         uint256 seen;
         for (uint256 i; i < logs.length; ++i) {
             if (logs[i].topics[0] != LIQUIDITY_FILLED_TOPIC) continue;
             (uint256 loggedIn, uint256 loggedOut) = abi.decode(logs[i].data, (uint256, uint256));
-            assertEq(loggedIn, amountIn - poolProtocolFee(amountIn), "event amountIn: what was swapped");
+            assertEq(loggedIn, amountIn - protocolFeeOf(amountIn), "event amountIn: the input less the protocol fee");
             assertEq(loggedOut, received, "event amountOut matches what the maker received");
             ++seen;
         }
         assertEq(seen, 1, "exactly one liquidity-fill event");
+        assertEq(
+            manager.balanceOf(address(hook.feeVault()), currency0.toId()),
+            protocolFeeOf(amountIn),
+            "0.01% of the input goes to the FeeVault"
+        );
     }
 
     /// Book first, pool second: the incoming order matches a resting counterparty for part of
@@ -304,19 +290,13 @@ contract PoolLiquidityFillTest is SetupHook {
         AsyncOrder memory ask = _submit(_order(alice, true, 1 ether, 0.95 ether));
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        // Bob (the maker) takes 0.5 token0 of alice's net input; she pays the matching share of her
-        // fee reserve. The pool gets the net remainder plus the rest of her reserve, less 0.01%.
-        uint256 reserve = AsyncFiller.tradeFee(1 ether);
-        uint256 matchedFee = Math.mulDiv(reserve, 0.5 ether, netOf(1 ether));
-        uint256 poolGross = netOf(1 ether) - 0.5 ether + reserve - matchedFee;
         assertEq(_countTopic(logs, MATCHED_TOPIC), 1, "one book match");
         assertEq(_countTopic(logs, LIQUIDITY_FILLED_TOPIC), 1, "one pool fill for the remainder");
         for (uint256 i; i < logs.length; ++i) {
             if (logs[i].topics[0] != LIQUIDITY_FILLED_TOPIC) continue;
             (uint256 loggedIn,) = abi.decode(logs[i].data, (uint256, uint256));
-            assertEq(loggedIn, poolGross - poolProtocolFee(poolGross), "pool only sees what the book left");
+            assertEq(loggedIn, 0.5 ether - protocolFeeOf(0.5 ether), "pool only sees what the book left");
         }
-        assertEq(_vault(currency0), matchedFee + poolProtocolFee(poolGross), "alice's fees, in token0");
         assertEq(hook.asyncOrder(poolId, _id(ask)), 0, "ask fully executed");
         assertEq(_escrow(currency0), 0, "no token0 escrow left");
         assertEq(_escrow(currency1), 0, "bob's bid fully consumed");
@@ -324,7 +304,7 @@ contract PoolLiquidityFillTest is SetupHook {
         uint256 received =
             token1.balanceOf(alice) + 100_000 + manager.balanceOf(alice, currency1.toId()) - aliceOutBefore;
         assertGe(received, 0.95 ether, "maker limit respected across both legs");
-        assertGt(received, 0.5 ether + 0.49 ether, "~0.5 from bob plus ~0.5 from the pool");
+        assertGt(received, 0.5 ether + 0.49 ether, "0.5 from bob plus ~0.5 from the pool");
     }
 
     /// After a partial book match, the shrunken remainder (and its reduced minimum) is what the
@@ -334,12 +314,8 @@ contract PoolLiquidityFillTest is SetupHook {
         AsyncOrder memory ask = _submit(_order(alice, true, 1 ether, 0.95 ether)); // no pool yet
         bytes32 id = _id(ask);
         (uint256 remaining, uint256 remainingMin) = hook.asyncOrderInfo(poolId, id);
-        assertEq(remaining, netOf(1 ether) - 0.5 ether, "half matched against bob");
-        assertEq(
-            remainingMin,
-            Math.mulDiv(0.95 ether, remaining, netOf(1 ether), Math.Rounding.Ceil),
-            "remainder keeps the ask's limit"
-        );
+        assertEq(remaining, 0.5 ether, "half matched against bob");
+        assertEq(remainingMin, 0.475 ether, "remainder keeps the ask's 0.95 limit");
 
         _addPoolLiquidity(1e24);
         vm.prank(bob);
@@ -364,12 +340,16 @@ contract PoolLiquidityFillTest is SetupHook {
         uint256 amountIn = 10 ether;
         _submit(_order(alice, true, amountIn, 9 ether));
 
-        uint256 swapped = amountIn - poolProtocolFee(amountIn);
-        assertEq(_vault(currency0), amountIn - swapped, "0.01% of the input goes to the FeeVault");
         (uint256 feeGrowth0, uint256 feeGrowth1) = manager.getFeeGrowthGlobals(poolId);
-        uint256 expectedGrowth0 = (swapped * 2 / 10_000) * (2 ** 128) / 1e24; // fee * Q128 / liquidity
+        uint256 swapped = amountIn - protocolFeeOf(amountIn);
+        uint256 expectedGrowth0 = (swapped * 200 / 1e6) * (2 ** 128) / 1e24; // fee * Q128 / liquidity
         assertApproxEqRel(
             feeGrowth0, expectedGrowth0, 0.01e18, "0.02% of the swapped input accrues as token0 fee growth"
+        );
+        assertEq(
+            manager.balanceOf(address(hook.feeVault()), currency0.toId()),
+            protocolFeeOf(amountIn),
+            "0.01% of the input goes to the FeeVault"
         );
         assertEq(feeGrowth1, 0, "the bid is not donated to LPs");
         assertEq(manager.balanceOf(address(hook.feeVault()), currency1.toId()), 100_000, "the bid goes to the FeeVault");
@@ -405,7 +385,7 @@ contract PoolLiquidityFillTest is SetupHook {
         vm.prank(bob);
         vm.expectRevert(AsyncFiller.NotAuthorizedExecutor.selector);
         router.fillFromPoolLiquidity(order);
-        assertEq(hook.asyncOrder(poolId, _id(order)), netOf(1 ether), "order untouched");
+        assertEq(hook.asyncOrder(poolId, _id(order)), 1 ether, "order untouched");
     }
 
     function test_retryUnknownOrderReverts() public {
@@ -449,16 +429,11 @@ contract PoolLiquidityFillTest is SetupHook {
         if (remaining == 0) {
             assertGe(received, amountOutMin, "filled: limit honored");
             assertEq(_escrow(input), 0, "filled: escrow burned");
-            assertEq(
-                manager.balanceOf(address(hook.feeVault()), input.toId()),
-                poolProtocolFee(amountIn) + (zeroForOne ? 0 : 100_000),
-                "filled: protocol fee (and a token1 bid) to the FeeVault"
-            );
             (uint160 sqrtPrice,,, uint24 fee) = manager.getSlot0(poolId);
             assertTrue(zeroForOne ? sqrtPrice < 2 ** 96 : sqrtPrice > 2 ** 96, "filled: price moved with the swap");
             assertEq(fee, 0, "filled: fee restored");
         } else {
-            assertEq(remaining, netOf(amountIn), "rest: nothing partially consumed");
+            assertEq(remaining, amountIn, "rest: nothing partially consumed");
             assertEq(received, 0, "rest: maker paid nothing");
             assertEq(_escrow(input), amountIn + (zeroForOne ? 0 : 100_000), "rest: input and bid escrow");
             _assertPoolUntouched(2 ** 96);
@@ -471,6 +446,7 @@ contract PoolLiquidityFillTest is SetupHook {
 ///         decimal gap in both directions.
 contract PoolLiquidityFillSixDecimalTest is Test {
     using PoolIdLibrary for PoolKey;
+    using CurrencyLibrary for Currency;
     using StateLibrary for IPoolManager;
 
     // sqrt(2000e6 / 1e18) * 2^96, i.e. 2,000 USDC per asset with the asset as currency0.
@@ -546,7 +522,13 @@ contract PoolLiquidityFillSixDecimalTest is Test {
         assertEq(hook.asyncOrder(poolId, id), 0, "1 asset fills against the pool");
         uint256 received = usdc.balanceOf(maker) - usdcBefore;
         assertGe(received, 1_990e6, "limit in raw USDC units honored");
-        assertLe(received, 2_000e6 * 9_997 / 10_000, "at most spot minus the 0.01% protocol and 0.02% LP fees");
+        uint256 swapped = 1 ether - protocolFeeOf(1 ether);
+        assertLe(received, 2_000e6 * swapped / 1 ether * 999_800 / 1_000_000, "at most spot minus both fill fees");
+        assertEq(
+            manager.balanceOf(address(hook.feeVault()), key.currency0.toId()),
+            protocolFeeOf(1 ether),
+            "0.01% of the input goes to the FeeVault"
+        );
     }
 
     function test_buyAssetWithUsdcAtMarket() public {
@@ -555,15 +537,21 @@ contract PoolLiquidityFillSixDecimalTest is Test {
         assertEq(hook.asyncOrder(poolId, id), 0, "2,000 USDC fills against the pool");
         uint256 received = asset.balanceOf(maker) - assetBefore;
         assertGe(received, 0.99 ether, "limit in asset wei honored");
-        assertLe(received, 0.9997 ether, "at most spot minus the fill fees");
+        uint256 swapped = 2_000e6 - protocolFeeOf(2_000e6);
+        assertLe(received, swapped * 1 ether / 2_000e6 * 999_800 / 1_000_000, "at most spot minus both fill fees");
+        assertEq(
+            manager.balanceOf(address(hook.feeVault()), key.currency1.toId()),
+            protocolFeeOf(2_000e6) + 100_000,
+            "0.01% of the input and the bid go to the FeeVault"
+        );
     }
 
     function test_limitAboveSpotRestsOnBothSides() public {
         bytes32 ask = _submit(true, 1 ether, 2_001e6);
-        assertEq(hook.asyncOrder(poolId, ask), netOf(1 ether), "ask above spot rests");
+        assertEq(hook.asyncOrder(poolId, ask), 1 ether, "ask above spot rests");
         bytes32 bid = _submit(false, 2_000e6, 1.001 ether);
-        assertEq(hook.asyncOrder(poolId, bid), netOf(2_000e6), "bid above spot rests");
-        assertEq(manager.balanceOf(address(hook), key.currency0.toId()), 1 ether, "asset escrow (net + fee reserve)");
+        assertEq(hook.asyncOrder(poolId, bid), 2_000e6, "bid above spot rests");
+        assertEq(manager.balanceOf(address(hook), key.currency0.toId()), 1 ether, "asset escrow");
         assertEq(
             manager.balanceOf(address(hook), key.currency1.toId()),
             2_000e6 + 200_000,
@@ -578,8 +566,7 @@ contract PoolLiquidityFillSixDecimalTest is Test {
     /// LimitPriceNotMet, so the order rests instead of being deleted for nothing.
     function test_dustInputNeverFillsForZeroOutput() public {
         uint256 assetBefore = asset.balanceOf(maker);
-        // 2 raw USDC units (1 net after the rounded-up 0.03% fee) for at least 1 wei of asset.
-        bytes32 id = _submit(false, 2, 1);
+        bytes32 id = _submit(false, 1, 1); // 1 raw USDC unit for at least 1 wei of asset
         uint256 remaining = hook.asyncOrder(poolId, id);
         uint256 received = asset.balanceOf(maker) - assetBefore;
         if (remaining == 0) assertGe(received, 1, "if it filled, it paid at least the limit");

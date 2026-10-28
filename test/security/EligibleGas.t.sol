@@ -63,7 +63,7 @@ contract EligibleGasTest is FormalMatchD {
         if (blockers == 128 && vm.envOr("EXPORT_GAS_FIXTURE", false)) {
             // dumpState exports touched accounts; ensure the Router's immutable runtime is included.
             vm.etch(address(router), address(router).code);
-            (,, address storedVault) = hook.asyncOrders(poolId);
+            (,, address storedVault,,) = hook.asyncOrders(poolId);
             assertEq(storedVault, address(hook.feeVault()), "pool vault before export");
             vm.dumpState("deployments/eligible-gas-state.json");
             emit log_named_address("benchmark_router", address(router));

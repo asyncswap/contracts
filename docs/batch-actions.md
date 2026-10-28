@@ -4,10 +4,10 @@
 
 ## Deploy with a Foundry keystore
 
-From the `contracts` directory, set the existing Unichain mainnet hook and run:
+From the `contracts` directory, set the deployed hook address and run:
 
 ```sh
-export HOOK_ADDRESS=0x917b2e7C352af82c35C7a4477d7D055C54E76888
+export HOOK_ADDRESS=<hook address on the target chain>
 forge script script/DeployBatchActions.s.sol:DeployBatchActions \
   --rpc-url https://mainnet.unichain.org \
   --account YOUR_FOUNDRY_KEYSTORE \

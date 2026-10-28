@@ -333,6 +333,30 @@
         ]
       }
     },
+    "robinhoodChainTestnet": {
+      "name": "Robinhood Chain Testnet",
+      "chainId": 46630,
+      "network": "testnet",
+      "rpcUrlEnv": "RPC_URL_ROBINHOOD_TESTNET",
+      "explorerUrl": "https://explorer.testnet.chain.robinhood.com",
+      "nativeCurrency": { "name": "Ether", "symbol": "ETH", "decimals": 18 },
+      "contracts": {
+        "poolManager": "0x8366a39CC670B4001A1121B8F6A443A643e40951",
+        "permit2": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+        "usdc": null,
+        "asyncSwapHook": null,
+        "router": null
+      },
+      "deployment": {
+        "status": "config_only",
+        "script": "script/deploy-robinhood-testnet.sh",
+        "requires": [
+          "USDC address chosen for the testnet (no Circle-issued USDC on 46630)",
+          "RPC_URL_ROBINHOOD_TESTNET in .env.deploy",
+          "ETH-funded deployer keystore"
+        ]
+      }
+    },
     "soneium": {
       "name": "Soneium",
       "chainId": 1868,

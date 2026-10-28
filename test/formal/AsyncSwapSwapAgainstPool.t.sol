@@ -23,7 +23,7 @@ contract AsyncSwapSwapAgainstPoolFormalTest is HookUnlockBase {
     using StateLibrary for IPoolManager;
 
     function _selfFill(AsyncOrder memory o, bytes32 id) internal view returns (Call[] memory) {
-        return _one(_cAs(address(hook), address(hook), abi.encodeCall(hook.fillOrderFromPoolLiquidity, (o, id))));
+        return _one(_cAs(address(hook), address(hook), abi.encodeCall(hook.fillOrderFromPoolLiquidity, (o, id, 0))));
     }
 
     function selfFillExt(AsyncOrder memory o, bytes32 id) external {

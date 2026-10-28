@@ -370,10 +370,10 @@ contract PoolLiquidityFillTest is SetupHook {
         _addPoolLiquidity(1e24);
         AsyncOrder memory order = _submit(_order(alice, true, 1 ether, 1.5 ether));
         vm.expectRevert(AsyncSwap.NotSelf.selector);
-        hook.fillOrderFromPoolLiquidity(order, _id(order));
+        hook.fillOrderFromPoolLiquidity(order, _id(order), 0);
         vm.prank(address(router));
         vm.expectRevert(AsyncSwap.NotSelf.selector);
-        hook.fillOrderFromPoolLiquidity(order, _id(order));
+        hook.fillOrderFromPoolLiquidity(order, _id(order), 0);
     }
 
     function test_retryRequiresMakerAuthorizedExecutor() public {

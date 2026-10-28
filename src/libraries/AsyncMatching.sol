@@ -188,7 +188,8 @@ library AsyncMatching {
         bytes32 id,
         address maker,
         address hook,
-        uint256 protocolFee
+        uint256 protocolFee,
+        uint160 sqrtPriceLimitX96
     ) public {
         AsyncFiller.OrderInfo storage info = self.orders[id];
         // The hook has already moved the protocol's 0.01% of the input to the vault; the rest is
@@ -201,7 +202,8 @@ library AsyncMatching {
         // Close the order before the maker's payout, which can run recipient code.
         AsyncFiller._remove(self, book, id);
         delete self.orders[id];
-        uint256 amountOut = _swapAgainstPool(self.poolManager, key, zeroForOne, amountIn, amountOutMin, hook);
+        uint256 amountOut =
+            _swapAgainstPool(self.poolManager, key, zeroForOne, amountIn, amountOutMin, hook, sqrtPriceLimitX96);
         Currency output = zeroForOne ? key.currency1 : key.currency0;
         output.take(self.poolManager, maker, amountOut, output.isAddressZero());
         AsyncFiller.settlePriorityFee(self, key, id, maker, priorityFee, hook);
@@ -214,7 +216,8 @@ library AsyncMatching {
         bool zeroForOne,
         uint256 amountIn,
         uint256 amountOutMin,
-        address hook
+        address hook,
+        uint160 sqrtPriceLimitX96
     ) private returns (uint256 amountOut) {
         if (manager.getLiquidity(key.toId()) == 0) revert NoActiveLiquidity();
         Currency input = zeroForOne ? key.currency0 : key.currency1;
@@ -224,7 +227,12 @@ library AsyncMatching {
         BalanceDelta delta = manager.swap(
             key,
             SwapParams(
-                zeroForOne, -amountIn.toInt256(), zeroForOne ? TickMath.MIN_SQRT_PRICE + 1 : TickMath.MAX_SQRT_PRICE - 1
+                zeroForOne,
+                -amountIn.toInt256(),
+                // A limit (the best book level) stops the swap there; a swap that stops short reverts below.
+                sqrtPriceLimitX96 != 0
+                    ? sqrtPriceLimitX96
+                    : zeroForOne ? TickMath.MIN_SQRT_PRICE + 1 : TickMath.MAX_SQRT_PRICE - 1
             ),
             ""
         );

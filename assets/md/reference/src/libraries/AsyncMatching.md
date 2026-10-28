@@ -1,6 +1,6 @@
 # AsyncMatching
 
-[Git Source](https://github.com/asyncswap/contracts/blob/05628c8ccb9f8ab9d157c5d9ad6e75938edcada5/src/libraries/AsyncMatching.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/550b463d7a76a7954a95bc55a3ee0f16207ed4b2/src/libraries/AsyncMatching.sol)
 
 Linked matching module operating on the hook's order and radix-book storage.
 
@@ -207,7 +207,7 @@ function _bookPair(AsyncFiller.State storage self, AsyncFiller.Book storage book
 | bidId | `bytes32` |  |
 | askId | `bytes32` |  |
 
-<a id="fillfrompoolliquidity-asyncfiller-state-asyncfiller-book-poolkey-bytes32-address-address-uint256" />
+<a id="fillfrompoolliquidity-asyncfiller-state-asyncfiller-book-poolkey-bytes32-address-address-uint256-uint160" />
 
 ### fillFromPoolLiquidity
 
@@ -226,7 +226,8 @@ function fillFromPoolLiquidity(
         bytes32 id,
         address maker,
         address hook,
-        uint256 protocolFee
+        uint256 protocolFee,
+        uint160 sqrtPriceLimitX96
     ) public;
 ```
 
@@ -241,8 +242,9 @@ function fillFromPoolLiquidity(
 | maker | `address` |  |
 | hook | `address` |  |
 | protocolFee | `uint256` |  |
+| sqrtPriceLimitX96 | `uint160` |  |
 
-<a id="_swapagainstpool-ipoolmanager-poolkey-bool-uint256-uint256-address" />
+<a id="_swapagainstpool-ipoolmanager-poolkey-bool-uint256-uint256-address-uint160" />
 
 ### \_swapAgainstPool
 
@@ -253,7 +255,8 @@ function _swapAgainstPool(
         bool zeroForOne,
         uint256 amountIn,
         uint256 amountOutMin,
-        address hook
+        address hook,
+        uint160 sqrtPriceLimitX96
     ) private returns (uint256 amountOut);
 ```
 
@@ -267,6 +270,7 @@ function _swapAgainstPool(
 | amountIn | `uint256` |  |
 | amountOutMin | `uint256` |  |
 | hook | `address` |  |
+| sqrtPriceLimitX96 | `uint160` |  |
 
 **Returns**
 

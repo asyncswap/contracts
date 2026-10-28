@@ -1,6 +1,6 @@
 # TickPrice
 
-[Git Source](https://github.com/asyncswap/contracts/blob/05628c8ccb9f8ab9d157c5d9ad6e75938edcada5/src/libraries/TickPrice.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/550b463d7a76a7954a95bc55a3ee0f16207ed4b2/src/libraries/TickPrice.sol)
 
 Book levels on Uniswap v4 ticks: an order sits at the floor tick (spacing 1, 0.01% steps)
 of its exact currency1/currency0 limit. Levels are a fixed relative width at any price and
@@ -34,6 +34,40 @@ function key(bool isBuy, bool zeroForOne, uint256 amountIn, uint256 amountOut) p
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | \<none> | `uint128` |  |
+
+<a id="poolbeatslevel-ipoolmanager-poolid-bool-bool-uint128" />
+
+### poolBeatsLevel
+
+Whether the pool has active liquidity and its current price is strictly better for an
+incoming order than the best opposite level `levelKey` (below the best ask for a buy,
+above the best bid for a sell), compared as keys; if so, also that level's sqrt price,
+the limit a pool-first swap may not cross. `quote1`: the numeraire is currency1, so the
+tick's price is already numeraire per asset; otherwise it is flipped.
+
+```solidity
+function poolBeatsLevel(IPoolManager manager, PoolId poolId, bool quote1, bool isBuy, uint128 levelKey)
+        public
+        view
+        returns (bool, uint160);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| manager | `IPoolManager` |  |
+| poolId | `PoolId` |  |
+| quote1 | `bool` |  |
+| isBuy | `bool` |  |
+| levelKey | `uint128` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bool` |  |
+| \<none> | `uint160` |  |
 
 <a id="floortick-uint256-uint256" />
 

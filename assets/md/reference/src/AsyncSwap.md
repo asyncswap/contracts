@@ -1,6 +1,6 @@
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/05628c8ccb9f8ab9d157c5d9ad6e75938edcada5/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/550b463d7a76a7954a95bc55a3ee0f16207ed4b2/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -632,13 +632,13 @@ function matchNewOrder(AsyncOrder calldata order) external returns (uint8 matche
 <i>
   True when the pool has active liquidity and its current price is strictly better for an
   incoming order than the best resting order on the other side: below the best ask for a
-  buy, above the best bid for a sell. Both are compared as `TickPrice` keys, which order
-  numeraire per asset. An empty opposite side or an equal level leaves the book first.
+  buy, above the best bid for a sell (`TickPrice.poolBeatsLevel`). An empty opposite side or an equal level leaves the book first.
   The spot price excludes the pool fill's fees and price impact, so this is a heuristic.
+  With it, the best level as a sqrt price: the limit a pool-first swap may not cross.
 </i>
 
 ```solidity
-function _poolBeatsBook(PoolKey calldata key, bool isBuy) private view returns (bool);
+function _poolBeatsBook(PoolKey calldata key, bool isBuy) private view returns (bool, uint160);
 ```
 
 **Parameters**
@@ -653,6 +653,7 @@ function _poolBeatsBook(PoolKey calldata key, bool isBuy) private view returns (
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | \<none> | `bool` |  |
+| \<none> | `uint160` |  |
 
 <a id="tryfillorderfrompoolliquidity-asyncorder" />
 
@@ -680,7 +681,7 @@ function tryFillOrderFromPoolLiquidity(AsyncOrder calldata order) external retur
 | ---- | ---- | ----------- |
 | filled | `bool` |  |
 
-<a id="fillorderfrompoolliquidity-asyncorder-bytes32" />
+<a id="fillorderfrompoolliquidity-asyncorder-bytes32-uint160" />
 
 ### fillOrderFromPoolLiquidity
 
@@ -688,10 +689,12 @@ function tryFillOrderFromPoolLiquidity(AsyncOrder calldata order) external retur
   The self-call boundary makes a failed AMM attempt atomic while preserving the resting
   order. PoolManager skips hook callbacks when the hook itself is the swap caller, so this
   swap does not create an order.
+  `sqrtPriceLimitX96` is a price the swap may not cross (0 for none): the whole order fills
+  before it, or the call reverts.
 </i>
 
 ```solidity
-function fillOrderFromPoolLiquidity(AsyncOrder calldata order, bytes32 id) external;
+function fillOrderFromPoolLiquidity(AsyncOrder calldata order, bytes32 id, uint160 sqrtPriceLimitX96) external;
 ```
 
 **Parameters**
@@ -700,6 +703,7 @@ function fillOrderFromPoolLiquidity(AsyncOrder calldata order, bytes32 id) exter
 | ---- | ---- | ----------- |
 | order | `AsyncOrder` |  |
 | id | `bytes32` |  |
+| sqrtPriceLimitX96 | `uint160` |  |
 
 <a id="matchbook-poolkey-uint8" />
 

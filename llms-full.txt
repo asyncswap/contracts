@@ -13,6 +13,8 @@ Sitemap:
 - [Contract reference](/reference/): Contracts, libraries, interfaces and types, generated from the NatSpec in src/.
 - [AsyncSwap](/reference/src/AsyncSwap): Uniswap v4 hook that converts an exact-input swap into an open async order: the maker deposits their input via `_beforeSwap`. Crossing orders settle directly at the resting limit; fillers settle unmatched orders.
 - [BatchActions](/reference/src/BatchActions): Cancels the caller's orders and redeems the caller's ERC-6909 PoolManager claims atomically in one PoolManager unlock.
+- [BatchCancels](/reference/src/BatchCancels): Cancels several orders owned by the caller in one PoolManager unlock.
+- [BatchClaims](/reference/src/BatchClaims): Atomically redeems a caller's PoolManager ERC-6909 claims for several currencies.
 - [FeeVault](/reference/src/FeeVault): Holds and redeems protocol fee claims, never maker escrow.
 - [ImmutableState](/reference/src/ImmutableState): A collection of immutable state variables, commonly used across multiple contracts
 - [MatchingEngine](/reference/src/MatchingEngine): Standalone price-time matching harness. It maintains a radix-indexed limit book and emits deterministic fill instructions.
@@ -1074,7 +1076,7 @@ match the code on `main`. Each page links to its source file.
 
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/84af4c7ef38278c180ca35e944b4349402bc1f99/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/05628c8ccb9f8ab9d157c5d9ad6e75938edcada5/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -2332,7 +2334,7 @@ struct UserParams {
 
 # BatchActions
 
-[Git Source](https://github.com/asyncswap/contracts/blob/84af4c7ef38278c180ca35e944b4349402bc1f99/src/BatchActions.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/05628c8ccb9f8ab9d157c5d9ad6e75938edcada5/src/BatchActions.sol)
 
 Cancels the caller's orders and redeems the caller's ERC-6909 PoolManager claims
 atomically in one PoolManager unlock.
@@ -2474,9 +2476,238 @@ error WrongHook();
 error OnlyPoolManager();
 ```
 
+# BatchCancels
+
+[Git Source](https://github.com/asyncswap/contracts/blob/05628c8ccb9f8ab9d157c5d9ad6e75938edcada5/src/BatchCancels.sol)
+
+Cancels several orders owned by the caller in one PoolManager unlock.
+
+<i>
+  Makers must authorize this contract as an executor for each order's pool.
+</i>
+
+## Constants
+
+### poolManager
+
+```solidity
+IPoolManager public immutable poolManager;
+```
+
+### hook
+
+```solidity
+AsyncSwap public immutable hook;
+```
+
+## State Variables
+
+### cancellingOwner
+
+```solidity
+address private cancellingOwner;
+```
+
+## Functions
+
+<a id="constructor-ipoolmanager-asyncswap" />
+
+### constructor
+
+```solidity
+constructor(IPoolManager manager, AsyncSwap orderHook);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| manager | `IPoolManager` |  |
+| orderHook | `AsyncSwap` |  |
+
+<a id="cancelorders-asyncorder" />
+
+### cancelOrders
+
+```solidity
+function cancelOrders(AsyncOrder[] calldata orders) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| orders | `AsyncOrder[]` |  |
+
+<a id="unlockcallback-bytes" />
+
+### unlockCallback
+
+```solidity
+function unlockCallback(bytes calldata data) external returns (bytes memory);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| data | `bytes` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes` |  |
+
+## Errors
+
+### InvalidBatch
+
+```solidity
+error InvalidBatch();
+```
+
+### NotOwner
+
+```solidity
+error NotOwner();
+```
+
+### OnlyPoolManager
+
+```solidity
+error OnlyPoolManager();
+```
+
+# BatchClaims
+
+[Git Source](https://github.com/asyncswap/contracts/blob/05628c8ccb9f8ab9d157c5d9ad6e75938edcada5/src/BatchClaims.sol)
+
+Atomically redeems a caller's PoolManager ERC-6909 claims for several currencies.
+
+<i>
+  The caller must first make this contract an operator on PoolManager. The operator
+  permission is used only for claims owned by msg.sender and paid to their recipient.
+</i>
+
+## Constants
+
+### poolManager
+
+```solidity
+IPoolManager public immutable poolManager;
+```
+
+## State Variables
+
+### \_redeeming
+
+```solidity
+bool private _redeeming;
+```
+
+## Functions
+
+<a id="constructor-ipoolmanager" />
+
+### constructor
+
+```solidity
+constructor(IPoolManager manager);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| manager | `IPoolManager` |  |
+
+<a id="nonreentrant" />
+
+### nonReentrant
+
+```solidity
+modifier nonReentrant();
+```
+
+<a id="redeem-currency-address-uint256" />
+
+### redeem
+
+```solidity
+function redeem(Currency[] calldata currencies, address recipient, uint256[] calldata amounts)
+        external
+        nonReentrant;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| currencies | `Currency[]` |  |
+| recipient | `address` |  |
+| amounts | `uint256[]` |  |
+
+<a id="unlockcallback-bytes" />
+
+### unlockCallback
+
+```solidity
+function unlockCallback(bytes calldata data) external returns (bytes memory);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| data | `bytes` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes` |  |
+
+## Events
+
+### ClaimRedeemed
+
+```solidity
+event ClaimRedeemed(address indexed owner, address indexed recipient, Currency indexed currency, uint256 amount);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| owner | `address` |  |
+| recipient | `address` |  |
+| currency | `Currency` |  |
+| amount | `uint256` |  |
+
+## Errors
+
+### OnlyPoolManager
+
+```solidity
+error OnlyPoolManager();
+```
+
+### InvalidRedemption
+
+```solidity
+error InvalidRedemption();
+```
+
+### ReentrantRedemption
+
+```solidity
+error ReentrantRedemption();
+```
+
 # FeeVault
 
-[Git Source](https://github.com/asyncswap/contracts/blob/84af4c7ef38278c180ca35e944b4349402bc1f99/src/FeeVault.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/05628c8ccb9f8ab9d157c5d9ad6e75938edcada5/src/FeeVault.sol)
 
 Holds and redeems protocol fee claims, never maker escrow.
 
@@ -2583,7 +2814,7 @@ error ZeroAddress();
 
 # ImmutableState
 
-[Git Source](https://github.com/asyncswap/contracts/blob/84af4c7ef38278c180ca35e944b4349402bc1f99/src/ImmutableState.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/05628c8ccb9f8ab9d157c5d9ad6e75938edcada5/src/ImmutableState.sol)
 
 **Title:** Immutable State
 
@@ -2635,7 +2866,7 @@ error NotPoolManager();
 
 # MatchingEngine
 
-[Git Source](https://github.com/asyncswap/contracts/blob/84af4c7ef38278c180ca35e944b4349402bc1f99/src/MatchingEngine.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/05628c8ccb9f8ab9d157c5d9ad6e75938edcada5/src/MatchingEngine.sol)
 
 **Title:** MatchingEngine
 
@@ -3108,7 +3339,7 @@ struct Book {
 
 # NativeClaims
 
-[Git Source](https://github.com/asyncswap/contracts/blob/84af4c7ef38278c180ca35e944b4349402bc1f99/src/NativeClaims.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/05628c8ccb9f8ab9d157c5d9ad6e75938edcada5/src/NativeClaims.sol)
 
 Redeems the caller's PoolManager native ETH claims to a chosen recipient.
 
@@ -3230,7 +3461,7 @@ error ReentrantRedemption();
 
 # Router
 
-[Git Source](https://github.com/asyncswap/contracts/blob/84af4c7ef38278c180ca35e944b4349402bc1f99/src/Router.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/05628c8ccb9f8ab9d157c5d9ad6e75938edcada5/src/Router.sol)
 
 **Inherits:** EIP712
 
@@ -3718,7 +3949,7 @@ enum ActionType {
 
 # TokenClaims
 
-[Git Source](https://github.com/asyncswap/contracts/blob/84af4c7ef38278c180ca35e944b4349402bc1f99/src/TokenClaims.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/05628c8ccb9f8ab9d157c5d9ad6e75938edcada5/src/TokenClaims.sol)
 
 Redeems the caller's PoolManager currency claims to a chosen recipient.
 
@@ -3842,7 +4073,7 @@ error ReentrantRedemption();
 
 # BaseHook
 
-[Git Source](https://github.com/asyncswap/contracts/blob/84af4c7ef38278c180ca35e944b4349402bc1f99/src/BaseHook.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/05628c8ccb9f8ab9d157c5d9ad6e75938edcada5/src/BaseHook.sol)
 
 **Inherits:** IHooks, [ImmutableState](/reference/src/ImmutableState)
 
@@ -4502,7 +4733,7 @@ error HookNotImplemented();
 
 # IFeeOwner
 
-[Git Source](https://github.com/asyncswap/contracts/blob/84af4c7ef38278c180ca35e944b4349402bc1f99/src/FeeVault.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/05628c8ccb9f8ab9d157c5d9ad6e75938edcada5/src/FeeVault.sol)
 
 ## Functions
 
@@ -4522,7 +4753,7 @@ function owner() external view returns (address);
 
 # ISignatureTransfer
 
-[Git Source](https://github.com/asyncswap/contracts/blob/84af4c7ef38278c180ca35e944b4349402bc1f99/src/interfaces/ISignatureTransfer.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/05628c8ccb9f8ab9d157c5d9ad6e75938edcada5/src/interfaces/ISignatureTransfer.sol)
 
 **Title:** ISignatureTransfer
 
@@ -4615,7 +4846,7 @@ struct SignatureTransferDetails {
 
 # AsyncFiller
 
-[Git Source](https://github.com/asyncswap/contracts/blob/84af4c7ef38278c180ca35e944b4349402bc1f99/src/libraries/AsyncFiller.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/05628c8ccb9f8ab9d157c5d9ad6e75938edcada5/src/libraries/AsyncFiller.sol)
 
 **Title:** AsyncFiller
 
@@ -5591,7 +5822,7 @@ struct Book {
 
 # AsyncMatching
 
-[Git Source](https://github.com/asyncswap/contracts/blob/84af4c7ef38278c180ca35e944b4349402bc1f99/src/libraries/AsyncMatching.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/05628c8ccb9f8ab9d157c5d9ad6e75938edcada5/src/libraries/AsyncMatching.sol)
 
 Linked matching module operating on the hook's order and radix-book storage.
 
@@ -6356,7 +6587,7 @@ struct UpdateParams {
 
 # ClaimTransfers
 
-[Git Source](https://github.com/asyncswap/contracts/blob/84af4c7ef38278c180ca35e944b4349402bc1f99/src/libraries/ClaimTransfers.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/05628c8ccb9f8ab9d157c5d9ad6e75938edcada5/src/libraries/ClaimTransfers.sol)
 
 <i>
   At most 16 makers and the FeeVault can each receive two currencies in eight matches.
@@ -6436,7 +6667,7 @@ struct Batch {
 
 # CurrencySettler
 
-[Git Source](https://github.com/asyncswap/contracts/blob/84af4c7ef38278c180ca35e944b4349402bc1f99/src/libraries/CurrencySettler.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/05628c8ccb9f8ab9d157c5d9ad6e75938edcada5/src/libraries/CurrencySettler.sol)
 
 **Title:** CurrencySettler
 
@@ -6487,7 +6718,7 @@ function take(Currency currency, IPoolManager manager, address recipient, uint25
 
 # EligiblePrice
 
-[Git Source](https://github.com/asyncswap/contracts/blob/84af4c7ef38278c180ca35e944b4349402bc1f99/src/libraries/EligiblePrice.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/05628c8ccb9f8ab9d157c5d9ad6e75938edcada5/src/libraries/EligiblePrice.sol)
 
 Exact-price summaries on a priority-key radix tree.
 
@@ -6666,7 +6897,7 @@ struct Ratio {
 
 # OrderSignatures
 
-[Git Source](https://github.com/asyncswap/contracts/blob/84af4c7ef38278c180ca35e944b4349402bc1f99/src/libraries/OrderSignatures.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/05628c8ccb9f8ab9d157c5d9ad6e75938edcada5/src/libraries/OrderSignatures.sol)
 
 **Title:** OrderSignatures
 
@@ -6919,7 +7150,7 @@ function hashCancel(
 
 # RadixPriceTree
 
-[Git Source](https://github.com/asyncswap/contracts/blob/84af4c7ef38278c180ca35e944b4349402bc1f99/src/libraries/RadixPriceTree.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/05628c8ccb9f8ab9d157c5d9ad6e75938edcada5/src/libraries/RadixPriceTree.sol)
 
 Patricia radix index for uint128 price levels. Inserts and removals
 traverse at most 128 branch bits; each distinct price creates one
@@ -7135,7 +7366,7 @@ struct Tree {
 
 # TickPrice
 
-[Git Source](https://github.com/asyncswap/contracts/blob/84af4c7ef38278c180ca35e944b4349402bc1f99/src/libraries/TickPrice.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/05628c8ccb9f8ab9d157c5d9ad6e75938edcada5/src/libraries/TickPrice.sol)
 
 Book levels on Uniswap v4 ticks: an order sits at the floor tick (spacing 1, 0.01% steps)
 of its exact currency1/currency0 limit. Levels are a fixed relative width at any price and
@@ -7196,7 +7427,7 @@ function floorTick(uint256 num, uint256 den) internal pure returns (int24);
 
 # AsyncOrderLibrary
 
-[Git Source](https://github.com/asyncswap/contracts/blob/84af4c7ef38278c180ca35e944b4349402bc1f99/src/types/AsyncOrder.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/05628c8ccb9f8ab9d157c5d9ad6e75938edcada5/src/types/AsyncOrder.sol)
 
 **Title:** AsyncOrderLibrary
 
@@ -7238,7 +7469,7 @@ function orderId(AsyncOrder calldata order) internal view returns (bytes32);
 
 # AsyncOrder
 
-[Git Source](https://github.com/asyncswap/contracts/blob/84af4c7ef38278c180ca35e944b4349402bc1f99/src/types/AsyncOrder.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/05628c8ccb9f8ab9d157c5d9ad6e75938edcada5/src/types/AsyncOrder.sol)
 
 Represents an async order for a swap in the Uniswap V4 pool.
 

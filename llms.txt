@@ -11,6 +11,8 @@ An on-chain order book and matching engine built as a Uniswap v4 hook: limit ord
 - [Contract reference](/reference/): Contracts, libraries, interfaces and types, generated from the NatSpec in src/.
 - [AsyncSwap](/reference/src/AsyncSwap): Uniswap v4 hook that converts an exact-input swap into an open async order: the maker deposits their input via `_beforeSwap`. Crossing orders settle directly at the resting limit; fillers settle unmatched orders.
 - [BatchActions](/reference/src/BatchActions): Cancels the caller's orders and redeems the caller's ERC-6909 PoolManager claims atomically in one PoolManager unlock.
+- [BatchCancels](/reference/src/BatchCancels): Cancels several orders owned by the caller in one PoolManager unlock.
+- [BatchClaims](/reference/src/BatchClaims): Atomically redeems a caller's PoolManager ERC-6909 claims for several currencies.
 - [FeeVault](/reference/src/FeeVault): Holds and redeems protocol fee claims, never maker escrow.
 - [ImmutableState](/reference/src/ImmutableState): A collection of immutable state variables, commonly used across multiple contracts
 - [MatchingEngine](/reference/src/MatchingEngine): Standalone price-time matching harness. It maintains a radix-indexed limit book and emits deterministic fill instructions.

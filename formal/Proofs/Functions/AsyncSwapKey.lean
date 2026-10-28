@@ -1,8 +1,8 @@
 import Specs.AsyncSwap
 import Proofs.Monad
-import Proofs.Swarm.AsyncSwapTickPrice
-import Proofs.Swarm.AsyncSwapFloorTick
-import Proofs.Swarm.AsyncSwapTickBounds
+import Proofs.Functions.AsyncSwapTickPrice
+import Proofs.Functions.AsyncSwapFloorTick
+import Proofs.Functions.AsyncSwapTickBounds
 open FormalAst Refinement
 
 /-!

@@ -1,7 +1,7 @@
 import Specs.AsyncSwap
 import Proofs.Monad
-import Proofs.Swarm.AsyncSwapSqrt
-import Proofs.Swarm.AsyncSwapGetTickAtSqrtPrice
+import Proofs.Functions.AsyncSwapSqrt
+import Proofs.Functions.AsyncSwapGetTickAtSqrtPrice
 open FormalAst Refinement
 
 /-!

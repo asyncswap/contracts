@@ -289,6 +289,815 @@ No test:
 |---|---|---|
 | `fill_cap` | [FillCap.lean:3](../../formal/Proofs/FillCap.lean#L3) | not tested yet |
 
+### `Proofs/Functions/AsyncSwapAddOrder.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `ite_bind'` | [AsyncSwapAddOrder.lean:48](../../formal/Proofs/Functions/AsyncSwapAddOrder.lean#L48) | not tested yet |
+| `throw_bind'` | [AsyncSwapAddOrder.lean:52](../../formal/Proofs/Functions/AsyncSwapAddOrder.lean#L52) | not tested yet |
+| `addOrder_split` | [AsyncSwapAddOrder.lean:91](../../formal/Proofs/Functions/AsyncSwapAddOrder.lean#L91) | not tested yet |
+| `addOrder_fee_error` | [AsyncSwapAddOrder.lean:99](../../formal/Proofs/Functions/AsyncSwapAddOrder.lean#L99) | not tested yet |
+| `addOrder_key_ok` | [AsyncSwapAddOrder.lean:107](../../formal/Proofs/Functions/AsyncSwapAddOrder.lean#L107) | not tested yet |
+| `addOrder_key_zero` | [AsyncSwapAddOrder.lean:122](../../formal/Proofs/Functions/AsyncSwapAddOrder.lean#L122) | not tested yet |
+| `addOrder_key_reverts_iff` | [AsyncSwapAddOrder.lean:134](../../formal/Proofs/Functions/AsyncSwapAddOrder.lean#L134) | not tested yet |
+| `matching_addOrder_split` | [AsyncSwapAddOrder.lean:151](../../formal/Proofs/Functions/AsyncSwapAddOrder.lean#L151) | not tested yet |
+| `matching_addOrder_zeroMin_gap` | [AsyncSwapAddOrder.lean:162](../../formal/Proofs/Functions/AsyncSwapAddOrder.lean#L162) | not tested yet |
+| `matching_addOrder_buy_ok` | [AsyncSwapAddOrder.lean:175](../../formal/Proofs/Functions/AsyncSwapAddOrder.lean#L175) | not tested yet |
+| `ceil_tail_pos` | [AsyncSwapAddOrder.lean:204](../../formal/Proofs/Functions/AsyncSwapAddOrder.lean#L204) | not tested yet |
+| `mulDivRnd_ceil_pos` | [AsyncSwapAddOrder.lean:221](../../formal/Proofs/Functions/AsyncSwapAddOrder.lean#L221) | not tested yet |
+| `rekey_den_ne_zero` | [AsyncSwapAddOrder.lean:240](../../formal/Proofs/Functions/AsyncSwapAddOrder.lean#L240) | not tested yet |
+| `rekey_priceKey_ok` | [AsyncSwapAddOrder.lean:249](../../formal/Proofs/Functions/AsyncSwapAddOrder.lean#L249) | not tested yet |
+| `rekey_den_sell` | [AsyncSwapAddOrder.lean:260](../../formal/Proofs/Functions/AsyncSwapAddOrder.lean#L260) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapAppend.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `good_addc` | [AsyncSwapAppend.lean:37](../../formal/Proofs/Functions/AsyncSwapAppend.lean#L37) | not tested yet |
+| `good_idx` | [AsyncSwapAppend.lean:44](../../formal/Proofs/Functions/AsyncSwapAppend.lean#L44) | not tested yet |
+| `insert_good` | [AsyncSwapAppend.lean:55](../../formal/Proofs/Functions/AsyncSwapAppend.lean#L55) | not tested yet |
+| `append_good` | [AsyncSwapAppend.lean:78](../../formal/Proofs/Functions/AsyncSwapAppend.lean#L78) | not tested yet |
+| `append_reverts_only` | [AsyncSwapAppend.lean:102](../../formal/Proofs/Functions/AsyncSwapAppend.lean#L102) | not tested yet |
+| `append_frame` | [AsyncSwapAppend.lean:131](../../formal/Proofs/Functions/AsyncSwapAppend.lean#L131) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapAsyncOrderInfo.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `asyncOrderInfo_storage` | [AsyncSwapAsyncOrderInfo.lean:10](../../formal/Proofs/Functions/AsyncSwapAsyncOrderInfo.lean#L10) | not tested yet |
+| `asyncOrderInfo_no_revert` | [AsyncSwapAsyncOrderInfo.lean:19](../../formal/Proofs/Functions/AsyncSwapAsyncOrderInfo.lean#L19) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapBest.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `good_pure` | [AsyncSwapBest.lean:40](../../formal/Proofs/Functions/AsyncSwapBest.lean#L40) | not tested yet |
+| `good_throw` | [AsyncSwapBest.lean:43](../../formal/Proofs/Functions/AsyncSwapBest.lean#L43) | not tested yet |
+| `good_bind` | [AsyncSwapBest.lean:46](../../formal/Proofs/Functions/AsyncSwapBest.lean#L46) | not tested yet |
+| `good_ite` | [AsyncSwapBest.lean:56](../../formal/Proofs/Functions/AsyncSwapBest.lean#L56) | not tested yet |
+| `good_forIn_list` | [AsyncSwapBest.lean:60](../../formal/Proofs/Functions/AsyncSwapBest.lean#L60) | not tested yet |
+| `good_forIn_range` | [AsyncSwapBest.lean:72](../../formal/Proofs/Functions/AsyncSwapBest.lean#L72) | not tested yet |
+| `best_good` | [AsyncSwapBest.lean:93](../../formal/Proofs/Functions/AsyncSwapBest.lean#L93) | not tested yet |
+| `best_reverts_only_loop_bound` | [AsyncSwapBest.lean:106](../../formal/Proofs/Functions/AsyncSwapBest.lean#L106) | not tested yet |
+| `best_frame` | [AsyncSwapBest.lean:128](../../formal/Proofs/Functions/AsyncSwapBest.lean#L128) | not tested yet |
+| `best_setters_irrelevant` | [AsyncSwapBest.lean:162](../../formal/Proofs/Functions/AsyncSwapBest.lean#L162) | not tested yet |
+| `loop_ok` | [AsyncSwapBest.lean:174](../../formal/Proofs/Functions/AsyncSwapBest.lean#L174) | not tested yet |
+| `loop_no_err` | [AsyncSwapBest.lean:190](../../formal/Proofs/Functions/AsyncSwapBest.lean#L190) | not tested yet |
+| `best_empty` | [AsyncSwapBest.lean:212](../../formal/Proofs/Functions/AsyncSwapBest.lean#L212) | not tested yet |
+| `best_root_ineligible` | [AsyncSwapBest.lean:224](../../formal/Proofs/Functions/AsyncSwapBest.lean#L224) | not tested yet |
+| `best_result` | [AsyncSwapBest.lean:244](../../formal/Proofs/Functions/AsyncSwapBest.lean#L244) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapBookPair.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `bookPair_good` | [AsyncSwapBookPair.lean:32](../../formal/Proofs/Functions/AsyncSwapBookPair.lean#L32) | not tested yet |
+| `bookPair_reverts` | [AsyncSwapBookPair.lean:47](../../formal/Proofs/Functions/AsyncSwapBookPair.lean#L47) | not tested yet |
+| `bookPair_self_set_irrelevant` | [AsyncSwapBookPair.lean:73](../../formal/Proofs/Functions/AsyncSwapBookPair.lean#L73) | not tested yet |
+| `bookPair_no_pair` | [AsyncSwapBookPair.lean:86](../../formal/Proofs/Functions/AsyncSwapBookPair.lean#L86) | not tested yet |
+| `bookPair_strict` | [AsyncSwapBookPair.lean:103](../../formal/Proofs/Functions/AsyncSwapBookPair.lean#L103) | not tested yet |
+| `bookPair_equal` | [AsyncSwapBookPair.lean:128](../../formal/Proofs/Functions/AsyncSwapBookPair.lean#L128) | not tested yet |
+| `bookPair_equal_div_zero` | [AsyncSwapBookPair.lean:157](../../formal/Proofs/Functions/AsyncSwapBookPair.lean#L157) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapCalculatePoolFee.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `calculatePoolFee_success` | [AsyncSwapCalculatePoolFee.lean:10](../../formal/Proofs/Functions/AsyncSwapCalculatePoolFee.lean#L10) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapCheckMinimum.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `checkMinimum_good` | [AsyncSwapCheckMinimum.lean:29](../../formal/Proofs/Functions/AsyncSwapCheckMinimum.lean#L29) | not tested yet |
+| `checkMinimum_reverts` | [AsyncSwapCheckMinimum.lean:43](../../formal/Proofs/Functions/AsyncSwapCheckMinimum.lean#L43) | not tested yet |
+| `checkMinimum_setters_irrelevant` | [AsyncSwapCheckMinimum.lean:65](../../formal/Proofs/Functions/AsyncSwapCheckMinimum.lean#L65) | not tested yet |
+| `checkMinimum_zero` | [AsyncSwapCheckMinimum.lean:80](../../formal/Proofs/Functions/AsyncSwapCheckMinimum.lean#L80) | not tested yet |
+| `checkMinimum_buy` | [AsyncSwapCheckMinimum.lean:92](../../formal/Proofs/Functions/AsyncSwapCheckMinimum.lean#L92) | not tested yet |
+| `checkMinimum_sell_below` | [AsyncSwapCheckMinimum.lean:105](../../formal/Proofs/Functions/AsyncSwapCheckMinimum.lean#L105) | not tested yet |
+| `checkMinimum_sell_zeroForOne` | [AsyncSwapCheckMinimum.lean:118](../../formal/Proofs/Functions/AsyncSwapCheckMinimum.lean#L118) | not tested yet |
+| `checkMinimum_sell_oneForZero` | [AsyncSwapCheckMinimum.lean:138](../../formal/Proofs/Functions/AsyncSwapCheckMinimum.lean#L138) | not tested yet |
+| `checkMinimum_sell_oneForZero_price_zero` | [AsyncSwapCheckMinimum.lean:159](../../formal/Proofs/Functions/AsyncSwapCheckMinimum.lean#L159) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapClaimTransfersFlush.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `forIn_flush` | [AsyncSwapClaimTransfersFlush.lean:30](../../formal/Proofs/Functions/AsyncSwapClaimTransfersFlush.lean#L30) | not tested yet |
+| `flush_eq` | [AsyncSwapClaimTransfersFlush.lean:65](../../formal/Proofs/Functions/AsyncSwapClaimTransfersFlush.lean#L65) | not tested yet |
+| `flush_empty` | [AsyncSwapClaimTransfersFlush.lean:87](../../formal/Proofs/Functions/AsyncSwapClaimTransfersFlush.lean#L87) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapCloseOrder.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `closeOrder_eq` | [AsyncSwapCloseOrder.lean:11](../../formal/Proofs/Functions/AsyncSwapCloseOrder.lean#L11) | not tested yet |
+| `closeOrder_run` | [AsyncSwapCloseOrder.lean:37](../../formal/Proofs/Functions/AsyncSwapCloseOrder.lean#L37) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapCreditPriorityFee.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `creditPriorityFee_zero` | [AsyncSwapCreditPriorityFee.lean:18](../../formal/Proofs/Functions/AsyncSwapCreditPriorityFee.lean#L18) | not tested yet |
+| `creditPriorityFee_nonzero` | [AsyncSwapCreditPriorityFee.lean:26](../../formal/Proofs/Functions/AsyncSwapCreditPriorityFee.lean#L26) | not tested yet |
+| `creditPriorityFee_run` | [AsyncSwapCreditPriorityFee.lean:43](../../formal/Proofs/Functions/AsyncSwapCreditPriorityFee.lean#L43) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapEligible.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `eligible_eq` | [AsyncSwapEligible.lean:18](../../formal/Proofs/Functions/AsyncSwapEligible.lean#L18) | not tested yet |
+| `eligible_reverts_iff` | [AsyncSwapEligible.lean:25](../../formal/Proofs/Functions/AsyncSwapEligible.lean#L25) | not tested yet |
+| `eligible_ok` | [AsyncSwapEligible.lean:35](../../formal/Proofs/Functions/AsyncSwapEligible.lean#L35) | not tested yet |
+| `eligible_never_reverts` | [AsyncSwapEligible.lean:44](../../formal/Proofs/Functions/AsyncSwapEligible.lean#L44) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapExactPrice.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `exactPrice_of_read` | [AsyncSwapExactPrice.lean:25](../../formal/Proofs/Functions/AsyncSwapExactPrice.lean#L25) | not tested yet |
+| `exactPrice_buy` | [AsyncSwapExactPrice.lean:35](../../formal/Proofs/Functions/AsyncSwapExactPrice.lean#L35) | not tested yet |
+| `exactPrice_sell` | [AsyncSwapExactPrice.lean:43](../../formal/Proofs/Functions/AsyncSwapExactPrice.lean#L43) | not tested yet |
+| `exactPrice_error` | [AsyncSwapExactPrice.lean:51](../../formal/Proofs/Functions/AsyncSwapExactPrice.lean#L51) | not tested yet |
+| `exactPrice_order_set_irrelevant` | [AsyncSwapExactPrice.lean:59](../../formal/Proofs/Functions/AsyncSwapExactPrice.lean#L59) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapFloorTick.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `run_bind_ok` | [AsyncSwapFloorTick.lean:48](../../formal/Proofs/Functions/AsyncSwapFloorTick.lean#L48) | not tested yet |
+| `mulDivFloor_ok` | [AsyncSwapFloorTick.lean:52](../../formal/Proofs/Functions/AsyncSwapFloorTick.lean#L52) | not tested yet |
+| `prod_lt` | [AsyncSwapFloorTick.lean:60](../../formal/Proofs/Functions/AsyncSwapFloorTick.lean#L60) | not tested yet |
+| `mulDiv_bounds` | [AsyncSwapFloorTick.lean:72](../../formal/Proofs/Functions/AsyncSwapFloorTick.lean#L72) | not tested yet |
+| `floorTick_eq` | [AsyncSwapFloorTick.lean:81](../../formal/Proofs/Functions/AsyncSwapFloorTick.lean#L81) | not tested yet |
+| `floorTick_den_zero` | [AsyncSwapFloorTick.lean:95](../../formal/Proofs/Functions/AsyncSwapFloorTick.lean#L95) | not tested yet |
+| `floorTick_low` | [AsyncSwapFloorTick.lean:103](../../formal/Proofs/Functions/AsyncSwapFloorTick.lean#L103) | not tested yet |
+| `floorTick_saturates` | [AsyncSwapFloorTick.lean:112](../../formal/Proofs/Functions/AsyncSwapFloorTick.lean#L112) | not tested yet |
+| `floorTick_mid` | [AsyncSwapFloorTick.lean:120](../../formal/Proofs/Functions/AsyncSwapFloorTick.lean#L120) | not tested yet |
+| `floorTick_run` | [AsyncSwapFloorTick.lean:129](../../formal/Proofs/Functions/AsyncSwapFloorTick.lean#L129) | not tested yet |
+| `tail_no_write` | [AsyncSwapFloorTick.lean:147](../../formal/Proofs/Functions/AsyncSwapFloorTick.lean#L147) | not tested yet |
+| `floorTick_no_write` | [AsyncSwapFloorTick.lean:161](../../formal/Proofs/Functions/AsyncSwapFloorTick.lean#L161) | not tested yet |
+| `sqrtPure_sq_le` | [AsyncSwapFloorTick.lean:174](../../formal/Proofs/Functions/AsyncSwapFloorTick.lean#L174) | not tested yet |
+| `sqrtPure_lt` | [AsyncSwapFloorTick.lean:185](../../formal/Proofs/Functions/AsyncSwapFloorTick.lean#L185) | not tested yet |
+| `shlw_sqrt_no_wrap` | [AsyncSwapFloorTick.lean:195](../../formal/Proofs/Functions/AsyncSwapFloorTick.lean#L195) | not tested yet |
+| `floorTick_mid_exact` | [AsyncSwapFloorTick.lean:210](../../formal/Proofs/Functions/AsyncSwapFloorTick.lean#L210) | not tested yet |
+| `floorTick_low_bound` | [AsyncSwapFloorTick.lean:220](../../formal/Proofs/Functions/AsyncSwapFloorTick.lean#L220) | not tested yet |
+| `tail_dispatch` | [AsyncSwapFloorTick.lean:226](../../formal/Proofs/Functions/AsyncSwapFloorTick.lean#L226) | not tested yet |
+| `floorTick_dispatch` | [AsyncSwapFloorTick.lean:245](../../formal/Proofs/Functions/AsyncSwapFloorTick.lean#L245) | not tested yet |
+| `floorTick_total` | [AsyncSwapFloorTick.lean:272](../../formal/Proofs/Functions/AsyncSwapFloorTick.lean#L272) | not tested yet |
+| `floorTick_error_iff` | [AsyncSwapFloorTick.lean:282](../../formal/Proofs/Functions/AsyncSwapFloorTick.lean#L282) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapGetSqrtPriceAtTick.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `step_fold` | [AsyncSwapGetSqrtPriceAtTick.lean:75](../../formal/Proofs/Functions/AsyncSwapGetSqrtPriceAtTick.lean#L75) | not tested yet |
+| `invert_fold` | [AsyncSwapGetSqrtPriceAtTick.lean:80](../../formal/Proofs/Functions/AsyncSwapGetSqrtPriceAtTick.lean#L80) | not tested yet |
+| `maxTick_word` | [AsyncSwapGetSqrtPriceAtTick.lean:84](../../formal/Proofs/Functions/AsyncSwapGetSqrtPriceAtTick.lean#L84) | not tested yet |
+| `getSqrtPriceAtTick_eq` | [AsyncSwapGetSqrtPriceAtTick.lean:90](../../formal/Proofs/Functions/AsyncSwapGetSqrtPriceAtTick.lean#L90) | not tested yet |
+| `getSqrtPriceAtTick_run` | [AsyncSwapGetSqrtPriceAtTick.lean:151](../../formal/Proofs/Functions/AsyncSwapGetSqrtPriceAtTick.lean#L151) | not tested yet |
+| `xor_allOnes` | [AsyncSwapGetSqrtPriceAtTick.lean:159](../../formal/Proofs/Functions/AsyncSwapGetSqrtPriceAtTick.lean#L159) | not tested yet |
+| `toUnsigned_cast` | [AsyncSwapGetSqrtPriceAtTick.lean:165](../../formal/Proofs/Functions/AsyncSwapGetSqrtPriceAtTick.lean#L165) | not tested yet |
+| `sar_low` | [AsyncSwapGetSqrtPriceAtTick.lean:170](../../formal/Proofs/Functions/AsyncSwapGetSqrtPriceAtTick.lean#L170) | not tested yet |
+| `sar_high` | [AsyncSwapGetSqrtPriceAtTick.lean:179](../../formal/Proofs/Functions/AsyncSwapGetSqrtPriceAtTick.lean#L179) | not tested yet |
+| `tick24_eq` | [AsyncSwapGetSqrtPriceAtTick.lean:189](../../formal/Proofs/Functions/AsyncSwapGetSqrtPriceAtTick.lean#L189) | not tested yet |
+| `absTickOf_eq` | [AsyncSwapGetSqrtPriceAtTick.lean:201](../../formal/Proofs/Functions/AsyncSwapGetSqrtPriceAtTick.lean#L201) | not tested yet |
+| `getSqrtPriceAtTick_int24` | [AsyncSwapGetSqrtPriceAtTick.lean:220](../../formal/Proofs/Functions/AsyncSwapGetSqrtPriceAtTick.lean#L220) | not tested yet |
+| `getSqrtPriceAtTick_reverts_iff` | [AsyncSwapGetSqrtPriceAtTick.lean:227](../../formal/Proofs/Functions/AsyncSwapGetSqrtPriceAtTick.lean#L227) | not tested yet |
+| `getSqrtPriceAtTick_zero` | [AsyncSwapGetSqrtPriceAtTick.lean:240](../../formal/Proofs/Functions/AsyncSwapGetSqrtPriceAtTick.lean#L240) | not tested yet |
+| `getSqrtPriceAtTick_minTick` | [AsyncSwapGetSqrtPriceAtTick.lean:247](../../formal/Proofs/Functions/AsyncSwapGetSqrtPriceAtTick.lean#L247) | not tested yet |
+| `getSqrtPriceAtTick_maxTick` | [AsyncSwapGetSqrtPriceAtTick.lean:254](../../formal/Proofs/Functions/AsyncSwapGetSqrtPriceAtTick.lean#L254) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapGetTickAtSqrtPrice.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `getTickAtSqrtPrice_eq` | [AsyncSwapGetTickAtSqrtPrice.lean:77](../../formal/Proofs/Functions/AsyncSwapGetTickAtSqrtPrice.lean#L77) | not tested yet |
+| `getTickAtSqrtPrice_out_of_range` | [AsyncSwapGetTickAtSqrtPrice.lean:97](../../formal/Proofs/Functions/AsyncSwapGetTickAtSqrtPrice.lean#L97) | not tested yet |
+| `guard_iff` | [AsyncSwapGetTickAtSqrtPrice.lean:104](../../formal/Proofs/Functions/AsyncSwapGetTickAtSqrtPrice.lean#L104) | not tested yet |
+| `priceOf_pos` | [AsyncSwapGetTickAtSqrtPrice.lean:111](../../formal/Proofs/Functions/AsyncSwapGetTickAtSqrtPrice.lean#L111) | not tested yet |
+| `tailR_run` | [AsyncSwapGetTickAtSqrtPrice.lean:120](../../formal/Proofs/Functions/AsyncSwapGetTickAtSqrtPrice.lean#L120) | not tested yet |
+| `getTickAtSqrtPrice_run` | [AsyncSwapGetTickAtSqrtPrice.lean:137](../../formal/Proofs/Functions/AsyncSwapGetTickAtSqrtPrice.lean#L137) | not tested yet |
+| `getTickAtSqrtPrice_result` | [AsyncSwapGetTickAtSqrtPrice.lean:152](../../formal/Proofs/Functions/AsyncSwapGetTickAtSqrtPrice.lean#L152) | not tested yet |
+| `getTickAtSqrtPrice_no_write` | [AsyncSwapGetTickAtSqrtPrice.lean:180](../../formal/Proofs/Functions/AsyncSwapGetTickAtSqrtPrice.lean#L180) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapIsExecutor.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `isExecutor_storage` | [AsyncSwapIsExecutor.lean:11](../../formal/Proofs/Functions/AsyncSwapIsExecutor.lean#L11) | not tested yet |
+| `isExecutor_no_revert` | [AsyncSwapIsExecutor.lean:19](../../formal/Proofs/Functions/AsyncSwapIsExecutor.lean#L19) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapKey.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `floorTick_bounded` | [AsyncSwapKey.lean:27](../../formal/Proofs/Functions/AsyncSwapKey.lean#L27) | not tested yet |
+| `key_ok` | [AsyncSwapKey.lean:56](../../formal/Proofs/Functions/AsyncSwapKey.lean#L56) | not tested yet |
+| `key_no_revert` | [AsyncSwapKey.lean:75](../../formal/Proofs/Functions/AsyncSwapKey.lean#L75) | not tested yet |
+| `key_spec` | [AsyncSwapKey.lean:85](../../formal/Proofs/Functions/AsyncSwapKey.lean#L85) | not tested yet |
+| `key_reverts_iff` | [AsyncSwapKey.lean:101](../../formal/Proofs/Functions/AsyncSwapKey.lean#L101) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapLevel.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `good_pure` | [AsyncSwapLevel.lean:38](../../formal/Proofs/Functions/AsyncSwapLevel.lean#L38) | not tested yet |
+| `good_throw` | [AsyncSwapLevel.lean:41](../../formal/Proofs/Functions/AsyncSwapLevel.lean#L41) | not tested yet |
+| `good_bind` | [AsyncSwapLevel.lean:44](../../formal/Proofs/Functions/AsyncSwapLevel.lean#L44) | not tested yet |
+| `good_ite` | [AsyncSwapLevel.lean:54](../../formal/Proofs/Functions/AsyncSwapLevel.lean#L54) | not tested yet |
+| `good_forIn_list` | [AsyncSwapLevel.lean:58](../../formal/Proofs/Functions/AsyncSwapLevel.lean#L58) | not tested yet |
+| `good_forIn_range` | [AsyncSwapLevel.lean:70](../../formal/Proofs/Functions/AsyncSwapLevel.lean#L70) | not tested yet |
+| `loop_ok` | [AsyncSwapLevel.lean:87](../../formal/Proofs/Functions/AsyncSwapLevel.lean#L87) | not tested yet |
+| `loop_no_err` | [AsyncSwapLevel.lean:102](../../formal/Proofs/Functions/AsyncSwapLevel.lean#L102) | not tested yet |
+| `level_good` | [AsyncSwapLevel.lean:124](../../formal/Proofs/Functions/AsyncSwapLevel.lean#L124) | not tested yet |
+| `level_reverts` | [AsyncSwapLevel.lean:134](../../formal/Proofs/Functions/AsyncSwapLevel.lean#L134) | not tested yet |
+| `level_frame` | [AsyncSwapLevel.lean:148](../../formal/Proofs/Functions/AsyncSwapLevel.lean#L148) | not tested yet |
+| `level_book_set_irrelevant` | [AsyncSwapLevel.lean:165](../../formal/Proofs/Functions/AsyncSwapLevel.lean#L165) | not tested yet |
+| `radix_best_result` | [AsyncSwapLevel.lean:175](../../formal/Proofs/Functions/AsyncSwapLevel.lean#L175) | not tested yet |
+| `level_empty` | [AsyncSwapLevel.lean:215](../../formal/Proofs/Functions/AsyncSwapLevel.lean#L215) | not tested yet |
+| `level_result` | [AsyncSwapLevel.lean:229](../../formal/Proofs/Functions/AsyncSwapLevel.lean#L229) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapLog2.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `ite_ok_pair` | [AsyncSwapLog2.lean:35](../../formal/Proofs/Functions/AsyncSwapLog2.lean#L35) | not tested yet |
+| `log2_run` | [AsyncSwapLog2.lean:41](../../formal/Proofs/Functions/AsyncSwapLog2.lean#L41) | not tested yet |
+| `log2_shift` | [AsyncSwapLog2.lean:48](../../formal/Proofs/Functions/AsyncSwapLog2.lean#L48) | not tested yet |
+| `spec_G1` | [AsyncSwapLog2.lean:74](../../formal/Proofs/Functions/AsyncSwapLog2.lean#L74) | not tested yet |
+| `spec_stage` | [AsyncSwapLog2.lean:81](../../formal/Proofs/Functions/AsyncSwapLog2.lean#L81) | not tested yet |
+| `spec_G128` | [AsyncSwapLog2.lean:110](../../formal/Proofs/Functions/AsyncSwapLog2.lean#L110) | not tested yet |
+| `log2_eq` | [AsyncSwapLog2.lean:116](../../formal/Proofs/Functions/AsyncSwapLog2.lean#L116) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapMin.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `min_run` | [AsyncSwapMin.lean:18](../../formal/Proofs/Functions/AsyncSwapMin.lean#L18) | not tested yet |
+| `min_spec` | [AsyncSwapMin.lean:27](../../formal/Proofs/Functions/AsyncSwapMin.lean#L27) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapMinPriorityFee.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `minPriorityFee_eq` | [AsyncSwapMinPriorityFee.lean:22](../../formal/Proofs/Functions/AsyncSwapMinPriorityFee.lean#L22) | not tested yet |
+| `minPriorityFee_ok` | [AsyncSwapMinPriorityFee.lean:39](../../formal/Proofs/Functions/AsyncSwapMinPriorityFee.lean#L39) | not tested yet |
+| `minPriorityFee_bounds` | [AsyncSwapMinPriorityFee.lean:51](../../formal/Proofs/Functions/AsyncSwapMinPriorityFee.lean#L51) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapMostPermissiveAtPrice.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `mostPermissiveAtPrice_of_read` | [AsyncSwapMostPermissiveAtPrice.lean:28](../../formal/Proofs/Functions/AsyncSwapMostPermissiveAtPrice.lean#L28) | not tested yet |
+| `mostPermissiveAtPrice_error` | [AsyncSwapMostPermissiveAtPrice.lean:39](../../formal/Proofs/Functions/AsyncSwapMostPermissiveAtPrice.lean#L39) | not tested yet |
+| `mostPermissiveAtPrice_no_revert` | [AsyncSwapMostPermissiveAtPrice.lean:48](../../formal/Proofs/Functions/AsyncSwapMostPermissiveAtPrice.lean#L48) | not tested yet |
+| `mostPermissiveAtPrice_book_set_irrelevant` | [AsyncSwapMostPermissiveAtPrice.lean:57](../../formal/Proofs/Functions/AsyncSwapMostPermissiveAtPrice.lean#L57) | not tested yet |
+| `mostPermissiveAtPrice_storage` | [AsyncSwapMostPermissiveAtPrice.lean:65](../../formal/Proofs/Functions/AsyncSwapMostPermissiveAtPrice.lean#L65) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapMostSignificantBit.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `stage_inv` | [AsyncSwapMostSignificantBit.lean:60](../../formal/Proofs/Functions/AsyncSwapMostSignificantBit.lean#L60) | model-only helper (loop invariant of Lean `stage`) |
+| `mostSignificantBit_run` | [AsyncSwapMostSignificantBit.lean:38](../../formal/Proofs/Functions/AsyncSwapMostSignificantBit.lean#L38) | not tested yet |
+| `lut_spec` | [AsyncSwapMostSignificantBit.lean:48](../../formal/Proofs/Functions/AsyncSwapMostSignificantBit.lean#L48) | not tested yet |
+| `or_eq_add` | [AsyncSwapMostSignificantBit.lean:52](../../formal/Proofs/Functions/AsyncSwapMostSignificantBit.lean#L52) | not tested yet |
+| `msbPure_spec` | [AsyncSwapMostSignificantBit.lean:98](../../formal/Proofs/Functions/AsyncSwapMostSignificantBit.lean#L98) | not tested yet |
+| `mostSignificantBit_eq` | [AsyncSwapMostSignificantBit.lean:134](../../formal/Proofs/Functions/AsyncSwapMostSignificantBit.lean#L134) | not tested yet |
+| `mostSignificantBit_zero` | [AsyncSwapMostSignificantBit.lean:148](../../formal/Proofs/Functions/AsyncSwapMostSignificantBit.lean#L148) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapMulDiv.lean`
+
+| Theorem | Lean | Test | Halmos |
+|---|---|---|---|
+| `mulDiv_ok` | [AsyncSwapMulDiv.lean:322](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L322) | [`AsyncSwapMulDiv.t.sol`](AsyncSwapMulDiv.t.sol) `testFuzz_mulDiv_ok` | yes |
+| `mulDiv_overflow` | [AsyncSwapMulDiv.lean:372](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L372) | [`AsyncSwapMulDiv.t.sol`](AsyncSwapMulDiv.t.sol) `testFuzz_mulDiv_overflow` | yes |
+| `mulDiv_zero` | [AsyncSwapMulDiv.lean:388](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L388) | [`AsyncSwapMulDiv.t.sol`](AsyncSwapMulDiv.t.sol) `testFuzz_mulDiv_zero` | yes |
+| `mulDiv_spec` | [AsyncSwapMulDiv.lean:405](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L405) | [`AsyncSwapMulDiv.t.sol`](AsyncSwapMulDiv.t.sol) `testFuzz_mulDiv_spec` | yes |
+| `mulDiv_eq_mulDivFloor` | [AsyncSwapMulDiv.lean:446](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L446) | [`AsyncSwapMulDiv.t.sol`](AsyncSwapMulDiv.t.sol) `testFuzz_mulDiv_eq_mulDivFloor` | yes |
+
+Left out:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `W_eq` | [AsyncSwapMulDiv.lean:36](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L36) | model-only helper (Lean constant `W = 2^256`) |
+| `W_pos` | [AsyncSwapMulDiv.lean:37](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L37) | model-only helper (Lean arithmetic fact) |
+| `ite_pos'` | [AsyncSwapMulDiv.lean:40](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L40) | model-only helper (Lean `ite` lemma) |
+| `ite_neg'` | [AsyncSwapMulDiv.lean:42](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L42) | model-only helper (Lean `ite` lemma) |
+| `mulw_eq` | [AsyncSwapMulDiv.lean:45](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L45) | model-only helper (Lean word op `mulw`) |
+| `ysub_le` | [AsyncSwapMulDiv.lean:47](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L47) | model-only helper (Lean Yul op `ysub`) |
+| `ysub_lt` | [AsyncSwapMulDiv.lean:52](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L52) | model-only helper (Lean Yul op `ysub`) |
+| `ylt_eq` | [AsyncSwapMulDiv.lean:56](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L56) | model-only helper (Lean Yul op `ylt`) |
+| `ygt_eq` | [AsyncSwapMulDiv.lean:59](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L59) | model-only helper (Lean Yul op `ygt`) |
+| `ydiv_pos` | [AsyncSwapMulDiv.lean:62](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L62) | model-only helper (Lean Yul op `ydiv`) |
+| `hi_word` | [AsyncSwapMulDiv.lean:67](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L67) | model-only helper (Nat lemma: mulmod trick gives the high word) |
+| `sub_rem` | [AsyncSwapMulDiv.lean:105](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L105) | model-only helper (512-bit subtraction lemma) |
+| `and_double` | [AsyncSwapMulDiv.lean:123](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L123) | model-only helper (Nat bitwise lemma) |
+| `lowbit_odd` | [AsyncSwapMulDiv.lean:132](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L132) | model-only helper (Nat bitwise lemma) |
+| `lowbit` | [AsyncSwapMulDiv.lean:150](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L150) | model-only helper (`d & -d` lemma) |
+| `fold_nstep` | [AsyncSwapMulDiv.lean:209](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L209) | model-only helper (folds a Lean expression into `nstep`) |
+| `nstep_spec` | [AsyncSwapMulDiv.lean:213](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L213) | model-only helper (Newton step lemma) |
+| `init_spec` | [AsyncSwapMulDiv.lean:258](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L258) | model-only helper (inverse seed lemma) |
+| `inv_spec` | [AsyncSwapMulDiv.lean:274](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L274) | model-only helper (inverse mod 2^256 lemma) |
+| `final` | [AsyncSwapMulDiv.lean:287](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L287) | model-only helper (final-stage arithmetic lemma; its content is tested by mulDiv_ok) |
+| `mulDivFloor_run` | [AsyncSwapMulDiv.lean:418](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L418) | model-only helper (unfolds the prelude `mulDivFloor`); its content is checked by `testFuzz_floor_run` |
+| `mulDiv_eq_mulDivFloor_any` | [AsyncSwapMulDiv.lean:453](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L453) | model-only (relates the generated `Math.mulDiv` to the prelude `mulDivFloor`); both sides are checked on the bytecode by `testFuzz_mulDiv_spec` and `testFuzz_floor_run` |
+| `two_pow_odd_aux` | [AsyncSwapMulDiv.lean:171](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L171) | not tested yet |
+| `dvd_modW` | [AsyncSwapMulDiv.lean:184](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L184) | not tested yet |
+| `ring_id` | [AsyncSwapMulDiv.lean:196](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L196) | not tested yet |
+| `addc_W` | [AsyncSwapMulDiv.lean:460](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L460) | not tested yet |
+| `mulDivRound_spec` | [AsyncSwapMulDiv.lean:469](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L469) | not tested yet |
+| `mulDivRound_eq_mulDivRnd` | [AsyncSwapMulDiv.lean:489](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L489) | not tested yet |
+| `mulDivRound_floor` | [AsyncSwapMulDiv.lean:504](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L504) | not tested yet |
+| `mulDivRound_ceil` | [AsyncSwapMulDiv.lean:511](../../formal/Proofs/Functions/AsyncSwapMulDiv.lean#L511) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapOrderCreatedSequence.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `orderCreatedSequence_run` | [AsyncSwapOrderCreatedSequence.lean:22](../../formal/Proofs/Functions/AsyncSwapOrderCreatedSequence.lean#L22) | not tested yet |
+| `orderCreatedSequence_never_reverts` | [AsyncSwapOrderCreatedSequence.lean:27](../../formal/Proofs/Functions/AsyncSwapOrderCreatedSequence.lean#L27) | not tested yet |
+| `orderCreatedSequence_ok` | [AsyncSwapOrderCreatedSequence.lean:32](../../formal/Proofs/Functions/AsyncSwapOrderCreatedSequence.lean#L32) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapOverloads.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `revertWith_int_run` | [AsyncSwapOverloads.lean:24](../../formal/Proofs/Functions/AsyncSwapOverloads.lean#L24) | not tested yet |
+| `revertWith_int_never_succeeds` | [AsyncSwapOverloads.lean:27](../../formal/Proofs/Functions/AsyncSwapOverloads.lean#L27) | not tested yet |
+| `revertWith_sel_run` | [AsyncSwapOverloads.lean:31](../../formal/Proofs/Functions/AsyncSwapOverloads.lean#L31) | not tested yet |
+| `revertWith_sel_never_succeeds` | [AsyncSwapOverloads.lean:34](../../formal/Proofs/Functions/AsyncSwapOverloads.lean#L34) | not tested yet |
+| `tryRecoverBytes_eq` | [AsyncSwapOverloads.lean:45](../../formal/Proofs/Functions/AsyncSwapOverloads.lean#L45) | not tested yet |
+| `tryRecoverBytes_bad_length` | [AsyncSwapOverloads.lean:56](../../formal/Proofs/Functions/AsyncSwapOverloads.lean#L56) | not tested yet |
+| `tryRecoverBytes_noError` | [AsyncSwapOverloads.lean:62](../../formal/Proofs/Functions/AsyncSwapOverloads.lean#L62) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapPayFiller.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `payFiller_setter_irrelevant` | [AsyncSwapPayFiller.lean:9](../../formal/Proofs/Functions/AsyncSwapPayFiller.lean#L9) | not tested yet |
+| `payFiller_expands` | [AsyncSwapPayFiller.lean:17](../../formal/Proofs/Functions/AsyncSwapPayFiller.lean#L17) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapPayouts.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `payouts_run` | [AsyncSwapPayouts.lean:29](../../formal/Proofs/Functions/AsyncSwapPayouts.lean#L29) | not tested yet |
+| `payouts_error` | [AsyncSwapPayouts.lean:45](../../formal/Proofs/Functions/AsyncSwapPayouts.lean#L45) | not tested yet |
+| `payouts_no_revert` | [AsyncSwapPayouts.lean:53](../../formal/Proofs/Functions/AsyncSwapPayouts.lean#L53) | not tested yet |
+| `payouts_self_set_irrelevant` | [AsyncSwapPayouts.lean:62](../../formal/Proofs/Functions/AsyncSwapPayouts.lean#L62) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapPoolBeatsBook.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `poolBeatsBook_def` | [AsyncSwapPoolBeatsBook.lean:12](../../formal/Proofs/Functions/AsyncSwapPoolBeatsBook.lean#L12) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapPriceKey.lean`
+
+| Theorem | Lean | Test | Halmos |
+|---|---|---|---|
+| `priceKey_eq` | [AsyncSwapPriceKey.lean:22](../../formal/Proofs/Functions/AsyncSwapPriceKey.lean#L22) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_priceKey_eq` | no |
+
+Left out:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `priceKey_spec` | [AsyncSwapPriceKey.lean:28](../../formal/Proofs/Functions/AsyncSwapPriceKey.lean#L28) | not tested yet |
+| `priceKey_reverts_iff` | [AsyncSwapPriceKey.lean:39](../../formal/Proofs/Functions/AsyncSwapPriceKey.lean#L39) | not tested yet |
+| `priceKey_ok_inv` | [AsyncSwapPriceKey.lean:46](../../formal/Proofs/Functions/AsyncSwapPriceKey.lean#L46) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapReceive.lean`
+
+| Theorem | Lean | Test | Halmos |
+|---|---|---|---|
+| `receive_run` | [AsyncSwapReceive.lean:15](../../formal/Proofs/Functions/AsyncSwapReceive.lean#L15) | [`AsyncSwapReceive.t.sol`](AsyncSwapReceive.t.sol) `testFuzz_receive_run` | no |
+| `receive_never_reverts` | [AsyncSwapReceive.lean:20](../../formal/Proofs/Functions/AsyncSwapReceive.lean#L20) | [`AsyncSwapReceive.t.sol`](AsyncSwapReceive.t.sol) `testFuzz_receive_never_reverts` | no |
+
+Left out:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `receive_pending` | [AsyncSwapReceive.lean:25](../../formal/Proofs/Functions/AsyncSwapReceive.lean#L25) | not tested yet |
+| `receive_other_transient` | [AsyncSwapReceive.lean:34](../../formal/Proofs/Functions/AsyncSwapReceive.lean#L34) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapRefresh.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `refresh_good` | [AsyncSwapRefresh.lean:27](../../formal/Proofs/Functions/AsyncSwapRefresh.lean#L27) | not tested yet |
+| `refresh_reverts_only_loop_bound` | [AsyncSwapRefresh.lean:47](../../formal/Proofs/Functions/AsyncSwapRefresh.lean#L47) | not tested yet |
+| `refresh_frame` | [AsyncSwapRefresh.lean:73](../../formal/Proofs/Functions/AsyncSwapRefresh.lean#L73) | not tested yet |
+| `refresh_tree_set_irrelevant` | [AsyncSwapRefresh.lean:114](../../formal/Proofs/Functions/AsyncSwapRefresh.lean#L114) | not tested yet |
+| `refresh_eq` | [AsyncSwapRefresh.lean:125](../../formal/Proofs/Functions/AsyncSwapRefresh.lean#L125) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapRefreshExactPrice.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `refreshExactPrice_good` | [AsyncSwapRefreshExactPrice.lean:38](../../formal/Proofs/Functions/AsyncSwapRefreshExactPrice.lean#L38) | not tested yet |
+| `refreshExactPrice_reverts_only_loop_bound` | [AsyncSwapRefreshExactPrice.lean:56](../../formal/Proofs/Functions/AsyncSwapRefreshExactPrice.lean#L56) | not tested yet |
+| `refreshExactPrice_frame` | [AsyncSwapRefreshExactPrice.lean:82](../../formal/Proofs/Functions/AsyncSwapRefreshExactPrice.lean#L82) | not tested yet |
+| `refreshExactPrice_self_set_irrelevant` | [AsyncSwapRefreshExactPrice.lean:122](../../formal/Proofs/Functions/AsyncSwapRefreshExactPrice.lean#L122) | not tested yet |
+| `refreshExactPrice_eq` | [AsyncSwapRefreshExactPrice.lean:147](../../formal/Proofs/Functions/AsyncSwapRefreshExactPrice.lean#L147) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapRemove.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `remove_good` | [AsyncSwapRemove.lean:31](../../formal/Proofs/Functions/AsyncSwapRemove.lean#L31) | not tested yet |
+| `remove_reverts_only` | [AsyncSwapRemove.lean:48](../../formal/Proofs/Functions/AsyncSwapRemove.lean#L48) | not tested yet |
+| `remove_reverts_missing` | [AsyncSwapRemove.lean:73](../../formal/Proofs/Functions/AsyncSwapRemove.lean#L73) | not tested yet |
+| `remove_frame` | [AsyncSwapRemove.lean:87](../../formal/Proofs/Functions/AsyncSwapRemove.lean#L87) | not tested yet |
+| `good_subc` | [AsyncSwapRemove.lean:134](../../formal/Proofs/Functions/AsyncSwapRemove.lean#L134) | not tested yet |
+| `good_ite_app` | [AsyncSwapRemove.lean:143](../../formal/Proofs/Functions/AsyncSwapRemove.lean#L143) | not tested yet |
+| `tree_remove_good` | [AsyncSwapRemove.lean:150](../../formal/Proofs/Functions/AsyncSwapRemove.lean#L150) | not tested yet |
+| `filler_remove_good` | [AsyncSwapRemove.lean:164](../../formal/Proofs/Functions/AsyncSwapRemove.lean#L164) | not tested yet |
+| `filler_remove_reverts_only` | [AsyncSwapRemove.lean:186](../../formal/Proofs/Functions/AsyncSwapRemove.lean#L186) | not tested yet |
+| `filler_remove_frame` | [AsyncSwapRemove.lean:210](../../formal/Proofs/Functions/AsyncSwapRemove.lean#L210) | not tested yet |
+| `filler_remove_self_set_irrelevant` | [AsyncSwapRemove.lean:248](../../formal/Proofs/Functions/AsyncSwapRemove.lean#L248) | not tested yet |
+| `filler_remove_reverts_missing` | [AsyncSwapRemove.lean:258](../../formal/Proofs/Functions/AsyncSwapRemove.lean#L258) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapRepair.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `good_pure` | [AsyncSwapRepair.lean:37](../../formal/Proofs/Functions/AsyncSwapRepair.lean#L37) | not tested yet |
+| `good_throw` | [AsyncSwapRepair.lean:40](../../formal/Proofs/Functions/AsyncSwapRepair.lean#L40) | not tested yet |
+| `good_bind` | [AsyncSwapRepair.lean:43](../../formal/Proofs/Functions/AsyncSwapRepair.lean#L43) | not tested yet |
+| `good_ite` | [AsyncSwapRepair.lean:53](../../formal/Proofs/Functions/AsyncSwapRepair.lean#L53) | not tested yet |
+| `good_forIn_list` | [AsyncSwapRepair.lean:57](../../formal/Proofs/Functions/AsyncSwapRepair.lean#L57) | not tested yet |
+| `good_forIn_range` | [AsyncSwapRepair.lean:69](../../formal/Proofs/Functions/AsyncSwapRepair.lean#L69) | not tested yet |
+| `repair_good` | [AsyncSwapRepair.lean:91](../../formal/Proofs/Functions/AsyncSwapRepair.lean#L91) | not tested yet |
+| `repair_reverts_only_loop_bound` | [AsyncSwapRepair.lean:110](../../formal/Proofs/Functions/AsyncSwapRepair.lean#L110) | not tested yet |
+| `repair_frame` | [AsyncSwapRepair.lean:136](../../formal/Proofs/Functions/AsyncSwapRepair.lean#L136) | not tested yet |
+| `repair_tree_set_irrelevant` | [AsyncSwapRepair.lean:175](../../formal/Proofs/Functions/AsyncSwapRepair.lean#L175) | not tested yet |
+| `repair_cursor_zero` | [AsyncSwapRepair.lean:183](../../formal/Proofs/Functions/AsyncSwapRepair.lean#L183) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapRevertWith.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `revertWith_run` | [AsyncSwapRevertWith.lean:22](../../formal/Proofs/Functions/AsyncSwapRevertWith.lean#L22) | not tested yet |
+| `revertWith_never_succeeds` | [AsyncSwapRevertWith.lean:28](../../formal/Proofs/Functions/AsyncSwapRevertWith.lean#L28) | not tested yet |
+| `revertWith_uniform` | [AsyncSwapRevertWith.lean:34](../../formal/Proofs/Functions/AsyncSwapRevertWith.lean#L34) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapSetDefaultMinOrder.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `setDefaultMinOrder_run` | [AsyncSwapSetDefaultMinOrder.lean:20](../../formal/Proofs/Functions/AsyncSwapSetDefaultMinOrder.lean#L20) | not tested yet |
+| `setDefaultMinOrder_reverts_of_not_owner` | [AsyncSwapSetDefaultMinOrder.lean:29](../../formal/Proofs/Functions/AsyncSwapSetDefaultMinOrder.lean#L29) | not tested yet |
+| `setDefaultMinOrder_ok_of_owner` | [AsyncSwapSetDefaultMinOrder.lean:35](../../formal/Proofs/Functions/AsyncSwapSetDefaultMinOrder.lean#L35) | not tested yet |
+| `setDefaultMinOrder_ok_iff` | [AsyncSwapSetDefaultMinOrder.lean:42](../../formal/Proofs/Functions/AsyncSwapSetDefaultMinOrder.lean#L42) | not tested yet |
+| `setDefaultMinOrder_frame` | [AsyncSwapSetDefaultMinOrder.lean:53](../../formal/Proofs/Functions/AsyncSwapSetDefaultMinOrder.lean#L53) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapSetExecutor.lean`
+
+| Theorem | Lean | Test | Halmos |
+|---|---|---|---|
+| `setExecutor_run` | [AsyncSwapSetExecutor.lean:15](../../formal/Proofs/Functions/AsyncSwapSetExecutor.lean#L15) | [`RefinementAsyncSwap.t.sol`](RefinementAsyncSwap.t.sol) `testFuzz_setExecutor_run` | with edits |
+| `setExecutor_frame` | [AsyncSwapSetExecutor.lean:33](../../formal/Proofs/Functions/AsyncSwapSetExecutor.lean#L33) | [`RefinementAsyncSwap.t.sol`](RefinementAsyncSwap.t.sol) `testFuzz_setExecutor_frame` | no |
+
+Left out:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `setExecutor_ok_iff` | [AsyncSwapSetExecutor.lean:21](../../formal/Proofs/Functions/AsyncSwapSetExecutor.lean#L21) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapSetMinOrder.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `filler_setMinOrder_run` | [AsyncSwapSetMinOrder.lean:31](../../formal/Proofs/Functions/AsyncSwapSetMinOrder.lean#L31) | not tested yet |
+| `filler_setMinOrder_of_read` | [AsyncSwapSetMinOrder.lean:48](../../formal/Proofs/Functions/AsyncSwapSetMinOrder.lean#L48) | not tested yet |
+| `filler_setMinOrder_poolId_irrelevant` | [AsyncSwapSetMinOrder.lean:56](../../formal/Proofs/Functions/AsyncSwapSetMinOrder.lean#L56) | not tested yet |
+| `filler_setMinOrder_ok` | [AsyncSwapSetMinOrder.lean:63](../../formal/Proofs/Functions/AsyncSwapSetMinOrder.lean#L63) | not tested yet |
+| `matching_setMinOrder_run` | [AsyncSwapSetMinOrder.lean:76](../../formal/Proofs/Functions/AsyncSwapSetMinOrder.lean#L76) | not tested yet |
+| `matching_setMinOrder_eq_filler` | [AsyncSwapSetMinOrder.lean:92](../../formal/Proofs/Functions/AsyncSwapSetMinOrder.lean#L92) | not tested yet |
+| `matching_setMinOrder_of_read` | [AsyncSwapSetMinOrder.lean:100](../../formal/Proofs/Functions/AsyncSwapSetMinOrder.lean#L100) | not tested yet |
+| `matching_setMinOrder_get_error` | [AsyncSwapSetMinOrder.lean:108](../../formal/Proofs/Functions/AsyncSwapSetMinOrder.lean#L108) | not tested yet |
+| `matching_setMinOrder_ok` | [AsyncSwapSetMinOrder.lean:116](../../formal/Proofs/Functions/AsyncSwapSetMinOrder.lean#L116) | not tested yet |
+| `matching_setMinOrder_poolId_irrelevant` | [AsyncSwapSetMinOrder.lean:125](../../formal/Proofs/Functions/AsyncSwapSetMinOrder.lean#L125) | not tested yet |
+| `setMinOrder_run` | [AsyncSwapSetMinOrder.lean:144](../../formal/Proofs/Functions/AsyncSwapSetMinOrder.lean#L144) | not tested yet |
+| `setMinOrder_reverts_of_not_owner` | [AsyncSwapSetMinOrder.lean:154](../../formal/Proofs/Functions/AsyncSwapSetMinOrder.lean#L154) | not tested yet |
+| `setMinOrder_ok_of_owner` | [AsyncSwapSetMinOrder.lean:160](../../formal/Proofs/Functions/AsyncSwapSetMinOrder.lean#L160) | not tested yet |
+| `setMinOrder_ok_iff` | [AsyncSwapSetMinOrder.lean:167](../../formal/Proofs/Functions/AsyncSwapSetMinOrder.lean#L167) | not tested yet |
+| `setMinOrder_frame` | [AsyncSwapSetMinOrder.lean:178](../../formal/Proofs/Functions/AsyncSwapSetMinOrder.lean#L178) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapSqrt.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `amgm_aux` | [AsyncSwapSqrt.lean:36](../../formal/Proofs/Functions/AsyncSwapSqrt.lean#L36) | not tested yet |
+| `amgm` | [AsyncSwapSqrt.lean:40](../../formal/Proofs/Functions/AsyncSwapSqrt.lean#L40) | not tested yet |
+| `sq_succ` | [AsyncSwapSqrt.lean:49](../../formal/Proofs/Functions/AsyncSwapSqrt.lean#L49) | not tested yet |
+| `sq_two` | [AsyncSwapSqrt.lean:53](../../formal/Proofs/Functions/AsyncSwapSqrt.lean#L53) | not tested yet |
+| `step_eq` | [AsyncSwapSqrt.lean:56](../../formal/Proofs/Functions/AsyncSwapSqrt.lean#L56) | not tested yet |
+| `lower` | [AsyncSwapSqrt.lean:61](../../formal/Proofs/Functions/AsyncSwapSqrt.lean#L61) | not tested yet |
+| `ne_of_inv` | [AsyncSwapSqrt.lean:73](../../formal/Proofs/Functions/AsyncSwapSqrt.lean#L73) | not tested yet |
+| `step_inv` | [AsyncSwapSqrt.lean:77](../../formal/Proofs/Functions/AsyncSwapSqrt.lean#L77) | not tested yet |
+| `R0_pos` | [AsyncSwapSqrt.lean:102](../../formal/Proofs/Functions/AsyncSwapSqrt.lean#L102) | not tested yet |
+| `shlw_R0` | [AsyncSwapSqrt.lean:104](../../formal/Proofs/Functions/AsyncSwapSqrt.lean#L104) | not tested yet |
+| `init_inv` | [AsyncSwapSqrt.lean:112](../../formal/Proofs/Functions/AsyncSwapSqrt.lean#L112) | not tested yet |
+| `divc_run` | [AsyncSwapSqrt.lean:134](../../formal/Proofs/Functions/AsyncSwapSqrt.lean#L134) | not tested yet |
+| `sqrt_run` | [AsyncSwapSqrt.lean:140](../../formal/Proofs/Functions/AsyncSwapSqrt.lean#L140) | not tested yet |
+| `sqrt_le` | [AsyncSwapSqrt.lean:174](../../formal/Proofs/Functions/AsyncSwapSqrt.lean#L174) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapTickBounds.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `wrapI256_id` | [AsyncSwapTickBounds.lean:24](../../formal/Proofs/Functions/AsyncSwapTickBounds.lean#L24) | not tested yet |
+| `wrapI24_id` | [AsyncSwapTickBounds.lean:28](../../formal/Proofs/Functions/AsyncSwapTickBounds.lean#L28) | not tested yet |
+| `ts_tu` | [AsyncSwapTickBounds.lean:32](../../formal/Proofs/Functions/AsyncSwapTickBounds.lean#L32) | not tested yet |
+| `tu_ts` | [AsyncSwapTickBounds.lean:39](../../formal/Proofs/Functions/AsyncSwapTickBounds.lean#L39) | not tested yet |
+| `rung_x` | [AsyncSwapTickBounds.lean:47](../../formal/Proofs/Functions/AsyncSwapTickBounds.lean#L47) | not tested yet |
+| `rung_spec` | [AsyncSwapTickBounds.lean:71](../../formal/Proofs/Functions/AsyncSwapTickBounds.lean#L71) | not tested yet |
+| `inv_step` | [AsyncSwapTickBounds.lean:94](../../formal/Proofs/Functions/AsyncSwapTickBounds.lean#L94) | not tested yet |
+| `log0_eq` | [AsyncSwapTickBounds.lean:119](../../formal/Proofs/Functions/AsyncSwapTickBounds.lean#L119) | not tested yet |
+| `logR_bounds` | [AsyncSwapTickBounds.lean:128](../../formal/Proofs/Functions/AsyncSwapTickBounds.lean#L128) | not tested yet |
+| `ticks_bounds` | [AsyncSwapTickBounds.lean:169](../../formal/Proofs/Functions/AsyncSwapTickBounds.lean#L169) | not tested yet |
+| `sqrt_min` | [AsyncSwapTickBounds.lean:181](../../formal/Proofs/Functions/AsyncSwapTickBounds.lean#L181) | not tested yet |
+| `norm_lt` | [AsyncSwapTickBounds.lean:185](../../formal/Proofs/Functions/AsyncSwapTickBounds.lean#L185) | not tested yet |
+| `logOf_bounds` | [AsyncSwapTickBounds.lean:205](../../formal/Proofs/Functions/AsyncSwapTickBounds.lean#L205) | not tested yet |
+| `getTickAtSqrtPrice_bounded` | [AsyncSwapTickBounds.lean:231](../../formal/Proofs/Functions/AsyncSwapTickBounds.lean#L231) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapTickPrice.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `divc_pure` | [AsyncSwapTickPrice.lean:35](../../formal/Proofs/Functions/AsyncSwapTickPrice.lean#L35) | not tested yet |
+| `mulDivFloor_ok` | [AsyncSwapTickPrice.lean:38](../../formal/Proofs/Functions/AsyncSwapTickPrice.lean#L38) | not tested yet |
+| `scaled_bounds` | [AsyncSwapTickPrice.lean:47](../../formal/Proofs/Functions/AsyncSwapTickPrice.lean#L47) | not tested yet |
+| `mulDivFloor_bind` | [AsyncSwapTickPrice.lean:59](../../formal/Proofs/Functions/AsyncSwapTickPrice.lean#L59) | not tested yet |
+| `sqrt_bind` | [AsyncSwapTickPrice.lean:65](../../formal/Proofs/Functions/AsyncSwapTickPrice.lean#L65) | not tested yet |
+| `floorTick_den_zero` | [AsyncSwapTickPrice.lean:76](../../formal/Proofs/Functions/AsyncSwapTickPrice.lean#L76) | not tested yet |
+| `floorTick_eq_small` | [AsyncSwapTickPrice.lean:80](../../formal/Proofs/Functions/AsyncSwapTickPrice.lean#L80) | not tested yet |
+| `floorTick_eq_huge` | [AsyncSwapTickPrice.lean:90](../../formal/Proofs/Functions/AsyncSwapTickPrice.lean#L90) | not tested yet |
+| `floorTick_eq_mid` | [AsyncSwapTickPrice.lean:97](../../formal/Proofs/Functions/AsyncSwapTickPrice.lean#L97) | not tested yet |
+| `floorTick_run_small` | [AsyncSwapTickPrice.lean:109](../../formal/Proofs/Functions/AsyncSwapTickPrice.lean#L109) | not tested yet |
+| `floorTick_run_huge` | [AsyncSwapTickPrice.lean:119](../../formal/Proofs/Functions/AsyncSwapTickPrice.lean#L119) | not tested yet |
+| `floorTick_run_mid` | [AsyncSwapTickPrice.lean:132](../../formal/Proofs/Functions/AsyncSwapTickPrice.lean#L132) | not tested yet |
+| `clamp_result` | [AsyncSwapTickPrice.lean:144](../../formal/Proofs/Functions/AsyncSwapTickPrice.lean#L144) | not tested yet |
+| `floorTick_result` | [AsyncSwapTickPrice.lean:168](../../formal/Proofs/Functions/AsyncSwapTickPrice.lean#L168) | not tested yet |
+| `key_eq_true` | [AsyncSwapTickPrice.lean:210](../../formal/Proofs/Functions/AsyncSwapTickPrice.lean#L210) | not tested yet |
+| `key_eq_false` | [AsyncSwapTickPrice.lean:220](../../formal/Proofs/Functions/AsyncSwapTickPrice.lean#L220) | not tested yet |
+| `key_eq` | [AsyncSwapTickPrice.lean:231](../../formal/Proofs/Functions/AsyncSwapTickPrice.lean#L231) | not tested yet |
+| `toUnsigned24_of` | [AsyncSwapTickPrice.lean:240](../../formal/Proofs/Functions/AsyncSwapTickPrice.lean#L240) | not tested yet |
+| `fits24` | [AsyncSwapTickPrice.lean:244](../../formal/Proofs/Functions/AsyncSwapTickPrice.lean#L244) | not tested yet |
+| `bucket_run` | [AsyncSwapTickPrice.lean:250](../../formal/Proofs/Functions/AsyncSwapTickPrice.lean#L250) | not tested yet |
+| `key_run` | [AsyncSwapTickPrice.lean:277](../../formal/Proofs/Functions/AsyncSwapTickPrice.lean#L277) | not tested yet |
+| `key_error` | [AsyncSwapTickPrice.lean:290](../../formal/Proofs/Functions/AsyncSwapTickPrice.lean#L290) | not tested yet |
+| `key_zero_den` | [AsyncSwapTickPrice.lean:299](../../formal/Proofs/Functions/AsyncSwapTickPrice.lean#L299) | not tested yet |
+| `keyPure_range` | [AsyncSwapTickPrice.lean:306](../../formal/Proofs/Functions/AsyncSwapTickPrice.lean#L306) | not tested yet |
+| `keyPure_strictMono_buy` | [AsyncSwapTickPrice.lean:315](../../formal/Proofs/Functions/AsyncSwapTickPrice.lean#L315) | not tested yet |
+| `keyPure_strictAnti_sell` | [AsyncSwapTickPrice.lean:325](../../formal/Proofs/Functions/AsyncSwapTickPrice.lean#L325) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapTradeFee.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `tradeFee_eq` | [AsyncSwapTradeFee.lean:8](../../formal/Proofs/Functions/AsyncSwapTradeFee.lean#L8) | not tested yet |
+| `tradeFee_success` | [AsyncSwapTradeFee.lean:15](../../formal/Proofs/Functions/AsyncSwapTradeFee.lean#L15) | not tested yet |
+| `tradeFee_footprint` | [AsyncSwapTradeFee.lean:21](../../formal/Proofs/Functions/AsyncSwapTradeFee.lean#L21) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapTryRecover.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `tryRecover_eq` | [AsyncSwapTryRecover.lean:30](../../formal/Proofs/Functions/AsyncSwapTryRecover.lean#L30) | not tested yet |
+| `tryRecover_high_s` | [AsyncSwapTryRecover.lean:40](../../formal/Proofs/Functions/AsyncSwapTryRecover.lean#L40) | not tested yet |
+| `tryRecover_zero_signer` | [AsyncSwapTryRecover.lean:46](../../formal/Proofs/Functions/AsyncSwapTryRecover.lean#L46) | not tested yet |
+| `tryRecover_ok` | [AsyncSwapTryRecover.lean:52](../../formal/Proofs/Functions/AsyncSwapTryRecover.lean#L52) | not tested yet |
+| `tryRecover_noError_signer_ne_zero` | [AsyncSwapTryRecover.lean:60](../../formal/Proofs/Functions/AsyncSwapTryRecover.lean#L60) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapUpdatePrice.lean`
+
+| Theorem | Lean | Test | Halmos |
+|---|---|---|---|
+| `updatePrice_notOwner` | [AsyncSwapUpdatePrice.lean:109](../../formal/Proofs/Functions/AsyncSwapUpdatePrice.lean#L109) | [`AsyncSwapUpdatePrice.t.sol`](AsyncSwapUpdatePrice.t.sol) `testFuzz_updatePrice_notOwner` | yes |
+| `updatePrice_zero` | [AsyncSwapUpdatePrice.lean:116](../../formal/Proofs/Functions/AsyncSwapUpdatePrice.lean#L116) | [`AsyncSwapUpdatePrice.t.sol`](AsyncSwapUpdatePrice.t.sol) `testFuzz_updatePrice_zero` | yes |
+| `updatePrice_notFound` | [AsyncSwapUpdatePrice.lean:123](../../formal/Proofs/Functions/AsyncSwapUpdatePrice.lean#L123) | [`AsyncSwapUpdatePrice.t.sol`](AsyncSwapUpdatePrice.t.sol) `testFuzz_updatePrice_notFound` | no |
+| `updatePrice_ok` | [AsyncSwapUpdatePrice.lean:180](../../formal/Proofs/Functions/AsyncSwapUpdatePrice.lean#L180) | [`AsyncSwapUpdatePrice.t.sol`](AsyncSwapUpdatePrice.t.sol) `testFuzz_updatePrice_ok` | no |
+
+Left out:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `priceKey_ok_iff` | [AsyncSwapUpdatePrice.lean:58](../../formal/Proofs/Functions/AsyncSwapUpdatePrice.lean#L58) | not tested yet |
+| `priceKey_error` | [AsyncSwapUpdatePrice.lean:75](../../formal/Proofs/Functions/AsyncSwapUpdatePrice.lean#L75) | not tested yet |
+| `tail_fin` | [AsyncSwapUpdatePrice.lean:146](../../formal/Proofs/Functions/AsyncSwapUpdatePrice.lean#L146) | not tested yet |
+| `checkMinimum_frame` | [AsyncSwapUpdatePrice.lean:255](../../formal/Proofs/Functions/AsyncSwapUpdatePrice.lean#L255) | not tested yet |
+| `updatePrice_ok_frame` | [AsyncSwapUpdatePrice.lean:276](../../formal/Proofs/Functions/AsyncSwapUpdatePrice.lean#L276) | not tested yet |
+| `updatePrice_error` | [AsyncSwapUpdatePrice.lean:335](../../formal/Proofs/Functions/AsyncSwapUpdatePrice.lean#L335) | not tested yet |
+| `hsg` | [AsyncSwapUpdatePrice.lean:426](../../formal/Proofs/Functions/AsyncSwapUpdatePrice.lean#L426) | not tested yet |
+| `hss` | [AsyncSwapUpdatePrice.lean:427](../../formal/Proofs/Functions/AsyncSwapUpdatePrice.lean#L427) | not tested yet |
+| `hbg` | [AsyncSwapUpdatePrice.lean:428](../../formal/Proofs/Functions/AsyncSwapUpdatePrice.lean#L428) | not tested yet |
+| `hbs` | [AsyncSwapUpdatePrice.lean:429](../../formal/Proofs/Functions/AsyncSwapUpdatePrice.lean#L429) | not tested yet |
+| `l1` | [AsyncSwapUpdatePrice.lean:434](../../formal/Proofs/Functions/AsyncSwapUpdatePrice.lean#L434) | not tested yet |
+| `l2` | [AsyncSwapUpdatePrice.lean:436](../../formal/Proofs/Functions/AsyncSwapUpdatePrice.lean#L436) | not tested yet |
+| `l3` | [AsyncSwapUpdatePrice.lean:438](../../formal/Proofs/Functions/AsyncSwapUpdatePrice.lean#L438) | not tested yet |
+| `l4` | [AsyncSwapUpdatePrice.lean:440](../../formal/Proofs/Functions/AsyncSwapUpdatePrice.lean#L440) | not tested yet |
+| `updatePrice_eq` | [AsyncSwapUpdatePrice.lean:448](../../formal/Proofs/Functions/AsyncSwapUpdatePrice.lean#L448) | not tested yet |
+| `updatePriceWithSig_eq` | [AsyncSwapUpdatePrice.lean:461](../../formal/Proofs/Functions/AsyncSwapUpdatePrice.lean#L461) | not tested yet |
+| `entry_notOwner` | [AsyncSwapUpdatePrice.lean:485](../../formal/Proofs/Functions/AsyncSwapUpdatePrice.lean#L485) | not tested yet |
+| `entry_zero` | [AsyncSwapUpdatePrice.lean:492](../../formal/Proofs/Functions/AsyncSwapUpdatePrice.lean#L492) | not tested yet |
+| `entry_notFound` | [AsyncSwapUpdatePrice.lean:499](../../formal/Proofs/Functions/AsyncSwapUpdatePrice.lean#L499) | not tested yet |
+| `entry_error` | [AsyncSwapUpdatePrice.lean:512](../../formal/Proofs/Functions/AsyncSwapUpdatePrice.lean#L512) | not tested yet |
+| `entry_ok` | [AsyncSwapUpdatePrice.lean:527](../../formal/Proofs/Functions/AsyncSwapUpdatePrice.lean#L527) | not tested yet |
+| `entrySig_error` | [AsyncSwapUpdatePrice.lean:550](../../formal/Proofs/Functions/AsyncSwapUpdatePrice.lean#L550) | not tested yet |
+| `entrySig_ok` | [AsyncSwapUpdatePrice.lean:575](../../formal/Proofs/Functions/AsyncSwapUpdatePrice.lean#L575) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapUpdatePriceIte.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `ite_err_ok_eq` | [AsyncSwapUpdatePriceIte.lean:12](../../formal/Proofs/Functions/AsyncSwapUpdatePriceIte.lean#L12) | not tested yet |
+| `ite_err_ok_eq_err` | [AsyncSwapUpdatePriceIte.lean:17](../../formal/Proofs/Functions/AsyncSwapUpdatePriceIte.lean#L17) | not tested yet |
+| `ite_ok_err_eq_err` | [AsyncSwapUpdatePriceIte.lean:21](../../formal/Proofs/Functions/AsyncSwapUpdatePriceIte.lean#L21) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapUseNonce.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `useNonce_reverts_not_executor` | [AsyncSwapUseNonce.lean:15](../../formal/Proofs/Functions/AsyncSwapUseNonce.lean#L15) | not tested yet |
+| `useNonce_reverts_used` | [AsyncSwapUseNonce.lean:22](../../formal/Proofs/Functions/AsyncSwapUseNonce.lean#L22) | not tested yet |
+| `useNonce_success` | [AsyncSwapUseNonce.lean:30](../../formal/Proofs/Functions/AsyncSwapUseNonce.lean#L30) | not tested yet |
+| `useNonce_ok_iff` | [AsyncSwapUseNonce.lean:41](../../formal/Proofs/Functions/AsyncSwapUseNonce.lean#L41) | not tested yet |
+| `useNonce_frame` | [AsyncSwapUseNonce.lean:60](../../formal/Proofs/Functions/AsyncSwapUseNonce.lean#L60) | not tested yet |
+
+### `Proofs/Functions/AsyncSwapUseNonceInternal.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `_useNonce_reverts_used` | [AsyncSwapUseNonceInternal.lean:20](../../formal/Proofs/Functions/AsyncSwapUseNonceInternal.lean#L20) | not tested yet |
+| `_useNonce_success` | [AsyncSwapUseNonceInternal.lean:25](../../formal/Proofs/Functions/AsyncSwapUseNonceInternal.lean#L25) | not tested yet |
+| `_useNonce_ok_iff` | [AsyncSwapUseNonceInternal.lean:32](../../formal/Proofs/Functions/AsyncSwapUseNonceInternal.lean#L32) | not tested yet |
+| `_useNonce_frame` | [AsyncSwapUseNonceInternal.lean:43](../../formal/Proofs/Functions/AsyncSwapUseNonceInternal.lean#L43) | not tested yet |
+| `_useNonce_no_replay` | [AsyncSwapUseNonceInternal.lean:70](../../formal/Proofs/Functions/AsyncSwapUseNonceInternal.lean#L70) | not tested yet |
+
+### `Proofs/Functions/RouterCancelOrder.lean`
+
+| Theorem | Lean | Test | Halmos |
+|---|---|---|---|
+| `cancelOrder_run` | [RouterCancelOrder.lean:10](../../formal/Proofs/Functions/RouterCancelOrder.lean#L10) | [`AsyncSwapCancelOrder.t.sol`](AsyncSwapCancelOrder.t.sol) `testFuzz_cancelOrder_run` | no |
+
+### `Proofs/Functions/RouterRequireUnchanged.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `requireUnchanged_run` | [RouterRequireUnchanged.lean:23](../../formal/Proofs/Functions/RouterRequireUnchanged.lean#L23) | not tested yet |
+| `requireUnchanged_ok_iff` | [RouterRequireUnchanged.lean:45](../../formal/Proofs/Functions/RouterRequireUnchanged.lean#L45) | not tested yet |
+| `requireUnchanged_reverts_changed` | [RouterRequireUnchanged.lean:67](../../formal/Proofs/Functions/RouterRequireUnchanged.lean#L67) | not tested yet |
+| `requireUnchanged_reverts_view` | [RouterRequireUnchanged.lean:77](../../formal/Proofs/Functions/RouterRequireUnchanged.lean#L77) | not tested yet |
+| `requireUnchanged_frame` | [RouterRequireUnchanged.lean:84](../../formal/Proofs/Functions/RouterRequireUnchanged.lean#L84) | not tested yet |
+
+### `Proofs/Functions/RouterTryRecoverBytes.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `tryRecoverBytes_bad_length` | [RouterTryRecoverBytes.lean:18](../../formal/Proofs/Functions/RouterTryRecoverBytes.lean#L18) | not tested yet |
+| `tryRecoverBytes_len65` | [RouterTryRecoverBytes.lean:25](../../formal/Proofs/Functions/RouterTryRecoverBytes.lean#L25) | not tested yet |
+
+### `Proofs/Functions/TokenClaimsNonReentrant.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `nonReentrant_reverts` | [TokenClaimsNonReentrant.lean:10](../../formal/Proofs/Functions/TokenClaimsNonReentrant.lean#L10) | not tested yet |
+| `nonReentrant_run` | [TokenClaimsNonReentrant.lean:19](../../formal/Proofs/Functions/TokenClaimsNonReentrant.lean#L19) | not tested yet |
+| `nonReentrant_ok_iff` | [TokenClaimsNonReentrant.lean:33](../../formal/Proofs/Functions/TokenClaimsNonReentrant.lean#L33) | not tested yet |
+
+### `Proofs/Functions/TokenClaimsRedeem.lean`
+
+| Theorem | Lean | Test | Halmos |
+|---|---|---|---|
+| `redeem_reentrant` | [TokenClaimsRedeem.lean:9](../../formal/Proofs/Functions/TokenClaimsRedeem.lean#L9) | [`NativeClaimsRedeem.t.sol`](NativeClaimsRedeem.t.sol) `testFuzz_redeem_reentrant` | yes |
+| `redeem_invalid` | [TokenClaimsRedeem.lean:15](../../formal/Proofs/Functions/TokenClaimsRedeem.lean#L15) | [`NativeClaimsRedeem.t.sol`](NativeClaimsRedeem.t.sol) `testFuzz_redeem_invalid` | yes |
+
+Left out:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `redeem_call` | [TokenClaimsRedeem.lean:23](../../formal/Proofs/Functions/TokenClaimsRedeem.lean#L23) | not tested yet |
+| `redeem_guard_reverts` | [TokenClaimsRedeem.lean:41](../../formal/Proofs/Functions/TokenClaimsRedeem.lean#L41) | not tested yet |
+
+### `Proofs/Functions/TokenClaimsUnlockCallback.lean`
+
+| Theorem | Lean | Test | Halmos |
+|---|---|---|---|
+| `unlockCallback_onlyPoolManager` | [TokenClaimsUnlockCallback.lean:9](../../formal/Proofs/Functions/TokenClaimsUnlockCallback.lean#L9) | [`NativeClaimsUnlockCallback.t.sol`](NativeClaimsUnlockCallback.t.sol) `testFuzz_unlockCallback_onlyPoolManager` | yes |
+
+Left out:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `unlockCallback_short` | [TokenClaimsUnlockCallback.lean:15](../../formal/Proofs/Functions/TokenClaimsUnlockCallback.lean#L15) | not tested yet |
+| `unlockCallback_badAddress` | [TokenClaimsUnlockCallback.lean:32](../../formal/Proofs/Functions/TokenClaimsUnlockCallback.lean#L32) | not tested yet |
+| `unlockCallback_success` | [TokenClaimsUnlockCallback.lean:60](../../formal/Proofs/Functions/TokenClaimsUnlockCallback.lean#L60) | not tested yet |
+| `unlockCallback_reverts_iff_guards` | [TokenClaimsUnlockCallback.lean:93](../../formal/Proofs/Functions/TokenClaimsUnlockCallback.lean#L93) | not tested yet |
+
+### `Proofs/InformalSpecs/S03/TickPriceKey.lean`
+
+No test:
+
+| Theorem | Lean | Reason |
+|---|---|---|
+| `S03.TickPrice_key` | [TickPriceKey.lean:20](../../formal/Proofs/InformalSpecs/S03/TickPriceKey.lean#L20) | not tested yet |
+
 ### `Proofs/Monad.lean`
 
 No test:
@@ -323,815 +1132,6 @@ No test:
 |---|---|---|
 | `transfer_run` | [Settlement.lean:8](../../formal/Proofs/Settlement.lean#L8) | not tested yet |
 | `best_exact` | [Settlement.lean:18](../../formal/Proofs/Settlement.lean#L18) | not tested yet |
-
-### `Proofs/Statements/S03/TickPriceKey.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `S03.TickPrice_key` | [TickPriceKey.lean:20](../../formal/Proofs/Statements/S03/TickPriceKey.lean#L20) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapAddOrder.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `ite_bind'` | [AsyncSwapAddOrder.lean:48](../../formal/Proofs/Swarm/AsyncSwapAddOrder.lean#L48) | not tested yet |
-| `throw_bind'` | [AsyncSwapAddOrder.lean:52](../../formal/Proofs/Swarm/AsyncSwapAddOrder.lean#L52) | not tested yet |
-| `addOrder_split` | [AsyncSwapAddOrder.lean:91](../../formal/Proofs/Swarm/AsyncSwapAddOrder.lean#L91) | not tested yet |
-| `addOrder_fee_error` | [AsyncSwapAddOrder.lean:99](../../formal/Proofs/Swarm/AsyncSwapAddOrder.lean#L99) | not tested yet |
-| `addOrder_key_ok` | [AsyncSwapAddOrder.lean:107](../../formal/Proofs/Swarm/AsyncSwapAddOrder.lean#L107) | not tested yet |
-| `addOrder_key_zero` | [AsyncSwapAddOrder.lean:122](../../formal/Proofs/Swarm/AsyncSwapAddOrder.lean#L122) | not tested yet |
-| `addOrder_key_reverts_iff` | [AsyncSwapAddOrder.lean:134](../../formal/Proofs/Swarm/AsyncSwapAddOrder.lean#L134) | not tested yet |
-| `matching_addOrder_split` | [AsyncSwapAddOrder.lean:151](../../formal/Proofs/Swarm/AsyncSwapAddOrder.lean#L151) | not tested yet |
-| `matching_addOrder_zeroMin_gap` | [AsyncSwapAddOrder.lean:162](../../formal/Proofs/Swarm/AsyncSwapAddOrder.lean#L162) | not tested yet |
-| `matching_addOrder_buy_ok` | [AsyncSwapAddOrder.lean:175](../../formal/Proofs/Swarm/AsyncSwapAddOrder.lean#L175) | not tested yet |
-| `ceil_tail_pos` | [AsyncSwapAddOrder.lean:204](../../formal/Proofs/Swarm/AsyncSwapAddOrder.lean#L204) | not tested yet |
-| `mulDivRnd_ceil_pos` | [AsyncSwapAddOrder.lean:221](../../formal/Proofs/Swarm/AsyncSwapAddOrder.lean#L221) | not tested yet |
-| `rekey_den_ne_zero` | [AsyncSwapAddOrder.lean:240](../../formal/Proofs/Swarm/AsyncSwapAddOrder.lean#L240) | not tested yet |
-| `rekey_priceKey_ok` | [AsyncSwapAddOrder.lean:249](../../formal/Proofs/Swarm/AsyncSwapAddOrder.lean#L249) | not tested yet |
-| `rekey_den_sell` | [AsyncSwapAddOrder.lean:260](../../formal/Proofs/Swarm/AsyncSwapAddOrder.lean#L260) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapAppend.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `good_addc` | [AsyncSwapAppend.lean:37](../../formal/Proofs/Swarm/AsyncSwapAppend.lean#L37) | not tested yet |
-| `good_idx` | [AsyncSwapAppend.lean:44](../../formal/Proofs/Swarm/AsyncSwapAppend.lean#L44) | not tested yet |
-| `insert_good` | [AsyncSwapAppend.lean:55](../../formal/Proofs/Swarm/AsyncSwapAppend.lean#L55) | not tested yet |
-| `append_good` | [AsyncSwapAppend.lean:78](../../formal/Proofs/Swarm/AsyncSwapAppend.lean#L78) | not tested yet |
-| `append_reverts_only` | [AsyncSwapAppend.lean:102](../../formal/Proofs/Swarm/AsyncSwapAppend.lean#L102) | not tested yet |
-| `append_frame` | [AsyncSwapAppend.lean:131](../../formal/Proofs/Swarm/AsyncSwapAppend.lean#L131) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapAsyncOrderInfo.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `asyncOrderInfo_storage` | [AsyncSwapAsyncOrderInfo.lean:10](../../formal/Proofs/Swarm/AsyncSwapAsyncOrderInfo.lean#L10) | not tested yet |
-| `asyncOrderInfo_no_revert` | [AsyncSwapAsyncOrderInfo.lean:19](../../formal/Proofs/Swarm/AsyncSwapAsyncOrderInfo.lean#L19) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapBest.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `good_pure` | [AsyncSwapBest.lean:40](../../formal/Proofs/Swarm/AsyncSwapBest.lean#L40) | not tested yet |
-| `good_throw` | [AsyncSwapBest.lean:43](../../formal/Proofs/Swarm/AsyncSwapBest.lean#L43) | not tested yet |
-| `good_bind` | [AsyncSwapBest.lean:46](../../formal/Proofs/Swarm/AsyncSwapBest.lean#L46) | not tested yet |
-| `good_ite` | [AsyncSwapBest.lean:56](../../formal/Proofs/Swarm/AsyncSwapBest.lean#L56) | not tested yet |
-| `good_forIn_list` | [AsyncSwapBest.lean:60](../../formal/Proofs/Swarm/AsyncSwapBest.lean#L60) | not tested yet |
-| `good_forIn_range` | [AsyncSwapBest.lean:72](../../formal/Proofs/Swarm/AsyncSwapBest.lean#L72) | not tested yet |
-| `best_good` | [AsyncSwapBest.lean:93](../../formal/Proofs/Swarm/AsyncSwapBest.lean#L93) | not tested yet |
-| `best_reverts_only_loop_bound` | [AsyncSwapBest.lean:106](../../formal/Proofs/Swarm/AsyncSwapBest.lean#L106) | not tested yet |
-| `best_frame` | [AsyncSwapBest.lean:128](../../formal/Proofs/Swarm/AsyncSwapBest.lean#L128) | not tested yet |
-| `best_setters_irrelevant` | [AsyncSwapBest.lean:162](../../formal/Proofs/Swarm/AsyncSwapBest.lean#L162) | not tested yet |
-| `loop_ok` | [AsyncSwapBest.lean:174](../../formal/Proofs/Swarm/AsyncSwapBest.lean#L174) | not tested yet |
-| `loop_no_err` | [AsyncSwapBest.lean:190](../../formal/Proofs/Swarm/AsyncSwapBest.lean#L190) | not tested yet |
-| `best_empty` | [AsyncSwapBest.lean:212](../../formal/Proofs/Swarm/AsyncSwapBest.lean#L212) | not tested yet |
-| `best_root_ineligible` | [AsyncSwapBest.lean:224](../../formal/Proofs/Swarm/AsyncSwapBest.lean#L224) | not tested yet |
-| `best_result` | [AsyncSwapBest.lean:244](../../formal/Proofs/Swarm/AsyncSwapBest.lean#L244) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapBookPair.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `bookPair_good` | [AsyncSwapBookPair.lean:32](../../formal/Proofs/Swarm/AsyncSwapBookPair.lean#L32) | not tested yet |
-| `bookPair_reverts` | [AsyncSwapBookPair.lean:47](../../formal/Proofs/Swarm/AsyncSwapBookPair.lean#L47) | not tested yet |
-| `bookPair_self_set_irrelevant` | [AsyncSwapBookPair.lean:73](../../formal/Proofs/Swarm/AsyncSwapBookPair.lean#L73) | not tested yet |
-| `bookPair_no_pair` | [AsyncSwapBookPair.lean:86](../../formal/Proofs/Swarm/AsyncSwapBookPair.lean#L86) | not tested yet |
-| `bookPair_strict` | [AsyncSwapBookPair.lean:103](../../formal/Proofs/Swarm/AsyncSwapBookPair.lean#L103) | not tested yet |
-| `bookPair_equal` | [AsyncSwapBookPair.lean:128](../../formal/Proofs/Swarm/AsyncSwapBookPair.lean#L128) | not tested yet |
-| `bookPair_equal_div_zero` | [AsyncSwapBookPair.lean:157](../../formal/Proofs/Swarm/AsyncSwapBookPair.lean#L157) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapCalculatePoolFee.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `calculatePoolFee_success` | [AsyncSwapCalculatePoolFee.lean:10](../../formal/Proofs/Swarm/AsyncSwapCalculatePoolFee.lean#L10) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapCheckMinimum.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `checkMinimum_good` | [AsyncSwapCheckMinimum.lean:29](../../formal/Proofs/Swarm/AsyncSwapCheckMinimum.lean#L29) | not tested yet |
-| `checkMinimum_reverts` | [AsyncSwapCheckMinimum.lean:43](../../formal/Proofs/Swarm/AsyncSwapCheckMinimum.lean#L43) | not tested yet |
-| `checkMinimum_setters_irrelevant` | [AsyncSwapCheckMinimum.lean:65](../../formal/Proofs/Swarm/AsyncSwapCheckMinimum.lean#L65) | not tested yet |
-| `checkMinimum_zero` | [AsyncSwapCheckMinimum.lean:80](../../formal/Proofs/Swarm/AsyncSwapCheckMinimum.lean#L80) | not tested yet |
-| `checkMinimum_buy` | [AsyncSwapCheckMinimum.lean:92](../../formal/Proofs/Swarm/AsyncSwapCheckMinimum.lean#L92) | not tested yet |
-| `checkMinimum_sell_below` | [AsyncSwapCheckMinimum.lean:105](../../formal/Proofs/Swarm/AsyncSwapCheckMinimum.lean#L105) | not tested yet |
-| `checkMinimum_sell_zeroForOne` | [AsyncSwapCheckMinimum.lean:118](../../formal/Proofs/Swarm/AsyncSwapCheckMinimum.lean#L118) | not tested yet |
-| `checkMinimum_sell_oneForZero` | [AsyncSwapCheckMinimum.lean:138](../../formal/Proofs/Swarm/AsyncSwapCheckMinimum.lean#L138) | not tested yet |
-| `checkMinimum_sell_oneForZero_price_zero` | [AsyncSwapCheckMinimum.lean:159](../../formal/Proofs/Swarm/AsyncSwapCheckMinimum.lean#L159) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapClaimTransfersFlush.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `forIn_flush` | [AsyncSwapClaimTransfersFlush.lean:30](../../formal/Proofs/Swarm/AsyncSwapClaimTransfersFlush.lean#L30) | not tested yet |
-| `flush_eq` | [AsyncSwapClaimTransfersFlush.lean:65](../../formal/Proofs/Swarm/AsyncSwapClaimTransfersFlush.lean#L65) | not tested yet |
-| `flush_empty` | [AsyncSwapClaimTransfersFlush.lean:87](../../formal/Proofs/Swarm/AsyncSwapClaimTransfersFlush.lean#L87) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapCloseOrder.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `closeOrder_eq` | [AsyncSwapCloseOrder.lean:11](../../formal/Proofs/Swarm/AsyncSwapCloseOrder.lean#L11) | not tested yet |
-| `closeOrder_run` | [AsyncSwapCloseOrder.lean:37](../../formal/Proofs/Swarm/AsyncSwapCloseOrder.lean#L37) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapCreditPriorityFee.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `creditPriorityFee_zero` | [AsyncSwapCreditPriorityFee.lean:18](../../formal/Proofs/Swarm/AsyncSwapCreditPriorityFee.lean#L18) | not tested yet |
-| `creditPriorityFee_nonzero` | [AsyncSwapCreditPriorityFee.lean:26](../../formal/Proofs/Swarm/AsyncSwapCreditPriorityFee.lean#L26) | not tested yet |
-| `creditPriorityFee_run` | [AsyncSwapCreditPriorityFee.lean:43](../../formal/Proofs/Swarm/AsyncSwapCreditPriorityFee.lean#L43) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapEligible.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `eligible_eq` | [AsyncSwapEligible.lean:18](../../formal/Proofs/Swarm/AsyncSwapEligible.lean#L18) | not tested yet |
-| `eligible_reverts_iff` | [AsyncSwapEligible.lean:25](../../formal/Proofs/Swarm/AsyncSwapEligible.lean#L25) | not tested yet |
-| `eligible_ok` | [AsyncSwapEligible.lean:35](../../formal/Proofs/Swarm/AsyncSwapEligible.lean#L35) | not tested yet |
-| `eligible_never_reverts` | [AsyncSwapEligible.lean:44](../../formal/Proofs/Swarm/AsyncSwapEligible.lean#L44) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapExactPrice.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `exactPrice_of_read` | [AsyncSwapExactPrice.lean:25](../../formal/Proofs/Swarm/AsyncSwapExactPrice.lean#L25) | not tested yet |
-| `exactPrice_buy` | [AsyncSwapExactPrice.lean:35](../../formal/Proofs/Swarm/AsyncSwapExactPrice.lean#L35) | not tested yet |
-| `exactPrice_sell` | [AsyncSwapExactPrice.lean:43](../../formal/Proofs/Swarm/AsyncSwapExactPrice.lean#L43) | not tested yet |
-| `exactPrice_error` | [AsyncSwapExactPrice.lean:51](../../formal/Proofs/Swarm/AsyncSwapExactPrice.lean#L51) | not tested yet |
-| `exactPrice_order_set_irrelevant` | [AsyncSwapExactPrice.lean:59](../../formal/Proofs/Swarm/AsyncSwapExactPrice.lean#L59) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapFloorTick.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `run_bind_ok` | [AsyncSwapFloorTick.lean:48](../../formal/Proofs/Swarm/AsyncSwapFloorTick.lean#L48) | not tested yet |
-| `mulDivFloor_ok` | [AsyncSwapFloorTick.lean:52](../../formal/Proofs/Swarm/AsyncSwapFloorTick.lean#L52) | not tested yet |
-| `prod_lt` | [AsyncSwapFloorTick.lean:60](../../formal/Proofs/Swarm/AsyncSwapFloorTick.lean#L60) | not tested yet |
-| `mulDiv_bounds` | [AsyncSwapFloorTick.lean:72](../../formal/Proofs/Swarm/AsyncSwapFloorTick.lean#L72) | not tested yet |
-| `floorTick_eq` | [AsyncSwapFloorTick.lean:81](../../formal/Proofs/Swarm/AsyncSwapFloorTick.lean#L81) | not tested yet |
-| `floorTick_den_zero` | [AsyncSwapFloorTick.lean:95](../../formal/Proofs/Swarm/AsyncSwapFloorTick.lean#L95) | not tested yet |
-| `floorTick_low` | [AsyncSwapFloorTick.lean:103](../../formal/Proofs/Swarm/AsyncSwapFloorTick.lean#L103) | not tested yet |
-| `floorTick_saturates` | [AsyncSwapFloorTick.lean:112](../../formal/Proofs/Swarm/AsyncSwapFloorTick.lean#L112) | not tested yet |
-| `floorTick_mid` | [AsyncSwapFloorTick.lean:120](../../formal/Proofs/Swarm/AsyncSwapFloorTick.lean#L120) | not tested yet |
-| `floorTick_run` | [AsyncSwapFloorTick.lean:129](../../formal/Proofs/Swarm/AsyncSwapFloorTick.lean#L129) | not tested yet |
-| `tail_no_write` | [AsyncSwapFloorTick.lean:147](../../formal/Proofs/Swarm/AsyncSwapFloorTick.lean#L147) | not tested yet |
-| `floorTick_no_write` | [AsyncSwapFloorTick.lean:161](../../formal/Proofs/Swarm/AsyncSwapFloorTick.lean#L161) | not tested yet |
-| `sqrtPure_sq_le` | [AsyncSwapFloorTick.lean:174](../../formal/Proofs/Swarm/AsyncSwapFloorTick.lean#L174) | not tested yet |
-| `sqrtPure_lt` | [AsyncSwapFloorTick.lean:185](../../formal/Proofs/Swarm/AsyncSwapFloorTick.lean#L185) | not tested yet |
-| `shlw_sqrt_no_wrap` | [AsyncSwapFloorTick.lean:195](../../formal/Proofs/Swarm/AsyncSwapFloorTick.lean#L195) | not tested yet |
-| `floorTick_mid_exact` | [AsyncSwapFloorTick.lean:210](../../formal/Proofs/Swarm/AsyncSwapFloorTick.lean#L210) | not tested yet |
-| `floorTick_low_bound` | [AsyncSwapFloorTick.lean:220](../../formal/Proofs/Swarm/AsyncSwapFloorTick.lean#L220) | not tested yet |
-| `tail_dispatch` | [AsyncSwapFloorTick.lean:226](../../formal/Proofs/Swarm/AsyncSwapFloorTick.lean#L226) | not tested yet |
-| `floorTick_dispatch` | [AsyncSwapFloorTick.lean:245](../../formal/Proofs/Swarm/AsyncSwapFloorTick.lean#L245) | not tested yet |
-| `floorTick_total` | [AsyncSwapFloorTick.lean:272](../../formal/Proofs/Swarm/AsyncSwapFloorTick.lean#L272) | not tested yet |
-| `floorTick_error_iff` | [AsyncSwapFloorTick.lean:282](../../formal/Proofs/Swarm/AsyncSwapFloorTick.lean#L282) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapGetSqrtPriceAtTick.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `step_fold` | [AsyncSwapGetSqrtPriceAtTick.lean:75](../../formal/Proofs/Swarm/AsyncSwapGetSqrtPriceAtTick.lean#L75) | not tested yet |
-| `invert_fold` | [AsyncSwapGetSqrtPriceAtTick.lean:80](../../formal/Proofs/Swarm/AsyncSwapGetSqrtPriceAtTick.lean#L80) | not tested yet |
-| `maxTick_word` | [AsyncSwapGetSqrtPriceAtTick.lean:84](../../formal/Proofs/Swarm/AsyncSwapGetSqrtPriceAtTick.lean#L84) | not tested yet |
-| `getSqrtPriceAtTick_eq` | [AsyncSwapGetSqrtPriceAtTick.lean:90](../../formal/Proofs/Swarm/AsyncSwapGetSqrtPriceAtTick.lean#L90) | not tested yet |
-| `getSqrtPriceAtTick_run` | [AsyncSwapGetSqrtPriceAtTick.lean:151](../../formal/Proofs/Swarm/AsyncSwapGetSqrtPriceAtTick.lean#L151) | not tested yet |
-| `xor_allOnes` | [AsyncSwapGetSqrtPriceAtTick.lean:159](../../formal/Proofs/Swarm/AsyncSwapGetSqrtPriceAtTick.lean#L159) | not tested yet |
-| `toUnsigned_cast` | [AsyncSwapGetSqrtPriceAtTick.lean:165](../../formal/Proofs/Swarm/AsyncSwapGetSqrtPriceAtTick.lean#L165) | not tested yet |
-| `sar_low` | [AsyncSwapGetSqrtPriceAtTick.lean:170](../../formal/Proofs/Swarm/AsyncSwapGetSqrtPriceAtTick.lean#L170) | not tested yet |
-| `sar_high` | [AsyncSwapGetSqrtPriceAtTick.lean:179](../../formal/Proofs/Swarm/AsyncSwapGetSqrtPriceAtTick.lean#L179) | not tested yet |
-| `tick24_eq` | [AsyncSwapGetSqrtPriceAtTick.lean:189](../../formal/Proofs/Swarm/AsyncSwapGetSqrtPriceAtTick.lean#L189) | not tested yet |
-| `absTickOf_eq` | [AsyncSwapGetSqrtPriceAtTick.lean:201](../../formal/Proofs/Swarm/AsyncSwapGetSqrtPriceAtTick.lean#L201) | not tested yet |
-| `getSqrtPriceAtTick_int24` | [AsyncSwapGetSqrtPriceAtTick.lean:220](../../formal/Proofs/Swarm/AsyncSwapGetSqrtPriceAtTick.lean#L220) | not tested yet |
-| `getSqrtPriceAtTick_reverts_iff` | [AsyncSwapGetSqrtPriceAtTick.lean:227](../../formal/Proofs/Swarm/AsyncSwapGetSqrtPriceAtTick.lean#L227) | not tested yet |
-| `getSqrtPriceAtTick_zero` | [AsyncSwapGetSqrtPriceAtTick.lean:240](../../formal/Proofs/Swarm/AsyncSwapGetSqrtPriceAtTick.lean#L240) | not tested yet |
-| `getSqrtPriceAtTick_minTick` | [AsyncSwapGetSqrtPriceAtTick.lean:247](../../formal/Proofs/Swarm/AsyncSwapGetSqrtPriceAtTick.lean#L247) | not tested yet |
-| `getSqrtPriceAtTick_maxTick` | [AsyncSwapGetSqrtPriceAtTick.lean:254](../../formal/Proofs/Swarm/AsyncSwapGetSqrtPriceAtTick.lean#L254) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapGetTickAtSqrtPrice.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `getTickAtSqrtPrice_eq` | [AsyncSwapGetTickAtSqrtPrice.lean:77](../../formal/Proofs/Swarm/AsyncSwapGetTickAtSqrtPrice.lean#L77) | not tested yet |
-| `getTickAtSqrtPrice_out_of_range` | [AsyncSwapGetTickAtSqrtPrice.lean:97](../../formal/Proofs/Swarm/AsyncSwapGetTickAtSqrtPrice.lean#L97) | not tested yet |
-| `guard_iff` | [AsyncSwapGetTickAtSqrtPrice.lean:104](../../formal/Proofs/Swarm/AsyncSwapGetTickAtSqrtPrice.lean#L104) | not tested yet |
-| `priceOf_pos` | [AsyncSwapGetTickAtSqrtPrice.lean:111](../../formal/Proofs/Swarm/AsyncSwapGetTickAtSqrtPrice.lean#L111) | not tested yet |
-| `tailR_run` | [AsyncSwapGetTickAtSqrtPrice.lean:120](../../formal/Proofs/Swarm/AsyncSwapGetTickAtSqrtPrice.lean#L120) | not tested yet |
-| `getTickAtSqrtPrice_run` | [AsyncSwapGetTickAtSqrtPrice.lean:137](../../formal/Proofs/Swarm/AsyncSwapGetTickAtSqrtPrice.lean#L137) | not tested yet |
-| `getTickAtSqrtPrice_result` | [AsyncSwapGetTickAtSqrtPrice.lean:152](../../formal/Proofs/Swarm/AsyncSwapGetTickAtSqrtPrice.lean#L152) | not tested yet |
-| `getTickAtSqrtPrice_no_write` | [AsyncSwapGetTickAtSqrtPrice.lean:180](../../formal/Proofs/Swarm/AsyncSwapGetTickAtSqrtPrice.lean#L180) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapIsExecutor.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `isExecutor_storage` | [AsyncSwapIsExecutor.lean:11](../../formal/Proofs/Swarm/AsyncSwapIsExecutor.lean#L11) | not tested yet |
-| `isExecutor_no_revert` | [AsyncSwapIsExecutor.lean:19](../../formal/Proofs/Swarm/AsyncSwapIsExecutor.lean#L19) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapKey.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `floorTick_bounded` | [AsyncSwapKey.lean:27](../../formal/Proofs/Swarm/AsyncSwapKey.lean#L27) | not tested yet |
-| `key_ok` | [AsyncSwapKey.lean:56](../../formal/Proofs/Swarm/AsyncSwapKey.lean#L56) | not tested yet |
-| `key_no_revert` | [AsyncSwapKey.lean:75](../../formal/Proofs/Swarm/AsyncSwapKey.lean#L75) | not tested yet |
-| `key_spec` | [AsyncSwapKey.lean:85](../../formal/Proofs/Swarm/AsyncSwapKey.lean#L85) | not tested yet |
-| `key_reverts_iff` | [AsyncSwapKey.lean:101](../../formal/Proofs/Swarm/AsyncSwapKey.lean#L101) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapLevel.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `good_pure` | [AsyncSwapLevel.lean:38](../../formal/Proofs/Swarm/AsyncSwapLevel.lean#L38) | not tested yet |
-| `good_throw` | [AsyncSwapLevel.lean:41](../../formal/Proofs/Swarm/AsyncSwapLevel.lean#L41) | not tested yet |
-| `good_bind` | [AsyncSwapLevel.lean:44](../../formal/Proofs/Swarm/AsyncSwapLevel.lean#L44) | not tested yet |
-| `good_ite` | [AsyncSwapLevel.lean:54](../../formal/Proofs/Swarm/AsyncSwapLevel.lean#L54) | not tested yet |
-| `good_forIn_list` | [AsyncSwapLevel.lean:58](../../formal/Proofs/Swarm/AsyncSwapLevel.lean#L58) | not tested yet |
-| `good_forIn_range` | [AsyncSwapLevel.lean:70](../../formal/Proofs/Swarm/AsyncSwapLevel.lean#L70) | not tested yet |
-| `loop_ok` | [AsyncSwapLevel.lean:87](../../formal/Proofs/Swarm/AsyncSwapLevel.lean#L87) | not tested yet |
-| `loop_no_err` | [AsyncSwapLevel.lean:102](../../formal/Proofs/Swarm/AsyncSwapLevel.lean#L102) | not tested yet |
-| `level_good` | [AsyncSwapLevel.lean:124](../../formal/Proofs/Swarm/AsyncSwapLevel.lean#L124) | not tested yet |
-| `level_reverts` | [AsyncSwapLevel.lean:134](../../formal/Proofs/Swarm/AsyncSwapLevel.lean#L134) | not tested yet |
-| `level_frame` | [AsyncSwapLevel.lean:148](../../formal/Proofs/Swarm/AsyncSwapLevel.lean#L148) | not tested yet |
-| `level_book_set_irrelevant` | [AsyncSwapLevel.lean:165](../../formal/Proofs/Swarm/AsyncSwapLevel.lean#L165) | not tested yet |
-| `radix_best_result` | [AsyncSwapLevel.lean:175](../../formal/Proofs/Swarm/AsyncSwapLevel.lean#L175) | not tested yet |
-| `level_empty` | [AsyncSwapLevel.lean:215](../../formal/Proofs/Swarm/AsyncSwapLevel.lean#L215) | not tested yet |
-| `level_result` | [AsyncSwapLevel.lean:229](../../formal/Proofs/Swarm/AsyncSwapLevel.lean#L229) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapLog2.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `ite_ok_pair` | [AsyncSwapLog2.lean:35](../../formal/Proofs/Swarm/AsyncSwapLog2.lean#L35) | not tested yet |
-| `log2_run` | [AsyncSwapLog2.lean:41](../../formal/Proofs/Swarm/AsyncSwapLog2.lean#L41) | not tested yet |
-| `log2_shift` | [AsyncSwapLog2.lean:48](../../formal/Proofs/Swarm/AsyncSwapLog2.lean#L48) | not tested yet |
-| `spec_G1` | [AsyncSwapLog2.lean:74](../../formal/Proofs/Swarm/AsyncSwapLog2.lean#L74) | not tested yet |
-| `spec_stage` | [AsyncSwapLog2.lean:81](../../formal/Proofs/Swarm/AsyncSwapLog2.lean#L81) | not tested yet |
-| `spec_G128` | [AsyncSwapLog2.lean:110](../../formal/Proofs/Swarm/AsyncSwapLog2.lean#L110) | not tested yet |
-| `log2_eq` | [AsyncSwapLog2.lean:116](../../formal/Proofs/Swarm/AsyncSwapLog2.lean#L116) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapMin.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `min_run` | [AsyncSwapMin.lean:18](../../formal/Proofs/Swarm/AsyncSwapMin.lean#L18) | not tested yet |
-| `min_spec` | [AsyncSwapMin.lean:27](../../formal/Proofs/Swarm/AsyncSwapMin.lean#L27) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapMinPriorityFee.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `minPriorityFee_eq` | [AsyncSwapMinPriorityFee.lean:22](../../formal/Proofs/Swarm/AsyncSwapMinPriorityFee.lean#L22) | not tested yet |
-| `minPriorityFee_ok` | [AsyncSwapMinPriorityFee.lean:39](../../formal/Proofs/Swarm/AsyncSwapMinPriorityFee.lean#L39) | not tested yet |
-| `minPriorityFee_bounds` | [AsyncSwapMinPriorityFee.lean:51](../../formal/Proofs/Swarm/AsyncSwapMinPriorityFee.lean#L51) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapMostPermissiveAtPrice.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `mostPermissiveAtPrice_of_read` | [AsyncSwapMostPermissiveAtPrice.lean:28](../../formal/Proofs/Swarm/AsyncSwapMostPermissiveAtPrice.lean#L28) | not tested yet |
-| `mostPermissiveAtPrice_error` | [AsyncSwapMostPermissiveAtPrice.lean:39](../../formal/Proofs/Swarm/AsyncSwapMostPermissiveAtPrice.lean#L39) | not tested yet |
-| `mostPermissiveAtPrice_no_revert` | [AsyncSwapMostPermissiveAtPrice.lean:48](../../formal/Proofs/Swarm/AsyncSwapMostPermissiveAtPrice.lean#L48) | not tested yet |
-| `mostPermissiveAtPrice_book_set_irrelevant` | [AsyncSwapMostPermissiveAtPrice.lean:57](../../formal/Proofs/Swarm/AsyncSwapMostPermissiveAtPrice.lean#L57) | not tested yet |
-| `mostPermissiveAtPrice_storage` | [AsyncSwapMostPermissiveAtPrice.lean:65](../../formal/Proofs/Swarm/AsyncSwapMostPermissiveAtPrice.lean#L65) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapMostSignificantBit.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `stage_inv` | [AsyncSwapMostSignificantBit.lean:60](../../formal/Proofs/Swarm/AsyncSwapMostSignificantBit.lean#L60) | model-only helper (loop invariant of Lean `stage`) |
-| `mostSignificantBit_run` | [AsyncSwapMostSignificantBit.lean:38](../../formal/Proofs/Swarm/AsyncSwapMostSignificantBit.lean#L38) | not tested yet |
-| `lut_spec` | [AsyncSwapMostSignificantBit.lean:48](../../formal/Proofs/Swarm/AsyncSwapMostSignificantBit.lean#L48) | not tested yet |
-| `or_eq_add` | [AsyncSwapMostSignificantBit.lean:52](../../formal/Proofs/Swarm/AsyncSwapMostSignificantBit.lean#L52) | not tested yet |
-| `msbPure_spec` | [AsyncSwapMostSignificantBit.lean:98](../../formal/Proofs/Swarm/AsyncSwapMostSignificantBit.lean#L98) | not tested yet |
-| `mostSignificantBit_eq` | [AsyncSwapMostSignificantBit.lean:134](../../formal/Proofs/Swarm/AsyncSwapMostSignificantBit.lean#L134) | not tested yet |
-| `mostSignificantBit_zero` | [AsyncSwapMostSignificantBit.lean:148](../../formal/Proofs/Swarm/AsyncSwapMostSignificantBit.lean#L148) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapMulDiv.lean`
-
-| Theorem | Lean | Test | Halmos |
-|---|---|---|---|
-| `mulDiv_ok` | [AsyncSwapMulDiv.lean:322](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L322) | [`AsyncSwapMulDiv.t.sol`](AsyncSwapMulDiv.t.sol) `testFuzz_mulDiv_ok` | yes |
-| `mulDiv_overflow` | [AsyncSwapMulDiv.lean:372](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L372) | [`AsyncSwapMulDiv.t.sol`](AsyncSwapMulDiv.t.sol) `testFuzz_mulDiv_overflow` | yes |
-| `mulDiv_zero` | [AsyncSwapMulDiv.lean:388](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L388) | [`AsyncSwapMulDiv.t.sol`](AsyncSwapMulDiv.t.sol) `testFuzz_mulDiv_zero` | yes |
-| `mulDiv_spec` | [AsyncSwapMulDiv.lean:405](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L405) | [`AsyncSwapMulDiv.t.sol`](AsyncSwapMulDiv.t.sol) `testFuzz_mulDiv_spec` | yes |
-| `mulDiv_eq_mulDivFloor` | [AsyncSwapMulDiv.lean:446](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L446) | [`AsyncSwapMulDiv.t.sol`](AsyncSwapMulDiv.t.sol) `testFuzz_mulDiv_eq_mulDivFloor` | yes |
-
-Left out:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `W_eq` | [AsyncSwapMulDiv.lean:36](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L36) | model-only helper (Lean constant `W = 2^256`) |
-| `W_pos` | [AsyncSwapMulDiv.lean:37](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L37) | model-only helper (Lean arithmetic fact) |
-| `ite_pos'` | [AsyncSwapMulDiv.lean:40](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L40) | model-only helper (Lean `ite` lemma) |
-| `ite_neg'` | [AsyncSwapMulDiv.lean:42](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L42) | model-only helper (Lean `ite` lemma) |
-| `mulw_eq` | [AsyncSwapMulDiv.lean:45](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L45) | model-only helper (Lean word op `mulw`) |
-| `ysub_le` | [AsyncSwapMulDiv.lean:47](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L47) | model-only helper (Lean Yul op `ysub`) |
-| `ysub_lt` | [AsyncSwapMulDiv.lean:52](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L52) | model-only helper (Lean Yul op `ysub`) |
-| `ylt_eq` | [AsyncSwapMulDiv.lean:56](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L56) | model-only helper (Lean Yul op `ylt`) |
-| `ygt_eq` | [AsyncSwapMulDiv.lean:59](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L59) | model-only helper (Lean Yul op `ygt`) |
-| `ydiv_pos` | [AsyncSwapMulDiv.lean:62](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L62) | model-only helper (Lean Yul op `ydiv`) |
-| `hi_word` | [AsyncSwapMulDiv.lean:67](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L67) | model-only helper (Nat lemma: mulmod trick gives the high word) |
-| `sub_rem` | [AsyncSwapMulDiv.lean:105](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L105) | model-only helper (512-bit subtraction lemma) |
-| `and_double` | [AsyncSwapMulDiv.lean:123](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L123) | model-only helper (Nat bitwise lemma) |
-| `lowbit_odd` | [AsyncSwapMulDiv.lean:132](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L132) | model-only helper (Nat bitwise lemma) |
-| `lowbit` | [AsyncSwapMulDiv.lean:150](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L150) | model-only helper (`d & -d` lemma) |
-| `fold_nstep` | [AsyncSwapMulDiv.lean:209](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L209) | model-only helper (folds a Lean expression into `nstep`) |
-| `nstep_spec` | [AsyncSwapMulDiv.lean:213](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L213) | model-only helper (Newton step lemma) |
-| `init_spec` | [AsyncSwapMulDiv.lean:258](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L258) | model-only helper (inverse seed lemma) |
-| `inv_spec` | [AsyncSwapMulDiv.lean:274](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L274) | model-only helper (inverse mod 2^256 lemma) |
-| `final` | [AsyncSwapMulDiv.lean:287](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L287) | model-only helper (final-stage arithmetic lemma; its content is tested by mulDiv_ok) |
-| `mulDivFloor_run` | [AsyncSwapMulDiv.lean:418](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L418) | model-only helper (unfolds the prelude `mulDivFloor`); its content is checked by `testFuzz_floor_run` |
-| `mulDiv_eq_mulDivFloor_any` | [AsyncSwapMulDiv.lean:453](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L453) | model-only (relates the generated `Math.mulDiv` to the prelude `mulDivFloor`); both sides are checked on the bytecode by `testFuzz_mulDiv_spec` and `testFuzz_floor_run` |
-| `two_pow_odd_aux` | [AsyncSwapMulDiv.lean:171](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L171) | not tested yet |
-| `dvd_modW` | [AsyncSwapMulDiv.lean:184](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L184) | not tested yet |
-| `ring_id` | [AsyncSwapMulDiv.lean:196](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L196) | not tested yet |
-| `addc_W` | [AsyncSwapMulDiv.lean:460](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L460) | not tested yet |
-| `mulDivRound_spec` | [AsyncSwapMulDiv.lean:469](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L469) | not tested yet |
-| `mulDivRound_eq_mulDivRnd` | [AsyncSwapMulDiv.lean:489](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L489) | not tested yet |
-| `mulDivRound_floor` | [AsyncSwapMulDiv.lean:504](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L504) | not tested yet |
-| `mulDivRound_ceil` | [AsyncSwapMulDiv.lean:511](../../formal/Proofs/Swarm/AsyncSwapMulDiv.lean#L511) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapOrderCreatedSequence.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `orderCreatedSequence_run` | [AsyncSwapOrderCreatedSequence.lean:22](../../formal/Proofs/Swarm/AsyncSwapOrderCreatedSequence.lean#L22) | not tested yet |
-| `orderCreatedSequence_never_reverts` | [AsyncSwapOrderCreatedSequence.lean:27](../../formal/Proofs/Swarm/AsyncSwapOrderCreatedSequence.lean#L27) | not tested yet |
-| `orderCreatedSequence_ok` | [AsyncSwapOrderCreatedSequence.lean:32](../../formal/Proofs/Swarm/AsyncSwapOrderCreatedSequence.lean#L32) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapOverloads.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `revertWith_int_run` | [AsyncSwapOverloads.lean:24](../../formal/Proofs/Swarm/AsyncSwapOverloads.lean#L24) | not tested yet |
-| `revertWith_int_never_succeeds` | [AsyncSwapOverloads.lean:27](../../formal/Proofs/Swarm/AsyncSwapOverloads.lean#L27) | not tested yet |
-| `revertWith_sel_run` | [AsyncSwapOverloads.lean:31](../../formal/Proofs/Swarm/AsyncSwapOverloads.lean#L31) | not tested yet |
-| `revertWith_sel_never_succeeds` | [AsyncSwapOverloads.lean:34](../../formal/Proofs/Swarm/AsyncSwapOverloads.lean#L34) | not tested yet |
-| `tryRecoverBytes_eq` | [AsyncSwapOverloads.lean:45](../../formal/Proofs/Swarm/AsyncSwapOverloads.lean#L45) | not tested yet |
-| `tryRecoverBytes_bad_length` | [AsyncSwapOverloads.lean:56](../../formal/Proofs/Swarm/AsyncSwapOverloads.lean#L56) | not tested yet |
-| `tryRecoverBytes_noError` | [AsyncSwapOverloads.lean:62](../../formal/Proofs/Swarm/AsyncSwapOverloads.lean#L62) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapPayFiller.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `payFiller_setter_irrelevant` | [AsyncSwapPayFiller.lean:9](../../formal/Proofs/Swarm/AsyncSwapPayFiller.lean#L9) | not tested yet |
-| `payFiller_expands` | [AsyncSwapPayFiller.lean:17](../../formal/Proofs/Swarm/AsyncSwapPayFiller.lean#L17) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapPayouts.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `payouts_run` | [AsyncSwapPayouts.lean:29](../../formal/Proofs/Swarm/AsyncSwapPayouts.lean#L29) | not tested yet |
-| `payouts_error` | [AsyncSwapPayouts.lean:45](../../formal/Proofs/Swarm/AsyncSwapPayouts.lean#L45) | not tested yet |
-| `payouts_no_revert` | [AsyncSwapPayouts.lean:53](../../formal/Proofs/Swarm/AsyncSwapPayouts.lean#L53) | not tested yet |
-| `payouts_self_set_irrelevant` | [AsyncSwapPayouts.lean:62](../../formal/Proofs/Swarm/AsyncSwapPayouts.lean#L62) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapPoolBeatsBook.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `poolBeatsBook_def` | [AsyncSwapPoolBeatsBook.lean:12](../../formal/Proofs/Swarm/AsyncSwapPoolBeatsBook.lean#L12) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapPriceKey.lean`
-
-| Theorem | Lean | Test | Halmos |
-|---|---|---|---|
-| `priceKey_eq` | [AsyncSwapPriceKey.lean:22](../../formal/Proofs/Swarm/AsyncSwapPriceKey.lean#L22) | [`AsyncSwapHelpers.t.sol`](AsyncSwapHelpers.t.sol) `testFuzz_priceKey_eq` | no |
-
-Left out:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `priceKey_spec` | [AsyncSwapPriceKey.lean:28](../../formal/Proofs/Swarm/AsyncSwapPriceKey.lean#L28) | not tested yet |
-| `priceKey_reverts_iff` | [AsyncSwapPriceKey.lean:39](../../formal/Proofs/Swarm/AsyncSwapPriceKey.lean#L39) | not tested yet |
-| `priceKey_ok_inv` | [AsyncSwapPriceKey.lean:46](../../formal/Proofs/Swarm/AsyncSwapPriceKey.lean#L46) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapReceive.lean`
-
-| Theorem | Lean | Test | Halmos |
-|---|---|---|---|
-| `receive_run` | [AsyncSwapReceive.lean:15](../../formal/Proofs/Swarm/AsyncSwapReceive.lean#L15) | [`AsyncSwapReceive.t.sol`](AsyncSwapReceive.t.sol) `testFuzz_receive_run` | no |
-| `receive_never_reverts` | [AsyncSwapReceive.lean:20](../../formal/Proofs/Swarm/AsyncSwapReceive.lean#L20) | [`AsyncSwapReceive.t.sol`](AsyncSwapReceive.t.sol) `testFuzz_receive_never_reverts` | no |
-
-Left out:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `receive_pending` | [AsyncSwapReceive.lean:25](../../formal/Proofs/Swarm/AsyncSwapReceive.lean#L25) | not tested yet |
-| `receive_other_transient` | [AsyncSwapReceive.lean:34](../../formal/Proofs/Swarm/AsyncSwapReceive.lean#L34) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapRefresh.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `refresh_good` | [AsyncSwapRefresh.lean:27](../../formal/Proofs/Swarm/AsyncSwapRefresh.lean#L27) | not tested yet |
-| `refresh_reverts_only_loop_bound` | [AsyncSwapRefresh.lean:47](../../formal/Proofs/Swarm/AsyncSwapRefresh.lean#L47) | not tested yet |
-| `refresh_frame` | [AsyncSwapRefresh.lean:73](../../formal/Proofs/Swarm/AsyncSwapRefresh.lean#L73) | not tested yet |
-| `refresh_tree_set_irrelevant` | [AsyncSwapRefresh.lean:114](../../formal/Proofs/Swarm/AsyncSwapRefresh.lean#L114) | not tested yet |
-| `refresh_eq` | [AsyncSwapRefresh.lean:125](../../formal/Proofs/Swarm/AsyncSwapRefresh.lean#L125) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapRefreshExactPrice.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `refreshExactPrice_good` | [AsyncSwapRefreshExactPrice.lean:38](../../formal/Proofs/Swarm/AsyncSwapRefreshExactPrice.lean#L38) | not tested yet |
-| `refreshExactPrice_reverts_only_loop_bound` | [AsyncSwapRefreshExactPrice.lean:56](../../formal/Proofs/Swarm/AsyncSwapRefreshExactPrice.lean#L56) | not tested yet |
-| `refreshExactPrice_frame` | [AsyncSwapRefreshExactPrice.lean:82](../../formal/Proofs/Swarm/AsyncSwapRefreshExactPrice.lean#L82) | not tested yet |
-| `refreshExactPrice_self_set_irrelevant` | [AsyncSwapRefreshExactPrice.lean:122](../../formal/Proofs/Swarm/AsyncSwapRefreshExactPrice.lean#L122) | not tested yet |
-| `refreshExactPrice_eq` | [AsyncSwapRefreshExactPrice.lean:147](../../formal/Proofs/Swarm/AsyncSwapRefreshExactPrice.lean#L147) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapRemove.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `remove_good` | [AsyncSwapRemove.lean:31](../../formal/Proofs/Swarm/AsyncSwapRemove.lean#L31) | not tested yet |
-| `remove_reverts_only` | [AsyncSwapRemove.lean:48](../../formal/Proofs/Swarm/AsyncSwapRemove.lean#L48) | not tested yet |
-| `remove_reverts_missing` | [AsyncSwapRemove.lean:73](../../formal/Proofs/Swarm/AsyncSwapRemove.lean#L73) | not tested yet |
-| `remove_frame` | [AsyncSwapRemove.lean:87](../../formal/Proofs/Swarm/AsyncSwapRemove.lean#L87) | not tested yet |
-| `good_subc` | [AsyncSwapRemove.lean:134](../../formal/Proofs/Swarm/AsyncSwapRemove.lean#L134) | not tested yet |
-| `good_ite_app` | [AsyncSwapRemove.lean:143](../../formal/Proofs/Swarm/AsyncSwapRemove.lean#L143) | not tested yet |
-| `tree_remove_good` | [AsyncSwapRemove.lean:150](../../formal/Proofs/Swarm/AsyncSwapRemove.lean#L150) | not tested yet |
-| `filler_remove_good` | [AsyncSwapRemove.lean:164](../../formal/Proofs/Swarm/AsyncSwapRemove.lean#L164) | not tested yet |
-| `filler_remove_reverts_only` | [AsyncSwapRemove.lean:186](../../formal/Proofs/Swarm/AsyncSwapRemove.lean#L186) | not tested yet |
-| `filler_remove_frame` | [AsyncSwapRemove.lean:210](../../formal/Proofs/Swarm/AsyncSwapRemove.lean#L210) | not tested yet |
-| `filler_remove_self_set_irrelevant` | [AsyncSwapRemove.lean:248](../../formal/Proofs/Swarm/AsyncSwapRemove.lean#L248) | not tested yet |
-| `filler_remove_reverts_missing` | [AsyncSwapRemove.lean:258](../../formal/Proofs/Swarm/AsyncSwapRemove.lean#L258) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapRepair.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `good_pure` | [AsyncSwapRepair.lean:37](../../formal/Proofs/Swarm/AsyncSwapRepair.lean#L37) | not tested yet |
-| `good_throw` | [AsyncSwapRepair.lean:40](../../formal/Proofs/Swarm/AsyncSwapRepair.lean#L40) | not tested yet |
-| `good_bind` | [AsyncSwapRepair.lean:43](../../formal/Proofs/Swarm/AsyncSwapRepair.lean#L43) | not tested yet |
-| `good_ite` | [AsyncSwapRepair.lean:53](../../formal/Proofs/Swarm/AsyncSwapRepair.lean#L53) | not tested yet |
-| `good_forIn_list` | [AsyncSwapRepair.lean:57](../../formal/Proofs/Swarm/AsyncSwapRepair.lean#L57) | not tested yet |
-| `good_forIn_range` | [AsyncSwapRepair.lean:69](../../formal/Proofs/Swarm/AsyncSwapRepair.lean#L69) | not tested yet |
-| `repair_good` | [AsyncSwapRepair.lean:91](../../formal/Proofs/Swarm/AsyncSwapRepair.lean#L91) | not tested yet |
-| `repair_reverts_only_loop_bound` | [AsyncSwapRepair.lean:110](../../formal/Proofs/Swarm/AsyncSwapRepair.lean#L110) | not tested yet |
-| `repair_frame` | [AsyncSwapRepair.lean:136](../../formal/Proofs/Swarm/AsyncSwapRepair.lean#L136) | not tested yet |
-| `repair_tree_set_irrelevant` | [AsyncSwapRepair.lean:175](../../formal/Proofs/Swarm/AsyncSwapRepair.lean#L175) | not tested yet |
-| `repair_cursor_zero` | [AsyncSwapRepair.lean:183](../../formal/Proofs/Swarm/AsyncSwapRepair.lean#L183) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapRevertWith.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `revertWith_run` | [AsyncSwapRevertWith.lean:22](../../formal/Proofs/Swarm/AsyncSwapRevertWith.lean#L22) | not tested yet |
-| `revertWith_never_succeeds` | [AsyncSwapRevertWith.lean:28](../../formal/Proofs/Swarm/AsyncSwapRevertWith.lean#L28) | not tested yet |
-| `revertWith_uniform` | [AsyncSwapRevertWith.lean:34](../../formal/Proofs/Swarm/AsyncSwapRevertWith.lean#L34) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapSetDefaultMinOrder.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `setDefaultMinOrder_run` | [AsyncSwapSetDefaultMinOrder.lean:20](../../formal/Proofs/Swarm/AsyncSwapSetDefaultMinOrder.lean#L20) | not tested yet |
-| `setDefaultMinOrder_reverts_of_not_owner` | [AsyncSwapSetDefaultMinOrder.lean:29](../../formal/Proofs/Swarm/AsyncSwapSetDefaultMinOrder.lean#L29) | not tested yet |
-| `setDefaultMinOrder_ok_of_owner` | [AsyncSwapSetDefaultMinOrder.lean:35](../../formal/Proofs/Swarm/AsyncSwapSetDefaultMinOrder.lean#L35) | not tested yet |
-| `setDefaultMinOrder_ok_iff` | [AsyncSwapSetDefaultMinOrder.lean:42](../../formal/Proofs/Swarm/AsyncSwapSetDefaultMinOrder.lean#L42) | not tested yet |
-| `setDefaultMinOrder_frame` | [AsyncSwapSetDefaultMinOrder.lean:53](../../formal/Proofs/Swarm/AsyncSwapSetDefaultMinOrder.lean#L53) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapSetExecutor.lean`
-
-| Theorem | Lean | Test | Halmos |
-|---|---|---|---|
-| `setExecutor_run` | [AsyncSwapSetExecutor.lean:15](../../formal/Proofs/Swarm/AsyncSwapSetExecutor.lean#L15) | [`RefinementAsyncSwap.t.sol`](RefinementAsyncSwap.t.sol) `testFuzz_setExecutor_run` | with edits |
-| `setExecutor_frame` | [AsyncSwapSetExecutor.lean:33](../../formal/Proofs/Swarm/AsyncSwapSetExecutor.lean#L33) | [`RefinementAsyncSwap.t.sol`](RefinementAsyncSwap.t.sol) `testFuzz_setExecutor_frame` | no |
-
-Left out:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `setExecutor_ok_iff` | [AsyncSwapSetExecutor.lean:21](../../formal/Proofs/Swarm/AsyncSwapSetExecutor.lean#L21) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapSetMinOrder.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `filler_setMinOrder_run` | [AsyncSwapSetMinOrder.lean:31](../../formal/Proofs/Swarm/AsyncSwapSetMinOrder.lean#L31) | not tested yet |
-| `filler_setMinOrder_of_read` | [AsyncSwapSetMinOrder.lean:48](../../formal/Proofs/Swarm/AsyncSwapSetMinOrder.lean#L48) | not tested yet |
-| `filler_setMinOrder_poolId_irrelevant` | [AsyncSwapSetMinOrder.lean:56](../../formal/Proofs/Swarm/AsyncSwapSetMinOrder.lean#L56) | not tested yet |
-| `filler_setMinOrder_ok` | [AsyncSwapSetMinOrder.lean:63](../../formal/Proofs/Swarm/AsyncSwapSetMinOrder.lean#L63) | not tested yet |
-| `matching_setMinOrder_run` | [AsyncSwapSetMinOrder.lean:76](../../formal/Proofs/Swarm/AsyncSwapSetMinOrder.lean#L76) | not tested yet |
-| `matching_setMinOrder_eq_filler` | [AsyncSwapSetMinOrder.lean:92](../../formal/Proofs/Swarm/AsyncSwapSetMinOrder.lean#L92) | not tested yet |
-| `matching_setMinOrder_of_read` | [AsyncSwapSetMinOrder.lean:100](../../formal/Proofs/Swarm/AsyncSwapSetMinOrder.lean#L100) | not tested yet |
-| `matching_setMinOrder_get_error` | [AsyncSwapSetMinOrder.lean:108](../../formal/Proofs/Swarm/AsyncSwapSetMinOrder.lean#L108) | not tested yet |
-| `matching_setMinOrder_ok` | [AsyncSwapSetMinOrder.lean:116](../../formal/Proofs/Swarm/AsyncSwapSetMinOrder.lean#L116) | not tested yet |
-| `matching_setMinOrder_poolId_irrelevant` | [AsyncSwapSetMinOrder.lean:125](../../formal/Proofs/Swarm/AsyncSwapSetMinOrder.lean#L125) | not tested yet |
-| `setMinOrder_run` | [AsyncSwapSetMinOrder.lean:144](../../formal/Proofs/Swarm/AsyncSwapSetMinOrder.lean#L144) | not tested yet |
-| `setMinOrder_reverts_of_not_owner` | [AsyncSwapSetMinOrder.lean:154](../../formal/Proofs/Swarm/AsyncSwapSetMinOrder.lean#L154) | not tested yet |
-| `setMinOrder_ok_of_owner` | [AsyncSwapSetMinOrder.lean:160](../../formal/Proofs/Swarm/AsyncSwapSetMinOrder.lean#L160) | not tested yet |
-| `setMinOrder_ok_iff` | [AsyncSwapSetMinOrder.lean:167](../../formal/Proofs/Swarm/AsyncSwapSetMinOrder.lean#L167) | not tested yet |
-| `setMinOrder_frame` | [AsyncSwapSetMinOrder.lean:178](../../formal/Proofs/Swarm/AsyncSwapSetMinOrder.lean#L178) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapSqrt.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `amgm_aux` | [AsyncSwapSqrt.lean:36](../../formal/Proofs/Swarm/AsyncSwapSqrt.lean#L36) | not tested yet |
-| `amgm` | [AsyncSwapSqrt.lean:40](../../formal/Proofs/Swarm/AsyncSwapSqrt.lean#L40) | not tested yet |
-| `sq_succ` | [AsyncSwapSqrt.lean:49](../../formal/Proofs/Swarm/AsyncSwapSqrt.lean#L49) | not tested yet |
-| `sq_two` | [AsyncSwapSqrt.lean:53](../../formal/Proofs/Swarm/AsyncSwapSqrt.lean#L53) | not tested yet |
-| `step_eq` | [AsyncSwapSqrt.lean:56](../../formal/Proofs/Swarm/AsyncSwapSqrt.lean#L56) | not tested yet |
-| `lower` | [AsyncSwapSqrt.lean:61](../../formal/Proofs/Swarm/AsyncSwapSqrt.lean#L61) | not tested yet |
-| `ne_of_inv` | [AsyncSwapSqrt.lean:73](../../formal/Proofs/Swarm/AsyncSwapSqrt.lean#L73) | not tested yet |
-| `step_inv` | [AsyncSwapSqrt.lean:77](../../formal/Proofs/Swarm/AsyncSwapSqrt.lean#L77) | not tested yet |
-| `R0_pos` | [AsyncSwapSqrt.lean:102](../../formal/Proofs/Swarm/AsyncSwapSqrt.lean#L102) | not tested yet |
-| `shlw_R0` | [AsyncSwapSqrt.lean:104](../../formal/Proofs/Swarm/AsyncSwapSqrt.lean#L104) | not tested yet |
-| `init_inv` | [AsyncSwapSqrt.lean:112](../../formal/Proofs/Swarm/AsyncSwapSqrt.lean#L112) | not tested yet |
-| `divc_run` | [AsyncSwapSqrt.lean:134](../../formal/Proofs/Swarm/AsyncSwapSqrt.lean#L134) | not tested yet |
-| `sqrt_run` | [AsyncSwapSqrt.lean:140](../../formal/Proofs/Swarm/AsyncSwapSqrt.lean#L140) | not tested yet |
-| `sqrt_le` | [AsyncSwapSqrt.lean:174](../../formal/Proofs/Swarm/AsyncSwapSqrt.lean#L174) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapTickBounds.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `wrapI256_id` | [AsyncSwapTickBounds.lean:24](../../formal/Proofs/Swarm/AsyncSwapTickBounds.lean#L24) | not tested yet |
-| `wrapI24_id` | [AsyncSwapTickBounds.lean:28](../../formal/Proofs/Swarm/AsyncSwapTickBounds.lean#L28) | not tested yet |
-| `ts_tu` | [AsyncSwapTickBounds.lean:32](../../formal/Proofs/Swarm/AsyncSwapTickBounds.lean#L32) | not tested yet |
-| `tu_ts` | [AsyncSwapTickBounds.lean:39](../../formal/Proofs/Swarm/AsyncSwapTickBounds.lean#L39) | not tested yet |
-| `rung_x` | [AsyncSwapTickBounds.lean:47](../../formal/Proofs/Swarm/AsyncSwapTickBounds.lean#L47) | not tested yet |
-| `rung_spec` | [AsyncSwapTickBounds.lean:71](../../formal/Proofs/Swarm/AsyncSwapTickBounds.lean#L71) | not tested yet |
-| `inv_step` | [AsyncSwapTickBounds.lean:94](../../formal/Proofs/Swarm/AsyncSwapTickBounds.lean#L94) | not tested yet |
-| `log0_eq` | [AsyncSwapTickBounds.lean:119](../../formal/Proofs/Swarm/AsyncSwapTickBounds.lean#L119) | not tested yet |
-| `logR_bounds` | [AsyncSwapTickBounds.lean:128](../../formal/Proofs/Swarm/AsyncSwapTickBounds.lean#L128) | not tested yet |
-| `ticks_bounds` | [AsyncSwapTickBounds.lean:169](../../formal/Proofs/Swarm/AsyncSwapTickBounds.lean#L169) | not tested yet |
-| `sqrt_min` | [AsyncSwapTickBounds.lean:181](../../formal/Proofs/Swarm/AsyncSwapTickBounds.lean#L181) | not tested yet |
-| `norm_lt` | [AsyncSwapTickBounds.lean:185](../../formal/Proofs/Swarm/AsyncSwapTickBounds.lean#L185) | not tested yet |
-| `logOf_bounds` | [AsyncSwapTickBounds.lean:205](../../formal/Proofs/Swarm/AsyncSwapTickBounds.lean#L205) | not tested yet |
-| `getTickAtSqrtPrice_bounded` | [AsyncSwapTickBounds.lean:231](../../formal/Proofs/Swarm/AsyncSwapTickBounds.lean#L231) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapTickPrice.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `divc_pure` | [AsyncSwapTickPrice.lean:35](../../formal/Proofs/Swarm/AsyncSwapTickPrice.lean#L35) | not tested yet |
-| `mulDivFloor_ok` | [AsyncSwapTickPrice.lean:38](../../formal/Proofs/Swarm/AsyncSwapTickPrice.lean#L38) | not tested yet |
-| `scaled_bounds` | [AsyncSwapTickPrice.lean:47](../../formal/Proofs/Swarm/AsyncSwapTickPrice.lean#L47) | not tested yet |
-| `mulDivFloor_bind` | [AsyncSwapTickPrice.lean:59](../../formal/Proofs/Swarm/AsyncSwapTickPrice.lean#L59) | not tested yet |
-| `sqrt_bind` | [AsyncSwapTickPrice.lean:65](../../formal/Proofs/Swarm/AsyncSwapTickPrice.lean#L65) | not tested yet |
-| `floorTick_den_zero` | [AsyncSwapTickPrice.lean:76](../../formal/Proofs/Swarm/AsyncSwapTickPrice.lean#L76) | not tested yet |
-| `floorTick_eq_small` | [AsyncSwapTickPrice.lean:80](../../formal/Proofs/Swarm/AsyncSwapTickPrice.lean#L80) | not tested yet |
-| `floorTick_eq_huge` | [AsyncSwapTickPrice.lean:90](../../formal/Proofs/Swarm/AsyncSwapTickPrice.lean#L90) | not tested yet |
-| `floorTick_eq_mid` | [AsyncSwapTickPrice.lean:97](../../formal/Proofs/Swarm/AsyncSwapTickPrice.lean#L97) | not tested yet |
-| `floorTick_run_small` | [AsyncSwapTickPrice.lean:109](../../formal/Proofs/Swarm/AsyncSwapTickPrice.lean#L109) | not tested yet |
-| `floorTick_run_huge` | [AsyncSwapTickPrice.lean:119](../../formal/Proofs/Swarm/AsyncSwapTickPrice.lean#L119) | not tested yet |
-| `floorTick_run_mid` | [AsyncSwapTickPrice.lean:132](../../formal/Proofs/Swarm/AsyncSwapTickPrice.lean#L132) | not tested yet |
-| `clamp_result` | [AsyncSwapTickPrice.lean:144](../../formal/Proofs/Swarm/AsyncSwapTickPrice.lean#L144) | not tested yet |
-| `floorTick_result` | [AsyncSwapTickPrice.lean:168](../../formal/Proofs/Swarm/AsyncSwapTickPrice.lean#L168) | not tested yet |
-| `key_eq_true` | [AsyncSwapTickPrice.lean:210](../../formal/Proofs/Swarm/AsyncSwapTickPrice.lean#L210) | not tested yet |
-| `key_eq_false` | [AsyncSwapTickPrice.lean:220](../../formal/Proofs/Swarm/AsyncSwapTickPrice.lean#L220) | not tested yet |
-| `key_eq` | [AsyncSwapTickPrice.lean:231](../../formal/Proofs/Swarm/AsyncSwapTickPrice.lean#L231) | not tested yet |
-| `toUnsigned24_of` | [AsyncSwapTickPrice.lean:240](../../formal/Proofs/Swarm/AsyncSwapTickPrice.lean#L240) | not tested yet |
-| `fits24` | [AsyncSwapTickPrice.lean:244](../../formal/Proofs/Swarm/AsyncSwapTickPrice.lean#L244) | not tested yet |
-| `bucket_run` | [AsyncSwapTickPrice.lean:250](../../formal/Proofs/Swarm/AsyncSwapTickPrice.lean#L250) | not tested yet |
-| `key_run` | [AsyncSwapTickPrice.lean:277](../../formal/Proofs/Swarm/AsyncSwapTickPrice.lean#L277) | not tested yet |
-| `key_error` | [AsyncSwapTickPrice.lean:290](../../formal/Proofs/Swarm/AsyncSwapTickPrice.lean#L290) | not tested yet |
-| `key_zero_den` | [AsyncSwapTickPrice.lean:299](../../formal/Proofs/Swarm/AsyncSwapTickPrice.lean#L299) | not tested yet |
-| `keyPure_range` | [AsyncSwapTickPrice.lean:306](../../formal/Proofs/Swarm/AsyncSwapTickPrice.lean#L306) | not tested yet |
-| `keyPure_strictMono_buy` | [AsyncSwapTickPrice.lean:315](../../formal/Proofs/Swarm/AsyncSwapTickPrice.lean#L315) | not tested yet |
-| `keyPure_strictAnti_sell` | [AsyncSwapTickPrice.lean:325](../../formal/Proofs/Swarm/AsyncSwapTickPrice.lean#L325) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapTradeFee.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `tradeFee_eq` | [AsyncSwapTradeFee.lean:8](../../formal/Proofs/Swarm/AsyncSwapTradeFee.lean#L8) | not tested yet |
-| `tradeFee_success` | [AsyncSwapTradeFee.lean:15](../../formal/Proofs/Swarm/AsyncSwapTradeFee.lean#L15) | not tested yet |
-| `tradeFee_footprint` | [AsyncSwapTradeFee.lean:21](../../formal/Proofs/Swarm/AsyncSwapTradeFee.lean#L21) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapTryRecover.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `tryRecover_eq` | [AsyncSwapTryRecover.lean:30](../../formal/Proofs/Swarm/AsyncSwapTryRecover.lean#L30) | not tested yet |
-| `tryRecover_high_s` | [AsyncSwapTryRecover.lean:40](../../formal/Proofs/Swarm/AsyncSwapTryRecover.lean#L40) | not tested yet |
-| `tryRecover_zero_signer` | [AsyncSwapTryRecover.lean:46](../../formal/Proofs/Swarm/AsyncSwapTryRecover.lean#L46) | not tested yet |
-| `tryRecover_ok` | [AsyncSwapTryRecover.lean:52](../../formal/Proofs/Swarm/AsyncSwapTryRecover.lean#L52) | not tested yet |
-| `tryRecover_noError_signer_ne_zero` | [AsyncSwapTryRecover.lean:60](../../formal/Proofs/Swarm/AsyncSwapTryRecover.lean#L60) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapUpdatePrice.lean`
-
-| Theorem | Lean | Test | Halmos |
-|---|---|---|---|
-| `updatePrice_notOwner` | [AsyncSwapUpdatePrice.lean:109](../../formal/Proofs/Swarm/AsyncSwapUpdatePrice.lean#L109) | [`AsyncSwapUpdatePrice.t.sol`](AsyncSwapUpdatePrice.t.sol) `testFuzz_updatePrice_notOwner` | yes |
-| `updatePrice_zero` | [AsyncSwapUpdatePrice.lean:116](../../formal/Proofs/Swarm/AsyncSwapUpdatePrice.lean#L116) | [`AsyncSwapUpdatePrice.t.sol`](AsyncSwapUpdatePrice.t.sol) `testFuzz_updatePrice_zero` | yes |
-| `updatePrice_notFound` | [AsyncSwapUpdatePrice.lean:123](../../formal/Proofs/Swarm/AsyncSwapUpdatePrice.lean#L123) | [`AsyncSwapUpdatePrice.t.sol`](AsyncSwapUpdatePrice.t.sol) `testFuzz_updatePrice_notFound` | no |
-| `updatePrice_ok` | [AsyncSwapUpdatePrice.lean:180](../../formal/Proofs/Swarm/AsyncSwapUpdatePrice.lean#L180) | [`AsyncSwapUpdatePrice.t.sol`](AsyncSwapUpdatePrice.t.sol) `testFuzz_updatePrice_ok` | no |
-
-Left out:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `priceKey_ok_iff` | [AsyncSwapUpdatePrice.lean:58](../../formal/Proofs/Swarm/AsyncSwapUpdatePrice.lean#L58) | not tested yet |
-| `priceKey_error` | [AsyncSwapUpdatePrice.lean:75](../../formal/Proofs/Swarm/AsyncSwapUpdatePrice.lean#L75) | not tested yet |
-| `tail_fin` | [AsyncSwapUpdatePrice.lean:146](../../formal/Proofs/Swarm/AsyncSwapUpdatePrice.lean#L146) | not tested yet |
-| `checkMinimum_frame` | [AsyncSwapUpdatePrice.lean:255](../../formal/Proofs/Swarm/AsyncSwapUpdatePrice.lean#L255) | not tested yet |
-| `updatePrice_ok_frame` | [AsyncSwapUpdatePrice.lean:276](../../formal/Proofs/Swarm/AsyncSwapUpdatePrice.lean#L276) | not tested yet |
-| `updatePrice_error` | [AsyncSwapUpdatePrice.lean:335](../../formal/Proofs/Swarm/AsyncSwapUpdatePrice.lean#L335) | not tested yet |
-| `hsg` | [AsyncSwapUpdatePrice.lean:426](../../formal/Proofs/Swarm/AsyncSwapUpdatePrice.lean#L426) | not tested yet |
-| `hss` | [AsyncSwapUpdatePrice.lean:427](../../formal/Proofs/Swarm/AsyncSwapUpdatePrice.lean#L427) | not tested yet |
-| `hbg` | [AsyncSwapUpdatePrice.lean:428](../../formal/Proofs/Swarm/AsyncSwapUpdatePrice.lean#L428) | not tested yet |
-| `hbs` | [AsyncSwapUpdatePrice.lean:429](../../formal/Proofs/Swarm/AsyncSwapUpdatePrice.lean#L429) | not tested yet |
-| `l1` | [AsyncSwapUpdatePrice.lean:434](../../formal/Proofs/Swarm/AsyncSwapUpdatePrice.lean#L434) | not tested yet |
-| `l2` | [AsyncSwapUpdatePrice.lean:436](../../formal/Proofs/Swarm/AsyncSwapUpdatePrice.lean#L436) | not tested yet |
-| `l3` | [AsyncSwapUpdatePrice.lean:438](../../formal/Proofs/Swarm/AsyncSwapUpdatePrice.lean#L438) | not tested yet |
-| `l4` | [AsyncSwapUpdatePrice.lean:440](../../formal/Proofs/Swarm/AsyncSwapUpdatePrice.lean#L440) | not tested yet |
-| `updatePrice_eq` | [AsyncSwapUpdatePrice.lean:448](../../formal/Proofs/Swarm/AsyncSwapUpdatePrice.lean#L448) | not tested yet |
-| `updatePriceWithSig_eq` | [AsyncSwapUpdatePrice.lean:461](../../formal/Proofs/Swarm/AsyncSwapUpdatePrice.lean#L461) | not tested yet |
-| `entry_notOwner` | [AsyncSwapUpdatePrice.lean:485](../../formal/Proofs/Swarm/AsyncSwapUpdatePrice.lean#L485) | not tested yet |
-| `entry_zero` | [AsyncSwapUpdatePrice.lean:492](../../formal/Proofs/Swarm/AsyncSwapUpdatePrice.lean#L492) | not tested yet |
-| `entry_notFound` | [AsyncSwapUpdatePrice.lean:499](../../formal/Proofs/Swarm/AsyncSwapUpdatePrice.lean#L499) | not tested yet |
-| `entry_error` | [AsyncSwapUpdatePrice.lean:512](../../formal/Proofs/Swarm/AsyncSwapUpdatePrice.lean#L512) | not tested yet |
-| `entry_ok` | [AsyncSwapUpdatePrice.lean:527](../../formal/Proofs/Swarm/AsyncSwapUpdatePrice.lean#L527) | not tested yet |
-| `entrySig_error` | [AsyncSwapUpdatePrice.lean:550](../../formal/Proofs/Swarm/AsyncSwapUpdatePrice.lean#L550) | not tested yet |
-| `entrySig_ok` | [AsyncSwapUpdatePrice.lean:575](../../formal/Proofs/Swarm/AsyncSwapUpdatePrice.lean#L575) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapUpdatePriceIte.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `ite_err_ok_eq` | [AsyncSwapUpdatePriceIte.lean:12](../../formal/Proofs/Swarm/AsyncSwapUpdatePriceIte.lean#L12) | not tested yet |
-| `ite_err_ok_eq_err` | [AsyncSwapUpdatePriceIte.lean:17](../../formal/Proofs/Swarm/AsyncSwapUpdatePriceIte.lean#L17) | not tested yet |
-| `ite_ok_err_eq_err` | [AsyncSwapUpdatePriceIte.lean:21](../../formal/Proofs/Swarm/AsyncSwapUpdatePriceIte.lean#L21) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapUseNonce.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `useNonce_reverts_not_executor` | [AsyncSwapUseNonce.lean:15](../../formal/Proofs/Swarm/AsyncSwapUseNonce.lean#L15) | not tested yet |
-| `useNonce_reverts_used` | [AsyncSwapUseNonce.lean:22](../../formal/Proofs/Swarm/AsyncSwapUseNonce.lean#L22) | not tested yet |
-| `useNonce_success` | [AsyncSwapUseNonce.lean:30](../../formal/Proofs/Swarm/AsyncSwapUseNonce.lean#L30) | not tested yet |
-| `useNonce_ok_iff` | [AsyncSwapUseNonce.lean:41](../../formal/Proofs/Swarm/AsyncSwapUseNonce.lean#L41) | not tested yet |
-| `useNonce_frame` | [AsyncSwapUseNonce.lean:60](../../formal/Proofs/Swarm/AsyncSwapUseNonce.lean#L60) | not tested yet |
-
-### `Proofs/Swarm/AsyncSwapUseNonceInternal.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `_useNonce_reverts_used` | [AsyncSwapUseNonceInternal.lean:20](../../formal/Proofs/Swarm/AsyncSwapUseNonceInternal.lean#L20) | not tested yet |
-| `_useNonce_success` | [AsyncSwapUseNonceInternal.lean:25](../../formal/Proofs/Swarm/AsyncSwapUseNonceInternal.lean#L25) | not tested yet |
-| `_useNonce_ok_iff` | [AsyncSwapUseNonceInternal.lean:32](../../formal/Proofs/Swarm/AsyncSwapUseNonceInternal.lean#L32) | not tested yet |
-| `_useNonce_frame` | [AsyncSwapUseNonceInternal.lean:43](../../formal/Proofs/Swarm/AsyncSwapUseNonceInternal.lean#L43) | not tested yet |
-| `_useNonce_no_replay` | [AsyncSwapUseNonceInternal.lean:70](../../formal/Proofs/Swarm/AsyncSwapUseNonceInternal.lean#L70) | not tested yet |
-
-### `Proofs/Swarm/RouterCancelOrder.lean`
-
-| Theorem | Lean | Test | Halmos |
-|---|---|---|---|
-| `cancelOrder_run` | [RouterCancelOrder.lean:10](../../formal/Proofs/Swarm/RouterCancelOrder.lean#L10) | [`AsyncSwapCancelOrder.t.sol`](AsyncSwapCancelOrder.t.sol) `testFuzz_cancelOrder_run` | no |
-
-### `Proofs/Swarm/RouterRequireUnchanged.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `requireUnchanged_run` | [RouterRequireUnchanged.lean:23](../../formal/Proofs/Swarm/RouterRequireUnchanged.lean#L23) | not tested yet |
-| `requireUnchanged_ok_iff` | [RouterRequireUnchanged.lean:45](../../formal/Proofs/Swarm/RouterRequireUnchanged.lean#L45) | not tested yet |
-| `requireUnchanged_reverts_changed` | [RouterRequireUnchanged.lean:67](../../formal/Proofs/Swarm/RouterRequireUnchanged.lean#L67) | not tested yet |
-| `requireUnchanged_reverts_view` | [RouterRequireUnchanged.lean:77](../../formal/Proofs/Swarm/RouterRequireUnchanged.lean#L77) | not tested yet |
-| `requireUnchanged_frame` | [RouterRequireUnchanged.lean:84](../../formal/Proofs/Swarm/RouterRequireUnchanged.lean#L84) | not tested yet |
-
-### `Proofs/Swarm/RouterTryRecoverBytes.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `tryRecoverBytes_bad_length` | [RouterTryRecoverBytes.lean:18](../../formal/Proofs/Swarm/RouterTryRecoverBytes.lean#L18) | not tested yet |
-| `tryRecoverBytes_len65` | [RouterTryRecoverBytes.lean:25](../../formal/Proofs/Swarm/RouterTryRecoverBytes.lean#L25) | not tested yet |
-
-### `Proofs/Swarm/TokenClaimsNonReentrant.lean`
-
-No test:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `nonReentrant_reverts` | [TokenClaimsNonReentrant.lean:10](../../formal/Proofs/Swarm/TokenClaimsNonReentrant.lean#L10) | not tested yet |
-| `nonReentrant_run` | [TokenClaimsNonReentrant.lean:19](../../formal/Proofs/Swarm/TokenClaimsNonReentrant.lean#L19) | not tested yet |
-| `nonReentrant_ok_iff` | [TokenClaimsNonReentrant.lean:33](../../formal/Proofs/Swarm/TokenClaimsNonReentrant.lean#L33) | not tested yet |
-
-### `Proofs/Swarm/TokenClaimsRedeem.lean`
-
-| Theorem | Lean | Test | Halmos |
-|---|---|---|---|
-| `redeem_reentrant` | [TokenClaimsRedeem.lean:9](../../formal/Proofs/Swarm/TokenClaimsRedeem.lean#L9) | [`NativeClaimsRedeem.t.sol`](NativeClaimsRedeem.t.sol) `testFuzz_redeem_reentrant` | yes |
-| `redeem_invalid` | [TokenClaimsRedeem.lean:15](../../formal/Proofs/Swarm/TokenClaimsRedeem.lean#L15) | [`NativeClaimsRedeem.t.sol`](NativeClaimsRedeem.t.sol) `testFuzz_redeem_invalid` | yes |
-
-Left out:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `redeem_call` | [TokenClaimsRedeem.lean:23](../../formal/Proofs/Swarm/TokenClaimsRedeem.lean#L23) | not tested yet |
-| `redeem_guard_reverts` | [TokenClaimsRedeem.lean:41](../../formal/Proofs/Swarm/TokenClaimsRedeem.lean#L41) | not tested yet |
-
-### `Proofs/Swarm/TokenClaimsUnlockCallback.lean`
-
-| Theorem | Lean | Test | Halmos |
-|---|---|---|---|
-| `unlockCallback_onlyPoolManager` | [TokenClaimsUnlockCallback.lean:9](../../formal/Proofs/Swarm/TokenClaimsUnlockCallback.lean#L9) | [`NativeClaimsUnlockCallback.t.sol`](NativeClaimsUnlockCallback.t.sol) `testFuzz_unlockCallback_onlyPoolManager` | yes |
-
-Left out:
-
-| Theorem | Lean | Reason |
-|---|---|---|
-| `unlockCallback_short` | [TokenClaimsUnlockCallback.lean:15](../../formal/Proofs/Swarm/TokenClaimsUnlockCallback.lean#L15) | not tested yet |
-| `unlockCallback_badAddress` | [TokenClaimsUnlockCallback.lean:32](../../formal/Proofs/Swarm/TokenClaimsUnlockCallback.lean#L32) | not tested yet |
-| `unlockCallback_success` | [TokenClaimsUnlockCallback.lean:60](../../formal/Proofs/Swarm/TokenClaimsUnlockCallback.lean#L60) | not tested yet |
-| `unlockCallback_reverts_iff_guards` | [TokenClaimsUnlockCallback.lean:93](../../formal/Proofs/Swarm/TokenClaimsUnlockCallback.lean#L93) | not tested yet |
 
 ### Tests whose theorem is gone
 

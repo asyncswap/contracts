@@ -1,7 +1,7 @@
 import Specs.AsyncSwap
 import Proofs.Monad
-import Proofs.Swarm.AsyncSwapMostSignificantBit
-import Proofs.Swarm.AsyncSwapGetSqrtPriceAtTick
+import Proofs.Functions.AsyncSwapMostSignificantBit
+import Proofs.Functions.AsyncSwapGetSqrtPriceAtTick
 open FormalAst Refinement
 
 /-!

@@ -1,10 +1,10 @@
 import Specs.AsyncSwap
 import Proofs.Monad
-import Proofs.Swarm.AsyncSwapKey
-import Proofs.Swarm.AsyncSwapTickPrice
-import Proofs.Swarm.AsyncSwapMinPriorityFee
-import Proofs.Swarm.AsyncSwapCheckMinimum
-import Proofs.Swarm.AsyncSwapUpdatePriceIte
+import Proofs.Functions.AsyncSwapKey
+import Proofs.Functions.AsyncSwapTickPrice
+import Proofs.Functions.AsyncSwapMinPriorityFee
+import Proofs.Functions.AsyncSwapCheckMinimum
+import Proofs.Functions.AsyncSwapUpdatePriceIte
 
 /-!
 # `AsyncFiller.updatePrice` and `AsyncFiller._priceKey` (src/AsyncSwap.sol)

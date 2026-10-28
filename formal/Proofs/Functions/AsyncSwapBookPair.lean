@@ -1,6 +1,6 @@
 import Specs.AsyncSwap
 import Proofs.Monad
-import Proofs.Swarm.AsyncSwapBest
+import Proofs.Functions.AsyncSwapBest
 open FormalAst Refinement AsyncSwap.Swarm.Best
 
 /-!

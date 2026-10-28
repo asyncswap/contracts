@@ -1,5 +1,5 @@
 import Specs.AsyncSwap
-import Proofs.Swarm.AsyncSwapTryRecover
+import Proofs.Functions.AsyncSwapTryRecover
 open FormalAst
 
 /-!

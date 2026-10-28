@@ -246,8 +246,9 @@ normal ERC-20 asset.
 See also [`price-key-crossing.md`](price-key-crossing.md) for how truncated price keys decide
 whether two orders cross, and [mainnet readiness](../MAINNET_READINESS.md) for the release gate.
 
-Signed repricing and cancellation typed data include `uint64 createdSequence` after `orderId`. Read it through
-`orderCreatedSequence(poolId, orderId)` when signing. This binds each signature to the current
-incarnation; replacing an identically identified order does not revive its old signatures.
-Same-block repricing remains allowed. Repricing signatures made without this field must be signed again.
+Signed cancellation typed data includes `uint64 createdSequence` after `orderId`; read it through
+`orderCreatedSequence(poolId, orderId)`. Signed repricing instead includes `uint64 sequence`, the order's
+current queue sequence (from `orderBookOrder`), which every reprice moves on: an unrelayed reprice
+signature cannot undo a later reprice, and replacing an identically identified order does not revive
+old signatures of either kind. Repricing signatures made with `createdSequence` must be signed again.
 `invalidateNonce` revokes the shared grant, reprice, and cancel nonce space.

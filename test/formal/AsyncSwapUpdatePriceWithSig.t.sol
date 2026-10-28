@@ -32,9 +32,8 @@ contract AsyncSwapUpdatePriceWithSigFormalTest is HookUnlockBase {
     }
 
     function _sig(AsyncOrder memory o, uint256 storedIn, U memory u, uint256 pk) internal view returns (bytes memory) {
-        bytes32 sh = OrderSignatures.hashUpdatePrice(
-            o, _idOf(o), storedIn, u.n, hook.orderCreatedSequence(poolId, _idOf(o)), u.nonce, u.deadline
-        );
+        (,,,,, uint64 sequence,) = hook.orderBookOrder(poolId, _idOf(o));
+        bytes32 sh = OrderSignatures.hashUpdatePrice(o, _idOf(o), storedIn, u.n, sequence, u.nonce, u.deadline);
         (uint8 v, bytes32 r, bytes32 s) =
             vm.sign(pk, keccak256(abi.encodePacked("\x19\x01", hook.DOMAIN_SEPARATOR(), sh)));
         return abi.encodePacked(r, s, v);
@@ -79,7 +78,7 @@ contract AsyncSwapUpdatePriceWithSigFormalTest is HookUnlockBase {
         }
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapUpdatePriceWithSig.lean:79 — _verify over hashUpdatePrice(order, id, stored amountIn, n, nonce, deadline), then ZeroAmount, then OrderNotFound, then the reprice; no NotOrderOwner guard.
+    /// @notice formal/Refinement/Swarm/AsyncSwapUpdatePriceWithSig.lean:79 — _verify over hashUpdatePrice(order, id, stored amountIn, n, nonce, deadline), then ZeroAmount, then OrderNotFound, then the reprice; no NotOrderOwner guard. (semantics changed: the hash binds the order's current sequence, not createdSequence; Lean statement needs updating)
     function testFuzz_updatePriceWithSig_run(bool zero, bool exists, uint256 n, uint256 nonce, uint256 d) public {
         AsyncOrder memory o = _order();
         if (!exists) o.salt = bytes32(uint256(o.salt) ^ 4);

@@ -622,7 +622,7 @@ contract AsyncSwap is BaseHook, EIP712 {
         _verify(
             order.owner,
             OrderSignatures.hashUpdatePrice(
-                order, id, amountIn, newAmountOutMin, asyncOrders[poolId].orders[id].createdSequence, nonce, deadline
+                order, id, amountIn, newAmountOutMin, asyncOrders[poolId].orders[id].sequence, nonce, deadline
             ),
             nonce,
             deadline,
@@ -640,11 +640,14 @@ contract AsyncSwap is BaseHook, EIP712 {
         _useNonce(msg.sender, nonce);
     }
 
-    /// @notice Burns `maker`'s nonce for a signature the calling executor verified itself (the
-    ///         Router's `cancelWithSig`). Every maker signature shares this one nonce space, so
-    ///         `invalidateNonce` revokes those signatures too.
+    /// @notice Burns `maker`'s nonce for a signature the Router verified itself (`cancelWithSig`).
+    ///         Every maker signature shares this one nonce space, so `invalidateNonce` revokes those
+    ///         signatures too, and only the trusted Router may burn one: any other executor could
+    ///         void the maker's signed actions on every pool.
     function useNonce(PoolId poolId, address maker, uint256 nonce) external {
-        if (!asyncOrders[poolId].isExecutor[maker][msg.sender]) revert AsyncFiller.NotAuthorizedExecutor();
+        if (msg.sender != router || !asyncOrders[poolId].isExecutor[maker][msg.sender]) {
+            revert AsyncFiller.NotAuthorizedExecutor();
+        }
         _useNonce(maker, nonce);
     }
 

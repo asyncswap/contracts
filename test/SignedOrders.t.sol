@@ -229,9 +229,9 @@ contract SignedOrdersTest is SetupHook {
         view
         returns (bytes memory)
     {
-        bytes32 structHash = OrderSignatures.hashUpdatePrice(
-            order, _id(order), AMOUNT_IN, newOut, hook.orderCreatedSequence(poolId, _id(order)), nonce, deadline
-        );
+        (,,,,, uint64 sequence,) = hook.orderBookOrder(poolId, _id(order));
+        bytes32 structHash =
+            OrderSignatures.hashUpdatePrice(order, _id(order), AMOUNT_IN, newOut, sequence, nonce, deadline);
         return _sign(_digest(hook.DOMAIN_SEPARATOR(), structHash));
     }
 
@@ -250,6 +250,22 @@ contract SignedOrdersTest is SetupHook {
         vm.prank(relayer);
         vm.expectRevert(AsyncSwap.NonceAlreadyUsed.selector);
         hook.updatePriceWithSig(order, 0.99 ether, 7, deadline, sig);
+    }
+
+    /// PoC: a reprice the maker signed but never relayed must not undo a later direct reprice. Here the
+    /// maker signs a lower minimum, then raises it directly; the stale signature would lower it again.
+    function test_updatePriceWithSig_rejectsSignatureAfterDirectReprice() public {
+        AsyncOrder memory order = _createSigned();
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes memory stale = _updateSig(order, 0.9 ether, 41, deadline);
+        vm.prank(maker);
+        hook.updatePrice(order, 1.1 ether);
+
+        vm.prank(relayer);
+        vm.expectRevert(AsyncSwap.InvalidSignature.selector);
+        hook.updatePriceWithSig(order, 0.9 ether, 41, deadline, stale);
+        (, uint256 minimum) = hook.asyncOrderInfo(poolId, _id(order));
+        assertEq(minimum, 1.1 ether, "the maker's direct reprice stands");
     }
 
     function test_updatePriceWithSig_rejectsUnusedSignatureOnReplacement() public {

@@ -1,0 +1,1552 @@
+{
+  "auditor": "Formal Mind",
+  "findings": [],
+  "kind": "internal",
+  "properties": [
+    {
+      "description": "- `AsyncSwap.setDefaultMinOrder minimum`, run in environment `r` on world `s`, has exactly this result: it equals `.ok ((), ext.set s {ext.get s with defaultMinOrder := minimum})` when `r.sender` equals the stored `owner`, and `.error NotOwner` otherwise (`setDefaultMinOrder_run`).\n- It reverts with `NotOwner` whenever the caller is not `owner` (`setDefaultMinOrder_reverts_of_not_owner`).\n- It succeeds if and only if the caller is `owner`. On success it returns `()`, and the post-state is the pre-state with only the single write `defaultMinOrder := minimum` (`setDefaultMinOrder_ok_of_owner`, `setDefaultMinOrder_ok_iff`).\n- On success, given lawful storage access, the contract state read back equals the previous state with `defaultMinOrder` replaced by `minimum`. In particular, `owner` and every other field keep their values (`setDefaultMinOrder_frame`).\n\n**Assumptions.** `setDefaultMinOrder_frame` assumes lawful storage access: `ext.get (ext.set w st) = st` for all `w` and `st`. The other theorems assume nothing.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapSetDefaultMinOrder.lean",
+        "lean-toolchain",
+        "lakefile.toml",
+        "validation/lean/Refinement/FillCap.lean",
+        "validation/lean/Refinement/ClaimBatch.lean"
+      ],
+      "id": "P-04",
+      "locations": [
+        {
+          "file": "src/AsyncSwap.sol",
+          "line": 253
+        }
+      ],
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.setDefaultMinOrder_run"
+        },
+        {
+          "name": "AsyncSwap.setDefaultMinOrder_reverts_of_not_owner"
+        },
+        {
+          "name": "AsyncSwap.setDefaultMinOrder_ok_of_owner"
+        },
+        {
+          "name": "AsyncSwap.setDefaultMinOrder_ok_iff"
+        },
+        {
+          "name": "AsyncSwap.setDefaultMinOrder_frame"
+        }
+      ],
+      "title": "AsyncSwap.setDefaultMinOrder"
+    },
+    {
+      "description": "Let `id = keccak256(abi.encode(currency0, currency1, fee, tickSpacing, hooks))` be the pool id `PoolIdLibrary.toId(key)` computes.\n- `AsyncSwap.setMinOrder(key, minimum)` reverts with `NotOwner` if and only if `msg.sender ≠ owner` (`setMinOrder_run`, `setMinOrder_reverts_of_not_owner`, `setMinOrder_ok_iff`).\n- When called by `owner` it succeeds, returns nothing, and its only effect on storage is `priceBooks[id].minOrder := minimum` (`setMinOrder_run`, `setMinOrder_ok_of_owner`, `setMinOrder_ok_iff`).\n- After a successful call, the book of pool `id` has `minOrder = minimum` and all its other fields unchanged; every other pool's book is unchanged, and so is `owner` (`setMinOrder_frame`).\n\n**Assumptions.** For `setMinOrder_frame` only: the storage accessor `Ext` is lawful (`ext.get (ext.set w st) = st`). The pool id hash is modelled by the model's `ext.keccak` over the PoolKey fields. The `MinOrderSet` event is not modelled, so nothing is proved about it.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapSetMinOrder.lean"
+      ],
+      "id": "P-10",
+      "locations": [
+        {
+          "file": "src/AsyncSwap.sol",
+          "line": 248
+        }
+      ],
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.setMinOrder_run"
+        },
+        {
+          "name": "AsyncSwap.setMinOrder_reverts_of_not_owner"
+        },
+        {
+          "name": "AsyncSwap.setMinOrder_ok_of_owner"
+        },
+        {
+          "name": "AsyncSwap.setMinOrder_ok_iff"
+        },
+        {
+          "name": "AsyncSwap.setMinOrder_frame"
+        }
+      ],
+      "title": "AsyncSwap.setMinOrder"
+    },
+    {
+      "description": "For any world `w`, environment `env` and arguments, with `σ₀ = ext.get w` the TokenClaims storage:\n- **`redeem_reentrant`**: if `σ₀._redeeming` is set, `TokenClaims.redeem` reverts with `ReentrantRedemption`.\n- **`redeem_invalid`**: if `_redeeming` is clear and `recipient = 0` or `amount = 0`, `TokenClaims.redeem` reverts with `InvalidRedemption` before making any external call.\n- **`redeem_guard_reverts`**: so `TokenClaims.redeem` reverts whenever `_redeeming ∨ recipient = 0 ∨ amount = 0` holds.\n- **`redeem_call`**: if `_redeeming` is clear, `recipient ≠ 0` and `amount ≠ 0`, `TokenClaims.redeem` first writes `_redeeming := true`. It then calls `IPoolManager(poolManager).unlock` with exactly `abi.encode(msg.sender, currency, recipient, amount)`, in the world where that flag is set. If the call reverts, `redeem` reverts with the same error. If the call succeeds and returns world `w₂`, the final world is `w₂` with only `_redeeming` reset to `false`. The function writes no other storage of its own and returns unit.\n\n**Assumptions.** `poolManager.unlock` is modelled as the opaque `ext.call_IPoolManager_unlock`: an arbitrary computation that may re-enter and change the world. The theorems quantify over all of its behaviours, so they hold whatever it does.",
+      "files": [
+        "validation/lean/Refinement/Swarm/TokenClaimsRedeem.lean"
+      ],
+      "id": "P-18",
+      "locations": [
+        {
+          "file": "src/TokenClaims.sol",
+          "line": 30
+        }
+      ],
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "TokenClaims.Swarm.Redeem.redeem_reentrant"
+        },
+        {
+          "name": "TokenClaims.Swarm.Redeem.redeem_invalid"
+        },
+        {
+          "name": "TokenClaims.Swarm.Redeem.redeem_call"
+        },
+        {
+          "name": "TokenClaims.Swarm.Redeem.redeem_guard_reverts"
+        }
+      ],
+      "title": "TokenClaims.redeem"
+    },
+    {
+      "description": "For `TokenClaims.unlockCallback(data)`, with `pm = poolManager` and calldata words `owner = data[0:32]`, `currency = data[32:64]`, `recipient = data[64:96]`, `amount = data[96:128]`:\n- **Guard** (`unlockCallback_onlyPoolManager`): when `msg.sender ≠ pm` it reverts `OnlyPoolManager`, before any decode or external call.\n- **Decode** (`unlockCallback_short`, `unlockCallback_badAddress`): from `pm`, it reverts `abi.decode` if the calldata is shorter than 128 bytes, or if `owner`, `currency` or `recipient` does not fit in 160 bits.\n- **Success and footprint** (`unlockCallback_success`): from `pm` with well-formed calldata, the result is exactly `poolManager.burn(owner, currency, amount)` run in the caller's world (`currency.toId()` is the identity), then `poolManager.take(currency, recipient, amount)` run in the world `burn` returned. It returns empty bytes in the world `take` returned. A revert from either call propagates unchanged. Burn runs strictly before take, and the function writes no storage of its own.\n- **Revert summary** (`unlockCallback_reverts_iff_guards`): it reverts before either external call whenever any of these guard conditions holds.\n\n**Assumptions.** `IPoolManager.burn` and `IPoolManager.take` are opaque calls (`Ext` fields) that may re-enter and change the world arbitrarily. The theorems state the result in terms of whatever those calls return. The `ClaimsRedeemed` event is not modelled.",
+      "files": [
+        "validation/lean/Refinement/Swarm/TokenClaimsUnlockCallback.lean"
+      ],
+      "id": "P-21",
+      "locations": [
+        {
+          "file": "src/TokenClaims.sol",
+          "line": 35
+        }
+      ],
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "TokenClaims.Swarm.UnlockCallback.unlockCallback_onlyPoolManager"
+        },
+        {
+          "name": "TokenClaims.Swarm.UnlockCallback.unlockCallback_short"
+        },
+        {
+          "name": "TokenClaims.Swarm.UnlockCallback.unlockCallback_badAddress"
+        },
+        {
+          "name": "TokenClaims.Swarm.UnlockCallback.unlockCallback_success"
+        },
+        {
+          "name": "TokenClaims.Swarm.UnlockCallback.unlockCallback_reverts_iff_guards"
+        }
+      ],
+      "title": "TokenClaims.unlockCallback"
+    },
+    {
+      "description": "`AsyncSwap.receive` (src/AsyncSwap.sol:636; generated def `AsyncSwap.AsyncSwap.«_1968»`, listed in the plan as `«_1914»`) is total and touches only the transient pending-native-deposit slot:\n- `receive_run`: for every environment and state it returns `()` with post-state `ext.set s {ext.get s with transient := upd T P ((T P + msg.value) mod 2^256)}`, where `P = PENDING_NATIVE_DEPOSIT_SLOT`.\n- `receive_never_reverts`: it never reverts, for any caller, value or state.\n- `receive_frame`: all persistent storage fields are unchanged; only `transient` differs.\n- `receive_pending`: the pending slot becomes `(old + msg.value) mod 2^256`; `receive_pending_exact`: it is exactly `old + msg.value` when that sum is below `2^256`.\n- `receive_other_transient`: every other transient slot is unchanged.\n\n**Assumptions.** The frame and accounting theorems assume a lawful state accessor: `ext.get (ext.set w st) = st`. Yul `add` wraps modulo 2^256, as modeled by `yadd`. \"Never reverts\" holds in the generated model, which does not model gas (an out-of-gas failure at the EVM level is outside its scope).",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapReceive.lean"
+      ],
+      "id": "P-44",
+      "locations": [
+        {
+          "file": "src/AsyncSwap.sol",
+          "line": 608
+        }
+      ],
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.receive_run"
+        },
+        {
+          "name": "AsyncSwap.receive_never_reverts"
+        },
+        {
+          "name": "AsyncSwap.receive_frame"
+        },
+        {
+          "name": "AsyncSwap.receive_pending"
+        },
+        {
+          "name": "AsyncSwap.receive_pending_exact"
+        },
+        {
+          "name": "AsyncSwap.receive_other_transient"
+        }
+      ],
+      "title": "AsyncSwap.«_1914»"
+    },
+    {
+      "description": "`AsyncFiller.setMinOrder(book, poolId, minimum)` has no guard of its own and makes no external call:\n- `filler_setMinOrder_run`: for any book getter `book_get` and setter `book_set`, environment `r` and world `s`, the call equals `match book_get r s with | ok (b, s₁) => book_set {b with minOrder := minimum} r s₁ | error e => error e`. It reverts exactly when the read or the write reverts. Its only write is the book with `minOrder := minimum`, all other fields of the book are unchanged, and it returns `()`.\n- `filler_setMinOrder_of_read`: when the getter only reads (`book_get r s = ok (b, s)`), the call is exactly the single write `book_set {b with minOrder := minimum} r s`.\n- `filler_setMinOrder_ok`: when the read and the write succeed, the call succeeds with the setter's final world.\n- `filler_setMinOrder_poolId_irrelevant`: the result does not depend on `poolId`, which is used only in the `MinOrderSet` event.\n- For the external caller `AsyncSwap.setMinOrder`, the same file proves (`setMinOrder_run`, `setMinOrder_frame`) that it reverts with `NotOwner` unless `msg.sender = owner`, and otherwise writes only `priceBooks[toId(key)].minOrder := minimum`.\n\n**Assumptions.** The getter and setter are arbitrary programs in the model's monad. `setMinOrder_frame` also assumes the storage accessor is lawful (`ext.get (ext.set w st) = st`). Events are not modelled.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapSetMinOrder.lean"
+      ],
+      "id": "P-58",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.filler_setMinOrder_run"
+        },
+        {
+          "name": "AsyncSwap.filler_setMinOrder_of_read"
+        },
+        {
+          "name": "AsyncSwap.filler_setMinOrder_ok"
+        },
+        {
+          "name": "AsyncSwap.filler_setMinOrder_poolId_irrelevant"
+        },
+        {
+          "name": "AsyncSwap.setMinOrder_run"
+        },
+        {
+          "name": "AsyncSwap.setMinOrder_frame"
+        }
+      ],
+      "title": "AsyncFiller.setMinOrder"
+    },
+    {
+      "description": "`AsyncMatching.setMinOrder(book, poolId, minimum)` has no guard of its own and makes no external calls. It forwards to the internal `AsyncFiller.setMinOrder` and equals it as a state transition.\n- `matching_setMinOrder_run`: run in environment `r` on world `s`, it first reads the book through `book_get`. If the read reverts with `e`, the call reverts with `e`. Otherwise, with the book `b` read and the world `s₁` after the read, the call is exactly `book_set {b with minOrder := minimum} r s₁`: a single write of the book with only `minOrder` replaced. It reverts exactly when that write reverts, and returns `()`.\n- `matching_setMinOrder_eq_filler`: it equals `AsyncFiller.setMinOrder` with the same arguments.\n- `matching_setMinOrder_of_read`: if the getter only reads (`book_get r s = ok (b, s)`), the call is exactly the write `book_set {b with minOrder := minimum}`.\n- `matching_setMinOrder_get_error`: a revert in the read propagates unchanged.\n- `matching_setMinOrder_ok`: when the read and the write both succeed, it returns `()` in the setter's post-world.\n- `matching_setMinOrder_poolId_irrelevant`: the result does not depend on `poolId`, which is used only in the `MinOrderSet` event.\n\n**Assumptions.** The storage reference `priceBooks[id]` is modelled by the abstract getter/setter pair `book_get`/`book_set`, and the theorems hold for any such pair. Events are not modelled.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapSetMinOrder.lean"
+      ],
+      "id": "P-59",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.matching_setMinOrder_run"
+        },
+        {
+          "name": "AsyncSwap.matching_setMinOrder_eq_filler"
+        },
+        {
+          "name": "AsyncSwap.matching_setMinOrder_of_read"
+        },
+        {
+          "name": "AsyncSwap.matching_setMinOrder_get_error"
+        },
+        {
+          "name": "AsyncSwap.matching_setMinOrder_ok"
+        },
+        {
+          "name": "AsyncSwap.matching_setMinOrder_poolId_irrelevant"
+        }
+      ],
+      "title": "AsyncMatching.setMinOrder"
+    },
+    {
+      "description": "`EligiblePrice._repair(cursor, isBuy, forceFirst)` has no guard of its own. It reaches storage only through the accessors it is given: `tree_get` and `bounds_get` read, `bounds_set` writes, and its result does not depend on `tree_set`. The only revert it raises itself is the model's loop bound `\"loop bound\"`. Below, `Good Q P x` means: started in a state satisfying `Q`, `x` either succeeds in a `Q`-state or fails with an error satisfying `P`.\n\n- `repair_good`: take any state predicate `Q` and error predicate `P`. If `tree_get`, `bounds_get`, every `bounds_set f` and every comparison `le a b` satisfy `Good Q P`, and `P ⟨\"loop bound\"⟩` holds, then `EligiblePrice.«_repair»` satisfies `Good Q P` for every `cursor`, `isBuy` and `forceFirst`.\n- `repair_reverts_only_loop_bound`: if the accessors and the comparison never revert, every revert of `EligiblePrice.«_repair»` is `\"loop bound\"`.\n- `repair_frame`: if `tree_get`, `bounds_get` and `le` leave the world unchanged and every `bounds_set f` leaves a given view of the world unchanged, then a successful call leaves that view unchanged. Storage outside what `bounds_set` writes, including the tree, is never modified.\n- `repair_tree_set_irrelevant`: `EligiblePrice.«_repair»` is definitionally independent of its `tree_set` argument.\n- `repair_cursor_zero`: with `cursor = 0` (the root sentinel), the call returns `()` with the world unchanged, for any accessors.\n\n**Assumptions.** The accessors (`tree_get`, `bounds_get`, `bounds_set`) and the opaque comparison `EligiblePrice.le` (`ext.fn_EligiblePrice_le_12553`) are arbitrary. Each theorem states the hypotheses it needs about them:\n- `repair_good` needs them to preserve `Q` and to fail only with `P`-errors.\n- `repair_reverts_only_loop_bound` needs them never to revert.\n- `repair_frame` needs `tree_get`, `bounds_get` and `le` to leave the world unchanged, and `bounds_set` to leave the chosen view unchanged.\n\nLoops are bounded by the model's `loopBound = 2^64` iterations; reaching the bound reverts with \"loop bound\".",
+      "files": [
+        "validation/lean/Refinement/Swarm/Scratch_Repair.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapRepair.lean"
+      ],
+      "id": "P-68",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.Repair.repair_good"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Repair.repair_reverts_only_loop_bound"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Repair.repair_frame"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Repair.repair_tree_set_irrelevant"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Repair.repair_cursor_zero"
+        }
+      ],
+      "title": "EligiblePrice.«_repair»"
+    },
+    {
+      "description": "`EligiblePrice.remove(rank, isBuy)` has no guard of its own. It reads `leaves[rank]` and that leaf's parent and grandparent, removes the level from the radix tree, and repairs the cached bounds from the grandparent upward.\n- `remove_good`: suppose the tree/bounds accessors and `EligiblePrice.le` preserve a state invariant `Q` and revert only with errors accepted by `P`, and `P` accepts `PriceLevelMissing` and `\"loop bound\"`. Then `EligiblePrice.remove` preserves `Q` and reverts only with errors accepted by `P`.\n- `remove_reverts_only`: when the accessors and `le` never revert, `EligiblePrice.remove` reverts only with `PriceLevelMissing` (from `RadixPriceTree.remove`) or `\"loop bound\"` (from `_repair`'s bounded walk).\n- `remove_reverts_missing`: when the tree read returns a tree `T` with `T.leaves rank = 0`, `EligiblePrice.remove` reverts with `PriceLevelMissing`.\n- `remove_frame`: suppose the reads and `le` leave the state unchanged, and every `tree_set` and `bounds_set` leaves a given view of the state unchanged. Then a successful `EligiblePrice.remove` also leaves that view unchanged; its only storage writes go through the tree and bounds setters.\n\n**Assumptions.** The storage accessors (`tree_get`, `tree_set`, `bounds_get`, `bounds_set`) and the comparison `EligiblePrice.le` are black boxes. Each theorem assumes what it needs about them: that they preserve the invariant, that they never revert, or that the reads are pure. The bounds-repair step relies on the proven `AsyncSwap.Swarm.Repair.repair_good`.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapRemove.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapRemove.lean.patch_note"
+      ],
+      "id": "P-69",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.Remove.remove_good"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Remove.remove_reverts_only"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Remove.remove_reverts_missing"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Remove.remove_frame"
+        }
+      ],
+      "title": "EligiblePrice.remove"
+    },
+    {
+      "description": "`AsyncFiller._closeOrder(key, id, hook)` has no guard of its own. It reverts only if the order-book `remove(id)` reverts or the fee transfer reverts.\n- `AsyncSwap.CloseOrder.closeOrder_eq`: the function equals the program that reads `orders[id].priorityFee`, calls the order-book library `remove(id)` and then writes `orders[id] := default`, with no other state field changed by this write. If the fee read *before* the deletion is 0, it then returns. Otherwise it makes exactly one `IERC6909Claims.transfer(poolManager, feeVault, numeraire, priorityFee)`, reading `poolManager`, `feeVault` and `numeraire` after the deletion. The value of the `orders[id].owner` read is unused.\n- `AsyncSwap.CloseOrder.closeOrder_run`: when the state accessor reads `view s` without changing the state and writes `put x s` without failing, a run from state `s` behaves as follows.\n  - It reverts with `e` exactly when `remove(id)` reverts with `e`.\n  - Otherwise, let `s₁` be the state after `remove` and `s₂` be `s₁` with `orders[id]` set to `default`. The run succeeds with `s₂` when `orders[id].priorityFee` in the initial state `s` is 0.\n  - In every other case its result is that of `transfer((view s₂).poolManager, (view s₂).feeVault, (view s₂).numeraire, fee)` run in `s₂`: it reverts exactly when the transfer reverts, and otherwise ends in the transfer's final state.\n\nThe forfeited amount is the fee from before the deletion, and the transfer is made exactly when that fee is nonzero. Emission of the `PriorityFeeForfeited` event is not modelled.\n\n**Assumptions.** The order-book library call `fn_AsyncFiller_remove_6712` and `IERC6909Claims.transfer` are opaque, and the theorems hold for every possible outcome of each. For `closeOrder_run` only: `self_get` returns `view s` without changing the state, and `self_set x` produces `put x s` without failing. `closeOrder_eq` needs no assumptions. The `PriorityFeeForfeited` event is not in the generated model.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapCloseOrder.lean"
+      ],
+      "id": "P-80",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.CloseOrder.closeOrder_eq"
+        },
+        {
+          "name": "AsyncSwap.CloseOrder.closeOrder_run"
+        }
+      ],
+      "title": "AsyncFiller.«_closeOrder»"
+    },
+    {
+      "description": "`AsyncFiller.exactPrice` has no guard of its own, writes no storage and makes no external call:\n- **exactPrice_of_read**: when the order's storage read returns `o` and leaves the state unchanged, the call succeeds, leaves the state unchanged and returns the order's limit price as a ratio (`ratioOf o`).\n- **exactPrice_buy**: for a buy order (`isBuy = true`), the returned ratio is `amountIn / amountOutMin` (numerator `amountIn`, denominator `amountOutMin`).\n- **exactPrice_sell**: for a sell order (`isBuy = false`), the returned ratio is `amountOutMin / amountIn`.\n- **exactPrice_error**: when the storage read reverts, the call reverts with the same error. Together with exactPrice_of_read, this means the function never reverts by itself.\n- **exactPrice_order_set_irrelevant**: the result does not depend on the order's storage writer `order_set`, so the function never writes the order.\n\n**Assumptions.** The storage accessor `order_get` is abstract. The success theorems assume that, in the given environment and state, it returns the order `o` without changing state, as a Solidity storage read does.",
+      "files": [
+        "Refinement/Swarm/AsyncSwapExactPrice.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapExactPrice.lean"
+      ],
+      "id": "P-85",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.ExactPrice.exactPrice_of_read"
+        },
+        {
+          "name": "AsyncSwap.Swarm.ExactPrice.exactPrice_buy"
+        },
+        {
+          "name": "AsyncSwap.Swarm.ExactPrice.exactPrice_sell"
+        },
+        {
+          "name": "AsyncSwap.Swarm.ExactPrice.exactPrice_error"
+        },
+        {
+          "name": "AsyncSwap.Swarm.ExactPrice.exactPrice_order_set_irrelevant"
+        }
+      ],
+      "title": "AsyncFiller.exactPrice"
+    },
+    {
+      "description": "`EligiblePrice._eligible(bound, limit, isBuy)` is, as a program, exactly the oriented price comparison: it equals `le(limit, bound)` when `isBuy` and `le(bound, limit)` otherwise (`eligible_eq`). Consequently:\n- it has no guard of its own: it reverts with `e` exactly when that comparison reverts with `e` (`eligible_reverts_iff`), and never reverts when the comparison never reverts (`eligible_never_reverts`);\n- its storage footprint is empty: when the comparison is a pure view returning `leF a b` with the state unchanged, `_eligible` returns `leF limit bound` for buys and `leF bound limit` for sells and leaves the state unchanged (`eligible_ok`).\n\n**Assumptions.** `EligiblePrice.le` is opaque in the model (`ext.fn_EligiblePrice_le_12553`). `eligible_eq` and `eligible_reverts_iff` hold for any implementation of it. `eligible_ok` assumes it never reverts and leaves the state unchanged, and `eligible_never_reverts` assumes it never reverts.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapEligible.lean"
+      ],
+      "id": "P-86",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.Eligible.eligible_eq"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Eligible.eligible_reverts_iff"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Eligible.eligible_ok"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Eligible.eligible_never_reverts"
+        }
+      ],
+      "title": "EligiblePrice.«_eligible»"
+    },
+    {
+      "description": "`EligiblePrice.best(limit, isBuy)` has no `require` of its own. It reads storage only through the tree and bounds accessors and never calls their setters, so it writes nothing.\n\n- `best_good`: if the tree read, the bounds read and the comparison `EligiblePrice.le` preserve a state predicate `Q` and fail only with errors in `P`, and `P` admits `\"loop bound\"`, then `EligiblePrice.best` preserves `Q` and fails only with errors in `P`.\n- `best_reverts_only_loop_bound`: when the reads and the comparison never revert, `EligiblePrice.best` reverts only with the model's loop-bound error `\"loop bound\"`.\n- `best_frame`: when the reads and the comparison are read-only, every successful call leaves the state unchanged.\n- `best_setters_irrelevant`: the function is independent of `tree_set` and `bounds_set`.\n- `best_empty`: if the tree's root is the sentinel `0`, it returns `(false, 0)` and leaves the state unchanged.\n- `best_root_ineligible`: if the root is nonzero but its bound is not eligible (`le(limit, bound)` is false for a buy, `le(bound, limit)` is false for a sell), it returns `(false, 0)` and leaves the state unchanged.\n- `best_result`: every successful run leaves the state unchanged. It returns `(false, 0)` only when the tree is empty or the root's bound is ineligible. It returns `(true, p)` only when the root is nonzero with an eligible bound, and then `p` is the `price` of some tree node whose `leaf` flag is set. That node need not be the best eligible price.\n\n**Assumptions.** `best_empty`, `best_root_ineligible` and `best_result` assume read-only views that never revert: the tree read returns a fixed tree `t`, the bounds read returns a fixed bounds map `b`, and `EligiblePrice.le` behaves as a pure comparison `leF` (in the Solidity, `le` is pure and the accessors are storage reads). `best_good`, `best_reverts_only_loop_bound` and `best_frame` take only the hypotheses they state on the reads and on `le`. `\"loop bound\"` is the model's 2^64-iteration bound on the descent loop.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapBest.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapBest.tail"
+      ],
+      "id": "P-87",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.Best.best_good"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Best.best_reverts_only_loop_bound"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Best.best_frame"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Best.best_setters_irrelevant"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Best.best_empty"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Best.best_root_ineligible"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Best.best_result"
+        }
+      ],
+      "title": "EligiblePrice.best"
+    },
+    {
+      "description": "`AsyncMatching._bookPair` has no guard of its own. It never calls the order setter, and it reverts only through its callees. It returns either `(0, 0)` or the pair of ids that `bestAtPrice` picks at the best bid and best ask prices.\n\n- **Reverts and frame** (`bookPair_good`): suppose the reads `book_get` and `self_get` and the two opaque helpers behind `bestAtPrice` (`mostPermissiveAtPrice`, `eligibleAtPrice`) each preserve a state predicate `Q` and fail only with errors in a class `P`, and that `P` contains `\"loop bound\"`, `panic 0x12` and `MathOverflowedMulDiv`. Then `_bookPair` preserves `Q` and fails only with errors in `P`.\n- **Revert reasons** (`bookPair_reverts`): if the reads and the helpers never revert, `_bookPair` reverts only with `\"loop bound\"` (the radix-tree descent), `panic 0x12` (the `mulDiv` in `_crosses` dividing by zero) or `MathOverflowedMulDiv`.\n- **No order writes** (`bookPair_self_set_irrelevant`): `_bookPair` is the same function for every `self_set`. It never writes `orders`; any storage change comes from what its callees do with `book_set`.\n- **No pair** (`bookPair_no_pair`): if the bid side is empty, the ask side is empty, or `bidPrice < askPrice`, the result is `(0, 0)` in the state the two `best` reads leave.\n- **Strict cross** (`bookPair_strict`): if both sides are non-empty and `askPrice < bidPrice`, the result is `(bidId, askId)`, the ids `bestAtPrice` returns at the two prices. No order is read.\n- **Equal prices** (`bookPair_equal`): if both best prices equal `p`, `self_get` is a read-only view of a fixed state, the ask's `amountOutMin ≠ 0` and `bid.amountIn·ask.amountIn < 2^256`, then the result is `(bidId, askId)` when `⌊bid.amountIn·ask.amountIn / ask.amountOutMin⌋ ≥ bid.amountOutMin`, and `(0, 0)` otherwise.\n- **Equal prices, zero ask minimum** (`bookPair_equal_div_zero`): under the same conditions but with the ask's `amountOutMin = 0`, `_bookPair` reverts with `panic 0x12`.\n\n**Assumptions.** The two opaque `Ext` helpers behind `bestAtPrice` (`mostPermissiveAtPrice` and `eligibleAtPrice`) are treated as black boxes:\n- Part A assumes they preserve the chosen state predicate and fail only with the chosen errors.\n- Part B takes their runs (and the runs of the two `RadixPriceTree.best` reads) as hypotheses `= .ok (…)`.\n\nThe equal-price theorems assume `self_get` is a read-only view returning a fixed `State_`. `bookPair_reverts` assumes the reads and the helpers never revert.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapBookPair.lean"
+      ],
+      "id": "P-88",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.BookPair.bookPair_good"
+        },
+        {
+          "name": "AsyncSwap.Swarm.BookPair.bookPair_reverts"
+        },
+        {
+          "name": "AsyncSwap.Swarm.BookPair.bookPair_self_set_irrelevant"
+        },
+        {
+          "name": "AsyncSwap.Swarm.BookPair.bookPair_no_pair"
+        },
+        {
+          "name": "AsyncSwap.Swarm.BookPair.bookPair_strict"
+        },
+        {
+          "name": "AsyncSwap.Swarm.BookPair.bookPair_equal"
+        },
+        {
+          "name": "AsyncSwap.Swarm.BookPair.bookPair_equal_div_zero"
+        }
+      ],
+      "title": "AsyncMatching.«_bookPair»"
+    },
+    {
+      "description": "`AsyncMatching._payouts(key, buyId, sellId)` is a read over the order map with no guard, no external call and no storage write:\n- **Exact outcome** (`payouts_run`): when the order-map read at `(r, s)` returns `st` and leaves the state unchanged, `_payouts` succeeds with the state unchanged. It returns `sellOwner = orders[sellId].owner`, `buyOwner = orders[buyId].owner`, `sellInput = orders[sellId].zeroForOne ? key.currency0 : key.currency1`, `buyInput = orders[buyId].zeroForOne ? key.currency0 : key.currency1`, and `sellRefund = buyRefund = 0`.\n- **Reverts** (`payouts_error`, `payouts_no_revert`): if the order-map read reverts with `e`, `_payouts` reverts with that same `e`. When the read is pure, `_payouts` never reverts, so it has no revert condition of its own.\n- **Footprint** (`payouts_self_set_irrelevant`): `_payouts` is the same function whichever order-map setter `self_set` it is given, so it writes no storage.\n\n**Assumptions.** `payouts_run` and `payouts_no_revert` take the storage accessor `self_get` to be a pure read at the given environment and state (`self_get r s = .ok (st, s)`). `payouts_error` assumes only that the read reverts. `payouts_self_set_irrelevant` assumes nothing.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapPayouts.lean"
+      ],
+      "id": "P-91",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.Payouts.payouts_run"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Payouts.payouts_error"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Payouts.payouts_no_revert"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Payouts.payouts_self_set_irrelevant"
+        }
+      ],
+      "title": "AsyncMatching.«_payouts»"
+    },
+    {
+      "description": "`EligiblePrice.refresh(rank, price, isBuy)` has no guard of its own. It reaches storage only through the tree and bounds accessors, never calls the tree setter, and returns `()`.\n\n- **`refresh_eq`**: when `tree_get` is a pure read of `T` and `bounds_get` initially reads `B`, `EligiblePrice.refresh` is exactly the write `bounds_set (upd B leaf price)` with `leaf = T.leaves rank`, followed by `_repair((T.nodes leaf).parent, isBuy, forceFirst = true)` in the resulting state.\n- **`refresh_good`**: for any state predicate `Q` and error predicate `P`, suppose the tree and bounds reads, every bounds write and every `le` comparison preserve `Q` and fail only with `P`-errors, and `P` accepts `\"loop bound\"`. Then `EligiblePrice.refresh` preserves `Q` and fails only with `P`-errors.\n- **`refresh_reverts_only_loop_bound`**: when the accessors and `le` never revert, the only revert `EligiblePrice.refresh` can produce is the model's `\"loop bound\"` gas bound. No existence check on `rank` runs, even when `leaves[rank] == 0`.\n- **`refresh_frame`**: when the reads and `le` leave the state unchanged and every `bounds_set` leaves a view unchanged, a successful `EligiblePrice.refresh` leaves that view unchanged. So outside the eligible-price bounds map it writes nothing.\n- **`refresh_tree_set_irrelevant`**: `EligiblePrice.refresh` is definitionally independent of the tree setter, so it never writes the radix tree.\n\n**Assumptions.** The storage accessors (`tree_get`, `bounds_get`, `bounds_set`) and the `le` comparison are abstract parameters of the generated def, and each theorem states its hypotheses about them explicitly: reads are pure or never revert, and writes affect only the bounds view. `_repair`'s behaviour comes from the proved lemma `AsyncSwap.Swarm.Repair.repair_good`. `rank` is not assumed to have a price level.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapRefresh.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapRefresh.lean.tmp"
+      ],
+      "id": "P-94",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.Refresh.refresh_good"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Refresh.refresh_reverts_only_loop_bound"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Refresh.refresh_frame"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Refresh.refresh_tree_set_irrelevant"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Refresh.refresh_eq"
+        }
+      ],
+      "title": "EligiblePrice.refresh"
+    },
+    {
+      "description": "`AsyncFiller.checkMinimum(poolId, isBuy, zeroForOne, amountIn, amountOutMin)` writes no storage. When its storage reads and `StateLibrary.getSlot0` do not revert, its only reverts are `BelowMinimumOrder`, `panic 0x12` and `MathOverflowedMulDiv`. Below, `m = book.minOrder` and `p` is the pool's `sqrtPriceX96`.\n- **Frame** (`checkMinimum_good`): if the book read, the state read and `getSlot0` preserve a state predicate `Q` and revert only with errors in `P`, and `P` contains the three errors above, then `checkMinimum` preserves `Q` and reverts only with errors in `P`.\n- **Revert set** (`checkMinimum_reverts`): if the reads and `getSlot0` never revert, every revert is `BelowMinimumOrder`, `panic 0x12` or `MathOverflowedMulDiv`.\n- **Empty footprint** (`checkMinimum_setters_irrelevant`): the function is identical for any `self_set` and `book_set`, so it never writes storage.\n- **`m = 0`** (`checkMinimum_zero`): it succeeds with no further check.\n- **Buy, `m ≠ 0`** (`checkMinimum_buy`): it reverts `BelowMinimumOrder` iff `amountIn < m`; otherwise it succeeds without reading the pool.\n- **Sell, `m ≠ 0`, `amountOutMin < m`** (`checkMinimum_sell_below`): it reverts `BelowMinimumOrder`.\n- **Sell, zeroForOne** (`checkMinimum_sell_zeroForOne`): with `amountOutMin ≥ m`, `amountIn·p < 2²⁵⁶` and `⌊amountIn·p/2⁹⁶⌋·p < 2²⁵⁶`, it reverts `BelowMinimumOrder` iff `⌊⌊amountIn·p/2⁹⁶⌋·p/2⁹⁶⌋ < m`, and otherwise succeeds in the state `getSlot0` left.\n- **Sell, oneForZero** (`checkMinimum_sell_oneForZero`): with `amountOutMin ≥ m`, `p ≠ 0`, `amountIn·2⁹⁶ < 2²⁵⁶` and `⌊amountIn·2⁹⁶/p⌋·2⁹⁶ < 2²⁵⁶`, it reverts `BelowMinimumOrder` iff `⌊⌊amountIn·2⁹⁶/p⌋·2⁹⁶/p⌋ < m`, and otherwise succeeds.\n- **Sell, oneForZero, `p = 0`** (`checkMinimum_sell_oneForZero_price_zero`): with `amountOutMin ≥ m`, it always reverts: `panic 0x12` when `amountIn·2⁹⁶ < 2²⁵⁶`, `MathOverflowedMulDiv` otherwise.\n\n**Assumptions.** The storage reads `book_get`/`self_get` and `StateLibrary.getSlot0` are taken as parameters. The frame theorems assume they preserve the state predicate and fail only with the allowed errors (for `checkMinimum_reverts`, that they never fail). The exact-outcome theorems assume given successful results of those reads. Both mulDiv-based outcome theorems also assume that the intermediate products fit in 256 bits.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapCheckMinimum.lean"
+      ],
+      "id": "P-116",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.CheckMinimum.checkMinimum_good"
+        },
+        {
+          "name": "AsyncSwap.Swarm.CheckMinimum.checkMinimum_reverts"
+        },
+        {
+          "name": "AsyncSwap.Swarm.CheckMinimum.checkMinimum_setters_irrelevant"
+        },
+        {
+          "name": "AsyncSwap.Swarm.CheckMinimum.checkMinimum_zero"
+        },
+        {
+          "name": "AsyncSwap.Swarm.CheckMinimum.checkMinimum_buy"
+        },
+        {
+          "name": "AsyncSwap.Swarm.CheckMinimum.checkMinimum_sell_below"
+        },
+        {
+          "name": "AsyncSwap.Swarm.CheckMinimum.checkMinimum_sell_zeroForOne"
+        },
+        {
+          "name": "AsyncSwap.Swarm.CheckMinimum.checkMinimum_sell_oneForZero"
+        },
+        {
+          "name": "AsyncSwap.Swarm.CheckMinimum.checkMinimum_sell_oneForZero_price_zero"
+        }
+      ],
+      "title": "AsyncFiller.checkMinimum"
+    },
+    {
+      "description": "`AsyncFiller.minPriorityFee(notional)` computes `Math.mulDiv(notional, PRIORITY_FEE_BPS = 10, 10000)` and returns `min(⌊notional·10/10000⌋, MIN_PRIORITY_FEE = 100000)`: 0.1% of the notional, capped at 100000. It reads and writes no storage.\n- `minPriorityFee_eq`: for every natural-number input it reverts with `MathOverflowedMulDiv` exactly when `10000 ≤ ⌊notional·10/2²⁵⁶⌋`. Otherwise it returns `min(⌊notional·10/10000⌋, 100000)` and leaves the state unchanged.\n- `minPriorityFee_ok`: for every `uint256` notional (`notional < 2²⁵⁶`) it does not revert, returns `min(⌊notional·10/10000⌋, 100000)` and leaves the state unchanged.\n- `minPriorityFee_bounds`: whenever it succeeds, the state is unchanged and the result is at most `MIN_PRIORITY_FEE = 100000` and at most `⌊notional/1000⌋`. So `MIN_PRIORITY_FEE` caps the result rather than setting a lower bound on it.\n\n**Assumptions.** `Math.mulDiv` is modelled by the shared `mulDivFloor` (OpenZeppelin 5.0 semantics: floor; reverts on a zero divisor or when the result overflows 256 bits).",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapMinPriorityFee.lean"
+      ],
+      "id": "P-140",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.MinPriorityFee.minPriorityFee_eq"
+        },
+        {
+          "name": "AsyncSwap.Swarm.MinPriorityFee.minPriorityFee_ok"
+        },
+        {
+          "name": "AsyncSwap.Swarm.MinPriorityFee.minPriorityFee_bounds"
+        }
+      ],
+      "title": "AsyncFiller.minPriorityFee"
+    },
+    {
+      "description": "`Router._requireUnchanged(order, id, amountIn, amountOutMin)` is decided by a single view call `AsyncSwap.asyncOrderInfo(HOOK, p, id)`, where `p = keccak(currency0, currency1, fee, uint256(tickSpacing), hooks)` is the `PoolIdLibrary.toId` hash of `order.key`:\n- `requireUnchanged_run`: in every environment and state, if the view returns `(nowIn, nowOut)`, the function succeeds and returns `()` with storage unchanged when `nowIn = amountIn` and `nowOut = amountOutMin`. Otherwise it reverts with \"Order changed during fill\". If the view reverts, that revert is propagated unchanged.\n- `requireUnchanged_ok_iff`: a run succeeds with final state `s'` exactly when the view returns `(amountIn, amountOutMin)` and `s' = s`.\n- `requireUnchanged_reverts_changed`: if the view returns amounts differing from `(amountIn, amountOutMin)` in either component, the function reverts with \"Order changed during fill\".\n- `requireUnchanged_reverts_view`: a revert of the view call is returned unchanged.\n- `requireUnchanged_frame`: every successful run leaves storage unchanged (empty write footprint).\n\n**Assumptions.** `ext.view_AsyncSwap_asyncOrderInfo` (the hook's view) and `ext.keccak` (the model of the assembly hash in `PoolIdLibrary.toId`) are opaque functions of the environment and state. The view call cannot modify Router storage, as the model's `view` combinator enforces. Gas and call-depth failures are not modelled.",
+      "files": [
+        "Refinement/Swarm/RouterRequireUnchanged.lean",
+        "validation/lean/Refinement/Swarm/RouterRequireUnchanged.lean"
+      ],
+      "id": "P-167",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "Router.Swarm.RequireUnchanged.requireUnchanged_run"
+        },
+        {
+          "name": "Router.Swarm.RequireUnchanged.requireUnchanged_ok_iff"
+        },
+        {
+          "name": "Router.Swarm.RequireUnchanged.requireUnchanged_reverts_changed"
+        },
+        {
+          "name": "Router.Swarm.RequireUnchanged.requireUnchanged_reverts_view"
+        },
+        {
+          "name": "Router.Swarm.RequireUnchanged.requireUnchanged_frame"
+        }
+      ],
+      "title": "Router.«_requireUnchanged»"
+    },
+    {
+      "description": "For any body `k`, environment and world, the `TokenClaims.nonReentrant` modifier satisfies:\n- **Guard** (`nonReentrant_reverts`): if `_redeeming` is `true` on entry, it reverts with `ReentrantRedemption` without running the body.\n- **Footprint and result** (`nonReentrant_run`): if `_redeeming` is `false` on entry, it runs the body in the world with `_redeeming := true` and no other change. If the body reverts, the modifier reverts with the same error. Otherwise it returns the body's value unchanged, and the final world is the one the body returned with `_redeeming` set back to `false`. Apart from the body's own effects, the modifier writes only `_redeeming`.\n- **Success characterization** (`nonReentrant_ok_iff`): the modifier succeeds exactly when `_redeeming` is `false` on entry and the body, run with the lock set, succeeds.\n\n**Assumptions.** The body `k` is arbitrary: the theorems hold for every body, which is treated as an opaque monadic action. The contract's storage is read and written only through the generated `Ext` getter and setter.",
+      "files": [
+        "validation/lean/Refinement/Swarm/TokenClaimsNonReentrant.lean"
+      ],
+      "id": "P-176",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "TokenClaims.Swarm.NonReentrant.nonReentrant_reverts"
+        },
+        {
+          "name": "TokenClaims.Swarm.NonReentrant.nonReentrant_run"
+        },
+        {
+          "name": "TokenClaims.Swarm.NonReentrant.nonReentrant_ok_iff"
+        }
+      ],
+      "title": "TokenClaims.nonReentrant"
+    },
+    {
+      "description": "For `AsyncSwap.useNonce(poolId, maker, nonce)`, write S for the contract storage in world w and `msg.sender = env.sender`:\n- **Executor guard** (`useNonce_reverts_not_executor`): if `S.asyncOrders[poolId].isExecutor[maker][msg.sender]` is false, the call reverts (`NotAuthorizedExecutor` in Solidity; the model's revert has an empty reason).\n- **Replay guard** (`useNonce_reverts_used`): if the caller is an authorized executor but `S.nonceUsed[maker][nonce]` is already true, the call reverts with `NonceAlreadyUsed`.\n- **Success** (`useNonce_success`): if the caller is an authorized executor and the nonce is unspent, the call returns `()`. The resulting world is `ext.set w { S with nonceUsed := upd S.nonceUsed maker (upd (S.nonceUsed maker) nonce true) }`, which is exactly the single write `nonceUsed[maker][nonce] = true`, with no external calls.\n- **Exact characterization** (`useNonce_ok_iff`): the call succeeds if and only if `isExecutor[maker][msg.sender]` holds for `poolId` and `nonceUsed[maker][nonce]` is false.\n- **Frame** (`useNonce_frame`): after a successful call, `nonceUsed[maker][nonce]` is true. Every other `nonceUsed[a][n]` with `(a, n) ≠ (maker, nonce)` is unchanged, and so are `asyncOrders`, `priceBooks`, `owner`, `pendingOwner`, `defaultMinOrder`, `_nameFallback`, `_versionFallback` and transient storage.\n\n**Assumptions.** The frame theorem assumes a lawful storage lens: `ext.get (ext.set w s) = s` for all w and s. The guard, success and characterization theorems need no assumptions. The model does not include the `NonceInvalidated` event or the custom-error selector of the executor revert.",
+      "files": [
+        "Refinement/Swarm/AsyncSwapUseNonce.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapUseNonce.lean"
+      ],
+      "id": "P-178",
+      "locations": [
+        {
+          "file": "src/AsyncSwap.sol",
+          "line": 603
+        }
+      ],
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.useNonce_reverts_not_executor"
+        },
+        {
+          "name": "AsyncSwap.useNonce_reverts_used"
+        },
+        {
+          "name": "AsyncSwap.useNonce_success"
+        },
+        {
+          "name": "AsyncSwap.useNonce_ok_iff"
+        },
+        {
+          "name": "AsyncSwap.useNonce_frame"
+        }
+      ],
+      "title": "AsyncSwap.useNonce"
+    },
+    {
+      "description": "`AsyncSwap.orderCreatedSequence(poolId, id)` (src/AsyncSwap.sol:306) is total and changes no state:\n- `orderCreatedSequence_run`: for every environment and state `s`, the call returns `asyncOrders[poolId].orders[id].createdSequence` and leaves the state as `s`.\n- `orderCreatedSequence_never_reverts`: no caller, `msg.value`, argument or storage state makes the call revert.\n- `orderCreatedSequence_ok`: every successful result `(v, s')` has `s' = s` (no storage is written) and `v` equal to the stored `createdSequence` of order `id` in pool `poolId`.\n\n**Assumptions.** None. The theorems hold for every storage accessor `Ext`, environment and state.",
+      "files": [
+        "Refinement/Swarm/AsyncSwapOrderCreatedSequence.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapOrderCreatedSequence.lean"
+      ],
+      "id": "P-179",
+      "locations": [
+        {
+          "file": "src/AsyncSwap.sol",
+          "line": 306
+        }
+      ],
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.orderCreatedSequence_run"
+        },
+        {
+          "name": "AsyncSwap.orderCreatedSequence_never_reverts"
+        },
+        {
+          "name": "AsyncSwap.orderCreatedSequence_ok"
+        }
+      ],
+      "title": "AsyncSwap.orderCreatedSequence"
+    },
+    {
+      "description": "`AsyncSwap.receive` (generated def `AsyncSwap.«_1993»`) has no guards and always succeeds, returning `()`.\n- `receive_run`: for every environment and state it evaluates to `.ok ((), receivePost)`, a pure state transition whose only effect is the transient write `T[PENDING_NATIVE_DEPOSIT_SLOT] := (T[PENDING_NATIVE_DEPOSIT_SLOT] + msg.value) mod 2^256`; in particular it makes no external calls.\n- `receive_never_reverts`: it never reverts, whatever the caller, value or state.\n- `receive_frame`: every field of the contract state other than `transient` is unchanged, so persistent storage is not written.\n- `receive_pending`: the pending native-deposit slot grows by `msg.value` modulo 2^256; `receive_pending_exact`: when the sum does not wrap, it grows by exactly `msg.value`.\n- `receive_other_transient`: every other transient slot is unchanged.\n\n**Assumptions.** The frame and accounting theorems assume the state lens is lawful (`ext.get (ext.set w st) = st`). `receive_pending_exact` also assumes the current pending-slot value plus `msg.value` is below 2^256.",
+      "files": [
+        "Refinement/Swarm/AsyncSwapReceive.lean"
+      ],
+      "id": "P-180",
+      "locations": [
+        {
+          "file": "src/AsyncSwap.sol",
+          "line": 636
+        }
+      ],
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.receive_run"
+        },
+        {
+          "name": "AsyncSwap.receive_never_reverts"
+        },
+        {
+          "name": "AsyncSwap.receive_frame"
+        },
+        {
+          "name": "AsyncSwap.receive_pending"
+        },
+        {
+          "name": "AsyncSwap.receive_pending_exact"
+        },
+        {
+          "name": "AsyncSwap.receive_other_transient"
+        }
+      ],
+      "title": "AsyncSwap.«_1993»"
+    },
+    {
+      "description": "`AsyncMatching._creditPriorityFee` has no guards of its own, and it makes no storage write of its own (`self_set` is never invoked):\n- **`creditPriorityFee_zero`**: when `amount = 0` the function is `pure ()`. It never reverts and leaves the state unchanged.\n- **`creditPriorityFee_nonzero`**: when `amount ≠ 0` the function is exactly three reads of the filler state followed by `ClaimTransfers.credit(batch, poolManager, numeraire, feeVault, amount)` and `return ()`.\n- **`creditPriorityFee_run`**: when `amount ≠ 0` and the state getter is a pure read, running the function from `(env, s)` gives exactly the result of the single `credit` call. That call receives `batch`, the current `poolManager`, `numeraire` and `feeVault`, and `amount`. The function therefore reverts exactly when that call reverts, and its final state is that call's final state. The priority fee is credited, in the numeraire, to `feeVault` as recipient, and no other credit is made.\n\nThe arguments `key`, `id` and `maker` do not affect the outcome.\n\n**Assumptions.** `ClaimTransfers.credit` is opaque (an `Ext` field), so the batch update it performs is not described here. `creditPriorityFee_run` assumes the state getter is a pure read (`self_get env s = .ok (view s, s)`), as it is at the generated call sites.",
+      "files": [
+        "Refinement/Swarm/AsyncSwapCreditPriorityFee.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapCreditPriorityFee.lean"
+      ],
+      "id": "P-182",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.CreditPriorityFee.creditPriorityFee_zero"
+        },
+        {
+          "name": "AsyncSwap.Swarm.CreditPriorityFee.creditPriorityFee_nonzero"
+        },
+        {
+          "name": "AsyncSwap.Swarm.CreditPriorityFee.creditPriorityFee_run"
+        }
+      ],
+      "title": "AsyncMatching.«_creditPriorityFee»"
+    },
+    {
+      "description": "`Math.log2(value)` (OpenZeppelin's unrolled binary search, used by AsyncSwap) has no revert path and no storage footprint, and it returns the exact floor base-2 logarithm:\n- `log2_run`: for every environment `r`, state `s` and input, `Math.log2 ext value r s = .ok (log2Pure value, s)`. It always succeeds, returns the eight-stage fold `log2Pure`, and leaves the state unchanged.\n- `log2_eq`: for every `value < 2^256`, `Math.log2 ext value r s = .ok (Nat.log2 value, s)`. The result is `⌊log₂ value⌋`, and `0` when `value = 0`.\n- `spec_stage` / `log2_shift`: at the stage that shifts by `k`, the current (already shifted) value `v` satisfies `1 ≤ v < 2^(2k)` and the accumulated `result + 2k ≤ 256`. So each `unchecked` addition `result += k` is exact and never wraps, and the final result is at most 255.\n\n**Assumptions.** `log2_eq` assumes the input fits in a uint256 word (`value < 2^256`), which every Solidity `uint256` does. `log2_run` assumes nothing.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapLog2.lean"
+      ],
+      "id": "P-183",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.Log2.log2_run"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Log2.log2_eq"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Log2.spec_stage"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Log2.log2_shift"
+        }
+      ],
+      "title": "Math.log2"
+    },
+    {
+      "description": "- `Math.min` never reverts and writes no storage. For every environment and state, it returns `min a b` and leaves the state unchanged (`min_run`).\n- The returned value `m` satisfies `m ≤ a`, `m ≤ b` and `m = a ∨ m = b` (`min_spec`).\n\n**Assumptions.** none",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapMin.lean"
+      ],
+      "id": "P-184",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.Min.min_run"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Min.min_spec"
+        }
+      ],
+      "title": "Math.min"
+    },
+    {
+      "description": "For every 256-bit input `a` (`a < 2^256`), every environment and every state:\n\n- **`sqrt_run`**: `Math.sqrt ext a r s = .ok (sqrtPure a, s)`. `Math.sqrt` never reverts and returns the state unchanged, so it writes no storage. It returns `0` for `a = 0`. Otherwise it returns `min(r₇, a / r₇)`, where `r₇` is the seventh iterate of the Newton step `r ↦ (r + a / r) >> 1` starting from `R₀ = 2^(⌊log₂ a⌋ / 2)`. None of the eight divisions `a / result` divides by zero, so panic `0x12` is unreachable. None of the unchecked additions wraps modulo `2^256`.\n- **`init_inv`, `step_inv`**: every iterate `r₁ … r₇` satisfies `a < (r+1)²` (i.e. `r ≥ ⌊√a⌋ ≥ 1`) and `r < 2^130`. The first step from `R₀` (with `R₀ ≤ 2^127`) enters this invariant and every later step preserves it. **`lower`** is the floor AM–GM bound behind the invariant: one Newton step from any positive estimate gives `a < (t+1)²`.\n- **`sqrt_le`**: the returned value `x` satisfies `x * x ≤ a`, so `Math.sqrt` never returns more than `⌊√a⌋`.\n\n**Assumptions.** The input is a 256-bit word (`a < 2^256`), as the ABI guarantees for `uint256`. The callees `Math.log2` and `Math.min` enter through their proved theorems `AsyncSwap.Swarm.Log2.log2_eq` and `AsyncSwap.Swarm.Min.min_run`, not through assumptions. The property does not include exact equality of the result with `⌊√a⌋` (convergence within seven steps).",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapSqrt.lean"
+      ],
+      "id": "P-185",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.Sqrt.sqrt_run"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Sqrt.sqrt_le"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Sqrt.step_inv"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Sqrt.init_inv"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Sqrt.lower"
+        }
+      ],
+      "title": "Math.sqrt"
+    },
+    {
+      "description": "`BitMath.mostSignificantBit(x)` (src/AsyncSwap.sol) is fully characterised:\n\n- **Guard** (`mostSignificantBit_run`, `mostSignificantBit_zero`): for every environment and state it reverts with `\"require\"` exactly when `x = 0`. Otherwise it succeeds, returning the value of the assembly block (`msbPure x`).\n- **Footprint**: on success the state is returned unchanged. It writes no storage and makes no external calls.\n- **Value** (`mostSignificantBit_eq`, `msbPure_spec`): for every word `0 < x < 2^256` the result is `Nat.log2 x`, i.e. the unique `R` with `2^R ≤ x < 2^(R+1)`.\n- **Supporting facts**:\n  - `stage_inv`: each of the five shift-and-compare stages (s = 128, 64, 32, 16, 8) keeps the binary-search invariant `s ∣ r ∧ r + s ≤ 256 ∧ 1 ≤ x >> r < 2^s`.\n  - `or_eq_add`: every assembly `or` is an exact addition, so the `mod 2^8` truncations never wrap.\n  - `lut_spec`: the final de Bruijn byte lookup returns `⌊log₂ y⌋ < 8` for all `0 < y < 256`.\n\n**Assumptions.** The input `x` is a 256-bit word (`x < 2^256`), as every Solidity `uint256` is; this is needed only for the value theorem. The guard and footprint theorems hold for every `x`, environment and state. `lut_spec` is checked by `decide +kernel` (kernel evaluation, no `native_decide`).",
+      "files": [
+        "validation/lean/Refinement/Swarm/Scratch_msb.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapMostSignificantBit.lean"
+      ],
+      "id": "P-186",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.MostSignificantBit.mostSignificantBit_run"
+        },
+        {
+          "name": "AsyncSwap.Swarm.MostSignificantBit.mostSignificantBit_zero"
+        },
+        {
+          "name": "AsyncSwap.Swarm.MostSignificantBit.mostSignificantBit_eq"
+        },
+        {
+          "name": "AsyncSwap.Swarm.MostSignificantBit.msbPure_spec"
+        },
+        {
+          "name": "AsyncSwap.Swarm.MostSignificantBit.stage_inv"
+        },
+        {
+          "name": "AsyncSwap.Swarm.MostSignificantBit.or_eq_add"
+        },
+        {
+          "name": "AsyncSwap.Swarm.MostSignificantBit.lut_spec"
+        }
+      ],
+      "title": "BitMath.mostSignificantBit"
+    },
+    {
+      "description": "`TickMath.getSqrtPriceAtTick` (src/AsyncSwap.sol, Uniswap v4 `TickMath`) has an empty storage footprint and makes no external calls. Its guard and value are characterised exactly:\n\n- **`getSqrtPriceAtTick_eq` / `getSqrtPriceAtTick_run`** (any `tick : Int`, environment and state):\n  - Let `tick' = toSigned 24 (signextend(2, tick))` and `absTick = xor(sar(255, tick'), add(sar(255, tick'), tick'))`. These are the assembly's int24 narrowing and its branch-free absolute value.\n  - The function returns `.error \"revert\"` exactly when `absTick > 887272` (`MAX_TICK`).\n  - Otherwise it returns `.ok (sqrtPure tick, s)` with the state `s` unchanged.\n  - `sqrtPure` is the closed form of the 20-step bit ladder: the Q128.128 ratio, inverted as `type(uint256).max / ratio` for positive ticks, then `(ratio + 2^32 − 1) >> 32` truncated to `uint160`.\n- **`tick24_eq`, `absTickOf_eq`**: for every int24 tick (`−2^23 ≤ tick < 2^23`), the narrowing is the identity and the assembly absolute value equals `|tick|`.\n- **`getSqrtPriceAtTick_int24`, `getSqrtPriceAtTick_reverts_iff`**: for an int24 tick, the function reverts iff `tick < −887272 ∨ 887272 < tick`, i.e. iff `tick ∉ [MIN_TICK, MAX_TICK]`. Otherwise it returns `sqrtPure tick` and leaves the state unchanged.\n- **`getSqrtPriceAtTick_zero`, `_minTick`, `_maxTick`**: it returns\n  - `2^96` (price 1) at tick 0,\n  - `4295128739` (`MIN_SQRT_PRICE`) at `MIN_TICK = −887272`,\n  - `1461446703485210103287273052203988822378723970342` (`MAX_SQRT_PRICE`) at `MAX_TICK = 887272`.\n\n  These match Uniswap v4's published constants.\n\n**Assumptions.** The int24 theorems assume `−2^23 ≤ tick < 2^23`, the range of Solidity's `int24` parameter type; the general `_eq`/`_run` theorems need no assumption. `CustomRevert.revertWith` is modelled by the generated def as an unconditional `throw ⟨\"revert\"⟩`. The concrete anchor values are checked by kernel evaluation (`decide +kernel`).",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapGetSqrtPriceAtTick.lean",
+        "validation/lean/Refinement/Swarm/Probe.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapGetSqrtPriceAtTickBase.lean",
+        "validation/lean/Refinement/Swarm/Probe2.lean",
+        "validation/lean/Refinement/Swarm/Probe3.lean"
+      ],
+      "id": "P-187",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.GetSqrtPriceAtTick.getSqrtPriceAtTick_eq"
+        },
+        {
+          "name": "AsyncSwap.Swarm.GetSqrtPriceAtTick.getSqrtPriceAtTick_run"
+        },
+        {
+          "name": "AsyncSwap.Swarm.GetSqrtPriceAtTick.tick24_eq"
+        },
+        {
+          "name": "AsyncSwap.Swarm.GetSqrtPriceAtTick.absTickOf_eq"
+        },
+        {
+          "name": "AsyncSwap.Swarm.GetSqrtPriceAtTick.getSqrtPriceAtTick_int24"
+        },
+        {
+          "name": "AsyncSwap.Swarm.GetSqrtPriceAtTick.getSqrtPriceAtTick_reverts_iff"
+        },
+        {
+          "name": "AsyncSwap.Swarm.GetSqrtPriceAtTick.getSqrtPriceAtTick_zero"
+        },
+        {
+          "name": "AsyncSwap.Swarm.GetSqrtPriceAtTick.getSqrtPriceAtTick_minTick"
+        },
+        {
+          "name": "AsyncSwap.Swarm.GetSqrtPriceAtTick.getSqrtPriceAtTick_maxTick"
+        }
+      ],
+      "title": "TickMath.getSqrtPriceAtTick"
+    },
+    {
+      "description": "`TickMath.getTickAtSqrtPrice(sqrtPriceX96)` (Uniswap v4 `TickMath`, src/AsyncSwap.sol) is characterised exactly. Write `p` for `sqrtPriceX96`, `L = logOf p` for the generated 14-step log₂ ladder on `p << 32`, and `tickLow = tickLowOf L`, `tickHi = tickHiOf L` for the two candidate ticks.\n\n- **`getTickAtSqrtPrice_eq`**: when the input guard passes, the function equals `msb ← BitMath.mostSignificantBit(p << 32); tailR p msb (norm (p << 32) msb)`. The ladder `logR` matches the generated assembly by `rfl`.\n- **`guard_iff`**: for `p < 2^160`, the guard `subw160(p − MIN_SQRT_PRICE) > MAX_SQRT_PRICE − MIN_SQRT_PRICE − 1` holds exactly when `p < MIN_SQRT_PRICE ∨ MAX_SQRT_PRICE ≤ p`.\n- **`getTickAtSqrtPrice_out_of_range`**: when the guard holds, the function reverts (`InvalidSqrtPrice`).\n- **`priceOf_pos`**: for `MIN_SQRT_PRICE ≤ p < 2^160`, `p << 32 > 0`, so the `require(x > 0)` in `mostSignificantBit` never fires here.\n- **`tailR_run`** / **`getTickAtSqrtPrice_run`**: for `MIN_SQRT_PRICE ≤ p < MAX_SQRT_PRICE` and any state `s`, the run gives:\n  - `ok (tickLow, s)` if `tickLow = tickHi`;\n  - otherwise a revert iff `absTickOf tickHi > 887272`;\n  - otherwise `ok (if sqrtPure tickHi ≤ p then tickHi else tickLow, s)`.\n- **`getTickAtSqrtPrice_result`**: for `p < 2^160`, any successful run leaves the state unchanged and has `MIN_SQRT_PRICE ≤ p < MAX_SQRT_PRICE`. It returns either `tickLow`, or `tickHi` with `absTickOf tickHi ≤ 887272` and `getSqrtPriceAtTick(tickHi) ≤ p`.\n- **`getTickAtSqrtPrice_no_write`**: for `p < 2^160`, every successful run returns the state unchanged.\n\n**Assumptions.** Relies on the previously proven callee characterisations:\n- `mostSignificantBit_run`: `BitMath.mostSignificantBit` reverts iff `x = 0`, otherwise returns `msbPure x` with the state unchanged.\n- `getSqrtPriceAtTick_run`: `TickMath.getSqrtPriceAtTick` reverts iff `absTickOf t > 887272`, otherwise returns `sqrtPure t` with the state unchanged.\n\n`CustomRevert.revertWith` is taken as the generated def's unconditional revert. The `uint160` bound `p < 2^160` is a hypothesis of `guard_iff`, `priceOf_pos`, `getTickAtSqrtPrice_run`, `getTickAtSqrtPrice_result` and `getTickAtSqrtPrice_no_write`.\n\nIt is not proven here that `tickHi` stays within ±887272 for in-range prices, so whether a valid price can revert is left open (proposed as S-02).",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapGetTickAtSqrtPrice.lean",
+        "validation/lean/Refinement/Swarm/Scratch188.lean"
+      ],
+      "id": "P-188",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.GetTickAtSqrtPrice.getTickAtSqrtPrice_eq"
+        },
+        {
+          "name": "AsyncSwap.Swarm.GetTickAtSqrtPrice.guard_iff"
+        },
+        {
+          "name": "AsyncSwap.Swarm.GetTickAtSqrtPrice.getTickAtSqrtPrice_out_of_range"
+        },
+        {
+          "name": "AsyncSwap.Swarm.GetTickAtSqrtPrice.priceOf_pos"
+        },
+        {
+          "name": "AsyncSwap.Swarm.GetTickAtSqrtPrice.tailR_run"
+        },
+        {
+          "name": "AsyncSwap.Swarm.GetTickAtSqrtPrice.getTickAtSqrtPrice_run"
+        },
+        {
+          "name": "AsyncSwap.Swarm.GetTickAtSqrtPrice.getTickAtSqrtPrice_result"
+        },
+        {
+          "name": "AsyncSwap.Swarm.GetTickAtSqrtPrice.getTickAtSqrtPrice_no_write"
+        }
+      ],
+      "title": "TickMath.getTickAtSqrtPrice"
+    },
+    {
+      "description": "`TickPrice.floorTick(num, den)` has no guards of its own, writes no storage and makes no external calls. Its behaviour is characterised exactly (`floorTick_run`):\n\n- **`den = 0`**: reverts with panic `0x12`, from the division `num / den` (`floorTick_den_zero`).\n- **`num / den < 2^64`**: returns `tail(sqrt(num · 2^192 / den))` (`floorTick_low`). The `mulDiv` provably does not overflow, since `num · 2^192 < 2^256 · den`, and `Math.sqrt` never reverts.\n- **`num / den ≥ 2^128`**: returns `MAX_TICK` with the state unchanged (`floorTick_saturates`).\n- **otherwise**: returns `tail((sqrt(num · 2^128 / den) << 32) mod 2^256)` (`floorTick_mid`). Here too the `mulDiv` provably does not overflow.\n\n`tail(sp)` is the clamp:\n- `MIN_TICK` when `sp < MIN_SQRT_PRICE`;\n- `MAX_TICK` when `sp ≥ MAX_SQRT_PRICE`;\n- otherwise exactly `TickMath.getTickAtSqrtPrice(sp mod 2^160)`.\n\nFor `den ≠ 0`, the generated def (join points included) equals this clean branching program (`floorTick_eq`).\n\n**Footprint.** Every successful run returns the state it was given (`floorTick_no_write`, via `tail_no_write` and `getTickAtSqrtPrice_no_write`).\n\n**Assumptions.** Relies on the swarm's lemmas `AsyncSwap.Swarm.Sqrt.sqrt_run` (Math.sqrt on a word returns `sqrtPure a` with state unchanged) and `AsyncSwap.Swarm.GetTickAtSqrtPrice.getTickAtSqrtPrice_no_write`. `Math.sqrt` and `getTickAtSqrtPrice` are kept as their generated defs, not black boxes. Inputs are unbounded naturals; the result does not depend on `num < 2^256`.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapFloorTick.lean",
+        "validation/lean/ScratchFT.lean"
+      ],
+      "id": "P-189",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.floorTick_run"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.floorTick_eq"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.floorTick_den_zero"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.floorTick_low"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.floorTick_saturates"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.floorTick_mid"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.floorTick_no_write"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.tail_no_write"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.mulDiv_bounds"
+        }
+      ],
+      "title": "TickPrice.floorTick"
+    },
+    {
+      "description": "Take any order price given as amountIn/amountOut (each a uint256). The tick is computed as floorTick(amountOut, amountIn) when zeroForOne is true, and floorTick(amountIn, amountOut) otherwise. If the divisor in that call is nonzero, TickPrice.key always succeeds and writes no state. The tick floorTick returns is between MIN_TICK and MAX_TICK inclusive: it is either clamped directly, or it comes from getTickAtSqrtPrice on a sqrt price in [MIN_SQRT_PRICE, MAX_SQRT_PRICE), and on that range getTickAtSqrtPrice's result (tickLow or tickHi) stays within those bounds. So the int24 subtraction in key (tick - MIN_TICK, or MAX_TICK - tick) never panics, and the key lies between 1 and MAX_TICK - MIN_TICK + 1. If the divisor is zero, key reverts with panic 0x12. That case is excluded here and is already proved.\n\nFor all `isBuy`, `zeroForOne` and `amountIn`, `amountOut` < 2^256 whose denominator (`amountIn` when `zeroForOne`, else `amountOut`) is nonzero:\n- `TickMath.getTickAtSqrtPrice` on any `sqrtPrice ∈ [MIN_SQRT_PRICE, MAX_SQRT_PRICE)` succeeds with state unchanged and returns a tick `t` with `MIN_TICK ≤ t ≤ MAX_TICK`.\n- `TickPrice.floorTick(num, den)` (num = `amountOut`, den = `amountIn` when `zeroForOne`; swapped otherwise) succeeds with state unchanged and returns `t ∈ [MIN_TICK, MAX_TICK]`.\n- `TickPrice.key(isBuy, zeroForOne, amountIn, amountOut)` succeeds with state unchanged, so its int24 subtraction (`tick - MIN_TICK` or `MAX_TICK - tick`) and its uint128 `+ 1` never panic. The returned key `k` satisfies `1 ≤ k ≤ MAX_TICK - MIN_TICK + 1`.\n\n**Assumptions.** The bound on getTickAtSqrtPrice is proved as a lemma on its own range [MIN_SQRT_PRICE, MAX_SQRT_PRICE), not for arbitrary inputs (outside that range it reverts with InvalidSqrtPrice). mulDivFloor and Math.sqrt in floorTick do not revert when den ≠ 0 (num·2^192/den < 2^256 because num/den < 2^64 on that branch, and num·2^128/den < 2^256 on the other). This is part of the obligation, not assumed away. TickPrice.key, TickPrice.floorTick and TickMath.getTickAtSqrtPrice are the generated defs in Generated/AsyncSwap.lean. They are internal library functions reached through AsyncFiller._priceKey and order placement, and `functions` does not list them. None beyond the hypotheses: both amounts are below 2^256 (unused by the proof) and the denominator is nonzero. The zero-denominator case (panic 0x12) is covered separately by key_zero_den.",
+      "files": [
+        "validation/lean/Refinement/Swarm/ProbeS03.lean",
+        "Refinement/Statements/S03/TickPriceKey.lean",
+        "validation/lean/Refinement/Swarm/ProbeS03Axioms.lean"
+      ],
+      "id": "P-S03",
+      "statement": "S-03",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "S03.TickPrice_key"
+        },
+        {
+          "name": "AsyncSwap.Swarm.TickBounds.key_ok"
+        },
+        {
+          "name": "AsyncSwap.Swarm.TickBounds.key_no_revert"
+        },
+        {
+          "name": "AsyncSwap.Swarm.TickBounds.getTickAtSqrtPrice_bounded"
+        }
+      ],
+      "title": "`TickMath.getTickAtSqrtPrice` returns a tick in [MIN_TICK, MAX_TICK] for every sqrtPriceX96 in [MIN_SQRT_PRICE, MAX_SQRT_PRICE), so `TickPrice.floorTick` always lands in [MIN_TICK, MAX_TICK] and `TickPrice.key` never reverts for a nonzero denominator."
+    },
+    {
+      "description": "`Math.mulDiv` (OpenZeppelin's 512-bit full-precision `x * y / d`, inlined assembly) and its rounding overload `Math.mulDiv(x, y, d, rounding)` (`Math.mulDiv_11245` in the built model, identical to `Math.mulDiv_11270` in the root model) are verified against the generated model. Neither writes storage or makes external calls: on the inputs the theorems cover, every successful run returns the world unchanged.\n\n- `mulDiv_spec`: for `x`, `y`, `d < 2^256`, `Math.mulDiv` returns exactly `⌊x·y/d⌋`, with the world unchanged, when `d ≠ 0` and `x·y/d < 2^256`. It reverts `MathOverflowedMulDiv` when `d ≠ 0` and the quotient doesn't fit. When `d = 0` it reverts with panic `0x12` if `x·y < 2^256`, and with `MathOverflowedMulDiv` otherwise. The three cases are also stated separately as `mulDiv_ok`, `mulDiv_overflow` and `mulDiv_zero`.\n- `mulDiv_eq_mulDivFloor_any` / `mulDiv_eq_mulDivFloor`: on 256-bit inputs, `Math.mulDiv` coincides with the prelude's floor `mulDivFloor` (result, world and revert reason).\n- Each assembly stage is proven correct: `hi_word` (`mulmod(x,y,not 0) - prod0 - lt` is the high word `x·y / 2^256`), the 512-bit subtraction of the remainder, `d & -d` as the largest power of two dividing `d`, the numerator shift (`final`), and the Newton–Raphson inverse of the odd part of `d` modulo `2^256` (`inv_spec`).\n- `mulDivRound_spec`: the rounding overload, whose generated body calls the prelude `mulDivFloor`, reverts exactly as `mulDivFloor` does (`d = 0`, or a quotient of `2^256` or more). Otherwise it returns `⌊x·y/d⌋ + 1` when `rounding` is odd (Ceil/Expand) and `x·y mod d ≠ 0`, reverting with panic `0x11` if that sum is `2^256`, and returns `⌊x·y/d⌋` in every other case.\n- `mulDivRound_eq_mulDivRnd`: the rounding overload equals the prelude's `mulDivRnd`.\n- `mulDivRound_floor`: with `rounding` even, `d ≠ 0` and a quotient that fits, the result is `⌊x·y/d⌋`.\n- `mulDivRound_ceil`: with `rounding` odd, `d ≠ 0` and `⌈x·y/d⌉ < 2^256`, the result is `⌈x·y/d⌉ = (x·y + d − 1)/d`.\n\n**Assumptions.** The theorems about the 4-argument `Math.mulDiv` assume `x, y < 2^256`, and `d < 2^256` for `mulDiv_spec`, `mulDiv_ok` and the `mulDivFloor` equivalences. ABI-decoded uint256 words always satisfy these bounds. The rounding-overload theorems hold for all naturals, but they describe the model, in which the overload calls the prelude `mulDivFloor`; that matches the Solidity's call to the assembly `mulDiv` on 256-bit inputs, by `mulDiv_eq_mulDivFloor_any`. The proofs use core Lean only, with no axioms beyond Lean's standard ones.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapMulDiv.lean",
+        "validation/lean/Refinement/Swarm/ScratchMulDivProbe.lean",
+        "Refinement/Swarm/AsyncSwapMulDiv.lean"
+      ],
+      "id": "P-219",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.MulDiv.mulDiv_spec"
+        },
+        {
+          "name": "AsyncSwap.Swarm.MulDiv.mulDiv_ok"
+        },
+        {
+          "name": "AsyncSwap.Swarm.MulDiv.mulDiv_overflow"
+        },
+        {
+          "name": "AsyncSwap.Swarm.MulDiv.mulDiv_zero"
+        },
+        {
+          "name": "AsyncSwap.Swarm.MulDiv.mulDiv_eq_mulDivFloor"
+        },
+        {
+          "name": "AsyncSwap.Swarm.MulDiv.mulDiv_eq_mulDivFloor_any"
+        },
+        {
+          "name": "AsyncSwap.Swarm.MulDiv.mulDivRound_spec"
+        },
+        {
+          "name": "AsyncSwap.Swarm.MulDiv.mulDivRound_eq_mulDivRnd"
+        },
+        {
+          "name": "AsyncSwap.Swarm.MulDiv.mulDivRound_floor"
+        },
+        {
+          "name": "AsyncSwap.Swarm.MulDiv.mulDivRound_ceil"
+        },
+        {
+          "name": "AsyncSwap.Swarm.MulDiv.hi_word"
+        },
+        {
+          "name": "AsyncSwap.Swarm.MulDiv.inv_spec"
+        },
+        {
+          "name": "AsyncSwap.Swarm.MulDiv.final"
+        }
+      ],
+      "title": "Math.mulDiv"
+    },
+    {
+      "description": "`CustomRevert.revertWith(selector, value)` (the `(bytes4, uint160)` overload AsyncSwap calls, e.g. from `TickMath.getTickAtSqrtPrice`) reverts unconditionally:\n- `revertWith_run`: for every `selector`, `value`, call environment and state, the function reverts (`Except.error ⟨\"revert\"⟩`).\n- `revertWith_never_succeeds`: it has no successful outcome, so it commits no storage or transient write and returns no value.\n- `revertWith_uniform`: the outcome does not depend on the arguments, the environment or the state.\n\n**Assumptions.** The generated model treats the assembly body (`mstore` of the selector and value into scratch memory, then `revert(0, 0x24)`) as an opaque `throw ⟨\"revert\"⟩`. The revert payload (the selector and value) is not modelled, so only the fact that the call reverts is proved, not the error data it returns.",
+      "files": [
+        "Refinement/Swarm/AsyncSwapRevertWith.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapRevertWith.lean"
+      ],
+      "id": "P-220",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.RevertWith.revertWith_run"
+        },
+        {
+          "name": "AsyncSwap.Swarm.RevertWith.revertWith_never_succeeds"
+        },
+        {
+          "name": "AsyncSwap.Swarm.RevertWith.revertWith_uniform"
+        }
+      ],
+      "title": "CustomRevert.revertWith"
+    },
+    {
+      "description": "`ECDSA.tryRecover(hash, v, r, s)` never reverts and never writes storage: for every environment and state it returns `ok (result, state)` with the state unchanged. The result `(signer, RecoverError, errorArg)` is:\n- `tryRecover_eq`: exactly the closed form of the three branches below.\n- `tryRecover_high_s`: if `s > 0x7FFF…20A0` (half the secp256k1 order, the EIP-2 malleability bound), it returns `(0, 3 = InvalidSignatureS, s)`.\n- `tryRecover_zero_signer`: if `s` is at most that bound and `ecrecover(hash, v, r, s) = 0`, it returns `(0, 1 = InvalidSignature, 0)`.\n- `tryRecover_ok`: if `s` is at most that bound and `ecrecover` returns a nonzero address, it returns `(ecrecover(hash, v, r, s), 0 = NoError, 0)`.\n- `tryRecover_noError_signer_ne_zero`: whenever the returned error code is `NoError` (0), the returned signer is nonzero and the state is unchanged.\n\n**Assumptions.** The `ecrecover` precompile is modelled as the uninterpreted pure function `ext.ecrecover : Nat → Nat → Nat → Nat → Nat`; the results hold for every such function, so no property of secp256k1 is assumed.",
+      "files": [
+        "Refinement/Swarm/AsyncSwapTryRecover.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapTryRecover.lean"
+      ],
+      "id": "P-221",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.TryRecover.tryRecover_eq"
+        },
+        {
+          "name": "AsyncSwap.Swarm.TryRecover.tryRecover_high_s"
+        },
+        {
+          "name": "AsyncSwap.Swarm.TryRecover.tryRecover_zero_signer"
+        },
+        {
+          "name": "AsyncSwap.Swarm.TryRecover.tryRecover_ok"
+        },
+        {
+          "name": "AsyncSwap.Swarm.TryRecover.tryRecover_noError_signer_ne_zero"
+        }
+      ],
+      "title": "ECDSA.tryRecover"
+    },
+    {
+      "description": "`TickPrice.floorTick(num, den)` has no guards of its own, writes no storage and makes no external calls.\n\n- **Revert:** it reverts only when `den = 0`, with panic `0x12` from `num / den` (`floorTick_den_zero`). For every `den ≠ 0` it never reverts: it succeeds, leaves the state unchanged and returns a tick in `[MIN_TICK, MAX_TICK]` (`AsyncSwap.Swarm.TickBounds.floorTick_bounded`).\n- **Dispatch:** for `den ≠ 0`, the run either returns `MIN_TICK` or `MAX_TICK` with the state unchanged, or it is exactly `TickMath.getTickAtSqrtPrice(sp)` for some `MIN_SQRT_PRICE ≤ sp < MAX_SQRT_PRICE`. On that range the `uint160(sp)` cast is the identity (`floorTick_dispatch`, `tail_dispatch`). On that range `getTickAtSqrtPrice` passes its `InvalidSqrtPrice` guard. Its inner `getSqrtPriceAtTick(tickHi)` has `|tickHi| ≤ 887272`, and the call never reverts and returns a tick in range (`getTickAtSqrtPrice_bounded`).\n- **Exact run:** by cases on `num / den < 2^64`, `num / den ≥ 2^128`, or in between (`floorTick_run`, `floorTick_low`, `floorTick_saturates`, `floorTick_mid`). Both `mulDiv(num, 2^192, den)` and `mulDiv(num, 2^128, den)` never overflow and yield a word. `Math.sqrt` never reverts.\n- **No wrap in the price computation:** the sqrt of a word is below `2^128` (`sqrtPure_lt`). So in the middle range `sqrt(num·2^128/den) << 32` equals `sqrt(num·2^128/den)·2^32 < 2^160` and the 256-bit shift never wraps (`shlw_sqrt_no_wrap`, `floorTick_mid_exact`). In the low range the price is below `2^128` (`floorTick_low_bound`).\n- **Footprint:** every successful run returns the state it was given (`floorTick_no_write`).\n\n**Assumptions.** None beyond the generated model. `Math.sqrt`, `mulDiv` and `TickMath.getTickAtSqrtPrice`/`getSqrtPriceAtTick` are used through their own proved run lemmas (AsyncSwapSqrt, AsyncSwapGetTickAtSqrtPrice, AsyncSwapKey).",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapFloorTick.lean"
+      ],
+      "id": "P-222",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.floorTick_dispatch"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.tail_dispatch"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.floorTick_run"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.floorTick_den_zero"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.floorTick_low"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.floorTick_saturates"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.floorTick_mid"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.floorTick_mid_exact"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.floorTick_low_bound"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.mulDiv_bounds"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.sqrtPure_lt"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.shlw_sqrt_no_wrap"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.floorTick_no_write"
+        },
+        {
+          "name": "AsyncSwap.Swarm.TickBounds.getTickAtSqrtPrice_bounded"
+        },
+        {
+          "name": "AsyncSwap.Swarm.TickBounds.floorTick_bounded"
+        }
+      ],
+      "title": "TickPrice.floorTick"
+    },
+    {
+      "description": "For `AsyncFiller.updatePrice(order, id, newAmountOutMin = n, caller)` and the `_priceKey` it calls:\n\n- `updatePrice_notOwner`: if `caller ≠ order.owner`, it reverts `NotOrderOwner`.\n- `updatePrice_zero`: if the owner calls with `n = 0`, it reverts `ZeroAmount`.\n- `updatePrice_notFound`: if the owner calls with `n ≠ 0` on an order with `orders[id].amountIn = 0`, it reverts `OrderNotFound`.\n- `priceKey_ok_iff`, `priceKey_error`: `AsyncFiller._priceKey` is exactly `TickPrice.key`, so it reaches `TickMath` only through it.\n  - It never changes state.\n  - It reverts if and only if its denominator is zero. The denominator is `amountIn` if `zeroForOne`, otherwise `amountOut`. The revert is then panic `0x12` (division by zero).\n  - On success it returns a key `p` with `1 ≤ p ≤ MAX_TICK − MIN_TICK + 1`.\n- `updatePrice_ok`: a successful call satisfies all of the following:\n  - `caller = order.owner`, `n ≠ 0` and `orders[id].amountIn ≠ 0`.\n  - `checkMinimum(poolId(order.key), isBuy, zeroForOne, amountIn, n)` succeeded on the order's stored fields.\n  - For a sell order, `minPriorityFee(n)` did not revert. If `n` exceeds the stored `amountOutMin`, then `priorityFee ≥ min(⌊n·10/10000⌋, 100000)`.\n  - Then `_remove(id)` ran, and the `_priceKey` denominator (with `n` as `amountOut`) was nonzero. `_priceKey` returned `p ∈ [1, MAX_TICK − MIN_TICK + 1]`, and `nextSequence + 1 < 2⁶⁴`.\n  - Between `_remove` and `_append`, the order state changes only in `orders[id]`: `amountOutMin := n`, `price := p`, `sequence := nextSequence + 1`. All other orders and fields stay the same. The book changes only in `nextSequence := nextSequence + 1`.\n  - Finally `_append(id)` ran.\n- `checkMinimum_frame`, `updatePrice_ok_frame`: if the PoolManager read `StateLibrary.getSlot0` changes no state, then `checkMinimum` changes no state. The success description above then holds from the call's initial state. So, apart from `_remove` and `_append`, the only order-state and book fields `updatePrice` changes are `orders[id].amountOutMin`, `orders[id].price`, `orders[id].sequence` and `book.nextSequence`.\n\n**Assumptions.** - The storage accessors passed to `updatePrice` behave as lawful lenses on two disjoint storage locations, the order state and the book:\n  - Reads return `view s` / `bview s` and leave the state unchanged.\n  - Writes set it to `putS s x` / `putB s b`.\n  - Reading back after a write returns what was written.\n  - Writing one location leaves the other's view unchanged.\n  - No accessor reverts.\n- `_remove` and `_append` (`ext.fn_AsyncFiller_remove_*` / `ext.fn_AsyncFiller_append_*`) are opaque in the generated model. The results describe only what happens around them.\n- `checkMinimum_frame` and `updatePrice_ok_frame` additionally assume that `StateLibrary.getSlot0` (an `extsload` view on the PoolManager) changes no state.\n- The results build on earlier swarm theorems: `TickBounds.key_no_revert`, `TickPrice.key_zero_den`, `MinPriorityFee.minPriorityFee_eq` and `CheckMinimum.checkMinimum_good`.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapUpdatePrice.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapUpdatePrice.lean.probe",
+        "Refinement/Swarm/AsyncSwapUpdatePrice.lean"
+      ],
+      "id": "P-223",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.UpdatePriceFiller.updatePrice_notOwner"
+        },
+        {
+          "name": "AsyncSwap.Swarm.UpdatePriceFiller.updatePrice_zero"
+        },
+        {
+          "name": "AsyncSwap.Swarm.UpdatePriceFiller.updatePrice_notFound"
+        },
+        {
+          "name": "AsyncSwap.Swarm.UpdatePriceFiller.priceKey_ok_iff"
+        },
+        {
+          "name": "AsyncSwap.Swarm.UpdatePriceFiller.priceKey_error"
+        },
+        {
+          "name": "AsyncSwap.Swarm.UpdatePriceFiller.tail_fin"
+        },
+        {
+          "name": "AsyncSwap.Swarm.UpdatePriceFiller.updatePrice_ok"
+        },
+        {
+          "name": "AsyncSwap.Swarm.UpdatePriceFiller.checkMinimum_frame"
+        },
+        {
+          "name": "AsyncSwap.Swarm.UpdatePriceFiller.updatePrice_ok_frame"
+        }
+      ],
+      "title": "AsyncFiller.updatePrice"
+    },
+    {
+      "description": "`TickPrice.floorTick(num, den)` is total whenever the denominator is nonzero, and reverts only when the denominator is zero:\n\n- **Totality** (`floorTick_total`): for every `num` (including `0`) and every `den ≠ 0`, `TickPrice.floorTick` succeeds and returns the state unchanged, with a tick `t` satisfying `MIN_TICK ≤ t ≤ MAX_TICK`.\n- **Revert condition** (`floorTick_error_iff`, `floorTick_den_zero`): the run reverts if and only if `den = 0`, with panic `0x12` from the division `num / den`.\n- **Exact behaviour** (`floorTick_run`, `floorTick_mid_exact`, `floorTick_dispatch`): for `den ≠ 0`, with `√` meaning the value computed by the generated `Math.sqrt` (`Sqrt.sqrtPure`, which satisfies `√m · √m ≤ m`):\n  - if `num/den < 2^64`, the sqrt price is `√(num·2^192/den)`;\n  - if `num/den ≥ 2^128`, the result is `MAX_TICK`;\n  - otherwise the sqrt price is `√(num·2^128/den)·2^32`, which is `< 2^160`.\n  \n  That price is then clamped to `MIN_TICK` (below `MIN_SQRT_PRICE`) or `MAX_TICK` (at or above `MAX_SQRT_PRICE`), or else passed unchanged to `TickMath.getTickAtSqrtPrice`.\n- **No overflow or wrap** (`mulDiv_bounds`, `shlw_sqrt_no_wrap`): if `num/den < 2^k` with `k + e = 256`, then `num·2^e < 2^256·den`. So `mulDiv(num, 2^e, den)` neither overflows nor leaves the word range, for both `(k, e) = (64, 192)` and `(128, 128)`. For a word `m`, `√m < 2^128`, so `√m << 32` equals `√m·2^32 < 2^160`: the shift never wraps and the `uint160` cast is the identity.\n- **Footprint** (`floorTick_no_write`): every successful run leaves storage unchanged.\n- **Callee on its range** (`TickBounds.getTickAtSqrtPrice_bounded`): for `MIN_SQRT_PRICE ≤ p < MAX_SQRT_PRICE`, `TickMath.getTickAtSqrtPrice` succeeds, leaves the state unchanged, and returns a tick in `[MIN_TICK, MAX_TICK]`.\n\n**Assumptions.** None beyond the generated model: `Math.sqrt` and `TickMath.getTickAtSqrtPrice` are the generated defs, and their behaviour is proven (`Sqrt.sqrt_run`, `GetTickAtSqrtPrice.getTickAtSqrtPrice_run`, `TickBounds.getTickAtSqrtPrice_bounded`), not assumed.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapTickBounds.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapKey.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapFloorTick.lean",
+        "Refinement/Swarm/AsyncSwapFloorTick.lean"
+      ],
+      "id": "P-226",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.floorTick_total"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.floorTick_error_iff"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.floorTick_den_zero"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.floorTick_run"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.floorTick_dispatch"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.floorTick_mid_exact"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.floorTick_no_write"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.mulDiv_bounds"
+        },
+        {
+          "name": "AsyncSwap.Swarm.FloorTick.shlw_sqrt_no_wrap"
+        },
+        {
+          "name": "AsyncSwap.Swarm.TickBounds.getTickAtSqrtPrice_bounded"
+        }
+      ],
+      "title": "TickPrice.floorTick"
+    },
+    {
+      "description": "For every `isBuy`, `zeroForOne`, `amountIn` and `amountOut`, let the denominator be `den = (zeroForOne ? amountIn : amountOut)` and the numerator the other amount:\n\n- `key_spec`: either `den = 0` and `TickPrice.key` reverts with panic `0x12` (division by zero in `floorTick`), or `den ≠ 0` and `TickPrice.key` returns `.ok (k, s)` with the state unchanged and `1 ≤ k ≤ 1774545`.\n- `key_reverts_iff`: `TickPrice.key` reverts if and only if `den = 0`.\n- `key_ok`: for `den ≠ 0`, `floorTick(num, den)` returns a tick `t ∈ [MIN_TICK, MAX_TICK]` with the state unchanged. `TickPrice.key` then returns `t − MIN_TICK + 1` when `isBuy != zeroForOne` and `MAX_TICK − t + 1` otherwise, so neither the checked `int24` subtraction nor the checked `uint128` `+1` reverts on that range. The key lies in `[1, MAX_TICK − MIN_TICK + 1]`.\n- `key_no_revert`: for `den ≠ 0`, `TickPrice.key` succeeds with the state unchanged and a key in `[1, MAX_TICK − MIN_TICK + 1]`.\n- `floorTick_bounded`: for `den ≠ 0`, `TickPrice.floorTick` succeeds with the state unchanged and returns a tick in `[MIN_TICK, MAX_TICK]`.\n\n**Assumptions.** None beyond the generated model. The external-call interface `ext` is arbitrary, since `key` makes no external calls.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapKey.lean",
+        "Refinement/Swarm/AsyncSwapKey.lean"
+      ],
+      "id": "P-227",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.TickBounds.key_spec"
+        },
+        {
+          "name": "AsyncSwap.Swarm.TickBounds.key_reverts_iff"
+        },
+        {
+          "name": "AsyncSwap.Swarm.TickBounds.key_ok"
+        },
+        {
+          "name": "AsyncSwap.Swarm.TickBounds.key_no_revert"
+        },
+        {
+          "name": "AsyncSwap.Swarm.TickBounds.floorTick_bounded"
+        }
+      ],
+      "title": "TickPrice.key"
+    },
+    {
+      "description": "`AsyncFiller._priceKey` agrees with `TickPrice.key` on every environment and state (`priceKey_eq`). With denominator `d = zeroForOne ? amountIn : amountOut`:\n- **Revert condition:** `_priceKey` reverts if and only if `d = 0`, and that revert is always panic `0x12` (division by zero) (`priceKey_spec`, `priceKey_reverts_iff`).\n- **Success:** when `d ≠ 0` it succeeds and returns a price-bucket key `k` with `1 ≤ k ≤ 1774545` (`= MAX_TICK − MIN_TICK + 1`). The contract state comes back unchanged, so no storage is written (`priceKey_spec`).\n- **Any success:** every successful call leaves the state unchanged, had `d ≠ 0` and returns a key in `[1, 1774545]` (`priceKey_ok_inv`).\n\n**Assumptions.** None beyond the generated model. The proof reuses the `TickPrice.key` specification proved in `Refinement.Swarm.AsyncSwapKey` (`key_spec`, `key_reverts_iff`).",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapPriceKey.lean",
+        "Refinement/Swarm/AsyncSwapPriceKey.lean"
+      ],
+      "id": "P-228",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.PriceKey.priceKey_eq"
+        },
+        {
+          "name": "AsyncSwap.Swarm.PriceKey.priceKey_spec"
+        },
+        {
+          "name": "AsyncSwap.Swarm.PriceKey.priceKey_reverts_iff"
+        },
+        {
+          "name": "AsyncSwap.Swarm.PriceKey.priceKey_ok_inv"
+        }
+      ],
+      "title": "AsyncFiller._priceKey"
+    },
+    {
+      "description": "Price-key denominator at the call sites of `_priceKey` (`TickPrice.key`), whose only revert is panic `0x12`, exactly when `den = if zeroForOne then amountIn else amountOutMin` (or its re-key counterpart) is zero:\n\n- **`AsyncFiller.addOrder`** equals the priority-fee step (`PriorityFeeTooSmall`, `PriorityFeeTooLarge`, the fee pull), then `_priceKey isBuy zeroForOne amountIn amountOutMin`, then the tail (sequence bump, `orders[id]` write, `_append`) (`addOrder_split`). A fee-step revert is a revert of `addOrder` (`addOrder_fee_error`). After a passing fee step:\n  - if `den ≠ 0`, the key step yields some `k ∈ [1, 1774545]` without changing state, and `addOrder` equals the tail on `k` (`addOrder_key_ok`);\n  - if `den = 0`, `addOrder` reverts with panic `0x12` (`addOrder_key_zero`, `addOrder_key_reverts_iff`).\n  \n  The library function has no zero-amount guard of its own.\n- **`AsyncMatching.addOrder`** is `checkMinimum` followed by `AsyncFiller.addOrder` on the order's fields (`matching_addOrder_split`).\n  - With `minOrder = 0`, a zeroForOne order with `amountIn = 0` whose fee step passes reverts with panic `0x12` (`matching_addOrder_zeroMin_gap`).\n  - With `minOrder ≠ 0`, a zeroForOne buy that passes `checkMinimum` has a key step that succeeds (`matching_addOrder_buy_ok`).\n  \n  On the public path, the zero-amount check is `AsyncSwap._createOrder`'s `amountIn == 0 || amountOutMin == 0 → ZeroAmount` (src/AsyncSwap.sol:490), which runs before `AsyncMatching.addOrder`.\n- **`updatePrice`**: covered by `UpdatePriceFiller.updatePrice_error`. `ZeroAmount` excludes `newAmountOutMin = 0`, and `OrderNotFound` excludes `amountIn = 0`.\n- **Partial-fill re-key** (`_priceKey isBuy zfo remainingInput remainingMinimum` in `_reduceAfterMatch`, with that function's guards taken as hypotheses):\n  - A successful ceiling `mulDivRnd` of two nonzero factors is nonzero (`ceil_tail_pos`, `mulDivRnd_ceil_pos`).\n  - Hence, with `remainingInput ≠ 0` and the resting order's `amountOutMin ≠ 0`, the denominator is nonzero, and `_priceKey` returns a key in `[1, 1774545]` from any state, leaving it unchanged (`rekey_den_ne_zero`, `rekey_priceKey_ok`).\n  - For a sell with `minOrder ≠ 0`, surviving the `remainingMinimum < minOrder` close guard alone forces a nonzero denominator (`rekey_den_sell`).\n- **Entry point** (`beforeSwap` → `_beforeSwap` → `_createOrder` → `addOrder`): Foundry fuzz evidence, `test/formal/AsyncSwapBeforeSwapPriceKey.t.sol`, 5 tests × 256 runs.\n  - For nonzero `amountIn ≤ 50e18` and nonzero `amountOutMin < 2^128`, in either direction and at extreme price ratios, order creation succeeds and escrows `amountIn`.\n  - For any nonzero `amountOutMin < 2^256`, and on a second order that may cross the first, no price-key-class revert occurs (Panic, `MathOverflowedMulDiv`, `InvalidSqrtPrice`, `InvalidTick`, including inside v4's `WrappedError`).\n  - With `amountOutMin = 0`, the swap reverts, and not with a price-key-class error.\n\n**Assumptions.** The storage accessors and the opaque `_append` (and `_remove`, for `updatePrice`) are arbitrary: the theorems hold for every choice of them. The re-key results take `_reduceAfterMatch`'s guards (`remainingInput ≠ 0`, the successful ceiling `mulDiv`, and for `rekey_den_sell` the close guard) as hypotheses rather than deriving them from that function's def. `rekey_priceKey_ok` also assumes the resting order's `amountOutMin ≠ 0`. That is expected from the `ZeroAmount` guards in `_createOrder` and `updatePrice` and from the ceiling re-key, but it is not proved as an invariant over call sequences. `AsyncSwap._createOrder` is opaque in the model (`fn_AsyncSwap_createOrder_1658`), so the entry-point hop rests on Foundry fuzz evidence, not on a Lean proof.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapAddOrder.lean",
+        "validation/lean/Refinement/Swarm/Scratch229.lean",
+        "test/formal/AsyncSwapBeforeSwapPriceKey.t.sol",
+        "Refinement/Swarm/AsyncSwapAddOrder.lean"
+      ],
+      "id": "P-229",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.AddOrderKey.addOrder_split"
+        },
+        {
+          "name": "AsyncSwap.Swarm.AddOrderKey.addOrder_fee_error"
+        },
+        {
+          "name": "AsyncSwap.Swarm.AddOrderKey.addOrder_key_ok"
+        },
+        {
+          "name": "AsyncSwap.Swarm.AddOrderKey.addOrder_key_zero"
+        },
+        {
+          "name": "AsyncSwap.Swarm.AddOrderKey.addOrder_key_reverts_iff"
+        },
+        {
+          "name": "AsyncSwap.Swarm.AddOrderKey.matching_addOrder_split"
+        },
+        {
+          "name": "AsyncSwap.Swarm.AddOrderKey.matching_addOrder_zeroMin_gap"
+        },
+        {
+          "name": "AsyncSwap.Swarm.AddOrderKey.matching_addOrder_buy_ok"
+        },
+        {
+          "name": "AsyncSwap.Swarm.AddOrderKey.ceil_tail_pos"
+        },
+        {
+          "name": "AsyncSwap.Swarm.AddOrderKey.mulDivRnd_ceil_pos"
+        },
+        {
+          "name": "AsyncSwap.Swarm.AddOrderKey.rekey_den_ne_zero"
+        },
+        {
+          "name": "AsyncSwap.Swarm.AddOrderKey.rekey_priceKey_ok"
+        },
+        {
+          "name": "AsyncSwap.Swarm.AddOrderKey.rekey_den_sell"
+        },
+        {
+          "name": "AsyncSwap.Swarm.AddOrderKey.ite_bind'"
+        },
+        {
+          "name": "AsyncSwap.Swarm.AddOrderKey.throw_bind'"
+        }
+      ],
+      "title": "AsyncFiller.addOrder"
+    },
+    {
+      "description": "`AsyncFiller.mostPermissiveAtPrice(book, isBuy, price)` selects the level `L = isBuy ? book.bidLevels[price] : book.askLevels[price]` and returns `L.exactBounds[L.priorityOrders.root]`, the exact price bound stored at the root of that level's priority tree. It has no guard of its own and writes no storage:\n- `mostPermissiveAtPrice_of_read`: when the book getter reads `b` without changing state, the function succeeds with `(L b).exactBounds (L b).priorityOrders.root` and leaves the state unchanged.\n- `mostPermissiveAtPrice_storage`: the same holds with the book read from the contract's `priceBooks[poolId]`.\n- `mostPermissiveAtPrice_no_revert`: with a getter that reads without changing state, the function does not revert.\n- `mostPermissiveAtPrice_error`: if the book getter reverts, the function reverts with that same error.\n- `mostPermissiveAtPrice_book_set_irrelevant`: the function's behaviour does not depend on the storage setter it is passed.\n\n**Assumptions.** The built model (`validation/lean/Generated/AsyncSwap.lean`) leaves this function as the uninterpreted field `Ext.fn_AsyncFiller_mostPermissiveAtPrice_6913` (\"can't write through Conditional\"); the root copy `Generated/AsyncSwap.lean` numbers it `_6938`. The theorems are about formal-ast's translation of the function, which handles the conditional storage reference. That translation is pasted unchanged into the proof module, under the same name and namespace. Callers in the model reach the function through the opaque field, so any result about a caller rests on that field equalling this def.",
+      "files": [
+        "Refinement/Swarm/AsyncSwapMostPermissiveAtPrice.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapMostPermissiveAtPrice.lean"
+      ],
+      "id": "P-231",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.MostPermissiveAtPrice.mostPermissiveAtPrice_of_read"
+        },
+        {
+          "name": "AsyncSwap.Swarm.MostPermissiveAtPrice.mostPermissiveAtPrice_storage"
+        },
+        {
+          "name": "AsyncSwap.Swarm.MostPermissiveAtPrice.mostPermissiveAtPrice_no_revert"
+        },
+        {
+          "name": "AsyncSwap.Swarm.MostPermissiveAtPrice.mostPermissiveAtPrice_error"
+        },
+        {
+          "name": "AsyncSwap.Swarm.MostPermissiveAtPrice.mostPermissiveAtPrice_book_set_irrelevant"
+        }
+      ],
+      "title": "AsyncFiller.mostPermissiveAtPrice"
+    },
+    {
+      "description": "`AsyncFiller._remove(id)` (src/AsyncSwap.sol) has no `require` of its own; it never writes `self` (and so never the `orders` map), and every storage write goes through the book accessor `book_set`.\n\n- **`filler_remove_good`**: for any state predicate `Q` and error predicate `P`, if `self_get`, `book_get`, every `book_set b` and every comparison `EligiblePrice.le a b` preserve `Q` and fail only with `P`-errors, and `P` accepts `PriceLevelMissing`, `\"loop bound\"` and `panic 0x11`, then `AsyncFiller.«_remove»` preserves `Q` and fails only with `P`-errors. No hypothesis on `self_set` is required.\n- **`filler_remove_reverts_only`**: when the accessors and the comparison never fail, every revert of `AsyncFiller.«_remove»` is `PriceLevelMissing` (the order's priority key, or its price once the level empties, is absent from the radix tree), `\"loop bound\"` (the model's iteration bound in `_repair`), or `panic 0x11` (checked underflow of the level's `orderCount` or the book's `openOrderCount`).\n- **`filler_remove_frame`**: if `self_get`, `book_get` and `le` leave the world unchanged and every `book_set b` leaves a view `view` unchanged, a successful `AsyncFiller.«_remove»` leaves `view` unchanged; that is, all writes go through `book_set`. Per the def, these update the selected level's `priorityOrders`, `exactBounds`, `priorityOrderIds[priorityKey]` and `orderCount`, the book's `openOrderCount`, and `bids` or `asks` only when the level's `orderCount` reaches zero.\n- **`filler_remove_self_set_irrelevant`**: `AsyncFiller.«_remove»` is definitionally independent of its `self` setter.\n- **`filler_remove_reverts_missing`**: with `self_get` and `book_get` pure reads of `S` and `B`, if the order's level (`B.bidLevels price` for a buy, `B.askLevels price` for a sell) has `priorityOrders.leaves[priorityKey] = 0`, `AsyncFiller.«_remove»` reverts with `PriceLevelMissing`.\n- The function returns `()`; its only call into `ext` is the opaque comparison `EligiblePrice.le`.\n\n**Assumptions.** Storage is reached through the accessor pairs `self_get`/`self_set` and `book_get`/`book_set` passed in by the model; each theorem states its own hypotheses on them (they preserve `Q` and fail only with `P`-errors, or never fail, or the reads are pure). `EligiblePrice.le` is opaque in the model (`Ext.fn_EligiblePrice_le_12578`, as it uses an mload at a computed offset) and is taken as a black box with the same stated contract. The model's `\"loop bound\"` revert stands for the iteration bound on `_repair`'s loop.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapRepair.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapRemove.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapMulDiv.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapOverloads.lean",
+        "validation/lean/Refinement/Settlement.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapCreditPriorityFee.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapEligible.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapRefresh.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapBest.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapMostPermissiveAtPrice.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapBookPair.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapReceive.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapCloseOrder.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapAddOrder.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapUpdatePrice.lean"
+      ],
+      "id": "P-233",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.Remove.filler_remove_good"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Remove.filler_remove_reverts_only"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Remove.filler_remove_frame"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Remove.filler_remove_self_set_irrelevant"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Remove.filler_remove_reverts_missing"
+        }
+      ],
+      "title": "AsyncFiller.«_remove»"
+    },
+    {
+      "description": "`AsyncFiller.refreshExactPrice(id)` has no guard of its own and never calls the setter of the filler's `self` state. On success it amounts to refreshing the order's exact limit price in the order's price level:\n\n- **Invariant (`refreshExactPrice_good`)**: for any state predicate `Q` and error predicate `P`, suppose `self_get`, `book_get`, every `book_set b` and the comparison `EligiblePrice.le` preserve `Q` and fail only with `P`-errors, and `P` accepts `\"loop bound\"`. Then `AsyncFiller.refreshExactPrice` preserves `Q` and fails only with `P`-errors.\n- **Reverts (`refreshExactPrice_reverts_only_loop_bound`)**: when the storage accessors and `le` never fail, the only possible revert is the model's `\"loop bound\"` from `_repair` inside `EligiblePrice.refresh`.\n- **Frame (`refreshExactPrice_frame`, `refreshExactPrice_self_set_irrelevant`)**: the result is definitionally independent of the `self` setter, so all writes go through `book_set`. Any view of the world that every `book_set` preserves is unchanged by a successful call. In particular, the orders table is unchanged whenever `book_set` leaves it untouched.\n- **Hand-off (`refreshExactPrice_eq`)**: when `self` reads as `S` and `o = S.orders id`, the function equals `EligiblePrice.refresh`, with the same result, final state and revert. The refresh runs on the order's price level (`book.bidLevels[o.price]` for a buy, `book.askLevels[o.price]` for a sell), that is, on its `priorityOrders` tree and `exactBounds` cache. The arguments are `rank = o.priorityKey`, `price = ratioOf o` (`amountIn/amountOutMin` for a buy, `amountOutMin/amountIn` for a sell) and `isBuy = o.isBuy`.\n\n**Assumptions.** The storage accessors (`self_get`, `book_get`, `book_set`) and the external comparison `EligiblePrice.le` are treated as black boxes. The revert theorem assumes they never fail. The frame theorem assumes the reads (`self_get`, `book_get`, `le`) leave the world unchanged and that `book_set` preserves the chosen view. The hand-off theorem assumes `self_get` is a pure read returning the fixed state `S`. `\"loop bound\"` is the model's gas bound on `_repair`'s loop, not a Solidity revert.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapRefreshExactPrice.lean",
+        "validation/lean/Refinement/Swarm/AsyncSwapRefreshExactPriceEq.lean"
+      ],
+      "id": "P-234",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.RefreshExactPrice.refreshExactPrice_good"
+        },
+        {
+          "name": "AsyncSwap.Swarm.RefreshExactPrice.refreshExactPrice_reverts_only_loop_bound"
+        },
+        {
+          "name": "AsyncSwap.Swarm.RefreshExactPrice.refreshExactPrice_frame"
+        },
+        {
+          "name": "AsyncSwap.Swarm.RefreshExactPrice.refreshExactPrice_self_set_irrelevant"
+        },
+        {
+          "name": "AsyncSwap.Swarm.RefreshExactPrice.refreshExactPrice_eq"
+        }
+      ],
+      "title": "AsyncFiller.refreshExactPrice"
+    },
+    {
+      "description": "`AsyncFiller._append(id)` has no guard of its own and reaches storage only through the accessors it is handed (`self_get`/`self_set` for the filler's order state, `book_get`/`book_set` for the price book).\n- **Invariant preservation** (`append_good`): for any state predicate `Q` and error predicate `P`, if `self_get`, every `self_set x`, `book_get`, every `book_set b` and the price comparison `le a b` keep `Q` and fail only with `P`-errors, and `P` accepts `\"loop bound\"`, `\"NodeIdOverflow\"` and the panics `0x11`, `0x31` and `0x32`, then `_append` keeps `Q` and fails only with `P`-errors. `RadixPriceTree.insert` satisfies the same property (`insert_good`), as do checked addition (`good_addc`, failing only with `panic 0x11`) and checked array indexing (`good_idx`, failing only with `panic 0x32`).\n- **Reverts** (`append_reverts_only`): when the accessors and the comparison never fail, every revert of `_append` is one of `panic 0x11`, `panic 0x31`, `panic 0x32`, `\"NodeIdOverflow\"` or `\"loop bound\"`. In the code, these come from the checked uint32 level `orderCount` and uint64 `openOrderCount` increments, the subtraction in `_priorityKey`, the bit counter in `_mostSignificantBit`, node allocation in `_newNode`, and the model's loop bound in `RadixPriceTree.insert` and `refreshExactPrice`.\n- **Frame** (`append_frame`): if the reads leave the world unchanged and every `self_set`/`book_set` write leaves a projection `view` of the world unchanged, a successful `_append` leaves `view` unchanged. It writes nothing outside the order state and the book.\n\n**Assumptions.** The accessors (`self_get`, `self_set`, `book_get`, `book_set`) and the external comparison `ext.fn_EligiblePrice_le_12578` are treated as black boxes. Each theorem's hypotheses say how they behave: they keep `Q` and fail only with `P`-errors, or they never fail, or the reads don't write. \"loop bound\" is the model's bound on unbounded loops, not a Solidity revert.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapAppend.lean"
+      ],
+      "id": "P-235",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.Append.append_good"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Append.append_reverts_only"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Append.append_frame"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Append.insert_good"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Append.good_addc"
+        },
+        {
+          "name": "AsyncSwap.Swarm.Append.good_idx"
+        }
+      ],
+      "title": "AsyncFiller.«_append»"
+    },
+    {
+      "description": "`AsyncSwap.receive` (generated as `AsyncSwap.«_2198»`) never reverts and returns `Unit`. It leaves persistent storage unchanged and updates only the transient `PENDING_NATIVE_DEPOSIT_SLOT`: its new value is the previous value plus `msg.value`, reduced modulo `2^256`; every other transient slot is unchanged.\n\n**Assumptions.** The external representation satisfies `hget`: `ext.get (ext.set w st) = st` for all worlds and contract states.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapReceive.lean"
+      ],
+      "id": "P-236",
+      "locations": [
+        {
+          "file": "src/AsyncSwap.sol",
+          "line": 682
+        }
+      ],
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.receive_run"
+        },
+        {
+          "name": "AsyncSwap.receive_never_reverts"
+        },
+        {
+          "name": "AsyncSwap.receive_pending"
+        },
+        {
+          "name": "AsyncSwap.receive_other_transient"
+        }
+      ],
+      "title": "AsyncSwap.«_2198»"
+    },
+    {
+      "description": "`AsyncFiller._payFiller` ignores its `self_set` argument and therefore does not invoke that setter in its generated computation. On successful completion it computes `tradeFee(amountIn)`, settles `amountIn`, pays the filler `amountIn - tradeFee` using the input currency’s address-zero mode, and, when the fee is nonzero, pays `tradeFee` to the fee vault with claims enabled; it returns unit. The generated checked arithmetic/helpers and opaque external settlement/take calls may revert.\n\n**Assumptions.** The generated `Ext` interface models external settlement and take calls opaquely; their success, revert behavior, and any reentrant storage effects are not constrained. The supplied `self_get` computation is also treated abstractly; the proof establishes only that `_payFiller` does not invoke the supplied `self_set` argument.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapPayFiller.lean"
+      ],
+      "id": "P-238",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Refinement.Swarm.AsyncSwapPayFiller.payFiller_setter_irrelevant"
+        },
+        {
+          "name": "AsyncSwap.Refinement.Swarm.AsyncSwapPayFiller.payFiller_expands"
+        }
+      ],
+      "title": "AsyncFiller.«_payFiller»"
+    },
+    {
+      "description": "`AsyncSwap._poolBeatsBook` resolves the pool ID, searches asks for buys and bids for sells, returns `false` when no book level is found or pool liquidity is zero, otherwise computes the oriented pool key from the pool tick and returns the strict pool-versus-book comparison (`poolKey < bookKey` for buys and `poolKey > bookKey` for sells).\n\n**Assumptions.** The generated semantics of `PoolIdLibrary.toId`, `RadixPriceTree.best`, liquidity and slot reads, and the arithmetic helpers are taken as given; the theorem establishes the exact generated computation and does not separately specify those helpers.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapPoolBeatsBook.lean"
+      ],
+      "id": "P-239",
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Refinement.Swarm.AsyncSwapPoolBeatsBook.poolBeatsBook_def"
+        }
+      ],
+      "title": "AsyncSwap.«_poolBeatsBook»"
+    },
+    {
+      "description": "`AsyncSwap.asyncOrderInfo` always succeeds; it returns `asyncOrders[poolId].orders[orderId].amountIn` and `amountOutMin` as a pair and leaves storage unchanged.\n\n**Assumptions.** None; the theorems evaluate the generated definition for every environment and storage state.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapAsyncOrderInfo.lean"
+      ],
+      "id": "P-01",
+      "locations": [
+        {
+          "file": "src/AsyncSwap.sol",
+          "line": 233
+        }
+      ],
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Swarm.AsyncOrderInfo.asyncOrderInfo_storage"
+        },
+        {
+          "name": "AsyncSwap.Swarm.AsyncOrderInfo.asyncOrderInfo_no_revert"
+        }
+      ],
+      "title": "AsyncSwap.asyncOrderInfo"
+    },
+    {
+      "description": "`AsyncSwap.isExecutor` always succeeds, leaves storage unchanged, and returns the executor flag stored at `asyncOrders[poolId].isExecutor[maker][executor]` for the specified pool, maker, and executor. It performs no external calls.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapIsExecutor.lean"
+      ],
+      "id": "P-02",
+      "locations": [
+        {
+          "file": "src/AsyncSwap.sol",
+          "line": 296
+        }
+      ],
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.Refinement.Swarm.AsyncSwapIsExecutor.isExecutor_storage"
+        },
+        {
+          "name": "AsyncSwap.Refinement.Swarm.AsyncSwapIsExecutor.isExecutor_no_revert"
+        }
+      ],
+      "title": "AsyncSwap.isExecutor"
+    },
+    {
+      "description": "`AsyncSwap.setExecutor` does not revert for any pool ID, executor, allowance, sender, environment, or initial modeled state; it returns `()` and updates only the nested `asyncOrders[poolId].isExecutor[msg.sender][executor]` entry to `allow` in the generated state model. Under the lawful `Ext` read-after-write assumption, the resulting permission lookup equals `allow` and the remaining modeled state is unchanged.\n\n**Assumptions.** The frame and permission-lookup conclusions assume `ext.get (ext.set w st) = st` for all `w` and `st`, expressing the generated model's lawful read-after-write behavior.",
+      "files": [
+        "validation/lean/Refinement/Swarm/AsyncSwapSetExecutor.lean"
+      ],
+      "id": "P-03",
+      "locations": [
+        {
+          "file": "src/AsyncSwap.sol",
+          "line": 524
+        }
+      ],
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "AsyncSwap.setExecutor_run"
+        },
+        {
+          "name": "AsyncSwap.setExecutor_ok_iff"
+        },
+        {
+          "name": "AsyncSwap.setExecutor_frame"
+        }
+      ],
+      "title": "AsyncSwap.setExecutor"
+    },
+    {
+      "description": "`Router.cancelOrder` reverts with `Only owner can cancel` unless the caller equals `order.owner`; for an owner call, it writes the caller to `Router.USER_LOCATION` in transient storage, invokes `IPoolManager.unlock` with the encoded cancellation callback (`action = 2`, `maxMatches = 0`), propagates an external-call revert, and returns success with the external call’s resulting state.\n\n**Assumptions.** The generated `Ext.call_IPoolManager_unlock` model is treated as the contract’s opaque external-call semantics; its returned result and state are propagated exactly.",
+      "files": [
+        "validation/lean/Refinement/Swarm/RouterCancelOrder.lean"
+      ],
+      "id": "P-05",
+      "locations": [
+        {
+          "file": "src/Router.sol",
+          "line": 220
+        }
+      ],
+      "status": "verified",
+      "theorems": [
+        {
+          "name": "Router.Swarm.RouterCancelOrder.cancelOrder_run"
+        }
+      ],
+      "title": "Router.cancelOrder"
+    }
+  ],
+  "schema": "formalmind.audit/v1",
+  "title": ""
+}

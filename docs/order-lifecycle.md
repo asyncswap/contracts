@@ -10,7 +10,11 @@ These diagrams describe the current source, not a deployment or mainnet-readines
 flowchart TD
     A["Submit order: input amount, minimum output, USDC bid"] --> D["Require pool minimum and tiered bid"]
     D --> E["Validate executor; escrow input and bid at creation"]
-    E --> F["Match best opposing prices first; up to 8 pairs"]
+    E --> R{"Pool spot price strictly better than the best opposing level?"}
+    R -- "No" --> F["Match best opposing prices first; up to 8 pairs"]
+    R -- "Yes" --> P["Try the order against pool liquidity first"]
+    P -- "Filled" --> Z
+    P -- "Attempt reverts" --> F
     F --> G["Same-price ties: highest remaining bid, then earliest sequence"]
     G --> H["Settle executable crossing pairs; reduce orders and settle bid shares"]
     H --> I{"Incoming order still open?"}

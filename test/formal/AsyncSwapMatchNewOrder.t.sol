@@ -46,7 +46,7 @@ contract AsyncSwapMatchNewOrderFormalTest is HookUnlockBase {
         }
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapMatchNewOrder.lean:74 — consumes the pending match; reverts NotAuthorizedExecutor unless id != 0 and sender = pending executor; OrderNotFound unless the stored owner is order.owner; else returns matchIncoming's count (one AsyncOrdersMatched each) and tries the pool fill on any remainder.
+    /// @notice formal/Refinement/Swarm/AsyncSwapMatchNewOrder.lean:74 — consumes the pending match; reverts NotAuthorizedExecutor unless id != 0 and sender = pending executor; OrderNotFound unless the stored owner is order.owner; else returns matchIncoming's count (one AsyncOrdersMatched each) and tries the pool fill on any remainder. (semantics changed by best-price routing, which tries the pool first when its spot beats the book; Lean statement needs updating)
     function testFuzz_matchNewOrder_run(bool asExecutor, bool ownerMatches, uint8 k, bool liquidity, address other)
         public
     {

@@ -176,6 +176,10 @@ are in [`order-lifecycle.md`](order-lifecycle.md). Three facts to keep in mind w
   ERC-6909 claims inside the PoolManager; the LP-fill path charges 0.02% to active v4 positions and
   0.01% to the FeeVault. Matching compares the signed limits, so the fee never changes which orders
   cross. `calculatePoolFee` and `calculateHookFee` are zero.
+- A new order goes to the better venue first. If the pool has active liquidity and its spot price is
+  strictly better than the best opposing book level, the hook tries the pool fill first and matches the
+  book only if that fails; otherwise it matches the book first and tries the pool for any remainder.
+  The comparison uses spot price, so it ignores the pool fill's fees and price impact.
 - `updatePrice` only re-ranks the order in the book. It needs no PoolManager unlock and triggers no
   matching; a later crossing order, `matchBook`, a filler or an LP retry has to execute it.
 - `matchNewOrder` is gated by a transient slot that `beforeSwap` writes for

@@ -4,6 +4,7 @@ pragma solidity 0.8.26;
 import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 import {AsyncMatching} from "@async-swap/libraries/AsyncMatching.sol";
 import {OrderSignatures} from "@async-swap/libraries/OrderSignatures.sol";
+import {RadixPriceTree} from "@async-swap/libraries/RadixPriceTree.sol";
 import {AsyncOrder, AsyncOrderLibrary} from "@async-swap/types/AsyncOrder.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
@@ -11,6 +12,8 @@ import {CurrencySettler} from "@async-swap/libraries/CurrencySettler.sol";
 import {IPoolManager, ModifyLiquidityParams, SwapParams} from "v4-core/interfaces/IPoolManager.sol";
 import {Hooks} from "v4-core/libraries/Hooks.sol";
 import {LPFeeLibrary} from "v4-core/libraries/LPFeeLibrary.sol";
+import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
+import {TickMath} from "v4-core/libraries/TickMath.sol";
 import {SafeCast} from "v4-core/libraries/SafeCast.sol";
 import {BeforeSwapDelta, toBeforeSwapDelta} from "v4-core/types/BeforeSwapDelta.sol";
 import {Currency} from "v4-core/types/Currency.sol";
@@ -34,6 +37,8 @@ contract AsyncSwap is BaseHook, EIP712 {
     using AsyncFiller for AsyncFiller.State;
     using AsyncFiller for AsyncFiller.Book;
     using AsyncOrderLibrary for AsyncOrder;
+    using StateLibrary for IPoolManager;
+    using RadixPriceTree for RadixPriceTree.Tree;
 
     /// @notice Per-pool order book.
     mapping(PoolId poolId => AsyncFiller.State) public asyncOrders;
@@ -192,7 +197,15 @@ contract AsyncSwap is BaseHook, EIP712 {
     }
 
     /// @inheritdoc BaseHook
-    function _beforeInitialize(address, PoolKey calldata key, uint160) internal virtual override returns (bytes4) {
+    /// @dev Only the owner opens pools: the initial price feeds the sell-side minimum check, so an
+    ///      extreme price set by anyone else could block every sell on the pool.
+    function _beforeInitialize(address sender, PoolKey calldata key, uint160)
+        internal
+        virtual
+        override
+        returns (bytes4)
+    {
+        if (sender != owner) revert NotOwner();
         if (!(key.currency0 == numeraire || key.currency1 == numeraire)) revert NumeraireRequired();
         if (key.fee != LPFeeLibrary.DYNAMIC_FEE_FLAG) revert DynamicFeeRequired();
         asyncOrders[key.toId()].poolManager = poolManager;
@@ -374,13 +387,37 @@ contract AsyncSwap is BaseHook, EIP712 {
         }
         if (id == bytes32(0) || msg.sender != executor) revert AsyncFiller.NotAuthorizedExecutor();
         AsyncFiller.State storage state = asyncOrders[order.key.toId()];
-        if (state.orders[id].owner != order.owner) revert AsyncFiller.OrderNotFound();
-        matched = AsyncMatching.matchIncoming(state, priceBooks[order.key.toId()], order.key, id, address(this));
-        if (state.orders[id].amountIn != 0) {
-            // A failed quote, insufficient active liquidity, or a price outside the maker's
-            // minimum reverts only this external self-call. The order itself remains resting.
-            try this.fillOrderFromPoolLiquidity(order, id) {} catch {}
+        if (state.orders[id].owner != order.owner || state.orders[id].amountIn == 0) {
+            revert AsyncFiller.OrderNotFound();
         }
+        // The better venue goes first, then the other, each only while input remains. A failed quote,
+        // insufficient active liquidity, or a price outside the maker's minimum reverts only the
+        // external pool self-call; whatever neither venue takes rests on the book.
+        bool poolFirst = _poolBeatsBook(order.key, state.orders[id].isBuy);
+        for (uint256 step; step < 2 && state.orders[id].amountIn != 0; ++step) {
+            if ((step == 0) == poolFirst) {
+                try this.fillOrderFromPoolLiquidity(order, id) {} catch {}
+            } else {
+                matched = AsyncMatching.matchIncoming(state, priceBooks[order.key.toId()], order.key, id, address(this));
+            }
+        }
+    }
+
+    /// @dev True when the pool has active liquidity and its current price is strictly better for an
+    ///      incoming order than the best resting order on the other side: below the best ask for a
+    ///      buy, above the best bid for a sell. Both are compared as `TickPrice` keys, which order
+    ///      numeraire per asset. An empty opposite side or an equal level leaves the book first.
+    ///      The spot price excludes the pool fill's fees and price impact, so this is a heuristic.
+    function _poolBeatsBook(PoolKey calldata key, bool isBuy) private view returns (bool) {
+        PoolId poolId = key.toId();
+        (bool found, uint128 bookKey) = isBuy ? priceBooks[poolId].asks.best(false) : priceBooks[poolId].bids.best(true);
+        if (!found || poolManager.getLiquidity(poolId) == 0) return false;
+        (, int24 tick,,) = poolManager.getSlot0(poolId);
+        // The pool's tick prices currency1 per currency0; flip it when the numeraire is currency0.
+        uint128 poolKey = key.currency1 == numeraire
+            ? uint128(uint24(tick - TickMath.MIN_TICK)) + 1
+            : uint128(uint24(TickMath.MAX_TICK - tick)) + 1;
+        return isBuy ? poolKey < bookKey : poolKey > bookKey;
     }
 
     /// @notice Permissionless executor entry for retrying a resting order against current pool LPs.

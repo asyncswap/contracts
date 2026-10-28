@@ -72,7 +72,8 @@ contract AsyncSwapDeployer {
 
     /// @dev RLP address for nonces 1..127.
     function _createAddress(address deployer, uint8 nonce) private pure returns (address) {
-        return address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xd6), bytes1(0x94), deployer, bytes1(nonce))))));
+        return
+            address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xd6), bytes1(0x94), deployer, bytes1(nonce))))));
     }
 }
 

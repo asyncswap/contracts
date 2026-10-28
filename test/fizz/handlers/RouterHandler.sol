@@ -84,8 +84,7 @@ abstract contract RouterHandler is Properties {
 
     /// @dev Builds the order, predicts the salt the hook will assign, places it and records it.
     function _swap(bool sell, uint256 amountIn, uint256 amountOutMin, uint256 bid) internal {
-        AsyncOrder memory order =
-            AsyncOrder(key, actor, sell, amountIn, amountOutMin, bid, SQRT_PRICE_2000, bytes32(0));
+        AsyncOrder memory order = AsyncOrder(key, actor, sell, amountIn, amountOutMin, bid, SQRT_PRICE_2000, bytes32(0));
         if (sell) {
             // ETH input is paid from the tester's balance via msg.value.
         } else {
@@ -93,7 +92,9 @@ abstract contract RouterHandler is Properties {
         }
         if (bid != 0) usdc.deal(actor, bid);
         order.salt = _predictSalt(order);
-        router_swap(order, abi.encode(AsyncSwap.UserParams(actor, address(router), amountOutMin, bid)), sell ? amountIn : 0);
+        router_swap(
+            order, abi.encode(AsyncSwap.UserParams(actor, address(router), amountOutMin, bid)), sell ? amountIn : 0
+        );
         orders.push(order);
     }
 

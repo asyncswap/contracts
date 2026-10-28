@@ -15,7 +15,7 @@ abstract contract Snapshots is Base {
     function _takeSnapshot(State storage state) private {
         state._placeholder = actor.balance;
     }
-    
+
     function snapshotBefore() internal {
         _takeSnapshot(stateBefore);
     }

@@ -1,6 +1,6 @@
 # AsyncMatching
 
-[Git Source](https://github.com/asyncswap/contracts/blob/996c1e5bc0203720c76f3ad0406a08db4650f3b5/src/libraries/AsyncMatching.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/84af4c7ef38278c180ca35e944b4349402bc1f99/src/libraries/AsyncMatching.sol)
 
 Linked matching module operating on the hook's order and radix-book storage.
 
@@ -18,8 +18,12 @@ uint8 public constant MAX_MATCHES_PER_CALL = 8;
 
 ### POOL_LIQUIDITY_FILL_FEE
 
+<i>
+  LP fee on a pool-liquidity fill, in v4 pips: 0.02%.
+</i>
+
 ```solidity
-uint24 private constant POOL_LIQUIDITY_FILL_FEE = 3_000;
+uint24 private constant POOL_LIQUIDITY_FILL_FEE = 200;
 ```
 
 ## Functions
@@ -40,22 +44,6 @@ function addOrder(AsyncFiller.State storage self, AsyncFiller.Book storage book,
 | self | `AsyncFiller.State` |  |
 | book | `AsyncFiller.Book` |  |
 | order | `AsyncFiller.NewOrder` |  |
-
-<a id="setminorder-asyncfiller-book-poolid-uint256" />
-
-### setMinOrder
-
-```solidity
-function setMinOrder(AsyncFiller.Book storage book, PoolId poolId, uint256 minimum) public;
-```
-
-**Parameters**
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| book | `AsyncFiller.Book` |  |
-| poolId | `PoolId` |  |
-| minimum | `uint256` |  |
 
 <a id="bestorder-asyncfiller-state-asyncfiller-book-bool" />
 
@@ -84,33 +72,6 @@ function bestOrder(AsyncFiller.State storage self, AsyncFiller.Book storage book
 | price | `uint128` |  |
 | orderId | `bytes32` |  |
 | owner | `address` |  |
-
-<a id="level-asyncfiller-book-bool-uint128" />
-
-### level
-
-```solidity
-function level(AsyncFiller.Book storage book, bool isBuy, uint128 price)
-        public
-        view
-        returns (bytes32 head, bytes32 tail, uint32 orderCount);
-```
-
-**Parameters**
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| book | `AsyncFiller.Book` |  |
-| isBuy | `bool` |  |
-| price | `uint128` |  |
-
-**Returns**
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| head | `bytes32` |  |
-| tail | `bytes32` |  |
-| orderCount | `uint32` |  |
 
 <a id="fill-asyncfiller-state-asyncfiller-book-fillparams" />
 
@@ -246,7 +207,7 @@ function _bookPair(AsyncFiller.State storage self, AsyncFiller.Book storage book
 | bidId | `bytes32` |  |
 | askId | `bytes32` |  |
 
-<a id="fillfrompoolliquidity-asyncfiller-state-asyncfiller-book-poolkey-bytes32-address-address" />
+<a id="fillfrompoolliquidity-asyncfiller-state-asyncfiller-book-poolkey-bytes32-address-address-uint256" />
 
 ### fillFromPoolLiquidity
 
@@ -264,7 +225,8 @@ function fillFromPoolLiquidity(
         PoolKey calldata key,
         bytes32 id,
         address maker,
-        address hook
+        address hook,
+        uint256 protocolFee
     ) public;
 ```
 
@@ -278,6 +240,7 @@ function fillFromPoolLiquidity(
 | id | `bytes32` |  |
 | maker | `address` |  |
 | hook | `address` |  |
+| protocolFee | `uint256` |  |
 
 <a id="_swapagainstpool-ipoolmanager-poolkey-bool-uint256-uint256-address" />
 
@@ -399,13 +362,18 @@ function _payouts(AsyncFiller.State storage self, PoolKey calldata key, bytes32 
 | ---- | ---- | ----------- |
 | payouts | `Payouts` |  |
 
-<a id="_settletransfers-ipoolmanager-payouts-asyncfiller-matchamounts-claimtransfers-batch" />
+<a id="_settletransfers-ipoolmanager-address-payouts-asyncfiller-matchamounts-claimtransfers-batch" />
 
 ### \_settleTransfers
+
+<i>
+  Each side receives its proceeds less the 0.02% trade fee, which goes to the vault.
+</i>
 
 ```solidity
 function _settleTransfers(
         IPoolManager manager,
+        address feeVault,
         Payouts memory payouts,
         AsyncFiller.MatchAmounts memory amounts,
         ClaimTransfers.Batch memory batch
@@ -417,6 +385,7 @@ function _settleTransfers(
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | manager | `IPoolManager` |  |
+| feeVault | `address` |  |
 | payouts | `Payouts` |  |
 | amounts | `AsyncFiller.MatchAmounts` |  |
 | batch | `ClaimTransfers.Batch` |  |

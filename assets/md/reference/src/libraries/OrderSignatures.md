@@ -1,6 +1,6 @@
 # OrderSignatures
 
-[Git Source](https://github.com/asyncswap/contracts/blob/996c1e5bc0203720c76f3ad0406a08db4650f3b5/src/libraries/OrderSignatures.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/84af4c7ef38278c180ca35e944b4349402bc1f99/src/libraries/OrderSignatures.sol)
 
 **Title:** OrderSignatures
 
@@ -69,7 +69,7 @@ bytes32 internal constant SET_EXECUTOR_TYPEHASH = keccak256(
 
 ```solidity
 bytes32 internal constant UPDATE_PRICE_TYPEHASH = keccak256(
-        "UpdatePrice(address maker,address tokenIn,address tokenOut,uint256 amountIn,uint256 newAmountOutMin,bytes32 orderId,uint64 createdSequence,uint256 nonce,uint256 deadline)"
+        "UpdatePrice(address maker,address tokenIn,address tokenOut,uint256 amountIn,uint256 newAmountOutMin,bytes32 orderId,uint64 sequence,uint256 nonce,uint256 deadline)"
     );
 ```
 
@@ -190,7 +190,7 @@ function hashUpdatePrice(
         bytes32 orderId,
         uint256 amountIn,
         uint256 newAmountOutMin,
-        uint64 createdSequence,
+        uint64 sequence,
         uint256 nonce,
         uint256 deadline
     ) internal pure returns (bytes32);
@@ -204,7 +204,7 @@ function hashUpdatePrice(
 | orderId | `bytes32` |  |
 | amountIn | `uint256` | the order's stored input, so the maker sees the size of the order they reprice. |
 | newAmountOutMin | `uint256` |  |
-| createdSequence | `uint64` | Immutable incarnation; an identical replacement cannot reuse this signature. |
+| sequence | `uint64` | The order's queue sequence, which every reprice and every recreation moves on, so a<br />signature can neither undo a later reprice nor apply to an identical replacement. |
 | nonce | `uint256` |  |
 | deadline | `uint256` |  |
 

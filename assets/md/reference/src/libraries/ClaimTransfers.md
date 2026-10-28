@@ -1,9 +1,9 @@
 # ClaimTransfers
 
-[Git Source](https://github.com/asyncswap/contracts/blob/996c1e5bc0203720c76f3ad0406a08db4650f3b5/src/libraries/ClaimTransfers.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/84af4c7ef38278c180ca35e944b4349402bc1f99/src/libraries/ClaimTransfers.sol)
 
 <i>
-  At most 16 makers can receive two currencies, plus one FeeVault, in eight matches.
+  At most 16 makers and the FeeVault can each receive two currencies in eight matches.
 </i>
 
 ## Functions
@@ -66,7 +66,7 @@ struct Credit {
 
 ```solidity
 struct Batch {
-        Credit[33] credits;
+        Credit[34] credits;
         uint256 count;
     }
 ```
@@ -75,5 +75,5 @@ struct Batch {
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| credits | `Credit[33]` |  |
+| credits | `Credit[34]` |  |
 | count | `uint256` |  |

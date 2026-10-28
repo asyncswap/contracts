@@ -1,6 +1,6 @@
 # AsyncFiller
 
-[Git Source](https://github.com/asyncswap/contracts/blob/996c1e5bc0203720c76f3ad0406a08db4650f3b5/src/libraries/AsyncFiller.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/84af4c7ef38278c180ca35e944b4349402bc1f99/src/libraries/AsyncFiller.sol)
 
 **Title:** AsyncFiller
 
@@ -44,6 +44,16 @@ uint64 internal constant MIN_PRIORITY_FEE = 100_000;
 uint256 internal constant PRIORITY_FEE_BPS = 10;
 ```
 
+### TRADE_FEE_BPS
+
+<i>
+  Protocol fee on what each side of a book match or filler fill receives: 0.02%.
+</i>
+
+```solidity
+uint256 internal constant TRADE_FEE_BPS = 2;
+```
+
 ## Functions
 
 <a id="addorder-state-book-bytes32-address-uint256-uint256-bool-bool-uint256" />
@@ -77,6 +87,29 @@ function addOrder(
 | isBuy | `bool` |  |
 | zeroForOne | `bool` |  |
 | priorityFee | `uint256` |  |
+
+<a id="tradefee-uint256" />
+
+### tradeFee
+
+The protocol's 0.02% of a payment, rounded up. Each side of a trade receives its
+proceeds less this fee, so a maker receives at least `amountOutMin` minus 0.02%.
+
+```solidity
+function tradeFee(uint256 amount) internal pure returns (uint256);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| amount | `uint256` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint256` |  |
 
 <a id="minpriorityfee-uint256" />
 
@@ -290,9 +323,9 @@ order owner; `filler` is the actual end-user paying the output and receiving the
 input. Must be invoked from inside an `IPoolManager.unlock` context.
 
 <i>
-  Settle gross output (native only; ERC20 is pre-settled), pay the signed net minimum to the maker, and mint fee
-  claims to the vault. Burn input claims and pay the full input to the filler.
-  Both currency deltas net to zero. A failed fill reverts all legs.
+  Settle gross output (native only; ERC20 is pre-settled), pay the signed minimum less the trade fee to the
+  maker, and mint fee claims to the vault. Burn input claims and pay the input less the trade fee to the
+  filler. Both currency deltas net to zero. A failed fill reverts all legs.
 </i>
 
 ```solidity
@@ -322,6 +355,38 @@ function fill(
 | filler | `address` |  |
 | feeVault | `address` |  |
 | fee | `uint256` |  |
+
+<a id="_payfiller-state-bytes32-currency-address-address-address-uint256" />
+
+### \_payFiller
+
+<i>
+  Burn the order's input claims and pay the filler all but the trade fee, which goes to the vault.
+</i>
+
+```solidity
+function _payFiller(
+        State storage self,
+        bytes32 id,
+        Currency input,
+        address hook,
+        address filler,
+        address feeVault,
+        uint256 amountIn
+    ) private;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `State` |  |
+| id | `bytes32` |  |
+| input | `Currency` |  |
+| hook | `address` |  |
+| filler | `address` |  |
+| feeVault | `address` |  |
+| amountIn | `uint256` |  |
 
 <a id="_closeorder-state-book-poolkey-bytes32-address" />
 

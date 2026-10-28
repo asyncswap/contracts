@@ -1,6 +1,6 @@
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/996c1e5bc0203720c76f3ad0406a08db4650f3b5/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/84af4c7ef38278c180ca35e944b4349402bc1f99/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -209,15 +209,24 @@ function sweep(Currency currency, address to) external onlyOwner;
 
 ### \_beforeInitialize
 
+<i>
+  Only the owner opens pools: the initial price feeds the sell-side minimum check, so an
+  extreme price set by anyone else could block every sell on the pool.
+</i>
+
 ```solidity
-function _beforeInitialize(address, PoolKey calldata key, uint160) internal virtual override returns (bytes4);
+function _beforeInitialize(address sender, PoolKey calldata key, uint160)
+        internal
+        virtual
+        override
+        returns (bytes4);
 ```
 
 **Parameters**
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| \_ | `address` |  |
+| sender | `address` |  |
 | key | `PoolKey` |  |
 | \_ | `uint160` |  |
 
@@ -550,10 +559,11 @@ function calculateHookFee(uint256) public pure returns (uint256);
 
 ### calculatePoolFee
 
-Fee added to the maker's net output: 0.3% of gross output, rounded down.
+Surcharge a filler pays on top of the maker's minimum: none. The 0.02% trade fee comes
+out of what each side receives instead (`AsyncFiller.tradeFee`).
 
 ```solidity
-function calculatePoolFee(uint24, uint256 amount) public pure virtual returns (uint256);
+function calculatePoolFee(uint24, uint256) public pure virtual returns (uint256);
 ```
 
 **Parameters**
@@ -561,7 +571,7 @@ function calculatePoolFee(uint24, uint256 amount) public pure virtual returns (u
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | \_ | `uint24` |  |
-| amount | `uint256` |  |
+| \_ | `uint256` |  |
 
 **Returns**
 
@@ -614,6 +624,35 @@ function matchNewOrder(AsyncOrder calldata order) external returns (uint8 matche
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | matched | `uint8` |  |
+
+<a id="_poolbeatsbook-poolkey-bool" />
+
+### \_poolBeatsBook
+
+<i>
+  True when the pool has active liquidity and its current price is strictly better for an
+  incoming order than the best resting order on the other side: below the best ask for a
+  buy, above the best bid for a sell. Both are compared as `TickPrice` keys, which order
+  numeraire per asset. An empty opposite side or an equal level leaves the book first.
+  The spot price excludes the pool fill's fees and price impact, so this is a heuristic.
+</i>
+
+```solidity
+function _poolBeatsBook(PoolKey calldata key, bool isBuy) private view returns (bool);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| key | `PoolKey` |  |
+| isBuy | `bool` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bool` |  |
 
 <a id="tryfillorderfrompoolliquidity-asyncorder" />
 
@@ -872,9 +911,10 @@ function invalidateNonce(uint256 nonce) external;
 
 ### useNonce
 
-Burns `maker`'s nonce for a signature the calling executor verified itself (the
-Router's `cancelWithSig`). Every maker signature shares this one nonce space, so
-`invalidateNonce` revokes those signatures too.
+Burns `maker`'s nonce for a signature the Router verified itself (`cancelWithSig`).
+Every maker signature shares this one nonce space, so `invalidateNonce` revokes those
+signatures too, and only the trusted Router may burn one: any other executor could
+void the maker's signed actions on every pool.
 
 ```solidity
 function useNonce(PoolId poolId, address maker, uint256 nonce) external;

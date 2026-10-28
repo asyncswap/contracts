@@ -1,4 +1,3 @@
-import Mathlib
 namespace AsyncSwap.ClaimBatch
 /-- Eight pairs, at most four maker credits per pair, and one shared FeeVault key.
 The caller must establish the per-pair credit bound and single-numeraire premise. -/

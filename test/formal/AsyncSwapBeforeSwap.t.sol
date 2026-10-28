@@ -16,10 +16,14 @@ import {PoolId} from "v4-core/types/PoolId.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 import {SwapParams} from "v4-core/types/PoolOperation.sol";
 
-/// @notice Bytecode checks of `formal/Refinement/Swarm/AsyncSwapBeforeSwap.lean`.
+/// @notice Bytecode checks of the theorems in `Refinement/Swarm/AsyncSwapBeforeSwap.lean` about
+///         `AsyncSwap.«_beforeSwap»` of the current model `Generated/AsyncSwap.lean` (the one with the
+///         `NotTrustedRouter` guard `sender != ext.router` and the opaque `fn_AsyncSwap_createOrder_1683`).
+///         Guard order checked: ExactInputOnly → negation panic 0x11 → abi.decode → NotTrustedRouter →
+///         executor check.
 /// @dev Guard theorems are checked by calling `hook.beforeSwap` directly (pranked as the PoolManager
 ///      or not). Success-path theorems need the real `poolManager.mint` (the model's opaque
-///      `call_IPoolManager_mint`) and `_createOrder` (`fn_AsyncSwap_createOrder_1681`) to run, so the
+///      `call_IPoolManager_mint`) and `_createOrder` (`fn_AsyncSwap_createOrder_1683`) to run, so the
 ///      call is made inside a real `manager.unlock` callback; the test then settles the hook's
 ///      escrow debt with `settleFor(hook)` so the unlock can close. This exposes the hook's raw
 ///      return tuple, which a full `manager.swap` would consume.
@@ -139,7 +143,7 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
         }
     }
 
-    /// @dev The model's `guards`.
+    /// @dev The model's `guards` (with the `onlyPoolManager` modifier of `BaseHook.beforeSwap`).
     function _guards(Call memory c) internal view returns (bool) {
         int256 a = c.params.amountSpecified;
         return c.caller == address(manager) && a <= 0 && a != type(int256).min && c.hd.length >= 128
@@ -233,7 +237,7 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
 
     // ---------------------------------------------------------------- guards
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeSwap.lean:78 — a caller other than the PoolManager reverts `NotPoolManager`.
+    /// @notice `BaseHook.beforeSwap`'s `onlyPoolManager` (the wrapper, `baseHook_eq`): a caller other than the PoolManager reverts `NotPoolManager`.
     function testFuzz_beforeSwap_notPoolManager(
         address caller,
         address sender,
@@ -250,7 +254,7 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
         hook.beforeSwap(sender, _rawKey(c0, c1, fee, ts), params, hd);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeSwap.lean:84 — from the PoolManager, `amountSpecified > 0` reverts `ExactInputOnly`.
+    /// @notice `beforeSwap_exactInputOnly`: from the PoolManager, `amountSpecified > 0` reverts `ExactInputOnly`.
     function testFuzz_beforeSwap_exactInputOnly(
         address sender,
         address c0,
@@ -266,7 +270,7 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
         hook.beforeSwap(sender, _rawKey(c0, c1, fee, ts), params, hd);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeSwap.lean:91 — from the PoolManager, `amountSpecified = type(int256).min` panics 0x11.
+    /// @notice `beforeSwap_negOverflow`: from the PoolManager, `amountSpecified = type(int256).min` panics 0x11.
     function testFuzz_beforeSwap_negOverflow(
         address sender,
         address c0,
@@ -283,7 +287,7 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
         hook.beforeSwap(sender, _rawKey(c0, c1, fee, ts), params, hd);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeSwap.lean:101 — from the PoolManager with a valid exact-input amount, hook data that is short or has a dirty address word reverts in `abi.decode` (empty revert data).
+    /// @notice `beforeSwap_badDecode`: from the PoolManager with a valid exact-input amount, hook data that is short or has a dirty address word reverts in `abi.decode` (empty revert data).
     function testFuzz_beforeSwap_badDecode(
         address sender,
         address c0,
@@ -303,7 +307,7 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
         assertEq(ret.length, 0, "abi.decode reverts with empty data");
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeSwap.lean:101 — as above, with 4+ well-sized words where the user or executor word is not an address.
+    /// @notice `beforeSwap_badDecode`: as above, with 4+ well-sized words where the user or executor word is not an address.
     function testFuzz_beforeSwap_badDecode_dirtyAddress(
         address sender,
         bool zeroForOne,
@@ -323,7 +327,7 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
         assertEq(ret.length, 0, "abi.decode reverts with empty data");
     }
 
-    /// @notice Past decode, a sender other than the hook's trusted Router reverts `NotTrustedRouter()`.
+    /// @notice `beforeSwap_notTrustedRouter`: past decode, a sender other than the hook's trusted Router (`ext.router`) reverts `NotTrustedRouter()`.
     function testFuzz_beforeSwap_notTrustedRouter(
         address sender,
         address c0,
@@ -352,7 +356,7 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
         assertEq(ret, abi.encodeWithSelector(AsyncSwap.NotTrustedRouter.selector));
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeSwap.lean:143 — past decode, from the Router, `sender != hookData.executor` reverts (model: empty reason; bytecode: `NotAuthorizedExecutor()`).
+    /// @notice `beforeSwap_notExecutor`: past decode, from the Router, `sender != hookData.executor` reverts (model: empty reason; bytecode: `NotAuthorizedExecutor()`).
     function testFuzz_beforeSwap_notExecutor(
         address sender,
         address c0,
@@ -384,7 +388,7 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
 
     // ---------------------------------------------------------------- success path
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeSwap.lean:161 — under the guards the call is exactly `mint(this, specified, amountTaken)` then `_createOrder(...)` then returns `(0x575e24b4, delta, 0)`.
+    /// @notice `beforeSwap_run_ok`: under the guards the call is exactly `mint(this, specified, amountTaken)` then `_createOrder(...)` then returns `(0x575e24b4, delta, 0)`.
     function testFuzz_beforeSwap_run_ok(
         bool zeroForOne,
         uint256 amt,
@@ -412,7 +416,7 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
         _assertTailEffects(c, ret, before);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeSwap.lean:161 — tail error propagation: under the guards, the outcome is the tail's (`mint` then `_createOrder`), including their reverts.
+    /// @notice `beforeSwap_run_ok` / `beforeSwap_error`: under the guards, the outcome is the tail's (`mint` then `_createOrder`), including their reverts.
     function testFuzz_beforeSwap_run_ok_tailErrors(
         bool zeroForOne,
         uint256 amt,
@@ -456,7 +460,7 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
         }
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeSwap.lean:178 — every success satisfies the guards and equals the `mint`-then-`_createOrder` tail.
+    /// @notice `beforeSwap_ok_inv`: every success satisfies the guards and equals the `mint`-then-`_createOrder` tail.
     /// forge-config: default.fuzz.runs = 2048
     function testFuzz_beforeSwap_ok_inv(In memory x) public {
         Call memory c = _build(x);
@@ -468,7 +472,7 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
         }
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeSwap.lean:200 — every success returns `(0x575e24b4, delta(params), 0)`.
+    /// @notice `beforeSwap_ok_returns`: every success returns `(0x575e24b4, delta(params), 0)`.
     /// forge-config: default.fuzz.runs = 2048
     function testFuzz_beforeSwap_ok_returns(In memory x) public {
         Call memory c = _build(x);
@@ -481,7 +485,7 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
         }
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeSwap.lean:213 — succeeds iff the def's guards hold and the external `mint` and `_createOrder` succeed.
+    /// @notice `beforeSwap_succeeds_iff`: succeeds iff the def's guards hold and the external `mint` and `_createOrder` succeed.
     /// forge-config: default.fuzz.runs = 2048
     function testFuzz_beforeSwap_succeeds_iff(In memory x) public {
         Call memory c = _build(x);
@@ -492,7 +496,7 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
         if (known) assertEq(ok, g && tailOk, "outcome != guards && tail succeeds");
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeSwap.lean:288 — on success with `-amountSpecified < 2^127`, returns `(selector, amountTaken * 2^128, 0)`.
+    /// @notice `beforeSwap_ok_delta`: on success with `-amountSpecified < 2^127`, returns `(selector, amountTaken * 2^128, 0)`.
     /// forge-config: default.fuzz.runs = 2048
     function testFuzz_beforeSwap_ok_delta(In memory x) public {
         Call memory c = _build(x);
@@ -505,7 +509,7 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
         }
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeSwap.lean:161 — real flow: a Router swap escrows the input as hook claims and opens the order (the PoolManager consumed the hook's delta).
+    /// @notice `beforeSwap_run_ok`, real flow: a Router swap escrows the input as hook claims and opens the order (the PoolManager consumed the hook's delta).
     function test_beforeSwap_run_ok_viaRouter() public {
         uint256 before = _claimBalance(currency0);
         (, bytes32 id) = _placeOrder(alice, true, 1 ether, 0.5 ether);

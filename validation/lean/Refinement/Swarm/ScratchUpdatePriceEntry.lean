@@ -1,0 +1,1 @@
+-- Scratch file, emptied; to be deleted (no theorems).

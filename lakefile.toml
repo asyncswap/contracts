@@ -1,0 +1,12 @@
+name = "asyncswap-formal"
+version = "0.1.0"
+srcDir = "validation/lean"
+defaultTargets = ["Generated", "Refinement"]
+
+[[lean_lib]]
+name = "Generated"
+globs = ["Generated.+"]
+
+[[lean_lib]]
+name = "Refinement"
+globs = ["Refinement.+"]

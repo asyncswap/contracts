@@ -1,0 +1,6 @@
+# Formal Mind: where this repository's Lean proofs live (https://docs.formal.team/files).
+[lean]
+# The Lake project: the folder with the lakefile.
+project = "."
+# Where Lake reads the sources: Generated/ (the models formal-ast writes) and Refinement/ (the proofs).
+sources = "validation/lean"

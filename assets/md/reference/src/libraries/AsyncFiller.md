@@ -1,6 +1,6 @@
 # AsyncFiller
 
-[Git Source](https://github.com/asyncswap/contracts/blob/19bb8dcdd03f03343b1b3af3ad1415292420077b/src/libraries/AsyncFiller.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/libraries/AsyncFiller.sol)
 
 **Title:** AsyncFiller
 
@@ -934,6 +934,9 @@ struct State {
         address feeVault;
         mapping(bytes32 orderId => OrderInfo) orders;
         mapping(address owner => mapping(address executor => bool)) isExecutor;
+        /// @dev Pool tick before the first pool fill of the current backrun window, and that fill's block.
+        int24 refTick;
+        uint64 refBlock;
     }
 ```
 
@@ -946,6 +949,8 @@ struct State {
 | feeVault | `address` |  |
 | orders | `mapping(bytes32 orderId => OrderInfo)` |  |
 | isExecutor | `mapping(address owner => mapping(address executor => bool))` |  |
+| refTick | `int24` |  |
+| refBlock | `uint64` |  |
 
 ### Book
 

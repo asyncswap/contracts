@@ -1,6 +1,6 @@
 # AsyncMatching
 
-[Git Source](https://github.com/asyncswap/contracts/blob/19bb8dcdd03f03343b1b3af3ad1415292420077b/src/libraries/AsyncMatching.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/libraries/AsyncMatching.sol)
 
 Linked matching module operating on the hook's order and radix-book storage.
 
@@ -244,13 +244,17 @@ function fillFromPoolLiquidity(
 | protocolFee | `uint256` |  |
 | sqrtPriceLimitX96 | `uint160` |  |
 
-<a id="_swapagainstpool-ipoolmanager-poolkey-bool-uint256-uint256-address-uint160" />
+<a id="_poolfillnet-asyncfiller-state-poolkey-bool-uint256-uint256-address-uint160" />
 
-### \_swapAgainstPool
+### \_poolFillNet
+
+<i>
+  The pool fill's output less the backrun premium; reverts unless it meets the minimum.
+</i>
 
 ```solidity
-function _swapAgainstPool(
-        IPoolManager manager,
+function _poolFillNet(
+        AsyncFiller.State storage self,
         PoolKey calldata key,
         bool zeroForOne,
         uint256 amountIn,
@@ -264,7 +268,7 @@ function _swapAgainstPool(
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| manager | `IPoolManager` |  |
+| self | `AsyncFiller.State` |  |
 | key | `PoolKey` |  |
 | zeroForOne | `bool` |  |
 | amountIn | `uint256` |  |
@@ -277,6 +281,39 @@ function _swapAgainstPool(
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | amountOut | `uint256` |  |
+
+<a id="_swapagainstpool-ipoolmanager-poolkey-bool-uint256-address-uint160" />
+
+### \_swapAgainstPool
+
+```solidity
+function _swapAgainstPool(
+        IPoolManager manager,
+        PoolKey calldata key,
+        bool zeroForOne,
+        uint256 amountIn,
+        address hook,
+        uint160 sqrtPriceLimitX96
+    ) private returns (uint256 amountOut, int24 tickBefore);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| manager | `IPoolManager` |  |
+| key | `PoolKey` |  |
+| zeroForOne | `bool` |  |
+| amountIn | `uint256` |  |
+| hook | `address` |  |
+| sqrtPriceLimitX96 | `uint160` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| amountOut | `uint256` |  |
+| tickBefore | `int24` |  |
 
 <a id="_matchpair-asyncfiller-state-asyncfiller-book-poolkey-bytes32-bytes32-claimtransfers-batch" />
 

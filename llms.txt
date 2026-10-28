@@ -24,6 +24,7 @@ An on-chain order book and matching engine built as a Uniswap v4 hook: limit ord
 - [ISignatureTransfer](/reference/src/interfaces/ISignatureTransfer): Minimal subset of Uniswap Permit2's SignatureTransfer interface used by the Router. Canonical Permit2 lives at 0x000000000022D473030F116dDEE9F6B43aC78BA3 on every chain.
 - [AsyncFiller](/reference/src/libraries/AsyncFiller): Stores open async orders and settles fills against them.
 - [AsyncMatching](/reference/src/libraries/AsyncMatching): Linked matching module operating on the hook's order and radix-book storage.
+- [BackrunPremium](/reference/src/libraries/BackrunPremium): Linked library called by `AsyncMatching` in the hook's context.
 - [ClaimTransfers](/reference/src/libraries/ClaimTransfers)
 - [CurrencySettler](/reference/src/libraries/CurrencySettler): Production copy of v4-core's test-only `CurrencySettler`, using safe transfers so tokens that return no data from `transfer` / `transferFrom` (e.g. USDT) settle correctly.
 - [EligiblePrice](/reference/src/libraries/EligiblePrice): Exact-price summaries on a priority-key radix tree.

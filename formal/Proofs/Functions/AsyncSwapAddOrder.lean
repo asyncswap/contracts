@@ -1,7 +1,7 @@
 import Specs.AsyncSwap
 import Proofs.Monad
-import Proofs.Swarm.AsyncSwapPriceKey
-import Proofs.Swarm.AsyncSwapCheckMinimum
+import Proofs.Functions.AsyncSwapPriceKey
+import Proofs.Functions.AsyncSwapCheckMinimum
 open FormalAst Refinement
 
 /-!

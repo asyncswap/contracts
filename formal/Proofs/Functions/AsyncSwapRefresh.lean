@@ -1,6 +1,6 @@
 import Specs.AsyncSwap
 import Proofs.Monad
-import Proofs.Swarm.AsyncSwapRepair
+import Proofs.Functions.AsyncSwapRepair
 open FormalAst Refinement
 
 /-!

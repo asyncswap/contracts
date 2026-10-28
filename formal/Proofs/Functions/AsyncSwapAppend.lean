@@ -1,8 +1,8 @@
 import Specs.AsyncSwap
 import Proofs.Monad
-import Proofs.Swarm.AsyncSwapRepair
-import Proofs.Swarm.AsyncSwapRemove
-import Proofs.Swarm.AsyncSwapRefreshExactPrice
+import Proofs.Functions.AsyncSwapRepair
+import Proofs.Functions.AsyncSwapRemove
+import Proofs.Functions.AsyncSwapRefreshExactPrice
 open FormalAst Refinement
 
 /-!

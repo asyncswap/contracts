@@ -84,7 +84,7 @@ contract AsyncSwapSettleTransfersFormalTest is FormalMatchD {
         Case memory c = _mkCase(s, flags);
         (bool matches, uint256 asset, uint256 quote) = _pre(c);
         if (!matches) return;
-        (IPoolManager pm0,,) = hook.asyncOrders(c.pid);
+        (IPoolManager pm0,,,,) = hook.asyncOrders(c.pid);
         assertEq(address(pm0), address(manager));
         // Every claim transfer (net legs and the vault's trade fees) uses the configured PoolManager.
         address vault = address(hook.feeVault());
@@ -105,7 +105,7 @@ contract AsyncSwapSettleTransfersFormalTest is FormalMatchD {
         );
         Run memory r = _exec(c);
         assertEq(r.matched, 1);
-        (IPoolManager pm1,,) = hook.asyncOrders(c.pid);
+        (IPoolManager pm1,,,,) = hook.asyncOrders(c.pid);
         assertEq(address(pm1), address(pm0), "poolManager unchanged");
     }
 }

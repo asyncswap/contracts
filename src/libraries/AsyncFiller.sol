@@ -83,6 +83,9 @@ library AsyncFiller {
         address feeVault;
         mapping(bytes32 orderId => OrderInfo) orders;
         mapping(address owner => mapping(address executor => bool)) isExecutor;
+        /// @dev Pool tick before the first pool fill of the current backrun window, and that fill's block.
+        int24 refTick;
+        uint64 refBlock;
     }
 
     struct Book {

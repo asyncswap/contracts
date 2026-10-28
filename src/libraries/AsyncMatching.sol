@@ -16,6 +16,7 @@ import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {RadixPriceTree} from "@async-swap/libraries/RadixPriceTree.sol";
 import {EligiblePrice} from "@async-swap/libraries/EligiblePrice.sol";
+import {BackrunPremium} from "@async-swap/libraries/BackrunPremium.sol";
 
 /// @notice Linked matching module operating on the hook's order and radix-book storage.
 /// @dev Public library calls use DELEGATECALL, so ERC-6909 escrow remains owned by Async Swap.
@@ -202,16 +203,16 @@ library AsyncMatching {
         // Close the order before the maker's payout, which can run recipient code.
         AsyncFiller._remove(self, book, id);
         delete self.orders[id];
-        uint256 amountOut =
-            _swapAgainstPool(self.poolManager, key, zeroForOne, amountIn, amountOutMin, hook, sqrtPriceLimitX96);
+        uint256 amountOut = _poolFillNet(self, key, zeroForOne, amountIn, amountOutMin, hook, sqrtPriceLimitX96);
         Currency output = zeroForOne ? key.currency1 : key.currency0;
         output.take(self.poolManager, maker, amountOut, output.isAddressZero());
         AsyncFiller.settlePriorityFee(self, key, id, maker, priorityFee, hook);
         emit AsyncOrderLiquidityFilled(key.toId(), id, maker, amountIn, amountOut);
     }
 
-    function _swapAgainstPool(
-        IPoolManager manager,
+    /// @dev The pool fill's output less the backrun premium; reverts unless it meets the minimum.
+    function _poolFillNet(
+        AsyncFiller.State storage self,
         PoolKey calldata key,
         bool zeroForOne,
         uint256 amountIn,
@@ -219,10 +220,25 @@ library AsyncMatching {
         address hook,
         uint160 sqrtPriceLimitX96
     ) private returns (uint256 amountOut) {
+        int24 tickBefore;
+        (amountOut, tickBefore) = _swapAgainstPool(self.poolManager, key, zeroForOne, amountIn, hook, sqrtPriceLimitX96);
+        amountOut -= BackrunPremium.charge(self, key, zeroForOne ? key.currency1 : key.currency0, tickBefore, amountOut);
+        if (amountOut < amountOutMin) revert LimitPriceNotMet();
+    }
+
+    function _swapAgainstPool(
+        IPoolManager manager,
+        PoolKey calldata key,
+        bool zeroForOne,
+        uint256 amountIn,
+        address hook,
+        uint160 sqrtPriceLimitX96
+    ) private returns (uint256 amountOut, int24 tickBefore) {
         if (manager.getLiquidity(key.toId()) == 0) revert NoActiveLiquidity();
         Currency input = zeroForOne ? key.currency0 : key.currency1;
         input.settle(manager, hook, amountIn, true);
-        (,,, uint24 previousFee) = manager.getSlot0(key.toId());
+        uint24 previousFee;
+        (, tickBefore,, previousFee) = manager.getSlot0(key.toId());
         manager.updateDynamicLPFee(key, POOL_LIQUIDITY_FILL_FEE);
         BalanceDelta delta = manager.swap(
             key,
@@ -240,8 +256,8 @@ library AsyncMatching {
         int128 inputDelta = zeroForOne ? delta.amount0() : delta.amount1();
         int128 outputDelta = zeroForOne ? delta.amount1() : delta.amount0();
         if (inputDelta != -amountIn.toInt128()) revert PartialLiquidityFill();
-        if (outputDelta <= 0 || uint256(uint128(outputDelta)) < amountOutMin) revert LimitPriceNotMet();
-        return uint256(uint128(outputDelta));
+        if (outputDelta <= 0) revert LimitPriceNotMet();
+        amountOut = uint256(uint128(outputDelta));
     }
 
     /// @dev `buyId` comes from the bid tree and `sellId` from the ask tree (`_bookPair`), so their

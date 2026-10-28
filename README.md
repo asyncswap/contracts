@@ -16,10 +16,11 @@ every push to `main` that touches them; preview it locally with `cd site && bun 
 - [Order lifecycle and priority bids](docs/order-lifecycle.md): matching, fills, cancellation, and bid settlement.
 - [Contract call sequences](docs/contract-call-sequences.md): calls, callbacks, responses, and withdrawals.
 - [Price-key crossing](docs/price-key-crossing.md): price comparisons and rounding.
+- [Backruns](docs/backruns.md): the backrun premium on pool fills, and who receives it.
 
 ## Build and deployment
 
-`AsyncMatching` is an external Solidity library linked into the hook. `script/deploy.sh <chain-key> [dry-run|broadcast|verify]` (wrapped by `script/deploy-arc.sh` and `script/deploy-unichain.sh`) deploys it deterministically through the shared CREATE2 deployer (`script/00_DeployMatchingLibrary.s.sol`), links that address into the hook bytecode, mines the hook salt, deploys the hook and Router, and records everything under `deployments/<chainId>/`. `verify` publishes sources through Sourcify, tries the chain's Blockscout API, and writes standard JSON inputs for manual upload. Set `ASYNC_MATCHING_LIBRARY_ADDRESS` in `.env.deploy` only to link a library deployed another way. The Foundry test runner links the library automatically.
+`AsyncMatching` is an external Solidity library linked into the hook; it links `TickPrice` and `BackrunPremium`, which `deploy.sh` deploys first the same way. `script/deploy.sh <chain-key> [dry-run|broadcast|verify]` (wrapped by `script/deploy-arc.sh` and `script/deploy-unichain.sh`) deploys it deterministically through the shared CREATE2 deployer (`script/00_DeployMatchingLibrary.s.sol`), links that address into the hook bytecode, mines the hook salt, deploys the hook and Router, and records everything under `deployments/<chainId>/`. `verify` publishes sources through Sourcify, tries the chain's Blockscout API, and writes standard JSON inputs for manual upload. Set `ASYNC_MATCHING_LIBRARY_ADDRESS` in `.env.deploy` only to link a library deployed another way. The Foundry test runner links the library automatically.
 
 Install dependencies and run the contract suite with:
 

@@ -110,7 +110,7 @@ fill's start and end ticks, so splitting a backrun into several orders costs abo
 the premium is donated to in-range LPs and half is credited to the FeeVault as claims (all of it to
 the FeeVault if no liquidity is in range). The premium is taken in the fill's output currency; the
 maker's minimum must still be met after it. Fills that move the price further from the reference, and
-fills after the window, pay none.
+fills after the window, pay none. See [`backruns.md`](backruns.md).
 Priority bids are escrowed as hook claims by `addOrder` and settle to the FeeVault: the filled share
 as input fills, the rest when the order closes. They never go to LPs, so liquidity added just before
 a settlement earns none of them.

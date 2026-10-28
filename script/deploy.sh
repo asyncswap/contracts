@@ -126,16 +126,16 @@ registry="$ROOT_DIR/deployments/$chain_id/$chain_id.json"
 # ---- verify mode ----------------------------------------------------------------------------
 if [[ "$mode" == "verify" ]]; then
   [[ -f "$registry" ]] || { echo "No registry at $registry; broadcast first." >&2; exit 1; }
-  read -r lib_addr hook_addr router_addr vault_addr tick_addr <<< "$(python3 - "$registry" <<'PY'
+  read -r lib_addr hook_addr router_addr vault_addr tick_addr premium_addr <<< "$(python3 - "$registry" <<'PY'
 import json, sys
 c = json.load(open(sys.argv[1]))["contracts"]
 def a(n):
     e = c.get(n)
     return e["address"] if e else "-"
-print(a("AsyncMatching"), a("AsyncSwap"), a("Router"), a("FeeVault"), a("TickPrice"))
+print(a("AsyncMatching"), a("AsyncSwap"), a("Router"), a("FeeVault"), a("TickPrice"), a("BackrunPremium"))
 PY
 )"
-  for pair in "AsyncMatching:$lib_addr" "AsyncSwap:$hook_addr" "Router:$router_addr" "FeeVault:$vault_addr" "TickPrice:$tick_addr"; do
+  for pair in "AsyncMatching:$lib_addr" "AsyncSwap:$hook_addr" "Router:$router_addr" "FeeVault:$vault_addr" "TickPrice:$tick_addr" "BackrunPremium:$premium_addr"; do
     [[ "${pair#*:}" != "-" ]] || { echo "Registry is missing ${pair%%:*}." >&2; exit 1; }
   done
   hook_args="$(cast abi-encode "constructor(address,address,address)" "$POOL_MANAGER_ADDRESS" "$DEPLOY_NUMERAIRE_ADDRESS" "$OWNER")"
@@ -143,6 +143,7 @@ PY
   vault_args="$(cast abi-encode "constructor(address)" "$POOL_MANAGER_ADDRESS")"
   lib_flag="src/libraries/AsyncMatching.sol:AsyncMatching:$lib_addr"
   tick_flag="src/libraries/TickPrice.sol:TickPrice:$tick_addr"
+  premium_flag="src/libraries/BackrunPremium.sol:BackrunPremium:$premium_addr"
   out_dir="$ROOT_DIR/deployments/$chain_id/verify"
   mkdir -p "$out_dir"
 
@@ -151,7 +152,7 @@ PY
     local extra=()
     [[ -n "$args" ]] && extra+=(--constructor-args "$args")
     [[ "$name" == "AsyncSwap" ]] && extra+=(--libraries "$lib_flag" --libraries "$tick_flag")
-    [[ "$name" == "AsyncMatching" ]] && extra+=(--libraries "$tick_flag")
+    [[ "$name" == "AsyncMatching" ]] && extra+=(--libraries "$tick_flag" --libraries "$premium_flag")
     echo "== $name @ $addr"
     forge verify-contract --chain "$chain_id" --verifier sourcify --watch "${extra[@]}" "$addr" "$target" \
       || echo "   Sourcify verification failed for $name (see above)." >&2
@@ -162,6 +163,7 @@ PY
     forge verify-contract --chain "$chain_id" --show-standard-json-input "${extra[@]}" "$addr" "$target" > "$out_dir/$name.json"
   }
   verify_one TickPrice "$tick_addr" src/libraries/TickPrice.sol:TickPrice ""
+  verify_one BackrunPremium "$premium_addr" src/libraries/BackrunPremium.sol:BackrunPremium ""
   verify_one AsyncMatching "$lib_addr" src/libraries/AsyncMatching.sol:AsyncMatching ""
   verify_one AsyncSwap "$hook_addr" src/AsyncSwap.sol:AsyncSwap "$hook_args"
   verify_one Router "$router_addr" src/Router.sol:Router "$router_args"
@@ -186,9 +188,25 @@ if ! has_code "$tick_addr"; then
   fi
 fi
 
+# ---- Backrun premium library (linked into AsyncMatching) ------------------------------------
+premium_init_code="$(forge inspect src/libraries/BackrunPremium.sol:BackrunPremium bytecode)"
+premium_salt="$(cast keccak "asyncswap.v2.BackrunPremium")"
+premium_addr="$(cast create2 --deployer "$CREATE2_DEPLOYER" --salt "$premium_salt" --init-code-hash "$(cast keccak "$premium_init_code")" | awk '/Address:/ {print $2} /^0x/ {print $1}' | tail -1)"
+premium_flag="src/libraries/BackrunPremium.sol:BackrunPremium:$premium_addr"
+if ! has_code "$premium_addr"; then
+  if [[ "$mode" == "broadcast" ]]; then
+    : "${DEPLOYER_ACCOUNT:?Set DEPLOYER_ACCOUNT to a Foundry keystore in .env.deploy}"
+    DEPLOY_DRY_RUN=false forge script "$ROOT_DIR/script/00_DeployBackrunPremium.s.sol" \
+      --rpc-url "$RPC_URL" --sender "$OWNER" --broadcast --account "$DEPLOYER_ACCOUNT"
+    has_code "$premium_addr" || { echo "BackrunPremium deployment missing" >&2; exit 1; }
+  else
+    DEPLOY_DRY_RUN=true forge script "$ROOT_DIR/script/00_DeployBackrunPremium.s.sol" --rpc-url "$RPC_URL" --sender "$OWNER"
+  fi
+fi
+
 # ---- AsyncMatching library ------------------------------------------------------------------
 # Deterministic address: CREATE2 via the shared deployer with the salt in 00_DeployMatchingLibrary.
-lib_init_code="$(forge inspect src/libraries/AsyncMatching.sol:AsyncMatching bytecode --libraries "$tick_flag")"
+lib_init_code="$(forge inspect src/libraries/AsyncMatching.sol:AsyncMatching bytecode --libraries "$tick_flag" --libraries "$premium_flag")"
 lib_salt="$(cast keccak "asyncswap.v2.AsyncMatching")"
 lib_predicted="$(cast create2 --deployer "$CREATE2_DEPLOYER" --salt "$lib_salt" --init-code-hash "$(cast keccak "$lib_init_code")" | awk '/Address:/ {print $2} /^0x/ {print $1}' | tail -1)"
 if [[ -n "${ASYNC_MATCHING_LIBRARY_ADDRESS:-}" && "$ASYNC_MATCHING_LIBRARY_ADDRESS" != "0x0000000000000000000000000000000000000000" ]]; then
@@ -202,12 +220,12 @@ else
   elif [[ "$mode" == "broadcast" ]]; then
     : "${DEPLOYER_ACCOUNT:?Set DEPLOYER_ACCOUNT to a Foundry keystore in .env.deploy}"
     echo "Deploying AsyncMatching to $lib_addr on $chain_name ($chain_id) from $OWNER."
-    DEPLOY_DRY_RUN=false forge script "$ROOT_DIR/script/00_DeployMatchingLibrary.s.sol" --libraries "$tick_flag" \
+    DEPLOY_DRY_RUN=false forge script "$ROOT_DIR/script/00_DeployMatchingLibrary.s.sol" --libraries "$tick_flag" --libraries "$premium_flag" \
       --rpc-url "$RPC_URL" --sender "$OWNER" --broadcast --account "$DEPLOYER_ACCOUNT"
     has_code "$lib_addr" || { echo "AsyncMatching has no code at $lib_addr after broadcast." >&2; exit 1; }
   else
     echo "AsyncMatching will be deployed to $lib_addr (simulating)."
-    DEPLOY_DRY_RUN=true forge script "$ROOT_DIR/script/00_DeployMatchingLibrary.s.sol" --libraries "$tick_flag" --rpc-url "$RPC_URL" --sender "$OWNER"
+    DEPLOY_DRY_RUN=true forge script "$ROOT_DIR/script/00_DeployMatchingLibrary.s.sol" --libraries "$tick_flag" --libraries "$premium_flag" --rpc-url "$RPC_URL" --sender "$OWNER"
   fi
 fi
 
@@ -219,6 +237,7 @@ forge_args=(
   --sender "$OWNER"
   --libraries "src/libraries/AsyncMatching.sol:AsyncMatching:$lib_addr"
   --libraries "$tick_flag"
+  --libraries "$premium_flag"
 )
 if [[ "$mode" == "broadcast" ]]; then
   : "${DEPLOYER_ACCOUNT:?Set DEPLOYER_ACCOUNT to a Foundry keystore in .env.deploy}"

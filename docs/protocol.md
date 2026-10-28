@@ -87,7 +87,7 @@ flowchart TB
     Escrow -->|match: input as claims| User
     Escrow -->|fill: input| CounterW["Filler wallet"]
     CounterW -->|fill: output| MakerW
-    FillerW["Filler wallet"] -->|protocol fee from gross output payment| Fees
+    Escrow -->|0.02% trade fees from each side's proceeds| Fees
     Escrow -->|priority bids| Fees
     Fees -->|collect| OwnerW["Owner-chosen recipient"]
     User -->|TokenClaims.redeem /<br/>NativeClaims.redeem| MakerW

@@ -52,8 +52,8 @@ An exact tie (`buyIn * sellIn == sellOut * buyOut`) counts as a cross and execut
 - Every genuine cross, including the tie, produces a non-zero match in `_matchAmounts` that pays
   each maker at least their signed minimum for the input consumed. This was checked exhaustively
   for small amounts and on randomized large near-tie pairs.
-- Direct order-to-order matches swap the two escrowed inputs with no protocol fee, so rounding never
-  moves value to or from the protocol.
+- Matching compares the signed minimums, not the post-fee proceeds, so the 0.02% trade fee (taken
+  from each side's proceeds afterwards, rounded up) never changes which orders cross.
 
 Example of equal keys without a cross: a sell asking `1000.05` and a buy offering `1000.02`
 USDC per asset sit on the same tick, but the buy is below the ask, so the pair rests.

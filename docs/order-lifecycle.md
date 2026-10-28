@@ -28,8 +28,8 @@ flowchart TD
     N -- "Remainder" --> M
     N -- "Input exhausted or remainder below pool minimum" --> Z
     M -- "Router.fillFromPoolLiquidity" --> J
-    M -- "Private filler chooses order" --> O["Check live minimum plus protocol fee against filler maxPrice"]
-    O --> P["Filler funds output; settle full remainder and bid; close order"]
+    M -- "Private filler chooses order" --> O["Check live minimum against filler maxPrice"]
+    O --> P["Filler pays the minimum; maker gets it less 0.02%, filler the input less 0.02%; settle bid; close order"]
     P --> Z
     M -- "Maker reprices" --> Q["Update minimum; re-enter book with fresh time priority"]
     Q --> M

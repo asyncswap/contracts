@@ -130,13 +130,14 @@ contract Router is EIP712 {
         POOLMANAGER.unlock(abi.encode(SwapCallback({action: ActionType.Swap, order: order, maxMatches: 0})));
     }
 
-    /// @notice Filler completes an open order, paying the maker's net minimum plus the protocol fee.
-    ///         For ERC20 output, approve the router for that gross amount. For native output,
-    ///         `msg.value` must equal the live net price plus the protocol fee;
+    /// @notice Filler completes an open order, paying exactly the maker's live minimum. The maker
+    ///         receives it less the 0.02% trade fee, and the filler the input less 0.02%.
+    ///         For ERC20 output, approve the router for that amount. For native output,
+    ///         `msg.value` must equal the live minimum;
     ///         a stale or excessive deposit reverts rather than stranding the difference.
     ///         Native output is currency1 for zeroForOne, otherwise currency0.
     ///
-    ///         `maxPrice` caps total output paid, including the fee —
+    ///         `maxPrice` caps the output the filler pays —
     ///         it protects fillers from a maker who front-runs them with `updatePrice` to
     ///         bump the order's stored price. Pass `type(uint256).max` to disable the check.
     ///         `order.amountIn` is the least input the filler accepts: the fill reverts if the

@@ -4,7 +4,7 @@ pragma solidity 0.8.26;
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {Currency} from "v4-core/types/Currency.sol";
 
-/// @dev At most 16 makers can receive two currencies, plus one FeeVault, in eight matches.
+/// @dev At most 16 makers and the FeeVault can each receive two currencies in eight matches.
 library ClaimTransfers {
     struct Credit {
         Currency currency;
@@ -13,7 +13,7 @@ library ClaimTransfers {
     }
 
     struct Batch {
-        Credit[33] credits;
+        Credit[34] credits;
         uint256 count;
     }
 

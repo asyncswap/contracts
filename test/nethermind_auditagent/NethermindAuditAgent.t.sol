@@ -13,6 +13,7 @@ import {PoolModifyLiquidityTest} from "v4-core/test/PoolModifyLiquidityTest.sol"
 import {ModifyLiquidityParams} from "v4-core/types/PoolOperation.sol";
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 interface ITransferObserver {
     function onTokenReceived() external;
@@ -288,7 +289,7 @@ contract NethermindAuditAgentTest is SetupHook {
         assertEq(asset.balanceOf(address(maker)), 0, "no ERC20 transfer during the match");
         assertEq(
             manager.balanceOf(address(maker), Currency.wrap(address(asset)).toId()),
-            40 ether,
+            40 ether - _fee(40 ether),
             "partial match credited the maker in claims"
         );
         assertFalse(maker.observed(), "match payout ran no token code");
@@ -339,7 +340,7 @@ contract NethermindAuditAgentTest is SetupHook {
         token1.approve(address(router), gross);
         router.fillOrder(ask, gross, "");
         vm.stopPrank();
-        assertEq(token0.balanceOf(bob) - bobToken0Before, 10 ether);
+        assertEq(token0.balanceOf(bob) - bobToken0Before, 10 ether - _fee(10 ether));
     }
 
     /* ------------------------------------------------------------------------------------------ *
@@ -438,7 +439,7 @@ contract NethermindAuditAgentTest is SetupHook {
         assertEq(hook.asyncOrder(assetPoolId, _assetId(resting)), 60 ether, "the match went through");
         assertEq(
             manager.balanceOf(address(maker), Currency.wrap(address(asset)).toId()),
-            40 ether,
+            40 ether - _fee(40 ether),
             "the blocked maker is credited claims"
         );
     }
@@ -461,8 +462,14 @@ contract NethermindAuditAgentTest is SetupHook {
         router.matchBook(key, 1);
 
         // The buy is still the maker, so the trade is at its 1.2: 10 asset for 12 quote.
-        // With the maker flipped to the sell it would be 1.1: 10 asset for 11 quote.
-        assertEq(_quoteOf(seller) - sellerQuoteBefore, 12 ether, "price set by the older order");
+        // With the maker flipped to the sell it would be 1.1: 10 asset for 11 quote. The seller receives it less
+        // the 0.02% trade fee.
+        assertEq(_quoteOf(seller) - sellerQuoteBefore, 12 ether - _fee(12 ether), "price set by the older order");
+    }
+
+    /// @dev The 0.02% trade fee, rounded up.
+    function _fee(uint256 x) internal pure returns (uint256) {
+        return Math.mulDiv(x, 2, 10_000, Math.Rounding.Ceil);
     }
 
     /// @dev Quote received in any form: ERC-20 balance plus PoolManager claims.

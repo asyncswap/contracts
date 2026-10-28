@@ -333,6 +333,31 @@
         ]
       }
     },
+    "robinhoodChainTestnet": {
+      "name": "Robinhood Chain Testnet",
+      "chainId": 46630,
+      "network": "testnet",
+      "rpcUrlEnv": "RPC_URL_ROBINHOOD_TESTNET",
+      "explorerUrl": "https://explorer.testnet.chain.robinhood.com",
+      "nativeCurrency": { "name": "Ether", "symbol": "ETH", "decimals": 18 },
+      "contracts": {
+        "poolManager": "0x8366a39CC670B4001A1121B8F6A443A643e40951",
+        "permit2": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+        "usdc": "0x7E955252E15c84f5768B83c41a71F9eba181802F",
+        "asyncSwapHook": null,
+        "router": null
+      },
+      "deployment": {
+        "status": "prepared",
+        "script": "script/deploy-robinhood-testnet.sh",
+        "numeraireNote": "Paxos USDG (Global Dollar) testnet token, 6 decimals: https://docs.paxos.com/guides/stablecoin/usdg/testnet. There is no Circle-issued USDC on 46630.",
+        "requires": [
+          "RPC_URL_ROBINHOOD_TESTNET in .env.deploy",
+          "ETH-funded deployer keystore",
+          "test USDG from https://faucet.paxos.com for pool liquidity"
+        ]
+      }
+    },
     "soneium": {
       "name": "Soneium",
       "chainId": 1868,

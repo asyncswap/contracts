@@ -61,7 +61,8 @@ contract AsyncSwapReduceMatchedOrdersFormalTest is FormalMatchD {
         uint256 buyerBefore = _claims(bob, c.k.currency0);
         uint256 sellerBefore = _claims(alice, c.k.currency1);
         bytes memory reason = abi.encodeWithSignature("MockedBatchSettlement(uint256)", tag);
-        _mockPayoutRevert(currency1, vault, fees, reason);
+        // The bid shares and the quote trade fee merge into one vault credit in currency1.
+        _mockPayoutRevert(currency1, vault, fees + _tradeFee(quote), reason);
         vm.expectRevert(reason);
         _run(_matchCalls(c.k));
         assertEq(keccak256(abi.encode(_info(c.pid, c.sellId))), keccak256(abi.encode(sell0)), "sell restored");

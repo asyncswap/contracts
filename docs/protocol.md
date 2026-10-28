@@ -78,7 +78,7 @@ FeeVault owns claims recorded in PoolManager. Crediting those claims does not ca
 flowchart TB
     subgraph PoolManager["PoolManager (custody)"]
         Escrow["ERC-6909 claims owned by the hook<br/>one balance per currency<br/>= Σ open orders' remaining input<br/>+ escrowed priority bids"]
-        Fees["ERC-6909 claims owned by FeeVault<br/>= accrued 30 bps fill fees<br/>+ settled priority bids"]
+        Fees["ERC-6909 claims owned by FeeVault<br/>= 0.02% trade fees and 0.01% pool-fill fees (both currencies)<br/>+ settled priority bids"]
         User["ERC-6909 claims owned by makers / fillers<br/>match proceeds and dust refunds (any currency),<br/>native fill proceeds (claim ID 0)"]
         Reserves["Pool reserves<br/>v4 LP positions"]
     end
@@ -93,9 +93,14 @@ flowchart TB
     User -->|TokenClaims.redeem /<br/>NativeClaims.redeem| MakerW
 ```
 
-Fees, by path: an order-to-order match charges nothing; a filler fill (`Router.fillOrder`) pays
-the maker's live minimum plus 30 bps of gross output, and that fee lands in the FeeVault as claims;
-an LP fill charges the 30 bps dynamic LP fee to the active v4 positions. `calculateHookFee` is zero.
+Fees, by path. A book match and a filler fill (`Router.fillOrder`) take a 0.02% trade fee, rounded up,
+from what each side receives, and credit it to the FeeVault as claims: in a match the buyer receives the
+asset less 0.02% and the seller the quote less 0.02%; in a filler fill the filler pays exactly the
+maker's live minimum, the maker receives that minimum less 0.02%, and the filler receives the input less
+0.02%. A maker's guarantee is therefore its minimum output minus 0.02%. Refunds and cancels are not
+charged. An LP fill sends 0.01% of the input to the FeeVault and swaps the rest at a 0.02% dynamic LP
+fee for the active v4 positions; it still pays the full minimum. `calculatePoolFee` (a surcharge on top
+of the minimum) and `calculateHookFee` are zero.
 Priority bids are escrowed as hook claims by `addOrder` and settle to the FeeVault: the filled share
 as input fills, the rest when the order closes. They never go to LPs, so liquidity added just before
 a settlement earns none of them.
@@ -167,10 +172,14 @@ redemption and fee collection are drawn step by step in
 [`contract-call-sequences.md`](contract-call-sequences.md); the lifecycle and priority-bid flowcharts
 are in [`order-lifecycle.md`](order-lifecycle.md). Three facts to keep in mind while reading them:
 
-- An order-to-order match charges no fee. The 30 bps protocol fee is paid by the filler on top of the
-  maker's live minimum and is credited to the FeeVault as ERC-6909 claims inside the PoolManager; the
-  LP-fill path instead charges the 30 bps dynamic LP fee to active v4 positions. `calculateHookFee`
-  is zero.
+- Book matches and filler fills take 0.02% of what each side receives, credited to the FeeVault as
+  ERC-6909 claims inside the PoolManager; the LP-fill path charges 0.02% to active v4 positions and
+  0.01% to the FeeVault. Matching compares the signed limits, so the fee never changes which orders
+  cross. `calculatePoolFee` and `calculateHookFee` are zero.
+- A new order goes to the better venue first. If the pool has active liquidity and its spot price is
+  strictly better than the best opposing book level, the hook tries the pool fill first and matches the
+  book only if that fails; otherwise it matches the book first and tries the pool for any remainder.
+  The comparison uses spot price, so it ignores the pool fill's fees and price impact.
 - `updatePrice` only re-ranks the order in the book. It needs no PoolManager unlock and triggers no
   matching; a later crossing order, `matchBook`, a filler or an LP retry has to execute it.
 - `matchNewOrder` is gated by a transient slot that `beforeSwap` writes for
@@ -237,8 +246,9 @@ normal ERC-20 asset.
 See also [`price-key-crossing.md`](price-key-crossing.md) for how truncated price keys decide
 whether two orders cross, and [mainnet readiness](../MAINNET_READINESS.md) for the release gate.
 
-Signed repricing and cancellation typed data include `uint64 createdSequence` after `orderId`. Read it through
-`orderCreatedSequence(poolId, orderId)` when signing. This binds each signature to the current
-incarnation; replacing an identically identified order does not revive its old signatures.
-Same-block repricing remains allowed. Repricing signatures made without this field must be signed again.
+Signed cancellation typed data includes `uint64 createdSequence` after `orderId`; read it through
+`orderCreatedSequence(poolId, orderId)`. Signed repricing instead includes `uint64 sequence`, the order's
+current queue sequence (from `orderBookOrder`), which every reprice moves on: an unrelayed reprice
+signature cannot undo a later reprice, and replacing an identically identified order does not revive
+old signatures of either kind. Repricing signatures made with `createdSequence` must be signed again.
 `invalidateNonce` revokes the shared grant, reprice, and cancel nonce space.

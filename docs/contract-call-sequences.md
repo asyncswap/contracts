@@ -69,6 +69,7 @@ sequenceDiagram
         Router->>PM: settleFor(hook)
     end
     Router->>Hook: matchNewOrder(order)
+    Note over Hook,PM: If the pool has active liquidity and its spot tick beats the best opposing level,<br/>the pool fill below runs first and the book takes only what it leaves.
     Hook->>Match: matchIncoming(...)
     loop Up to 8 executable crossing pairs
         Match->>Match: Best bid and best ask across the whole book (price, then bid, then time)
@@ -83,7 +84,8 @@ sequenceDiagram
     opt Incoming order still has a remainder
         Hook->>Hook: External self-call fillOrderFromPoolLiquidity(order, id)
         Hook->>Match: fillFromPoolLiquidity(...)
-        Match->>PM: Burn remaining input claims, temporarily set 30 bps LP fee
+        Hook->>Vault: Credit 0.01% of the input as protocol fee claims
+        Match->>PM: Burn the rest of the input claims, temporarily set 0.02% LP fee
         Match->>PM: swap(remaining exact input)
         Note over Hook,PM: Hook-originated swap skips this hook's callbacks, it does not create another order.
         PM-->>Match: Actual input and output deltas
@@ -129,9 +131,9 @@ sequenceDiagram
         Note over Caller,Hook: Native output requires exact gross ETH, forwarded by Router to hook before unlock.<br/>ERC-20 output requires filler approval to Router.
         Router->>PM: unlock(fill action)
         PM->>Router: unlockCallback(data)
-        Router->>Hook: Read live minimum and calculate protocol fee
-        Hook-->>Router: Net minimum and fee
-        Router->>Router: Require gross output no greater than maxPrice
+        Router->>Hook: Read live minimum and surcharge (calculatePoolFee, zero)
+        Hook-->>Router: Live minimum
+        Router->>Router: Require the minimum no greater than maxPrice
         opt ERC-20 output
             Router->>PM: sync(output token)
             Router->>Token: transferFrom(filler, PoolManager, gross output)
@@ -140,11 +142,11 @@ sequenceDiagram
         end
         Router->>Hook: executeOrder(order, filler)
         Hook->>Match: fill(...), validate executor and open order
-        Match->>PM: Settle output, pay maker net minimum
+        Match->>PM: Settle output, pay maker its minimum less 0.02%
         PM-->>Maker: ERC-20 output or native claims
-        Match->>PM: mint protocol-fee claims to FeeVault
+        Match->>PM: mint the maker's 0.02% as FeeVault claims
         Note over PM,Vault: Claims are credited inside PoolManager, FeeVault is not called during a fill.
-        Match->>PM: Burn input escrow, pay filler remaining input
+        Match->>PM: Burn input escrow, pay filler the input less 0.02%, mint that 0.02% to FeeVault
         PM-->>Caller: ERC-20 input or native claims
         Match->>PM: Settle remaining bid to FeeVault
         Match-->>Hook: Order closed, AsyncOrderFilled event
@@ -158,7 +160,7 @@ sequenceDiagram
         PM->>Router: unlockCallback(data)
         Router->>Hook: matchBook(key, maxMatches)
         Hook->>Match: Match best bid and ask, settle pairs and bids
-        Match->>PM: Burn claims, pay counterparties, settle bid shares
+        Match->>PM: Burn claims, pay counterparties less 0.02% each (to FeeVault), settle bid shares
         Match-->>Hook: Matched pair count
         Hook-->>Router: Matched pair count
         Router-->>PM: Callback complete

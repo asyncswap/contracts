@@ -72,8 +72,14 @@ contract AsyncSwapSettleMatchedPriorityFeeFormalTest is FormalMatchD {
             (uint256 u,) = _unfilled(sd[i], r.ops);
             assertEq(u, 0, "returns 0");
         }
+        // No bid is forfeited: the FeeVault receives only the two trade fees.
         for (uint256 i; i < r.ops.length; ++i) {
-            assertTrue(r.ops[i].who != address(hook.feeVault()), "nothing forfeited");
+            if (r.ops[i].who != address(hook.feeVault())) continue;
+            assertEq(
+                r.ops[i].amount,
+                r.ops[i].cur == c.k.currency0.toId() ? _tradeFee(r.asset) : _tradeFee(r.quote),
+                "nothing forfeited: trade fee only"
+            );
         }
         _assertOps(r.ops, _expected(c, r));
     }

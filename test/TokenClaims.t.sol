@@ -81,6 +81,8 @@ contract TokenClaimsTest is SetupHook {
     using PoolIdLibrary for PoolKey;
 
     uint256 constant AMOUNT = 10 ether;
+    /// @dev What each side of an AMOUNT-for-AMOUNT match is credited: AMOUNT less the 0.02% trade fee, rounded up.
+    uint256 constant CREDITED = AMOUNT - (AMOUNT * 2 + 9_999) / 10_000;
 
     address alice = makeAddr("alice"); // seller of token0
     address bob = makeAddr("bob"); // buyer of token0
@@ -111,28 +113,28 @@ contract TokenClaimsTest is SetupHook {
         token0.approve(address(router), AMOUNT);
         _swap(key, alice, true, AMOUNT, AMOUNT);
         _swap(key, bob, false, AMOUNT, AMOUNT);
-        assertEq(manager.balanceOf(alice, currency1.toId()), AMOUNT, "seller credited quote claims");
-        assertEq(manager.balanceOf(bob, currency0.toId()), AMOUNT, "buyer credited asset claims");
+        assertEq(manager.balanceOf(alice, currency1.toId()), CREDITED, "seller credited quote claims");
+        assertEq(manager.balanceOf(bob, currency0.toId()), CREDITED, "buyer credited asset claims");
     }
 
     function test_redeemPartialToChosenRecipientThenNoDoubleSpend() public {
         _match();
         vm.startPrank(alice);
-        manager.approve(address(claims), currency1.toId(), AMOUNT);
+        manager.approve(address(claims), currency1.toId(), CREDITED);
 
         vm.expectEmit(true, true, true, true, address(claims));
         emit ClaimsRedeemed(alice, carol, currency1, 4 ether);
         claims.redeem(currency1, carol, 4 ether);
-        assertEq(manager.balanceOf(alice, currency1.toId()), 6 ether, "claims burned");
+        assertEq(manager.balanceOf(alice, currency1.toId()), CREDITED - 4 ether, "claims burned");
         assertEq(token1.balanceOf(carol), 4 ether, "recipient paid in ERC20");
 
-        claims.redeem(currency1, carol, 6 ether);
+        claims.redeem(currency1, carol, CREDITED - 4 ether);
         vm.expectRevert();
         claims.redeem(currency1, carol, 1);
         vm.stopPrank();
 
         assertEq(manager.balanceOf(alice, currency1.toId()), 0);
-        assertEq(token1.balanceOf(carol), AMOUNT);
+        assertEq(token1.balanceOf(carol), CREDITED);
         assertEq(manager.allowance(alice, address(claims), currency1.toId()), 0, "allowance consumed");
     }
 
@@ -144,9 +146,9 @@ contract TokenClaimsTest is SetupHook {
         // Bob holds token0 claims only; token1 is a different claim id.
         vm.expectRevert();
         claims.redeem(currency1, bob, 1);
-        claims.redeem(currency0, bob, AMOUNT);
+        claims.redeem(currency0, bob, CREDITED);
         vm.stopPrank();
-        assertEq(token0.balanceOf(bob) - bobToken0Before, AMOUNT);
+        assertEq(token0.balanceOf(bob) - bobToken0Before, CREDITED);
         assertEq(manager.balanceOf(bob, currency0.toId()), 0);
     }
 
@@ -155,7 +157,7 @@ contract TokenClaimsTest is SetupHook {
         vm.prank(alice);
         vm.expectRevert();
         claims.redeem(currency1, alice, 1 ether);
-        assertEq(manager.balanceOf(alice, currency1.toId()), AMOUNT);
+        assertEq(manager.balanceOf(alice, currency1.toId()), CREDITED);
     }
 
     function test_RevertWhen_RedeemingAnotherOwnersClaims() public {
@@ -166,7 +168,7 @@ contract TokenClaimsTest is SetupHook {
         vm.prank(carol);
         vm.expectRevert();
         claims.redeem(currency1, carol, 1 ether);
-        assertEq(manager.balanceOf(alice, currency1.toId()), AMOUNT);
+        assertEq(manager.balanceOf(alice, currency1.toId()), CREDITED);
         assertEq(token1.balanceOf(carol), 0);
     }
 
@@ -183,7 +185,7 @@ contract TokenClaimsTest is SetupHook {
         manager.approve(address(claims), currency1.toId(), AMOUNT);
         vm.expectRevert(TokenClaims.OnlyPoolManager.selector);
         claims.unlockCallback(abi.encode(alice, currency1, carol, AMOUNT));
-        assertEq(manager.balanceOf(alice, currency1.toId()), AMOUNT);
+        assertEq(manager.balanceOf(alice, currency1.toId()), CREDITED);
     }
 
     /* ---------------------------- token with transfer hooks ---------------------------- */
@@ -217,7 +219,7 @@ contract TokenClaimsTest is SetupHook {
 
         _swap(hookedKey, bob, hookedIsZero, AMOUNT, AMOUNT);
         _swap(hookedKey, alice, !hookedIsZero, AMOUNT, AMOUNT);
-        assertEq(manager.balanceOf(alice, hookedCurrency.toId()), AMOUNT, "buyer credited hooked claims");
+        assertEq(manager.balanceOf(alice, hookedCurrency.toId()), CREDITED, "buyer credited hooked claims");
     }
 
     function test_failedTransferPreservesClaimsAndAllowance() public {
@@ -226,14 +228,14 @@ contract TokenClaimsTest is SetupHook {
         vm.startPrank(alice);
         manager.approve(address(claims), hc.toId(), AMOUNT);
         vm.expectRevert();
-        claims.redeem(hc, carol, AMOUNT);
-        assertEq(manager.balanceOf(alice, hc.toId()), AMOUNT, "claims restored");
+        claims.redeem(hc, carol, CREDITED);
+        assertEq(manager.balanceOf(alice, hc.toId()), CREDITED, "claims restored");
         assertEq(manager.allowance(alice, address(claims), hc.toId()), AMOUNT, "allowance restored");
 
         // The same claims redeem to an address the token accepts.
-        claims.redeem(hc, alice, AMOUNT);
+        claims.redeem(hc, alice, CREDITED);
         vm.stopPrank();
-        assertEq(hooked.balanceOf(alice), AMOUNT);
+        assertEq(hooked.balanceOf(alice), CREDITED);
         assertEq(manager.balanceOf(alice, hc.toId()), 0);
     }
 
@@ -243,11 +245,11 @@ contract TokenClaimsTest is SetupHook {
         hooked.setObserver(address(recipient));
         vm.startPrank(alice);
         manager.approve(address(claims), hc.toId(), AMOUNT);
-        claims.redeem(hc, address(recipient), AMOUNT);
+        claims.redeem(hc, address(recipient), CREDITED);
         vm.stopPrank();
         assertTrue(recipient.blocked(), "nested redeem was attempted and failed");
         assertEq(recipient.reentryError(), TokenClaims.ReentrantRedemption.selector);
-        assertEq(hooked.balanceOf(address(recipient)), AMOUNT);
+        assertEq(hooked.balanceOf(address(recipient)), CREDITED);
         assertEq(manager.balanceOf(alice, hc.toId()), 0);
     }
 }

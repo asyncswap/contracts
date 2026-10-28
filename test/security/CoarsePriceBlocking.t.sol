@@ -6,6 +6,7 @@ import {AsyncSwap} from "@async-swap/AsyncSwap.sol";
 import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {MockERC20} from "../utils/MockERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Currency} from "v4-core/types/Currency.sol";
 
 /// @notice Regression for exact eligibility with real Router, hook and PoolManager.
@@ -38,6 +39,11 @@ contract CoarsePriceBlockingTest is SetupHook {
         topUp(buyer, 100 ether);
     }
 
+    /// @dev The 0.02% trade fee, rounded up.
+    function _fee(uint256 x) internal pure returns (uint256) {
+        return Math.mulDiv(x, 2, 10_000, Math.Rounding.Ceil);
+    }
+
     function submit(address maker, bool zfo, uint256 amount, uint256 minimum, uint256 bid)
         internal
         returns (AsyncOrder memory order)
@@ -64,8 +70,10 @@ contract CoarsePriceBlockingTest is SetupHook {
         for (uint256 i; i < 20; ++i) {
             submit(buyer, false, 1_000_000_000, 1e18, 100_000);
         }
-        // Match proceeds are credited as PoolManager claims.
-        assertEq(manager.balanceOf(seller, currency1.toId()) - before, 20_000_000_000);
+        // Match proceeds, less the 0.02% trade fee, are credited as PoolManager claims.
+        assertEq(manager.balanceOf(seller, currency1.toId()) - before, 20 * (1_000_000_000 - _fee(1_000_000_000)));
+        // The vault holds the 20 quote fees and the 40 matched orders' bids.
+        assertEq(manager.balanceOf(address(hook.feeVault()), currency1.toId()), 20 * _fee(1_000_000_000) + 40 * 100_000);
         assertEq(hook.asyncOrder(poolId, _orderIdFor(blocker, true, bad.salt)), 2e15 - 1);
         (bool hasAsk, uint128 price, bytes32 head,) = hook.bestOrder(poolId, false);
         assertTrue(hasAsk);
@@ -115,7 +123,8 @@ contract CoarsePriceBlockingTest is SetupHook {
         AsyncOrder memory bid = submit(buyer, false, 10_800e6, 1e27, 100_000);
         assertEq(hook.asyncOrder(poolId, _orderIdFor(seller, true, better.salt)), 0, "cheaper ask filled");
         assertEq(hook.asyncOrder(poolId, _orderIdFor(blocker, true, worse.salt)), 1e27, "worse ask untouched");
-        assertEq(manager.balanceOf(buyer, currency0.toId()), 1e27, "buyer received the asset");
+        assertEq(manager.balanceOf(buyer, currency0.toId()), 1e27 - _fee(1e27), "buyer received the asset");
+        assertEq(manager.balanceOf(address(hook.feeVault()), currency0.toId()), _fee(1e27), "vault got the asset fee");
         assertEq(hook.asyncOrder(poolId, _orderIdFor(buyer, false, bid.salt)), 700e6, "700 USDC unspent");
     }
 
@@ -129,7 +138,8 @@ contract CoarsePriceBlockingTest is SetupHook {
         submit(buyer, false, 1_000_000_001, 1e18, 100_000);
         assertEq(hook.asyncOrder(poolId, _orderIdFor(seller, true, better.salt)), 0);
         assertEq(hook.asyncOrder(poolId, _orderIdFor(blocker, true, worse.salt)), 1e18);
-        assertEq(manager.balanceOf(seller, currency1.toId()), 1_000_000_000);
+        assertEq(manager.balanceOf(seller, currency1.toId()), 1_000_000_000 - _fee(1_000_000_000));
+        assertEq(manager.balanceOf(address(hook.feeVault()), currency1.toId()), _fee(1_000_000_000) + 2 * 100_000);
     }
 
     function test_sameTickBestBidBeatsHigherFeeAndEarlierAge() public {
@@ -138,6 +148,7 @@ contract CoarsePriceBlockingTest is SetupHook {
         submit(seller, true, 1e18, 1_000_000_000, 100_000);
         assertEq(hook.asyncOrder(poolId, _orderIdFor(buyer, false, better.salt)), 0);
         assertEq(hook.asyncOrder(poolId, _orderIdFor(blocker, false, worse.salt)), 1_000_000_000);
-        assertEq(manager.balanceOf(seller, currency1.toId()), 1_000_000_001);
+        assertEq(manager.balanceOf(seller, currency1.toId()), 1_000_000_001 - _fee(1_000_000_001));
+        assertEq(manager.balanceOf(address(hook.feeVault()), currency1.toId()), _fee(1_000_000_001) + 2 * 100_000);
     }
 }

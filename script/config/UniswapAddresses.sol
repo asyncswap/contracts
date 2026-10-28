@@ -23,6 +23,7 @@ library UniswapAddresses {
     uint256 internal constant CHAIN_ID_CELO = 42220;
     uint256 internal constant CHAIN_ID_ARBITRUM = 42161;
     uint256 internal constant CHAIN_ID_ROBINHOOD = 4663;
+    uint256 internal constant CHAIN_ID_ROBINHOOD_TESTNET = 46630;
     uint256 internal constant CHAIN_ID_ZORA = 7777777;
     uint256 internal constant CHAIN_ID_SEPOLIA = 11155111;
     uint256 internal constant CHAIN_ID_BASE_SEPOLIA = 84532;
@@ -58,6 +59,8 @@ library UniswapAddresses {
         if (chainId == CHAIN_ID_CELO) return 0x288dc841A52FCA2707c6947B3A777c5E56cd87BC;
         if (chainId == CHAIN_ID_ARBITRUM) return 0x360E68faCcca8cA495c1B759Fd9EEe466db9FB32;
         if (chainId == CHAIN_ID_ROBINHOOD) return 0x8366a39CC670B4001A1121B8F6A443A643e40951;
+        // Robinhood Chain testnet: verified PoolManager on explorer.testnet.chain.robinhood.com.
+        if (chainId == CHAIN_ID_ROBINHOOD_TESTNET) return 0x8366a39CC670B4001A1121B8F6A443A643e40951;
         if (chainId == CHAIN_ID_ZORA) return 0x0575338e4C17006aE181B47900A84404247CA30f;
         if (chainId == CHAIN_ID_SEPOLIA) return 0xE03A1074c86CFeDd5C142C4F04F1a1536e203543;
         if (chainId == CHAIN_ID_BASE_SEPOLIA) return 0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408;
@@ -95,6 +98,7 @@ library UniswapAddresses {
         if (chainId == CHAIN_ID_CELO) return 43_985_160;
         if (chainId == CHAIN_ID_ARBITRUM) return 297_842_872;
         if (chainId == CHAIN_ID_ROBINHOOD) return 9_070;
+        if (chainId == CHAIN_ID_ROBINHOOD_TESTNET) return 89_068_706;
         if (chainId == CHAIN_ID_ZORA) return 25_434_534;
         if (chainId == CHAIN_ID_SEPOLIA) return 7_258_946;
         if (chainId == CHAIN_ID_BASE_SEPOLIA) return 19_088_197;

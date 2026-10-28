@@ -7,6 +7,7 @@ import {AsyncSwap} from "@async-swap/AsyncSwap.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {Router} from "@async-swap/Router.sol";
 import {MockERC20} from "../utils/MockERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Test} from "forge-std/Test.sol";
 import {PoolManager} from "v4-core/PoolManager.sol";
 import {Currency, IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
@@ -160,6 +161,11 @@ contract NativeSettlementReentrancyTest is Test {
         erc20.mint(bob, 100 ether);
     }
 
+    /// @dev The 0.02% trade fee, rounded up.
+    function _fee(uint256 x) internal pure returns (uint256) {
+        return Math.mulDiv(x, 2, 10_000, Math.Rounding.Ceil);
+    }
+
     function _expectedSalt(address user, uint256 amountIn, uint256 amountOutMin) internal view returns (bytes32) {
         return
             keccak256(
@@ -211,9 +217,10 @@ contract NativeSettlementReentrancyTest is Test {
         assertEq(maker.reentrySuccesses(), 0, "no re-entry succeeded");
         assertEq(
             address(maker).balance - makerEthBefore + manager.balanceOf(address(maker), 0),
-            amountOutMin,
+            amountOutMin - _fee(amountOutMin),
             "maker paid exactly once, no double-spend"
         );
+        assertEq(manager.balanceOf(address(hook.feeVault()), 0), _fee(amountOutMin), "vault got the output trade fee");
 
         // Order is gone.
         bytes32 id = keccak256(abi.encode(block.chainid, poolId, address(maker), false, order.salt));
@@ -319,9 +326,10 @@ contract NativeSettlementReentrancyTest is Test {
         emit log_named_uint("maker ETH received", alice.balance - aliceEthBefore);
         assertEq(
             alice.balance - aliceEthBefore + manager.balanceOf(alice, 0),
-            amountOutMin,
-            "honest fill pays maker exactly the live price"
+            amountOutMin - _fee(amountOutMin),
+            "honest fill pays maker exactly the live price less the trade fee"
         );
+        assertEq(manager.balanceOf(address(hook.feeVault()), 0), _fee(amountOutMin), "vault got the output trade fee");
         assertEq(address(hook).balance, 0, "no stranded ETH on fair honest fill");
     }
 }

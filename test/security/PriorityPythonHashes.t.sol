@@ -41,7 +41,7 @@ contract PriorityPythonHashesTest is Test {
         );
         assertEq(
             OrderSignatures.hashUpdatePrice(o, id, o.amountIn, 2000000000, 1, 8, 100),
-            0xa94cc7025525c8665b24864de04a05e372946e4026a5ea61d407b57c626217c1
+            0x6d4082761496506f4a4993f0eff28f03db456720fca7d8cd993793e266729703
         );
         assertEq(
             OrderSignatures.hashCancel(o, id, o.amountIn, 1, 9, 100),

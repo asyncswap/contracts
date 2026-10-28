@@ -84,7 +84,8 @@ library AsyncMatching {
     error LimitPriceNotMet();
     error NoActiveLiquidity();
 
-    uint24 private constant POOL_LIQUIDITY_FILL_FEE = 3_000;
+    /// @dev LP fee on a pool-liquidity fill, in v4 pips: 0.02%.
+    uint24 private constant POOL_LIQUIDITY_FILL_FEE = 200;
 
     event AsyncOrderLiquidityFilled(
         PoolId indexed poolId, bytes32 indexed orderId, address indexed maker, uint256 amountIn, uint256 amountOut
@@ -106,24 +107,12 @@ library AsyncMatching {
         );
     }
 
-    function setMinOrder(AsyncFiller.Book storage book, PoolId poolId, uint256 minimum) public {
-        book.setMinOrder(poolId, minimum);
-    }
-
     function bestOrder(AsyncFiller.State storage self, AsyncFiller.Book storage book, bool isBuy)
         public
         view
         returns (bool found, uint128 price, bytes32 orderId, address owner)
     {
         return self.bestOrder(book, isBuy);
-    }
-
-    function level(AsyncFiller.Book storage book, bool isBuy, uint128 price)
-        public
-        view
-        returns (bytes32 head, bytes32 tail, uint32 orderCount)
-    {
-        return book.level(isBuy, price);
     }
 
     function fill(AsyncFiller.State storage self, AsyncFiller.Book storage book, FillParams memory params) public {
@@ -198,12 +187,15 @@ library AsyncMatching {
         PoolKey calldata key,
         bytes32 id,
         address maker,
-        address hook
+        address hook,
+        uint256 protocolFee
     ) public {
         AsyncFiller.OrderInfo storage info = self.orders[id];
-        uint256 amountIn = info.amountIn;
+        // The hook has already moved the protocol's 0.01% of the input to the vault; the rest is
+        // swapped, paying the 0.02% LP fee.
+        uint256 amountIn = info.amountIn - protocolFee;
         uint256 amountOutMin = info.amountOutMin;
-        if (amountIn == 0) revert AsyncFiller.OrderNotFound();
+        if (info.amountIn == 0) revert AsyncFiller.OrderNotFound();
         bool zeroForOne = info.zeroForOne;
         uint256 priorityFee = info.priorityFee;
         // Close the order before the maker's payout, which can run recipient code.
@@ -266,7 +258,7 @@ library AsyncMatching {
         // transferred after the bounded match loop; no underlying token transfer occurs.
         Payouts memory payouts = _payouts(self, key, buyId, sellId);
         (payouts.sellRefund, payouts.buyRefund) = _reduceMatchedOrders(self, book, key, buyId, sellId, amounts, batch);
-        _settleTransfers(self.poolManager, payouts, amounts, batch);
+        _settleTransfers(self.poolManager, self.feeVault, payouts, amounts, batch);
         emit AsyncOrdersMatched(key.toId(), sellId, buyId, amounts.assetAmount, amounts.quoteAmount);
         return true;
     }
@@ -311,14 +303,20 @@ library AsyncMatching {
         payouts.buyOwner = buy.owner;
     }
 
+    /// @dev Each side receives its proceeds less the 0.02% trade fee, which goes to the vault.
     function _settleTransfers(
         IPoolManager manager,
+        address feeVault,
         Payouts memory payouts,
         AsyncFiller.MatchAmounts memory amounts,
         ClaimTransfers.Batch memory batch
     ) private {
-        _transferEscrow(manager, payouts.sellInput, payouts.buyOwner, amounts.assetAmount, batch);
-        _transferEscrow(manager, payouts.buyInput, payouts.sellOwner, amounts.quoteAmount, batch);
+        uint256 assetFee = AsyncFiller.tradeFee(amounts.assetAmount);
+        uint256 quoteFee = AsyncFiller.tradeFee(amounts.quoteAmount);
+        _transferEscrow(manager, payouts.sellInput, payouts.buyOwner, amounts.assetAmount - assetFee, batch);
+        _transferEscrow(manager, payouts.buyInput, payouts.sellOwner, amounts.quoteAmount - quoteFee, batch);
+        _transferEscrow(manager, payouts.sellInput, feeVault, assetFee, batch);
+        _transferEscrow(manager, payouts.buyInput, feeVault, quoteFee, batch);
         if (payouts.sellRefund != 0) {
             _transferEscrow(manager, payouts.sellInput, payouts.sellOwner, payouts.sellRefund, batch);
         }

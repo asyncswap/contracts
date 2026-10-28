@@ -8,6 +8,7 @@ import {FeeVault} from "@async-swap/FeeVault.sol";
 import {Router} from "@async-swap/Router.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {MockERC20} from "../utils/MockERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Test, stdError} from "forge-std/Test.sol";
 import {PoolManager} from "v4-core/PoolManager.sol";
 import {Currency, IPoolManager, SwapParams} from "v4-core/interfaces/IPoolManager.sol";
@@ -18,8 +19,8 @@ import {PoolId} from "v4-core/types/PoolId.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 
 /// @dev Maker that is also its own fill executor. Opens an order through the Router (the only way to open one),
-///      then fills it itself in its own unlock, paying exactly `pay` of the output currency. Used to show the fee
-///      is enforced by the hook, not only by the Router.
+///      then fills it itself in its own unlock, paying exactly `pay` of the output currency. Used to show the
+///      payment and the trade fee are enforced by the hook, not only by the Router.
 contract SelfExecutor {
     IPoolManager pm;
     AsyncSwap hook;
@@ -97,7 +98,7 @@ contract VaultOutsider {
 }
 
 /// @dev Native-output maker whose receive() re-enters mid-fill, while the hook still holds a
-///      positive ETH delta equal to the not-yet-minted fee. Tries to spend that credit on a
+///      positive ETH delta equal to the not-yet-minted trade fee. Tries to spend that credit on a
 ///      second native-output order it executes itself.
 contract ReenteringMaker {
     Router router;
@@ -186,6 +187,11 @@ contract FeeCollectTest is Test {
         erc20.mint(bob, 100 ether);
     }
 
+    /// @dev The 0.02% trade fee, rounded up.
+    function _fee(uint256 x) internal pure returns (uint256) {
+        return Math.mulDiv(x, 2, 10_000, Math.Rounding.Ceil);
+    }
+
     function _salt(address user, uint256 amountIn, uint256 amountOutMin) internal view returns (bytes32) {
         return
             keccak256(
@@ -193,28 +199,32 @@ contract FeeCollectTest is Test {
             );
     }
 
-    /* ---------------- fee is enforced by the hook, not just the Router ---------------- */
+    /* ---------------- payment and fee are enforced by the hook, not just the Router ---------------- */
 
     function test_customExecutor_underpayingFee_ERC20Output_reverts() public {
         SelfExecutor s = new SelfExecutor(manager, hook, router, key, erc20);
         vm.deal(address(s), 1 ether);
         erc20.mint(address(s), 10 ether);
         uint256 amountOutMin = 1 ether;
-        uint256 fee = hook.calculatePoolFee(key.fee, amountOutMin);
-        assertGt(fee, 0);
+        assertEq(hook.calculatePoolFee(key.fee, amountOutMin), 0, "no surcharge on top of the minimum");
+        uint256 feeOut = _fee(amountOutMin);
+        uint256 feeIn = _fee(1 ether);
+        assertGt(feeOut, 0);
 
-        // Pays net only: hook is left -fee in TST, unlock fails.
+        // Pays the maker's net only: hook is left -feeOut in TST, unlock fails.
         vm.expectRevert(IPoolManager.CurrencyNotSettled.selector);
-        s.run(true, 1 ether, amountOutMin, amountOutMin);
-        // Pays one wei short of gross.
+        s.run(true, 1 ether, amountOutMin, amountOutMin - feeOut);
+        // Pays one wei short of the minimum.
         vm.expectRevert(IPoolManager.CurrencyNotSettled.selector);
-        s.run(true, 1 ether, amountOutMin, amountOutMin + fee - 1);
+        s.run(true, 1 ether, amountOutMin, amountOutMin - 1);
         assertEq(manager.balanceOf(address(vault), tok.toId()), 0);
 
-        // Exact gross works and the fee lands in the vault.
-        s.run(true, 1 ether, amountOutMin, amountOutMin + fee);
-        assertEq(manager.balanceOf(address(vault), tok.toId()), fee + 100_000);
-        assertEq(erc20.balanceOf(address(s)), 10 ether - fee - 100_000); // paid gross, got net back
+        // Exact minimum works and the trade fees land in the vault.
+        s.run(true, 1 ether, amountOutMin, amountOutMin);
+        assertEq(manager.balanceOf(address(vault), tok.toId()), feeOut + 100_000);
+        assertEq(manager.balanceOf(address(vault), eth.toId()), feeIn);
+        assertEq(erc20.balanceOf(address(s)), 10 ether - feeOut - 100_000); // paid the minimum, got it back less fee
+        assertEq(address(s).balance + manager.balanceOf(address(s), 0), 1 ether - feeIn); // input back less fee
     }
 
     function test_customExecutor_underpayingFee_nativeOutput_reverts() public {
@@ -222,17 +232,19 @@ contract FeeCollectTest is Test {
         vm.deal(address(s), 10 ether);
         erc20.mint(address(s), 1 ether + 100_000);
         uint256 amountOutMin = 1 ether;
-        uint256 fee = hook.calculatePoolFee(key.fee, amountOutMin);
+        assertEq(hook.calculatePoolFee(key.fee, amountOutMin), 0, "no surcharge on top of the minimum");
+        uint256 feeOut = _fee(amountOutMin);
 
         vm.expectRevert(AsyncSwap.UnaccountedNativeOutput.selector);
-        s.run(false, 1 ether, amountOutMin, amountOutMin);
+        s.run(false, 1 ether, amountOutMin, amountOutMin - feeOut);
         vm.expectRevert(AsyncSwap.UnaccountedNativeOutput.selector);
-        s.run(false, 1 ether, amountOutMin, amountOutMin + fee - 1);
+        s.run(false, 1 ether, amountOutMin, amountOutMin - 1);
         assertEq(manager.balanceOf(address(vault), eth.toId()), 0);
 
-        s.run(false, 1 ether, amountOutMin, amountOutMin + fee);
-        assertEq(manager.balanceOf(address(vault), eth.toId()), fee);
-        assertEq(address(s).balance + manager.balanceOf(address(s), 0), 10 ether - fee);
+        s.run(false, 1 ether, amountOutMin, amountOutMin);
+        assertEq(manager.balanceOf(address(vault), eth.toId()), feeOut);
+        assertEq(manager.balanceOf(address(vault), tok.toId()), _fee(1 ether) + 100_000);
+        assertEq(address(s).balance + manager.balanceOf(address(s), 0), 10 ether - feeOut);
         assertEq(address(hook).balance, 0, "no ETH stranded in hook");
     }
 
@@ -246,10 +258,11 @@ contract FeeCollectTest is Test {
         AsyncOrder memory o = AsyncOrder(key, bob, false, 1 ether, 1 ether, 100_000, 2 ** 96, bytes32(0));
         router.swap(o, abi.encode(AsyncSwap.UserParams(bob, address(router), 1 ether, 100_000)));
         o.salt = _salt(bob, 1 ether, 1 ether);
-        fee = hook.calculatePoolFee(key.fee, 1 ether);
-        router.fillOrder{value: 1 ether + fee}(o, type(uint256).max, "");
+        fee = _fee(1 ether);
+        router.fillOrder{value: 1 ether}(o, type(uint256).max, "");
         vm.stopPrank();
         assertEq(manager.balanceOf(address(vault), eth.toId()), fee);
+        assertEq(manager.balanceOf(address(vault), tok.toId()), _fee(1 ether) + 100_000, "input fee and bid in vault");
     }
 
     function test_thirdParty_cannotTransferOrBurnVaultClaims() public {
@@ -285,7 +298,7 @@ contract FeeCollectTest is Test {
         hook.sweep(eth, treasury);
 
         assertEq(treasury.balance, fee, "owner got exactly the fee");
-        assertEq(erc20.balanceOf(treasury), 100_000, "owner receives forfeited bid only");
+        assertEq(erc20.balanceOf(treasury), 100_000 + _fee(1 ether), "owner receives forfeited bid and input fee only");
         assertEq(manager.balanceOf(address(hook), tok.toId()), 5 ether + 100_000, "input and bid escrow intact");
     }
 
@@ -295,9 +308,9 @@ contract FeeCollectTest is Test {
         ReenteringMaker m = new ReenteringMaker(router, hook, key, erc20);
         erc20.mint(address(m), 10 ether);
 
-        // Order A: big, gets filled by bob. Order B: tiny, so amountOutMin_B + fee_B <= fee_A.
+        // Order A: big, gets filled by bob. Order B: tiny, so amountOutMin_B <= fee_A.
         uint256 outA = 10 ether;
-        uint256 feeA = hook.calculatePoolFee(key.fee, outA);
+        uint256 feeA = _fee(outA);
         uint256 outB = feeA / 2;
         m.submit(1 ether, outA);
         m.submit(1 ether, outB);
@@ -309,11 +322,11 @@ contract FeeCollectTest is Test {
 
         uint256 mBefore = address(m).balance;
         vm.prank(bob);
-        router.fillOrder{value: outA + feeA}(a, type(uint256).max, "");
+        router.fillOrder{value: outA}(a, type(uint256).max, "");
 
         assertFalse(m.reentryReverted(), "native callback never runs");
         assertEq(address(m).balance, mBefore);
-        assertEq(manager.balanceOf(address(m), 0), outA, "maker credited exactly net A");
+        assertEq(manager.balanceOf(address(m), 0), outA - feeA, "maker credited exactly net A");
         assertEq(manager.balanceOf(address(vault), eth.toId()), feeA, "full fee A in vault");
         assertEq(
             hook.asyncOrder(poolId, keccak256(abi.encode(block.chainid, poolId, address(m), false, b.salt))),

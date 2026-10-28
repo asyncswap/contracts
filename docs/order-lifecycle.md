@@ -10,14 +10,18 @@ These diagrams describe the current source, not a deployment or mainnet-readines
 flowchart TD
     A["Submit order: input amount, minimum output, USDC bid"] --> D["Require pool minimum and tiered bid"]
     D --> E["Validate executor; escrow input and bid at creation"]
-    E --> F["Match best opposing prices first; up to 8 pairs"]
+    E --> R{"Pool spot price strictly better than the best opposing level?"}
+    R -- "No" --> F["Match best opposing prices first; up to 8 pairs"]
+    R -- "Yes" --> P["Try the order against pool liquidity first"]
+    P -- "Filled" --> Z
+    P -- "Attempt reverts" --> F
     F --> G["Same-price ties: highest remaining bid, then earliest sequence"]
     G --> H["Settle executable crossing pairs; reduce orders and settle bid shares"]
     H --> I{"Incoming order still open?"}
     I -- "No" --> Z["Order closed; return unused input if any"]
     I -- "Yes" --> J["Try remaining input against pool liquidity"]
     J --> K{"Full remaining input consumed and minimum output met?"}
-    K -- "Yes" --> L["Settle pool fill; 30 bps LP fee; settle remaining bid"]
+    K -- "Yes" --> L["Settle pool fill; 0.02% LP fee + 0.01% protocol fee; settle remaining bid"]
     L --> Z
     K -- "No / attempt reverts" --> M["Roll back LP attempt only; keep remaining order open"]
     M -- "New crossing order or Router.matchBook" --> N["Bounded book matching; partial fills can remain open"]

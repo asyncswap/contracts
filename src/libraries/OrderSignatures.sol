@@ -40,7 +40,7 @@ library OrderSignatures {
     );
 
     bytes32 internal constant UPDATE_PRICE_TYPEHASH = keccak256(
-        "UpdatePrice(address maker,address tokenIn,address tokenOut,uint256 amountIn,uint256 newAmountOutMin,bytes32 orderId,uint64 createdSequence,uint256 nonce,uint256 deadline)"
+        "UpdatePrice(address maker,address tokenIn,address tokenOut,uint256 amountIn,uint256 newAmountOutMin,bytes32 orderId,uint64 sequence,uint256 nonce,uint256 deadline)"
     );
 
     bytes32 internal constant CANCEL_ORDER_TYPEHASH = keccak256(
@@ -97,13 +97,14 @@ library OrderSignatures {
     }
 
     /// @param amountIn the order's stored input, so the maker sees the size of the order they reprice.
-    /// @param createdSequence Immutable incarnation; an identical replacement cannot reuse this signature.
+    /// @param sequence The order's queue sequence, which every reprice and every recreation moves on, so a
+    ///        signature can neither undo a later reprice nor apply to an identical replacement.
     function hashUpdatePrice(
         AsyncOrder memory order,
         bytes32 orderId,
         uint256 amountIn,
         uint256 newAmountOutMin,
-        uint64 createdSequence,
+        uint64 sequence,
         uint256 nonce,
         uint256 deadline
     ) internal pure returns (bytes32) {
@@ -117,7 +118,7 @@ library OrderSignatures {
                 amountIn,
                 newAmountOutMin,
                 orderId,
-                createdSequence,
+                sequence,
                 nonce,
                 deadline
             )

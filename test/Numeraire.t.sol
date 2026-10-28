@@ -2,6 +2,7 @@
 pragma solidity 0.8.26;
 
 import {Test} from "forge-std/Test.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {AsyncSwap} from "src/AsyncSwap.sol";
 import {BaseHook} from "src/BaseHook.sol";
 import {Router} from "src/Router.sol";
@@ -150,8 +151,10 @@ contract NumeraireTest is Test {
         MockERC20 output = buyAsset ? asset : usdc;
         uint256 amountIn = buyAsset ? 100e6 : 1 ether;
         uint256 netOutput = buyAsset ? 1 ether : 99_700_000;
-        uint256 fee = (netOutput / 997) * 3 + ((netOutput % 997) * 3) / 997;
-        uint256 grossOutput = netOutput + fee;
+        // No filler surcharge: the filler pays exactly the minimum; each side pays the 0.02% trade fee.
+        uint256 grossOutput = netOutput;
+        uint256 outFee = Math.mulDiv(netOutput, 2, 10_000, Math.Rounding.Ceil);
+        uint256 inFee = Math.mulDiv(amountIn, 2, 10_000, Math.Rounding.Ceil);
         bool direction = Currency.unwrap(key.currency0) == address(input);
         AsyncOrder memory order = AsyncOrder(key, maker, direction, amountIn, netOutput, 100_000, 2 ** 96, bytes32(0));
         input.mint(maker, amountIn);
@@ -169,10 +172,13 @@ contract NumeraireTest is Test {
         output.approve(address(router), grossOutput);
         router.fillOrder(order, grossOutput, "");
         vm.stopPrank();
-        assertEq(output.balanceOf(maker), netOutput);
-        assertEq(input.balanceOf(filler), amountIn);
+        assertEq(output.balanceOf(maker), netOutput - outFee);
+        assertEq(input.balanceOf(filler), amountIn - inFee);
         assertEq(output.balanceOf(filler), 0);
-        assertEq(manager.balanceOf(address(hook.feeVault()), uint160(address(output))), fee + (buyAsset ? 0 : 100_000));
+        assertEq(
+            manager.balanceOf(address(hook.feeVault()), uint160(address(output))), outFee + (buyAsset ? 0 : 100_000)
+        );
+        assertEq(manager.balanceOf(address(hook.feeVault()), uint160(address(input))), inFee + (buyAsset ? 100_000 : 0));
         assertEq(
             hook.asyncOrder(key.toId(), keccak256(abi.encode(block.chainid, key.toId(), maker, direction, order.salt))),
             0

@@ -27,6 +27,7 @@ contract AsyncSwapTransferEscrowFormalTest is FormalMatchD {
         Case memory c = _mkCase(s, flags);
         (bool matches, uint256 asset, uint256 quote) = _pre(c);
         if (!matches) return;
+        if ((quoteLeg ? quote - _tradeFee(quote) : asset - _tradeFee(asset)) == 0) return; // zero net: no transfer
         _mockLeg(c, asset, quote, quoteLeg ? 3 : 1, _reason(tag));
         uint256 bobBefore = _claims(bob, c.k.currency0);
         vm.expectRevert(_reason(tag));
@@ -39,6 +40,8 @@ contract AsyncSwapTransferEscrowFormalTest is FormalMatchD {
         Case memory c = _mkCase(s, flags | 2);
         (bool matches, uint256 asset, uint256 quote) = _pre(c);
         if (!matches) return;
+        uint256 assetNet = asset - _tradeFee(asset);
+        if (assetNet == 0) return; // the buyer's whole asset went to the trade fee: no buyer transfer
         if (failTransfer) {
             _mockLeg(c, asset, quote, 2, _reason(tag)); // transfer native claims to the buyer
             vm.expectRevert(_reason(tag));
@@ -47,7 +50,8 @@ contract AsyncSwapTransferEscrowFormalTest is FormalMatchD {
             Run memory r = _exec(c);
             assertEq(r.matched, 1);
             Op[] memory legs = _legsOf(r.ops);
-            _assertOp(legs[0], Op(OP_TRANSFER, bob, 0, asset, 0, 0, 0), "native claim transfer");
+            _assertOp(legs[0], Op(OP_TRANSFER, bob, 0, assetNet, 0, 0, 0), "native claim transfer");
+            assertEq(_claims(address(hook.feeVault()), c.k.currency0), _tradeFee(asset), "vault native fee");
         }
     }
 
@@ -62,15 +66,18 @@ contract AsyncSwapTransferEscrowFormalTest is FormalMatchD {
         Case memory c = _mkCase(s, flags & ~uint8(2));
         (bool matches, uint256 asset, uint256 quote) = _pre(c);
         if (!matches) return;
+        uint256 assetNet = asset - _tradeFee(asset);
+        uint256 quoteNet = quote - _tradeFee(quote);
+        if ((quoteLeg ? quoteNet : assetNet) == 0) return; // zero net: the leg is skipped
         if (failTransfer) {
             _mockLeg(c, asset, quote, quoteLeg ? 4 : 2, _reason(tag));
             vm.expectRevert(_reason(tag));
             _run(_matchCalls(c.k));
         } else {
             Op[] memory legs = _legsOf(_exec(c).ops);
-            uint256 i = quoteLeg ? 1 : 0;
+            uint256 i = quoteLeg && assetNet != 0 ? 1 : 0;
             (address token, address to, uint256 amount) =
-                quoteLeg ? (address(token1), alice, quote) : (address(token0), bob, asset);
+                quoteLeg ? (address(token1), alice, quoteNet) : (address(token0), bob, assetNet);
             _assertOp(legs[i], Op(OP_TRANSFER, to, uint256(uint160(token)), amount, 0, 0, 0), "claim transfer");
         }
     }
@@ -81,8 +88,9 @@ contract AsyncSwapTransferEscrowFormalTest is FormalMatchD {
         Run memory r = _exec(c);
         if (r.matched == 0) return;
         Op[] memory legs = _legsOf(r.ops);
-        assertEq(legs.length, 2);
-        for (uint256 leg; leg < 2; ++leg) {
+        // Two legs, less any whose net after the trade fee is zero.
+        assertEq(legs.length, (r.asset - _tradeFee(r.asset) != 0 ? 1 : 0) + (r.quote - _tradeFee(r.quote) != 0 ? 1 : 0));
+        for (uint256 leg; leg < legs.length; ++leg) {
             assertEq(legs[leg].kind, OP_TRANSFER);
         }
         _assertOps(legs, _legOps(c, r));
@@ -95,7 +103,8 @@ contract AsyncSwapTransferEscrowFormalTest is FormalMatchD {
         if (!matches) return;
         mode %= 5; // 0: neither call reverts; 1/3: the burn of a leg; 2/4: its payout
         _mockLeg(c, asset, quote, mode, _reason(tag));
-        if (mode == 0) {
+        // A leg whose net after the trade fee is zero is never transferred, so its mock cannot fire.
+        if (mode == 0 || (mode <= 2 ? asset - _tradeFee(asset) : quote - _tradeFee(quote)) == 0) {
             bytes[] memory res = _runR(_matchCalls(c.k));
             assertEq(abi.decode(res[0], (uint8)), 1, "no revert");
         } else {

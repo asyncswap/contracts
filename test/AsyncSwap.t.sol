@@ -17,6 +17,7 @@ import {SwapParams} from "v4-core/types/PoolOperation.sol";
 import {CustomRevert} from "v4-core/libraries/CustomRevert.sol";
 import {Hooks} from "v4-core/libraries/Hooks.sol";
 import {TickMath} from "v4-core/libraries/TickMath.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract AsyncSwapTest is SetupHook {
     using CurrencyLibrary for Currency;
@@ -29,6 +30,11 @@ contract AsyncSwapTest is SetupHook {
         super.setUp();
         topUp(alice, 100 ether);
         topUp(bob, 100 ether + 100_000);
+    }
+
+    /// @dev The 0.02% trade fee, rounded up.
+    function _fee(uint256 x) internal pure returns (uint256) {
+        return Math.mulDiv(x, 2, 10_000, Math.Rounding.Ceil);
     }
 
     function _orderFromMaker(address maker, bool zeroForOne, uint256 amountIn, uint256 amountOutMin)
@@ -374,10 +380,18 @@ contract AsyncSwapTest is SetupHook {
         assertEq(leftIn, 0, "order cleared after full fill");
 
         // Maker received amountOutMin of REAL token1 — no 6909 withdrawal step needed.
-        assertEq(token1.balanceOf(alice) - aliceToken1Before, amountOutMin, "maker received real token1");
+        assertEq(
+            token1.balanceOf(alice) - aliceToken1Before, amountOutMin - _fee(amountOutMin), "maker received real token1"
+        );
         assertEq(manager.balanceOf(alice, currency1.toId()), 0, "maker has no leftover 6909 of currency1");
         // Filler received amountIn of real token0 in exchange.
-        assertEq(token0.balanceOf(bob) - bobToken0Before, amountIn, "filler got real token0");
+        assertEq(token0.balanceOf(bob) - bobToken0Before, amountIn - _fee(amountIn), "filler got real token0");
+        assertEq(manager.balanceOf(address(hook.feeVault()), currency0.toId()), _fee(amountIn), "vault input fee");
+        assertEq(
+            manager.balanceOf(address(hook.feeVault()), currency1.toId()),
+            _fee(amountOutMin) + 100_000,
+            "vault output fee and bid"
+        );
         assertEq(
             bobToken1Before - token1.balanceOf(bob),
             amountOutMin + hook.calculatePoolFee(key.fee, amountOutMin),
@@ -432,9 +446,18 @@ contract AsyncSwapTest is SetupHook {
         assertEq(bidLeft, quoteAmount - askMinimum, "bid remainder rests");
         // Match proceeds are credited as PoolManager claims; only the seller's bid left in ERC20.
         assertEq(aliceQuoteBefore - token1.balanceOf(alice), 100_000, "seller paid only the bid in ERC20");
-        assertEq(manager.balanceOf(alice, currency1.toId()), askMinimum, "seller receives ask minimum as claims");
+        assertEq(
+            manager.balanceOf(alice, currency1.toId()),
+            askMinimum - _fee(askMinimum),
+            "seller receives ask minimum less the trade fee as claims"
+        );
         assertEq(token0.balanceOf(bob), bobAssetBefore, "buyer receives no ERC20 asset from the match");
-        assertEq(manager.balanceOf(bob, currency0.toId()), assetAmount, "buyer receives matched asset as claims");
+        assertEq(
+            manager.balanceOf(bob, currency0.toId()),
+            assetAmount - _fee(assetAmount),
+            "buyer receives matched asset less the trade fee as claims"
+        );
+        assertEq(manager.balanceOf(address(hook.feeVault()), currency0.toId()), _fee(assetAmount), "vault asset fee");
         assertEq(bobQuoteBefore - token1.balanceOf(bob), quoteAmount + 100_000, "buyer pays input and bid");
         assertEq(manager.balanceOf(address(hook), currency0.toId()), 0, "asset escrow claims consumed");
         assertEq(
@@ -622,13 +645,13 @@ contract AsyncSwapTest is SetupHook {
         // Match proceeds arrive as claims; the bid was paid in ERC20.
         assertEq(
             token1.balanceOf(alice) + manager.balanceOf(alice, currency1.toId()) - usdcBefore,
-            48 ether,
+            48 ether - _fee(50 ether),
             "the full bid remains charged after cancellation"
         );
         assertEq(
             manager.balanceOf(address(hook.feeVault()), currency1.toId()),
-            bidAmount + buyPriorityFee,
-            "filled and canceled bid portions both leave maker escrow"
+            bidAmount + buyPriorityFee + _fee(50 ether),
+            "filled and canceled bid portions and the quote trade fee leave maker escrow"
         );
     }
 
@@ -653,7 +676,7 @@ contract AsyncSwapTest is SetupHook {
         vm.stopPrank();
 
         (uint256 growth0After, uint256 growth1After) = manager.getFeeGrowthGlobals(poolId);
-        assertGt(growth0After, growth0Before, "active LPs earn the 30 bps fill fee in the input token");
+        assertGt(growth0After, growth0Before, "active LPs earn the 0.02% fill fee in the input token");
         assertEq(growth1After, growth1Before, "the bid is not donated to LPs");
         assertEq(manager.balanceOf(address(hook), currency1.toId()), 0, "priority bid claims leave the hook");
         assertEq(
@@ -870,13 +893,15 @@ contract AsyncSwapTest is SetupHook {
 
         // Maker received real currency0 (the maker's chosen output); filler paid currency0 and
         // received currency1 (the maker's input).
-        assertEq(token0.balanceOf(alice) - aliceToken0Before, amountOutMin, "maker received real token0");
+        assertEq(
+            token0.balanceOf(alice) - aliceToken0Before, amountOutMin - _fee(amountOutMin), "maker received real token0"
+        );
         assertEq(
             bobToken0Before - token0.balanceOf(bob),
             amountOutMin + hook.calculatePoolFee(key.fee, amountOutMin),
             "filler paid token0"
         );
-        assertEq(token1.balanceOf(bob) - bobToken1Before, amountIn, "filler received token1");
+        assertEq(token1.balanceOf(bob) - bobToken1Before, amountIn - _fee(amountIn), "filler received token1");
     }
 
     /* ------------------------- multiple orders per maker ------------------------- */
@@ -988,7 +1013,9 @@ contract AsyncSwapTest is SetupHook {
             1.1 ether + hook.calculatePoolFee(key.fee, 1.1 ether),
             "filler paid updated price"
         );
-        assertEq(token1.balanceOf(alice) - aliceToken1Before, 1.1 ether, "maker received updated price");
+        assertEq(
+            token1.balanceOf(alice) - aliceToken1Before, 1.1 ether - _fee(1.1 ether), "maker received updated price"
+        );
     }
 
     /* -------------------- ordering invariants after cancel -------------------- */

@@ -63,7 +63,7 @@ contract AsyncSwapFillOrderFromPoolLiquidityFormalTest is HookUnlockBase {
         _run(_selfFill(o, id));
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapFillOrderFromPoolLiquidity.lean:175 — a successful pool swap: liquidity != 0, the escrowed input claims (amtIn) are burned from the hook, the swap runs at LP fee 3000 and the previous fee is restored, the full input is consumed and out >= amtOutMin.
+    /// @notice formal/Refinement/Swarm/AsyncSwapFillOrderFromPoolLiquidity.lean:175 — a successful pool swap: liquidity != 0, the escrowed input claims (amtIn) leave the hook (0.01% to the FeeVault, the rest burned and swapped), the swap runs at LP fee 200 (was 3000) and the previous fee is restored, the full input is consumed and out >= amtOutMin. (semantics changed by the 0.02% trade fee; Lean statement needs updating)
     function testFuzz_swapAgainstPool_ok(uint256 amountIn, uint256 limitBps, bool zeroForOne) public {
         amountIn = bound(amountIn, 1e6, 10 ether);
         uint256 amountOutMin = amountIn * bound(limitBps, 1, 9_900) / 10_000 + 1;
@@ -74,17 +74,24 @@ contract AsyncSwapFillOrderFromPoolLiquidityFormalTest is HookUnlockBase {
         uint24 feeBefore = _lpFee();
         uint256 gBefore = _inputFeeGrowth(zeroForOne);
         uint256 claimsBefore = _claims(address(hook), inC);
+        // The FeeVault's input claims expected after the fill: + the protocol's 0.01% of the input, rounded up.
+        uint256 vaultWant = _claims(address(hook.feeVault()), inC) + (amountIn + 9_999) / 10_000;
         uint256 makerBefore = out.balanceOf(alice);
         _run(_selfFill(o, id));
         assertGt(manager.getLiquidity(poolId), 0);
         assertEq(
             claimsBefore - _claims(address(hook), inC),
             amountIn + (zeroForOne ? 0 : 100_000),
-            "input and bid claims burned"
+            "input and bid claims leave the hook"
+        );
+        assertEq(
+            _claims(address(hook.feeVault()), inC),
+            vaultWant + (zeroForOne ? 0 : 100_000),
+            "protocol 0.01% (and bid) to the FeeVault"
         );
         assertEq(_lpFee(), feeBefore, "LP fee restored");
         assertEq(feeBefore, 0, "pool fee was 0 before");
-        assertGt(_inputFeeGrowth(zeroForOne) - gBefore, 0, "a non-zero (3000) LP fee was charged on the input");
+        assertGt(_inputFeeGrowth(zeroForOne) - gBefore, 0, "a non-zero (200) LP fee was charged on the input");
         assertGe(out.balanceOf(alice) - makerBefore, amountOutMin, "out >= amountOutMin");
     }
 

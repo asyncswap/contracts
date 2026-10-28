@@ -8,6 +8,7 @@ import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {Router} from "@async-swap/Router.sol";
 import {MockERC20} from "./utils/MockERC20.sol";
 import {Test} from "forge-std/Test.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {PoolManager} from "v4-core/PoolManager.sol";
 import {Currency, IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {Hooks} from "v4-core/libraries/Hooks.sol";
@@ -77,6 +78,11 @@ contract NativeAsyncSwapTest is Test {
     }
 
     /// @dev Predict the contract-assigned salt; mirrors `_createOrder`.
+    /// @dev The 0.02% trade fee, rounded up.
+    function _fee(uint256 x) internal pure returns (uint256) {
+        return Math.mulDiv(x, 2, 10_000, Math.Rounding.Ceil);
+    }
+
     function _expectedSalt(address user, uint256 amountIn, uint256 amountOutMin) internal view returns (bytes32) {
         return
             keccak256(
@@ -171,8 +177,9 @@ contract NativeAsyncSwapTest is Test {
             "filler paid TST"
         );
         assertEq(bob.balance, bobEthBefore, "no native callback during fill");
-        assertEq(manager.balanceOf(bob, 0), 1 ether, "filler received ETH claims");
-        assertEq(erc20.balanceOf(alice) - aliceErc20Before, 0.95 ether, "maker received real TST");
+        assertEq(manager.balanceOf(bob, 0), 1 ether - _fee(1 ether), "filler received ETH claims");
+        assertEq(erc20.balanceOf(alice) - aliceErc20Before, 0.95 ether - _fee(0.95 ether), "maker received real TST");
+        assertEq(manager.balanceOf(address(hook.feeVault()), 0), _fee(1 ether), "vault received the ETH trade fee");
     }
 
     /// If the hook refuses the filler's ETH, the Router reverts before any settlement.
@@ -252,9 +259,10 @@ contract NativeAsyncSwapTest is Test {
         assertEq(
             bobEthBefore - bob.balance, 0.9 ether + hook.calculatePoolFee(order.key.fee, 0.9 ether), "filler paid ETH"
         );
-        assertEq(erc20.balanceOf(bob) - bobErc20Before, 1 ether, "filler received TST");
+        assertEq(erc20.balanceOf(bob) - bobErc20Before, 1 ether - _fee(1 ether), "filler received TST");
         assertEq(alice.balance, aliceEthBefore, "no native callback during fill");
-        assertEq(manager.balanceOf(alice, 0), 0.9 ether, "maker received ETH claims");
+        assertEq(manager.balanceOf(alice, 0), 0.9 ether - _fee(0.9 ether), "maker received ETH claims");
+        assertEq(manager.balanceOf(address(hook.feeVault()), 0), _fee(0.9 ether), "vault received the ETH trade fee");
     }
 
     /* ------------------------------- cancel native input ------------------------------ */

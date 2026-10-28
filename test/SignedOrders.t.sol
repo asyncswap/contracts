@@ -9,6 +9,7 @@ import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 import {OrderSignatures} from "@async-swap/libraries/OrderSignatures.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {Currency} from "v4-core/types/Currency.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 interface IPermit2Domain {
     function DOMAIN_SEPARATOR() external view returns (bytes32);
@@ -212,7 +213,11 @@ contract SignedOrdersTest is SetupHook {
         router.fillOrder(order, type(uint256).max, "");
         vm.stopPrank();
 
-        assertEq(token1.balanceOf(maker), makerOutBefore + AMOUNT_OUT_MIN, "maker paid limit price");
+        assertEq(
+            token1.balanceOf(maker),
+            makerOutBefore + AMOUNT_OUT_MIN - Math.mulDiv(AMOUNT_OUT_MIN, 2, 10_000, Math.Rounding.Ceil),
+            "maker paid limit price less the trade fee"
+        );
         (uint256 storedIn,) = hook.asyncOrderInfo(poolId, _id(order));
         assertEq(storedIn, 0, "order cleared");
     }
@@ -224,9 +229,9 @@ contract SignedOrdersTest is SetupHook {
         view
         returns (bytes memory)
     {
-        bytes32 structHash = OrderSignatures.hashUpdatePrice(
-            order, _id(order), AMOUNT_IN, newOut, hook.orderCreatedSequence(poolId, _id(order)), nonce, deadline
-        );
+        (,,,,, uint64 sequence,) = hook.orderBookOrder(poolId, _id(order));
+        bytes32 structHash =
+            OrderSignatures.hashUpdatePrice(order, _id(order), AMOUNT_IN, newOut, sequence, nonce, deadline);
         return _sign(_digest(hook.DOMAIN_SEPARATOR(), structHash));
     }
 
@@ -245,6 +250,22 @@ contract SignedOrdersTest is SetupHook {
         vm.prank(relayer);
         vm.expectRevert(AsyncSwap.NonceAlreadyUsed.selector);
         hook.updatePriceWithSig(order, 0.99 ether, 7, deadline, sig);
+    }
+
+    /// PoC: a reprice the maker signed but never relayed must not undo a later direct reprice. Here the
+    /// maker signs a lower minimum, then raises it directly; the stale signature would lower it again.
+    function test_updatePriceWithSig_rejectsSignatureAfterDirectReprice() public {
+        AsyncOrder memory order = _createSigned();
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes memory stale = _updateSig(order, 0.9 ether, 41, deadline);
+        vm.prank(maker);
+        hook.updatePrice(order, 1.1 ether);
+
+        vm.prank(relayer);
+        vm.expectRevert(AsyncSwap.InvalidSignature.selector);
+        hook.updatePriceWithSig(order, 0.9 ether, 41, deadline, stale);
+        (, uint256 minimum) = hook.asyncOrderInfo(poolId, _id(order));
+        assertEq(minimum, 1.1 ether, "the maker's direct reprice stands");
     }
 
     function test_updatePriceWithSig_rejectsUnusedSignatureOnReplacement() public {

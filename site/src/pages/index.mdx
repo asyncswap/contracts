@@ -16,8 +16,8 @@ liquidity, and anyone can permissionlessly fill a resting order.
 - **Orders rest until they execute.** Unfilled amounts stay open for later matching, a pool fill,
   a filler, repricing or cancellation.
 - **No swap touches the curve directly.** Every swap becomes an order. The only AMM swaps are the
-  ones the hook makes to fill a resting order from pool liquidity, and those pay active LPs a
-  0.30% fee.
+  ones the hook makes to fill a resting order from pool liquidity, and those pay active LPs
+  0.02% and the protocol 0.01%. Book matches and filler fills take 0.02% of what each side receives.
 - **Proceeds you can always claim.** A book match credits both sides as PoolManager claims, which
   you redeem to any address through `TokenClaims` (ERC-20) or `NativeClaims` (ETH). A recipient a
   token refuses cannot block matching.

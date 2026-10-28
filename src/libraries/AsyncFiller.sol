@@ -33,6 +33,8 @@ library AsyncFiller {
     uint64 internal constant MIN_PRIORITY_FEE = 100_000;
     /// @dev Below a $100 order the least bid is 10 bps of the order instead: min($0.10, 0.1% of it).
     uint256 internal constant PRIORITY_FEE_BPS = 10;
+    /// @dev Protocol fee on what each side of a book match or filler fill receives: 0.02%.
+    uint256 internal constant TRADE_FEE_BPS = 2;
 
     /// @notice Open-order record. Filler fills are full-order; direct matches can reduce it
     ///         partially while keeping the remaining input in escrow.
@@ -164,6 +166,12 @@ library AsyncFiller {
         _append(self, book, id);
     }
 
+    /// @notice The protocol's 0.02% of a payment, rounded up. Each side of a trade receives its
+    ///         proceeds less this fee, so a maker receives at least `amountOutMin` minus 0.02%.
+    function tradeFee(uint256 amount) internal pure returns (uint256) {
+        return Math.mulDiv(amount, TRADE_FEE_BPS, 10_000, Math.Rounding.Ceil);
+    }
+
     /// @notice The least bid for an order worth `notional` numeraire units: $0.10, or 0.1% of the
     ///         order when that is less (orders under $100).
     function minPriorityFee(uint256 notional) internal pure returns (uint256) {
@@ -283,9 +291,9 @@ library AsyncFiller {
     ///         order owner; `filler` is the actual end-user paying the output and receiving the
     ///         input. Must be invoked from inside an `IPoolManager.unlock` context.
     ///
-    /// @dev Settle gross output (native only; ERC20 is pre-settled), pay the signed net minimum to the maker, and mint fee
-    ///      claims to the vault. Burn input claims and pay the full input to the filler.
-    ///      Both currency deltas net to zero. A failed fill reverts all legs.
+    /// @dev Settle gross output (native only; ERC20 is pre-settled), pay the signed minimum less the trade fee to the
+    ///      maker, and mint fee claims to the vault. Burn input claims and pay the input less the trade fee to the
+    ///      filler. Both currency deltas net to zero. A failed fill reverts all legs.
     function fill(
         State storage self,
         Book storage book,
@@ -316,16 +324,36 @@ library AsyncFiller {
         // Then take real tokens straight to the maker — both legs net the hook's output delta to zero.
         if (output.isAddressZero()) output.settle(self.poolManager, hook, amountOutMin + fee, false);
         // Native proceeds are redeemable claims; settlement never invokes native recipients.
-        output.take(self.poolManager, order.owner, amountOutMin, output.isAddressZero());
+        uint256 tradeFeeOut = tradeFee(amountOutMin);
+        output.take(self.poolManager, order.owner, amountOutMin - tradeFeeOut, output.isAddressZero());
 
+        fee += tradeFeeOut;
         if (fee != 0) {
             output.take(self.poolManager, feeVault, fee, true);
             emit OrderFeeAccrued(id, output, fee);
         }
 
-        input.settle(self.poolManager, hook, amountIn, true);
-        input.take(self.poolManager, filler, amountIn, input.isAddressZero());
+        _payFiller(self, id, input, hook, filler, feeVault, amountIn);
         emit AsyncOrderFilled(order.key.toId(), id, filler, amountIn, amountOutMin);
+    }
+
+    /// @dev Burn the order's input claims and pay the filler all but the trade fee, which goes to the vault.
+    function _payFiller(
+        State storage self,
+        bytes32 id,
+        Currency input,
+        address hook,
+        address filler,
+        address feeVault,
+        uint256 amountIn
+    ) private {
+        uint256 tradeFeeIn = tradeFee(amountIn);
+        input.settle(self.poolManager, hook, amountIn, true);
+        input.take(self.poolManager, filler, amountIn - tradeFeeIn, input.isAddressZero());
+        if (tradeFeeIn != 0) {
+            input.take(self.poolManager, feeVault, tradeFeeIn, true);
+            emit OrderFeeAccrued(id, input, tradeFeeIn);
+        }
     }
 
     /// @dev Remove and delete an order, then settle its bid.

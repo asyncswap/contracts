@@ -6,6 +6,7 @@ import {AsyncSwap} from "@async-swap/AsyncSwap.sol";
 import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {MockERC20} from "../utils/MockERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {LPFeeLibrary} from "v4-core/libraries/LPFeeLibrary.sol";
 import {Currency} from "v4-core/types/Currency.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
@@ -134,6 +135,11 @@ contract MinimumOrderTest is SetupHook {
     }
 
     /// The resting bid is matched down to 5 of numeraire, below the minimum: it closes and the 5 return to bob.
+    /// @dev The 0.02% trade fee, rounded up.
+    function _fee(uint256 x) internal pure returns (uint256) {
+        return Math.mulDiv(x, 2, 10_000, Math.Rounding.Ceil);
+    }
+
     function test_partialMatchBuyRemainderBelowMinimum_refunded() public {
         hook.setMinOrder(key, MIN);
         AsyncOrder memory bid = _order(bob, false, 15 ether, 15 ether, 100_000);
@@ -144,7 +150,18 @@ contract MinimumOrderTest is SetupHook {
         assertEq(hook.asyncOrder(poolId, _id(bid)), 0, "remainder below the minimum closes the order");
         assertEq(bobToken1Before - token1.balanceOf(bob), 15 ether + 100_000, "full input and bid were paid");
         assertEq(manager.balanceOf(bob, currency1.toId()), 5 ether, "the unmatched 5 are refunded as claims");
-        assertEq(manager.balanceOf(bob, currency0.toId()), MIN, "the matched 10 asset arrive as claims");
+        assertEq(
+            manager.balanceOf(bob, currency0.toId()),
+            MIN - _fee(MIN),
+            "the matched 10 asset arrive as claims, less the fee"
+        );
+        address vault = address(hook.feeVault());
+        assertEq(manager.balanceOf(vault, currency0.toId()), _fee(MIN), "vault got the asset trade fee");
+        assertEq(
+            manager.balanceOf(vault, currency1.toId()),
+            _fee(MIN) + 2 * 100_000,
+            "vault got the quote fee and both bids; the refund is not charged"
+        );
     }
 
     /* --------------------------------------------- numeraire as currency0 */

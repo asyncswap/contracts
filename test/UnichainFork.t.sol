@@ -2,6 +2,7 @@
 pragma solidity 0.8.26;
 
 import {Test} from "forge-std/Test.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {AsyncSwap} from "src/AsyncSwap.sol";
 import {Router} from "src/Router.sol";
 import {AsyncOrder} from "src/types/AsyncOrder.sol";
@@ -75,6 +76,11 @@ contract UnichainForkTest is Test {
         order.salt = keccak256(abi.encode(block.timestamp, block.number, address(MANAGER), actor, amount, minimum, bid));
     }
 
+    /// @dev The 0.02% trade fee, rounded up.
+    function _fee(uint256 x) internal pure returns (uint256) {
+        return Math.mulDiv(x, 2, 10_000, Math.Rounding.Ceil);
+    }
+
     function _remaining(AsyncOrder memory order) internal view returns (uint256) {
         return hook.asyncOrder(
             key.toId(), keccak256(abi.encode(block.chainid, key.toId(), order.owner, order.zeroForOne, order.salt))
@@ -87,9 +93,10 @@ contract UnichainForkTest is Test {
         AsyncOrder memory ask = _submit(seller, true, 2 ether, 5_000e6, 100_000);
         _submit(buyer, false, 2_500e6, 1 ether, 100_000);
         assertEq(IERC20(USDC).balanceOf(seller), quoteBefore - 100_000);
-        assertEq(MANAGER.balanceOf(seller, uint160(USDC)), 2_500e6);
+        assertEq(MANAGER.balanceOf(seller, uint160(USDC)), 2_500e6 - _fee(2_500e6));
         assertEq(buyer.balance, ethBefore);
-        assertEq(MANAGER.balanceOf(buyer, 0), 1 ether);
+        assertEq(MANAGER.balanceOf(buyer, 0), 1 ether - _fee(1 ether));
+        assertEq(MANAGER.balanceOf(address(hook.feeVault()), 0), _fee(1 ether));
         assertEq(_remaining(ask), 1 ether);
         assertEq(MANAGER.balanceOf(address(hook), 0), 1 ether);
         vm.prank(seller);
@@ -118,11 +125,11 @@ contract UnichainForkTest is Test {
             _submit(actor, true, 1 ether, 2_500e6, 100_000);
         }
         AsyncOrder memory bid = _submit(buyer, false, 25_000e6, 10 ether, 100_000);
-        assertEq(buyer.balance + MANAGER.balanceOf(buyer, 0), 108 ether);
+        assertEq(buyer.balance + MANAGER.balanceOf(buyer, 0), 100 ether + 8 * (1 ether - _fee(1 ether)));
         assertEq(_remaining(bid), 5_000e6);
         vm.prank(makeAddr("permissionless keeper"));
         router.matchBook(key, 2);
-        assertEq(buyer.balance + MANAGER.balanceOf(buyer, 0), 110 ether);
+        assertEq(buyer.balance + MANAGER.balanceOf(buyer, 0), 100 ether + 10 * (1 ether - _fee(1 ether)));
         assertEq(_remaining(bid), 0);
         assertEq(MANAGER.balanceOf(address(hook), 0), 0);
         assertEq(MANAGER.balanceOf(address(hook), uint160(USDC)), 0);

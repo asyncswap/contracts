@@ -23,8 +23,9 @@ contract AsyncSwapSettleTransfersFormalTest is FormalMatchD {
         Run memory r = _exec(c);
         if (r.matched == 0) return;
         Trace memory t = _newTrace();
-        _escrowLeg(t, _inputOf(c, r.sell0.zeroForOne), r.buy0.owner, r.asset);
-        _escrowLeg(t, _inputOf(c, r.buy0.zeroForOne), r.sell0.owner, r.quote);
+        // Each side receives its proceeds less the 0.02% trade fee (the vault's credits are excluded by `_legsOf`).
+        _credit(t, _inputOf(c, r.sell0.zeroForOne), r.buy0.owner, r.asset - _tradeFee(r.asset));
+        _credit(t, _inputOf(c, r.buy0.zeroForOne), r.sell0.owner, r.quote - _tradeFee(r.quote));
         _assertOps(_legsOf(r.ops), _done(t));
         assertEq(r.buy0.owner, bob);
         assertEq(r.sell0.owner, alice);
@@ -37,7 +38,8 @@ contract AsyncSwapSettleTransfersFormalTest is FormalMatchD {
         if (!matches) return;
         mode %= 5; // 0 none; 1/2 asset leg burn/payout; 3/4 quote leg burn/payout
         _mockLeg(c, asset, quote, mode, _reason(tag));
-        if (mode == 0) {
+        // A leg whose net (after the trade fee) is zero is never transferred, so its mock cannot fire.
+        if (mode == 0 || (mode <= 2 ? asset - _tradeFee(asset) : quote - _tradeFee(quote)) == 0) {
             bytes[] memory res = _runR(_matchCalls(c.k));
             assertEq(abi.decode(res[0], (uint8)), 1, "both legs succeed: no revert");
         } else {
@@ -52,19 +54,29 @@ contract AsyncSwapSettleTransfersFormalTest is FormalMatchD {
         Run memory r = _exec(c);
         if (r.matched == 0) return;
         Op[] memory legs = _legsOf(r.ops);
-        assertEq(legs.length, 2);
-        assertEq(legs[0].kind, OP_TRANSFER);
-        assertEq(legs[1].kind, OP_TRANSFER);
-        assertEq(legs[0].cur, _inputOf(c, true).toId());
-        assertEq(legs[1].cur, _inputOf(c, false).toId());
-        assertEq(legs[0].amount, r.asset);
-        assertEq(legs[1].amount, r.quote);
-        assertEq(legs[0].who, bob);
-        assertEq(legs[1].who, alice);
+        uint256 assetNet = r.asset - _tradeFee(r.asset);
+        uint256 quoteNet = r.quote - _tradeFee(r.quote);
+        // A zero net credit is skipped by the batch.
+        assertEq(legs.length, (assetNet != 0 ? 1 : 0) + (quoteNet != 0 ? 1 : 0));
+        uint256 i;
+        if (assetNet != 0) {
+            assertEq(legs[i].kind, OP_TRANSFER);
+            assertEq(legs[i].cur, _inputOf(c, true).toId());
+            assertEq(legs[i].amount, assetNet);
+            assertEq(legs[i++].who, bob);
+        }
+        if (quoteNet != 0) {
+            assertEq(legs[i].kind, OP_TRANSFER);
+            assertEq(legs[i].cur, _inputOf(c, false).toId());
+            assertEq(legs[i].amount, quoteNet);
+            assertEq(legs[i].who, alice);
+        }
         Trace memory t = _newTrace();
-        _escrowLeg(t, c.k.currency0, bob, r.asset);
-        _escrowLeg(t, c.k.currency1, alice, r.quote);
+        _credit(t, c.k.currency0, bob, assetNet);
+        _credit(t, c.k.currency1, alice, quoteNet);
         _assertOps(legs, _done(t));
+        // The vault receives both trade fees.
+        assertEq(_claims(address(hook.feeVault()), c.k.currency0), _tradeFee(r.asset), "vault asset fee");
     }
 
     /// @notice Check the direct claim-transfer path and its observable result.
@@ -74,9 +86,23 @@ contract AsyncSwapSettleTransfersFormalTest is FormalMatchD {
         if (!matches) return;
         (IPoolManager pm0,,) = hook.asyncOrders(c.pid);
         assertEq(address(pm0), address(manager));
-        // Both claim transfers use the configured PoolManager.
-        vm.expectCall(address(manager), abi.encodeCall(IERC6909Claims.transfer, (bob, c.k.currency0.toId(), asset)));
-        vm.expectCall(address(manager), abi.encodeCall(IERC6909Claims.transfer, (alice, c.k.currency1.toId(), quote)));
+        // Every claim transfer (net legs and the vault's trade fees) uses the configured PoolManager.
+        address vault = address(hook.feeVault());
+        uint256 assetNet = asset - _tradeFee(asset);
+        uint256 quoteNet = quote - _tradeFee(quote);
+        if (assetNet != 0) {
+            vm.expectCall(
+                address(manager), abi.encodeCall(IERC6909Claims.transfer, (bob, c.k.currency0.toId(), assetNet))
+            );
+        }
+        if (quoteNet != 0) {
+            vm.expectCall(
+                address(manager), abi.encodeCall(IERC6909Claims.transfer, (alice, c.k.currency1.toId(), quoteNet))
+            );
+        }
+        vm.expectCall(
+            address(manager), abi.encodeCall(IERC6909Claims.transfer, (vault, c.k.currency0.toId(), _tradeFee(asset)))
+        );
         Run memory r = _exec(c);
         assertEq(r.matched, 1);
         (IPoolManager pm1,,) = hook.asyncOrders(c.pid);

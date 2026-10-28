@@ -38,7 +38,8 @@ contract MatchingAdversarialTest is NativeAsyncSwapTest {
         vm.prank(alice);
         router.swap{value: 1 ether}(sell, data);
         assertEq(alice.balance, 1 ether);
-        assertEq(manager.balanceOf(address(rejector), 0), 1 ether);
+        assertEq(manager.balanceOf(address(rejector), 0), 1 ether - _fee(1 ether));
+        assertEq(manager.balanceOf(address(hook.feeVault()), 0), _fee(1 ether), "vault received the ETH trade fee");
         assertEq(address(rejector).balance, 0);
         assertEq(manager.balanceOf(address(hook), 0), 0);
         (bool found,,,) = hook.bestOrder(poolId, true);

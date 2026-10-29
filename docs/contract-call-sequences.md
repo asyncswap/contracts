@@ -18,6 +18,7 @@ sequenceDiagram
     participant Router
     participant Hook as AsyncSwap hook
     participant Match as AsyncMatching / AsyncFiller
+    participant Fee as DynamicFeeOrdering
     participant Permit as Permit2
     participant Token as ERC-20 / USDC
     participant PM as PoolManager
@@ -90,8 +91,15 @@ sequenceDiagram
         Note over Hook,PM: Hook-originated swap skips this hook's callbacks, it does not create another order.
         PM-->>Match: Actual input and output deltas
         Match->>PM: Restore previous LP fee
-        alt Full remaining input consumed and minimum output met
-            Match->>PM: Pay output, settle remaining bid to FeeVault
+        Match->>Fee: charge(state, key, output, tickBefore, amountOut)
+        Note over Fee,PM: First pool fill in a 2-block window: record the tick before it as the reference, no fee.<br/>Later fill in the window that moves the price back toward it: half the price gap it closes.
+        opt Dynamic fee is due
+            Fee->>PM: donate half of the fee to in-range LPs
+            Fee->>PM: mint the rest to FeeVault as claims
+        end
+        Fee-->>Match: Dynamic fee, taken from the output
+        alt Full remaining input consumed and minimum output met after the dynamic fee
+            Match->>PM: Pay output less the dynamic fee, settle remaining bid to FeeVault
             PM-->>Wallet: ERC-20 proceeds or native claims
             Match-->>Hook: Order removed, liquidity fill event
         else Insufficient liquidity, partial execution, or limit not met
@@ -106,7 +114,7 @@ sequenceDiagram
     Note over Wallet,Relayer: For signed submission, the transaction result returns to the submitter instead.
 ```
 
-The LP fee accrues through PoolManager's position accounting. Priority bids are not paid to LPs: every settled bid goes to the FeeVault. LPs do not receive an external callback on every fill.
+The LP fee and the LPs' half of the dynamic fee accrue through PoolManager's position accounting (the dynamic fee by `donate`); see [`dynamic-fee-ordering.md`](dynamic-fee-ordering.md). Priority bids are not paid to LPs: every settled bid goes to the FeeVault. LPs do not receive an external callback on every fill.
 
 ### Private fillers, continuation, repricing, and cancellation
 
@@ -171,7 +179,7 @@ sequenceDiagram
         Router->>PM: unlock(pool fill action)
         PM->>Router: unlockCallback(data)
         Router->>Hook: tryFillOrderFromPoolLiquidity(order)
-        Note over Hook,PM: Same guarded LP self-call as above, no book-priority check.
+        Note over Hook,PM: Same guarded LP self-call as above, including the dynamic fee, no book-priority check.
         Hook-->>Router: true if filled, false if LP attempt rolled back
         Router-->>PM: Callback complete
         PM-->>Router: Unlock complete

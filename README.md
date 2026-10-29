@@ -4,7 +4,7 @@
 
 Async Swap is an on-chain order book and matching engine built as a Uniswap v4 hook. Traders set a limit price for assets paired with USDC. Orders can match with other traders or available pool liquidity. Anyone can permissionlessly fill orders.
 
-Book matching prioritizes price, with higher escrowed USDC bids breaking same-price ties and earlier submissions breaking equal-bid ties. Each side of a book match or filler fill receives its proceeds less a 0.02% protocol fee, so a maker receives at least its minimum output minus 0.02%; fills against pool liquidity pay active LPs 0.02% and the protocol 0.01%, and a fill that moves the pool back within two blocks of a pool fill pays a premium of half the price gap it closes, split between LPs and the protocol. Unfilled amounts remain open for later execution, repricing, or cancellation; fills depend on available liquidity and counterparties.
+Book matching prioritizes price, with higher escrowed USDC bids breaking same-price ties and earlier submissions breaking equal-bid ties. Each side of a book match or filler fill receives its proceeds less a 0.02% protocol fee, so a maker receives at least its minimum output minus 0.02%; fills against pool liquidity pay active LPs 0.02% and the protocol 0.01%, and a fill that moves the pool back within two blocks of a pool fill pays a dynamic fee of half the price gap it closes, split between LPs and the protocol (dynamic fee ordering). Unfilled amounts remain open for later execution, repricing, or cancellation; fills depend on available liquidity and counterparties.
 
 ## Documentation
 
@@ -16,10 +16,11 @@ every push to `main` that touches them; preview it locally with `cd site && bun 
 - [Order lifecycle and priority bids](docs/order-lifecycle.md): matching, fills, cancellation, and bid settlement.
 - [Contract call sequences](docs/contract-call-sequences.md): calls, callbacks, responses, and withdrawals.
 - [Price-key crossing](docs/price-key-crossing.md): price comparisons and rounding.
+- [Dynamic fee ordering](docs/dynamic-fee-ordering.md): the dynamic fee on pool fills that backrun a price move, and who receives it.
 
 ## Build and deployment
 
-`AsyncMatching` is an external Solidity library linked into the hook. `script/deploy.sh <chain-key> [dry-run|broadcast|verify]` (wrapped by `script/deploy-arc.sh` and `script/deploy-unichain.sh`) deploys it deterministically through the shared CREATE2 deployer (`script/00_DeployMatchingLibrary.s.sol`), links that address into the hook bytecode, mines the hook salt, deploys the hook and Router, and records everything under `deployments/<chainId>/`. `verify` publishes sources through Sourcify, tries the chain's Blockscout API, and writes standard JSON inputs for manual upload. Set `ASYNC_MATCHING_LIBRARY_ADDRESS` in `.env.deploy` only to link a library deployed another way. The Foundry test runner links the library automatically.
+`AsyncMatching` is an external Solidity library linked into the hook; it links `TickPrice` and `DynamicFeeOrdering`, which `deploy.sh` deploys first the same way. `script/deploy.sh <chain-key> [dry-run|broadcast|verify]` (wrapped by `script/deploy-arc.sh` and `script/deploy-unichain.sh`) deploys it deterministically through the shared CREATE2 deployer (`script/00_DeployMatchingLibrary.s.sol`), links that address into the hook bytecode, mines the hook salt, deploys the hook and Router, and records everything under `deployments/<chainId>/`. `verify` publishes sources through Sourcify, tries the chain's Blockscout API, and writes standard JSON inputs for manual upload. Set `ASYNC_MATCHING_LIBRARY_ADDRESS` in `.env.deploy` only to link a library deployed another way. The Foundry test runner links the library automatically.
 
 Install dependencies and run the contract suite with:
 

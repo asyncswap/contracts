@@ -21,6 +21,7 @@ const routes = {
   'docs/order-lifecycle.md': '/protocol/order-lifecycle',
   'docs/contract-call-sequences.md': '/protocol/contract-call-sequences',
   'docs/price-key-crossing.md': '/protocol/price-key-crossing',
+  'docs/dynamic-fee-ordering.md': '/protocol/dynamic-fee-ordering',
   'audit/auditagent_report_1_status.md': '/audit/status',
 }
 

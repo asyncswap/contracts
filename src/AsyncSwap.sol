@@ -122,6 +122,17 @@ contract AsyncSwap is BaseHook, EIP712 {
         PoolId indexed poolId, bytes32 indexed orderId, address indexed maker, uint256 amountIn, uint256 amountOut
     );
 
+    /// @notice Mirror of `DynamicFeeOrdering.DynamicFeeCharged`, emitted by the linked library in this
+    ///         contract's context, so the hook's ABI decodes it.
+    event DynamicFeeCharged(
+        PoolId indexed poolId,
+        bytes32 indexed orderId,
+        Currency indexed currency,
+        uint256 toLps,
+        uint256 toFeeVault,
+        int24 refTick
+    );
+
     /// @notice Restricts a call to the protocol owner.
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
@@ -449,7 +460,7 @@ contract AsyncSwap is BaseHook, EIP712 {
         if (protocolFee != 0) {
             Currency input = order.zeroForOne ? order.key.currency0 : order.key.currency1;
             poolManager.transfer(address(feeVault), input.toId(), protocolFee);
-            emit AsyncFiller.OrderFeeAccrued(id, input, protocolFee);
+            emit AsyncFiller.OrderFeeAccrued(poolId, id, input, protocolFee);
         }
         AsyncMatching.fillFromPoolLiquidity(
             state,

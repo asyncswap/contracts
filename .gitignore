@@ -31,3 +31,7 @@ node_modules/
 # Formal Mind's local state (the plan, runs, ledger): kept out of the repository
 /.formal/
 .solidity-auditor/
+
+# Local dev stack (script/local/up.sh): anvil state and the app env it prints
+/.local/
+deployments/31337/

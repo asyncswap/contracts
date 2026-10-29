@@ -4,6 +4,7 @@ pragma solidity 0.8.26;
 import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {Currency} from "v4-core/types/Currency.sol";
+import {PoolId} from "v4-core/types/PoolId.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -18,6 +19,17 @@ library DynamicFeeOrdering {
     /// @dev Blocks a pool fill's starting tick stays the reference that later fills are measured against.
     uint256 internal constant ORDERING_WINDOW = 2;
 
+    /// @notice A pool fill paid the dynamic fee, in `currency` (the fill's output): `toLps` donated to
+    ///         in-range LPs and `toFeeVault` credited to the FeeVault, measured against `refTick`.
+    event DynamicFeeCharged(
+        PoolId indexed poolId,
+        bytes32 indexed orderId,
+        Currency indexed currency,
+        uint256 toLps,
+        uint256 toFeeVault,
+        int24 refTick
+    );
+
     /// @dev Dynamic fee on a pool fill that backruns a price move, taken from its output. The first pool fill in a window of
     ///      `ORDERING_WINDOW` blocks records its starting tick as the reference. A later fill in the
     ///      window that moves the price back toward the reference pays half the price gap it closes:
@@ -27,6 +39,7 @@ library DynamicFeeOrdering {
     function charge(
         AsyncFiller.State storage self,
         PoolKey calldata key,
+        bytes32 id,
         Currency output,
         int24 tickBefore,
         uint256 amountOut
@@ -45,11 +58,21 @@ library DynamicFeeOrdering {
         uint256 gapAfter = SignedMath.abs(to);
         if (gapAfter >= gapBefore) return 0;
         fee = Math.min(amountOut * (gapBefore + gapAfter) / 40_000, amountOut / 2);
+        _pay(self, key, id, output, fee);
+    }
+
+    /// @dev Half of `fee` to in-range LPs (all of it to the FeeVault if none are in range), the rest
+    ///      to the FeeVault as claims.
+    function _pay(AsyncFiller.State storage self, PoolKey calldata key, bytes32 id, Currency output, uint256 fee)
+        private
+    {
+        IPoolManager manager = self.poolManager;
         uint256 toLps = manager.getLiquidity(key.toId()) == 0 ? 0 : fee / 2;
         if (toLps != 0) {
             bool zero = output == key.currency0;
             manager.donate(key, zero ? toLps : 0, zero ? 0 : toLps, "");
         }
         manager.mint(self.feeVault, output.toId(), fee - toLps);
+        emit DynamicFeeCharged(key.toId(), id, output, toLps, fee - toLps, self.refTick);
     }
 }

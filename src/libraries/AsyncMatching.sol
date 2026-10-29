@@ -203,7 +203,7 @@ library AsyncMatching {
         // Close the order before the maker's payout, which can run recipient code.
         AsyncFiller._remove(self, book, id);
         delete self.orders[id];
-        uint256 amountOut = _poolFillNet(self, key, zeroForOne, amountIn, amountOutMin, hook, sqrtPriceLimitX96);
+        uint256 amountOut = _poolFillNet(self, key, id, zeroForOne, amountIn, amountOutMin, hook, sqrtPriceLimitX96);
         Currency output = zeroForOne ? key.currency1 : key.currency0;
         output.take(self.poolManager, maker, amountOut, output.isAddressZero());
         AsyncFiller.settlePriorityFee(self, key, id, maker, priorityFee, hook);
@@ -214,6 +214,7 @@ library AsyncMatching {
     function _poolFillNet(
         AsyncFiller.State storage self,
         PoolKey calldata key,
+        bytes32 id,
         bool zeroForOne,
         uint256 amountIn,
         uint256 amountOutMin,
@@ -223,7 +224,7 @@ library AsyncMatching {
         int24 tickBefore;
         (amountOut, tickBefore) = _swapAgainstPool(self.poolManager, key, zeroForOne, amountIn, hook, sqrtPriceLimitX96);
         amountOut -= DynamicFeeOrdering.charge(
-            self, key, zeroForOne ? key.currency1 : key.currency0, tickBefore, amountOut
+            self, key, id, zeroForOne ? key.currency1 : key.currency0, tickBefore, amountOut
         );
         if (amountOut < amountOutMin) revert LimitPriceNotMet();
     }
@@ -285,6 +286,13 @@ library AsyncMatching {
         Payouts memory payouts = _payouts(self, key, buyId, sellId);
         (payouts.sellRefund, payouts.buyRefund) = _reduceMatchedOrders(self, book, key, buyId, sellId, amounts, batch);
         _settleTransfers(self.poolManager, self.feeVault, payouts, amounts, batch);
+        // Each side's 0.02% comes out of what it receives: the buyer's in the asset, the seller's in the quote.
+        emit AsyncFiller.OrderFeeAccrued(
+            key.toId(), buyId, payouts.sellInput, AsyncFiller.tradeFee(amounts.assetAmount)
+        );
+        emit AsyncFiller.OrderFeeAccrued(
+            key.toId(), sellId, payouts.buyInput, AsyncFiller.tradeFee(amounts.quoteAmount)
+        );
         emit AsyncOrdersMatched(key.toId(), sellId, buyId, amounts.assetAmount, amounts.quoteAmount);
         return true;
     }

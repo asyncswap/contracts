@@ -114,6 +114,20 @@ the dynamic fee is donated to in-range LPs and half is credited to the FeeVault 
 the FeeVault if no liquidity is in range). The dynamic fee is taken in the fill's output currency; the
 maker's minimum must still be met after it. Fills that move the price further from the reference, and
 fills after the window, pay none. See [`dynamic-fee-ordering.md`](dynamic-fee-ordering.md).
+
+Fee events. Every fee the hook moves is logged by the hook, with its pool, so indexers never have to
+recompute fees from gross amounts:
+
+| Fee | Event | Logged against |
+|---|---|---|
+| 0.02% trade fee, book match | `OrderFeeAccrued(poolId, orderId, currency, amount)`, one per side | the buy order (asset fee) and the sell order (quote fee) |
+| 0.02% trade fee, filler fill | `OrderFeeAccrued`, one per side | the filled order: the maker's fee in the output, the filler's in the input |
+| 0.01% protocol fee, pool fill | `OrderFeeAccrued` | the filled order, in the input |
+| Dynamic fee, pool fill | `DynamicFeeCharged(poolId, orderId, currency, toLps, toFeeVault, refTick)` | the filled order, in the output |
+| 0.02% LP fee, pool fill | PoolManager's `Swap` event (`fee`) | the pool |
+
+`AsyncOrdersMatched` and `AsyncOrderFilled` carry gross amounts; `AsyncOrderLiquidityFilled` carries the
+maker's output after the dynamic fee.
 Priority bids are escrowed as hook claims by `addOrder` and settle to the FeeVault: the filled share
 as input fills, the rest when the order closes. They never go to LPs, so liquidity added just before
 a settlement earns none of them.

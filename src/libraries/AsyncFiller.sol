@@ -119,7 +119,7 @@ library AsyncFiller {
 
     event AsyncOrderCancelled(PoolId indexed poolId, bytes32 indexed orderId, address indexed owner, uint256 amountIn);
 
-    event OrderFeeAccrued(bytes32 indexed orderId, Currency indexed currency, uint256 amount);
+    event OrderFeeAccrued(PoolId indexed poolId, bytes32 indexed orderId, Currency indexed currency, uint256 amount);
     event PriorityFeeDonated(PoolId indexed poolId, bytes32 indexed orderId, address indexed maker, uint256 amount);
     event PriorityFeeForfeited(PoolId indexed poolId, bytes32 indexed orderId, address indexed maker, uint256 amount);
     event MinOrderSet(PoolId indexed poolId, uint256 minOrder);
@@ -333,30 +333,28 @@ library AsyncFiller {
         fee += tradeFeeOut;
         if (fee != 0) {
             output.take(self.poolManager, feeVault, fee, true);
-            emit OrderFeeAccrued(id, output, fee);
+            emit OrderFeeAccrued(order.key.toId(), id, output, fee);
         }
 
-        _payFiller(self, id, input, hook, filler, feeVault, amountIn);
+        // `fee` now holds the filler's trade fee on the input (reused to keep the stack shallow).
+        fee = _payFiller(self, input, hook, filler, feeVault, amountIn);
+        if (fee != 0) emit OrderFeeAccrued(order.key.toId(), id, input, fee);
         emit AsyncOrderFilled(order.key.toId(), id, filler, amountIn, amountOutMin);
     }
 
     /// @dev Burn the order's input claims and pay the filler all but the trade fee, which goes to the vault.
     function _payFiller(
         State storage self,
-        bytes32 id,
         Currency input,
         address hook,
         address filler,
         address feeVault,
         uint256 amountIn
-    ) private {
-        uint256 tradeFeeIn = tradeFee(amountIn);
+    ) private returns (uint256 tradeFeeIn) {
+        tradeFeeIn = tradeFee(amountIn);
         input.settle(self.poolManager, hook, amountIn, true);
         input.take(self.poolManager, filler, amountIn - tradeFeeIn, input.isAddressZero());
-        if (tradeFeeIn != 0) {
-            input.take(self.poolManager, feeVault, tradeFeeIn, true);
-            emit OrderFeeAccrued(id, input, tradeFeeIn);
-        }
+        if (tradeFeeIn != 0) input.take(self.poolManager, feeVault, tradeFeeIn, true);
     }
 
     /// @dev Remove and delete an order, then settle its bid.

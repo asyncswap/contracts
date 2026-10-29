@@ -1,6 +1,6 @@
 # AsyncFiller
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/libraries/AsyncFiller.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9e8cf35f5e2c6a55c344fd3f18722f08518bf9f4/src/libraries/AsyncFiller.sol)
 
 **Title:** AsyncFiller
 
@@ -356,7 +356,7 @@ function fill(
 | feeVault | `address` |  |
 | fee | `uint256` |  |
 
-<a id="_payfiller-state-bytes32-currency-address-address-address-uint256" />
+<a id="_payfiller-state-currency-address-address-address-uint256" />
 
 ### \_payFiller
 
@@ -367,13 +367,12 @@ function fill(
 ```solidity
 function _payFiller(
         State storage self,
-        bytes32 id,
         Currency input,
         address hook,
         address filler,
         address feeVault,
         uint256 amountIn
-    ) private;
+    ) private returns (uint256 tradeFeeIn);
 ```
 
 **Parameters**
@@ -381,12 +380,17 @@ function _payFiller(
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | self | `State` |  |
-| id | `bytes32` |  |
 | input | `Currency` |  |
 | hook | `address` |  |
 | filler | `address` |  |
 | feeVault | `address` |  |
 | amountIn | `uint256` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| tradeFeeIn | `uint256` |  |
 
 <a id="_closeorder-state-book-poolkey-bytes32-address" />
 
@@ -714,13 +718,14 @@ event AsyncOrderCancelled(PoolId indexed poolId, bytes32 indexed orderId, addres
 ### OrderFeeAccrued
 
 ```solidity
-event OrderFeeAccrued(bytes32 indexed orderId, Currency indexed currency, uint256 amount);
+event OrderFeeAccrued(PoolId indexed poolId, bytes32 indexed orderId, Currency indexed currency, uint256 amount);
 ```
 
 **Parameters**
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
 | orderId | `bytes32` |  |
 | currency | `Currency` |  |
 | amount | `uint256` |  |

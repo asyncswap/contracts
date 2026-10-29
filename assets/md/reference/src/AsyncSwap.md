@@ -1,6 +1,6 @@
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9e8cf35f5e2c6a55c344fd3f18722f08518bf9f4/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -1157,6 +1157,33 @@ event AsyncOrderLiquidityFilled(
 | maker | `address` |  |
 | amountIn | `uint256` |  |
 | amountOut | `uint256` |  |
+
+### DynamicFeeCharged
+
+Mirror of `DynamicFeeOrdering.DynamicFeeCharged`, emitted by the linked library in this
+contract's context, so the hook's ABI decodes it.
+
+```solidity
+event DynamicFeeCharged(
+        PoolId indexed poolId,
+        bytes32 indexed orderId,
+        Currency indexed currency,
+        uint256 toLps,
+        uint256 toFeeVault,
+        int24 refTick
+    );
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| orderId | `bytes32` |  |
+| currency | `Currency` |  |
+| toLps | `uint256` |  |
+| toFeeVault | `uint256` |  |
+| refTick | `int24` |  |
 
 ## Errors
 

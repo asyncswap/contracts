@@ -191,6 +191,20 @@ the dynamic fee is donated to in-range LPs and half is credited to the FeeVault 
 the FeeVault if no liquidity is in range). The dynamic fee is taken in the fill's output currency; the
 maker's minimum must still be met after it. Fills that move the price further from the reference, and
 fills after the window, pay none. See [`dynamic-fee-ordering.md`](/protocol/dynamic-fee-ordering).
+
+Fee events. Every fee the hook moves is logged by the hook, with its pool, so indexers never have to
+recompute fees from gross amounts:
+
+| Fee | Event | Logged against |
+|---|---|---|
+| 0.02% trade fee, book match | `OrderFeeAccrued(poolId, orderId, currency, amount)`, one per side | the buy order (asset fee) and the sell order (quote fee) |
+| 0.02% trade fee, filler fill | `OrderFeeAccrued`, one per side | the filled order: the maker's fee in the output, the filler's in the input |
+| 0.01% protocol fee, pool fill | `OrderFeeAccrued` | the filled order, in the input |
+| Dynamic fee, pool fill | `DynamicFeeCharged(poolId, orderId, currency, toLps, toFeeVault, refTick)` | the filled order, in the output |
+| 0.02% LP fee, pool fill | PoolManager's `Swap` event (`fee`) | the pool |
+
+`AsyncOrdersMatched` and `AsyncOrderFilled` carry gross amounts; `AsyncOrderLiquidityFilled` carries the
+maker's output after the dynamic fee.
 Priority bids are escrowed as hook claims by `addOrder` and settle to the FeeVault: the filled share
 as input fills, the rest when the order closes. They never go to LPs, so liquidity added just before
 a settlement earns none of them.
@@ -879,6 +893,10 @@ that `AsyncMatching` calls after every pool fill.
 The 0.01% protocol fee on the input and the 0.02% LP fee still apply to every pool fill; the dynamic
 fee is on top of them.
 
+Each charge emits `DynamicFeeCharged(poolId, orderId, currency, toLps, toFeeVault, refTick)` from the
+hook: the fill's output currency, the LPs' and the FeeVault's shares, and the reference tick it was
+measured against. The fill's `AsyncOrderLiquidityFilled` reports the maker's output after the fee.
+
 ## Example
 
 From [`test/BackrunCapture.t.sol`](https://github.com/asyncswap/contracts/blob/main/test/BackrunCapture.t.sol), a pool at 1 USDC per asset with deep
@@ -1187,7 +1205,7 @@ match the code on `main`. Each page links to its source file.
 
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9e8cf35f5e2c6a55c344fd3f18722f08518bf9f4/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -2345,6 +2363,33 @@ event AsyncOrderLiquidityFilled(
 | amountIn | `uint256` |  |
 | amountOut | `uint256` |  |
 
+### DynamicFeeCharged
+
+Mirror of `DynamicFeeOrdering.DynamicFeeCharged`, emitted by the linked library in this
+contract's context, so the hook's ABI decodes it.
+
+```solidity
+event DynamicFeeCharged(
+        PoolId indexed poolId,
+        bytes32 indexed orderId,
+        Currency indexed currency,
+        uint256 toLps,
+        uint256 toFeeVault,
+        int24 refTick
+    );
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| orderId | `bytes32` |  |
+| currency | `Currency` |  |
+| toLps | `uint256` |  |
+| toFeeVault | `uint256` |  |
+| refTick | `int24` |  |
+
 ## Errors
 
 ### ExactInputOnly
@@ -2449,7 +2494,7 @@ struct UserParams {
 
 # BatchActions
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/BatchActions.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9e8cf35f5e2c6a55c344fd3f18722f08518bf9f4/src/BatchActions.sol)
 
 Cancels the caller's orders and redeems the caller's ERC-6909 PoolManager claims
 atomically in one PoolManager unlock.
@@ -2593,7 +2638,7 @@ error OnlyPoolManager();
 
 # BatchCancels
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/BatchCancels.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9e8cf35f5e2c6a55c344fd3f18722f08518bf9f4/src/BatchCancels.sol)
 
 Cancels several orders owned by the caller in one PoolManager unlock.
 
@@ -2696,7 +2741,7 @@ error OnlyPoolManager();
 
 # BatchClaims
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/BatchClaims.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9e8cf35f5e2c6a55c344fd3f18722f08518bf9f4/src/BatchClaims.sol)
 
 Atomically redeems a caller's PoolManager ERC-6909 claims for several currencies.
 
@@ -2822,7 +2867,7 @@ error ReentrantRedemption();
 
 # FeeVault
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/FeeVault.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9e8cf35f5e2c6a55c344fd3f18722f08518bf9f4/src/FeeVault.sol)
 
 Holds and redeems protocol fee claims, never maker escrow.
 
@@ -2929,7 +2974,7 @@ error ZeroAddress();
 
 # ImmutableState
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/ImmutableState.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9e8cf35f5e2c6a55c344fd3f18722f08518bf9f4/src/ImmutableState.sol)
 
 **Title:** Immutable State
 
@@ -2981,7 +3026,7 @@ error NotPoolManager();
 
 # MatchingEngine
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/MatchingEngine.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9e8cf35f5e2c6a55c344fd3f18722f08518bf9f4/src/MatchingEngine.sol)
 
 **Title:** MatchingEngine
 
@@ -3454,7 +3499,7 @@ struct Book {
 
 # NativeClaims
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/NativeClaims.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9e8cf35f5e2c6a55c344fd3f18722f08518bf9f4/src/NativeClaims.sol)
 
 Redeems the caller's PoolManager native ETH claims to a chosen recipient.
 
@@ -3576,7 +3621,7 @@ error ReentrantRedemption();
 
 # Router
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/Router.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9e8cf35f5e2c6a55c344fd3f18722f08518bf9f4/src/Router.sol)
 
 **Inherits:** EIP712
 
@@ -4065,7 +4110,7 @@ enum ActionType {
 
 # TokenClaims
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/TokenClaims.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9e8cf35f5e2c6a55c344fd3f18722f08518bf9f4/src/TokenClaims.sol)
 
 Redeems the caller's PoolManager currency claims to a chosen recipient.
 
@@ -4189,7 +4234,7 @@ error ReentrantRedemption();
 
 # BaseHook
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/BaseHook.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9e8cf35f5e2c6a55c344fd3f18722f08518bf9f4/src/BaseHook.sol)
 
 **Inherits:** IHooks, [ImmutableState](/reference/src/ImmutableState)
 
@@ -4849,7 +4894,7 @@ error HookNotImplemented();
 
 # IFeeOwner
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/FeeVault.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9e8cf35f5e2c6a55c344fd3f18722f08518bf9f4/src/FeeVault.sol)
 
 ## Functions
 
@@ -4869,7 +4914,7 @@ function owner() external view returns (address);
 
 # ISignatureTransfer
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/interfaces/ISignatureTransfer.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9e8cf35f5e2c6a55c344fd3f18722f08518bf9f4/src/interfaces/ISignatureTransfer.sol)
 
 **Title:** ISignatureTransfer
 
@@ -4962,7 +5007,7 @@ struct SignatureTransferDetails {
 
 # AsyncFiller
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/libraries/AsyncFiller.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9e8cf35f5e2c6a55c344fd3f18722f08518bf9f4/src/libraries/AsyncFiller.sol)
 
 **Title:** AsyncFiller
 
@@ -5318,7 +5363,7 @@ function fill(
 | feeVault | `address` |  |
 | fee | `uint256` |  |
 
-<a id="_payfiller-state-bytes32-currency-address-address-address-uint256" />
+<a id="_payfiller-state-currency-address-address-address-uint256" />
 
 ### \_payFiller
 
@@ -5329,13 +5374,12 @@ function fill(
 ```solidity
 function _payFiller(
         State storage self,
-        bytes32 id,
         Currency input,
         address hook,
         address filler,
         address feeVault,
         uint256 amountIn
-    ) private;
+    ) private returns (uint256 tradeFeeIn);
 ```
 
 **Parameters**
@@ -5343,12 +5387,17 @@ function _payFiller(
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | self | `State` |  |
-| id | `bytes32` |  |
 | input | `Currency` |  |
 | hook | `address` |  |
 | filler | `address` |  |
 | feeVault | `address` |  |
 | amountIn | `uint256` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| tradeFeeIn | `uint256` |  |
 
 <a id="_closeorder-state-book-poolkey-bytes32-address" />
 
@@ -5676,13 +5725,14 @@ event AsyncOrderCancelled(PoolId indexed poolId, bytes32 indexed orderId, addres
 ### OrderFeeAccrued
 
 ```solidity
-event OrderFeeAccrued(bytes32 indexed orderId, Currency indexed currency, uint256 amount);
+event OrderFeeAccrued(PoolId indexed poolId, bytes32 indexed orderId, Currency indexed currency, uint256 amount);
 ```
 
 **Parameters**
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
 | orderId | `bytes32` |  |
 | currency | `Currency` |  |
 | amount | `uint256` |  |
@@ -5943,7 +5993,7 @@ struct Book {
 
 # AsyncMatching
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/libraries/AsyncMatching.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9e8cf35f5e2c6a55c344fd3f18722f08518bf9f4/src/libraries/AsyncMatching.sol)
 
 Linked matching module operating on the hook's order and radix-book storage.
 
@@ -6187,7 +6237,7 @@ function fillFromPoolLiquidity(
 | protocolFee | `uint256` |  |
 | sqrtPriceLimitX96 | `uint160` |  |
 
-<a id="_poolfillnet-asyncfiller-state-poolkey-bool-uint256-uint256-address-uint160" />
+<a id="_poolfillnet-asyncfiller-state-poolkey-bytes32-bool-uint256-uint256-address-uint160" />
 
 ### \_poolFillNet
 
@@ -6199,6 +6249,7 @@ function fillFromPoolLiquidity(
 function _poolFillNet(
         AsyncFiller.State storage self,
         PoolKey calldata key,
+        bytes32 id,
         bool zeroForOne,
         uint256 amountIn,
         uint256 amountOutMin,
@@ -6213,6 +6264,7 @@ function _poolFillNet(
 | ---- | ---- | ----------- |
 | self | `AsyncFiller.State` |  |
 | key | `PoolKey` |  |
+| id | `bytes32` |  |
 | zeroForOne | `bool` |  |
 | amountIn | `uint256` |  |
 | amountOutMin | `uint256` |  |
@@ -6749,7 +6801,7 @@ struct UpdateParams {
 
 # ClaimTransfers
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/libraries/ClaimTransfers.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9e8cf35f5e2c6a55c344fd3f18722f08518bf9f4/src/libraries/ClaimTransfers.sol)
 
 <i>
   At most 16 makers and the FeeVault can each receive two currencies in eight matches.
@@ -6829,7 +6881,7 @@ struct Batch {
 
 # CurrencySettler
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/libraries/CurrencySettler.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9e8cf35f5e2c6a55c344fd3f18722f08518bf9f4/src/libraries/CurrencySettler.sol)
 
 **Title:** CurrencySettler
 
@@ -6880,7 +6932,7 @@ function take(Currency currency, IPoolManager manager, address recipient, uint25
 
 # DynamicFeeOrdering
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/libraries/DynamicFeeOrdering.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9e8cf35f5e2c6a55c344fd3f18722f08518bf9f4/src/libraries/DynamicFeeOrdering.sol)
 
 **Title:** Dynamic fee ordering on pool-liquidity fills
 
@@ -6900,7 +6952,7 @@ uint256 internal constant ORDERING_WINDOW = 2;
 
 ## Functions
 
-<a id="charge-asyncfiller-state-poolkey-currency-int24-uint256" />
+<a id="charge-asyncfiller-state-poolkey-bytes32-currency-int24-uint256" />
 
 ### charge
 
@@ -6917,6 +6969,7 @@ uint256 internal constant ORDERING_WINDOW = 2;
 function charge(
         AsyncFiller.State storage self,
         PoolKey calldata key,
+        bytes32 id,
         Currency output,
         int24 tickBefore,
         uint256 amountOut
@@ -6929,6 +6982,7 @@ function charge(
 | ---- | ---- | ----------- |
 | self | `AsyncFiller.State` |  |
 | key | `PoolKey` |  |
+| id | `bytes32` |  |
 | output | `Currency` |  |
 | tickBefore | `int24` |  |
 | amountOut | `uint256` |  |
@@ -6939,9 +6993,62 @@ function charge(
 | ---- | ---- | ----------- |
 | fee | `uint256` |  |
 
+<a id="_pay-asyncfiller-state-poolkey-bytes32-currency-uint256" />
+
+### \_pay
+
+<i>
+  Half of `fee` to in-range LPs (all of it to the FeeVault if none are in range), the rest
+  to the FeeVault as claims.
+</i>
+
+```solidity
+function _pay(AsyncFiller.State storage self, PoolKey calldata key, bytes32 id, Currency output, uint256 fee)
+        private;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| key | `PoolKey` |  |
+| id | `bytes32` |  |
+| output | `Currency` |  |
+| fee | `uint256` |  |
+
+## Events
+
+### DynamicFeeCharged
+
+A pool fill paid the dynamic fee, in `currency` (the fill's output): `toLps` donated to
+in-range LPs and `toFeeVault` credited to the FeeVault, measured against `refTick`.
+
+```solidity
+event DynamicFeeCharged(
+        PoolId indexed poolId,
+        bytes32 indexed orderId,
+        Currency indexed currency,
+        uint256 toLps,
+        uint256 toFeeVault,
+        int24 refTick
+    );
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| orderId | `bytes32` |  |
+| currency | `Currency` |  |
+| toLps | `uint256` |  |
+| toFeeVault | `uint256` |  |
+| refTick | `int24` |  |
+
 # EligiblePrice
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/libraries/EligiblePrice.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9e8cf35f5e2c6a55c344fd3f18722f08518bf9f4/src/libraries/EligiblePrice.sol)
 
 Exact-price summaries on a priority-key radix tree.
 
@@ -7120,7 +7227,7 @@ struct Ratio {
 
 # OrderSignatures
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/libraries/OrderSignatures.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9e8cf35f5e2c6a55c344fd3f18722f08518bf9f4/src/libraries/OrderSignatures.sol)
 
 **Title:** OrderSignatures
 
@@ -7373,7 +7480,7 @@ function hashCancel(
 
 # RadixPriceTree
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/libraries/RadixPriceTree.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9e8cf35f5e2c6a55c344fd3f18722f08518bf9f4/src/libraries/RadixPriceTree.sol)
 
 Patricia radix index for uint128 price levels. Inserts and removals
 traverse at most 128 branch bits; each distinct price creates one
@@ -7589,7 +7696,7 @@ struct Tree {
 
 # TickPrice
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/libraries/TickPrice.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9e8cf35f5e2c6a55c344fd3f18722f08518bf9f4/src/libraries/TickPrice.sol)
 
 Book levels on Uniswap v4 ticks: an order sits at the floor tick (spacing 1, 0.01% steps)
 of its exact currency1/currency0 limit. Levels are a fixed relative width at any price and
@@ -7684,7 +7791,7 @@ function floorTick(uint256 num, uint256 den) internal pure returns (int24);
 
 # AsyncOrderLibrary
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/types/AsyncOrder.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9e8cf35f5e2c6a55c344fd3f18722f08518bf9f4/src/types/AsyncOrder.sol)
 
 **Title:** AsyncOrderLibrary
 
@@ -7726,7 +7833,7 @@ function orderId(AsyncOrder calldata order) internal view returns (bytes32);
 
 # AsyncOrder
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/types/AsyncOrder.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9e8cf35f5e2c6a55c344fd3f18722f08518bf9f4/src/types/AsyncOrder.sol)
 
 Represents an async order for a swap in the Uniswap V4 pool.
 

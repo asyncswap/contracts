@@ -43,6 +43,10 @@ that `AsyncMatching` calls after every pool fill.
 The 0.01% protocol fee on the input and the 0.02% LP fee still apply to every pool fill; the dynamic
 fee is on top of them.
 
+Each charge emits `DynamicFeeCharged(poolId, orderId, currency, toLps, toFeeVault, refTick)` from the
+hook: the fill's output currency, the LPs' and the FeeVault's shares, and the reference tick it was
+measured against. The fill's `AsyncOrderLiquidityFilled` reports the maker's output after the fee.
+
 ## Example
 
 From [`test/BackrunCapture.t.sol`](https://github.com/asyncswap/contracts/blob/main/test/BackrunCapture.t.sol), a pool at 1 USDC per asset with deep

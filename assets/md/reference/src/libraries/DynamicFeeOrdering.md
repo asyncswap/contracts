@@ -1,6 +1,6 @@
 # DynamicFeeOrdering
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/libraries/DynamicFeeOrdering.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9e8cf35f5e2c6a55c344fd3f18722f08518bf9f4/src/libraries/DynamicFeeOrdering.sol)
 
 **Title:** Dynamic fee ordering on pool-liquidity fills
 
@@ -20,7 +20,7 @@ uint256 internal constant ORDERING_WINDOW = 2;
 
 ## Functions
 
-<a id="charge-asyncfiller-state-poolkey-currency-int24-uint256" />
+<a id="charge-asyncfiller-state-poolkey-bytes32-currency-int24-uint256" />
 
 ### charge
 
@@ -37,6 +37,7 @@ uint256 internal constant ORDERING_WINDOW = 2;
 function charge(
         AsyncFiller.State storage self,
         PoolKey calldata key,
+        bytes32 id,
         Currency output,
         int24 tickBefore,
         uint256 amountOut
@@ -49,6 +50,7 @@ function charge(
 | ---- | ---- | ----------- |
 | self | `AsyncFiller.State` |  |
 | key | `PoolKey` |  |
+| id | `bytes32` |  |
 | output | `Currency` |  |
 | tickBefore | `int24` |  |
 | amountOut | `uint256` |  |
@@ -58,3 +60,56 @@ function charge(
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | fee | `uint256` |  |
+
+<a id="_pay-asyncfiller-state-poolkey-bytes32-currency-uint256" />
+
+### \_pay
+
+<i>
+  Half of `fee` to in-range LPs (all of it to the FeeVault if none are in range), the rest
+  to the FeeVault as claims.
+</i>
+
+```solidity
+function _pay(AsyncFiller.State storage self, PoolKey calldata key, bytes32 id, Currency output, uint256 fee)
+        private;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| key | `PoolKey` |  |
+| id | `bytes32` |  |
+| output | `Currency` |  |
+| fee | `uint256` |  |
+
+## Events
+
+### DynamicFeeCharged
+
+A pool fill paid the dynamic fee, in `currency` (the fill's output): `toLps` donated to
+in-range LPs and `toFeeVault` credited to the FeeVault, measured against `refTick`.
+
+```solidity
+event DynamicFeeCharged(
+        PoolId indexed poolId,
+        bytes32 indexed orderId,
+        Currency indexed currency,
+        uint256 toLps,
+        uint256 toFeeVault,
+        int24 refTick
+    );
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| orderId | `bytes32` |  |
+| currency | `Currency` |  |
+| toLps | `uint256` |  |
+| toFeeVault | `uint256` |  |
+| refTick | `int24` |  |

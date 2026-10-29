@@ -78,7 +78,7 @@ FeeVault owns claims recorded in PoolManager. Crediting those claims does not ca
 flowchart TB
     subgraph PoolManager["PoolManager (custody)"]
         Escrow["ERC-6909 claims owned by the hook<br/>one balance per currency<br/>= Σ open orders' remaining input<br/>+ escrowed priority bids"]
-        Fees["ERC-6909 claims owned by FeeVault<br/>= 0.02% trade fees and 0.01% pool-fill fees (both currencies)<br/>+ settled priority bids"]
+        Fees["ERC-6909 claims owned by FeeVault<br/>= 0.02% trade fees and 0.01% pool-fill fees (both currencies)<br/>+ half of each dynamic fee<br/>+ settled priority bids"]
         User["ERC-6909 claims owned by makers / fillers<br/>match proceeds and dust refunds (any currency),<br/>native fill proceeds (claim ID 0)"]
         Reserves["Pool reserves<br/>v4 LP positions"]
     end
@@ -89,6 +89,9 @@ flowchart TB
     CounterW -->|fill: output| MakerW
     Escrow -->|0.02% trade fees from each side's proceeds| Fees
     Escrow -->|priority bids| Fees
+    Reserves -->|pool fill output| MakerW
+    Reserves -->|dynamic fee: half| Fees
+    Reserves -->|dynamic fee: half, donated| Reserves
     Fees -->|collect| OwnerW["Owner-chosen recipient"]
     User -->|TokenClaims.redeem /<br/>NativeClaims.redeem| MakerW
 ```
@@ -102,15 +105,15 @@ charged. An LP fill sends 0.01% of the input to the FeeVault and swaps the rest 
 fee for the active v4 positions; it still pays the full minimum. `calculatePoolFee` (a surcharge on top
 of the minimum) and `calculateHookFee` are zero.
 
-Backrun premium (`BackrunPremium`). The first pool fill in a window of 2 blocks records the pool's
+Dynamic fee ordering (`DynamicFeeOrdering`). The first pool fill in a window of 2 blocks records the pool's
 tick before it as the reference. A later pool fill in that window that moves the price back toward the
-reference pays a premium from its output: half the price gap it closes, `amountOut * (gapBefore +
+reference pays a dynamic fee from its output: half the price gap it closes, `amountOut * (gapBefore +
 gapAfter) / 4` in units of 0.01% (one tick), capped at half the output. The gap is averaged over the
 fill's start and end ticks, so splitting a backrun into several orders costs about the same. Half of
-the premium is donated to in-range LPs and half is credited to the FeeVault as claims (all of it to
-the FeeVault if no liquidity is in range). The premium is taken in the fill's output currency; the
+the dynamic fee is donated to in-range LPs and half is credited to the FeeVault as claims (all of it to
+the FeeVault if no liquidity is in range). The dynamic fee is taken in the fill's output currency; the
 maker's minimum must still be met after it. Fills that move the price further from the reference, and
-fills after the window, pay none. See [`backruns.md`](backruns.md).
+fills after the window, pay none. See [`dynamic-fee-ordering.md`](dynamic-fee-ordering.md).
 Priority bids are escrowed as hook claims by `addOrder` and settle to the FeeVault: the filled share
 as input fills, the rest when the order closes. They never go to LPs, so liquidity added just before
 a settlement earns none of them.
@@ -184,7 +187,7 @@ are in [`order-lifecycle.md`](order-lifecycle.md). Three facts to keep in mind w
 
 - Book matches and filler fills take 0.02% of what each side receives, credited to the FeeVault as
   ERC-6909 claims inside the PoolManager; the LP-fill path charges 0.02% to active v4 positions and
-  0.01% to the FeeVault, plus a backrun premium on fills that move the price back within 2 blocks of a
+  0.01% to the FeeVault, plus a dynamic fee on fills that move the price back within 2 blocks of a
   pool fill (half to LPs, half to the FeeVault). Matching compares the signed limits, so the fee never changes which orders
   cross. `calculatePoolFee` and `calculateHookFee` are zero.
 - A new order goes to the better venue first. If the pool has active liquidity and its spot price is

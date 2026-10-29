@@ -37,7 +37,7 @@ export default defineConfig({
         { text: 'Order lifecycle and priority bids', link: '/protocol/order-lifecycle' },
         { text: 'Contract call sequences', link: '/protocol/contract-call-sequences' },
         { text: 'Price keys and crossing', link: '/protocol/price-key-crossing' },
-        { text: 'Backruns and the backrun premium', link: '/protocol/backruns' },
+        { text: 'Dynamic fee ordering', link: '/protocol/dynamic-fee-ordering' },
       ],
     },
     {

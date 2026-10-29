@@ -16,7 +16,7 @@ import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {RadixPriceTree} from "@async-swap/libraries/RadixPriceTree.sol";
 import {EligiblePrice} from "@async-swap/libraries/EligiblePrice.sol";
-import {BackrunPremium} from "@async-swap/libraries/BackrunPremium.sol";
+import {DynamicFeeOrdering} from "@async-swap/libraries/DynamicFeeOrdering.sol";
 
 /// @notice Linked matching module operating on the hook's order and radix-book storage.
 /// @dev Public library calls use DELEGATECALL, so ERC-6909 escrow remains owned by Async Swap.
@@ -210,7 +210,7 @@ library AsyncMatching {
         emit AsyncOrderLiquidityFilled(key.toId(), id, maker, amountIn, amountOut);
     }
 
-    /// @dev The pool fill's output less the backrun premium; reverts unless it meets the minimum.
+    /// @dev The pool fill's output less the dynamic fee (`DynamicFeeOrdering`); reverts unless it meets the minimum.
     function _poolFillNet(
         AsyncFiller.State storage self,
         PoolKey calldata key,
@@ -222,7 +222,9 @@ library AsyncMatching {
     ) private returns (uint256 amountOut) {
         int24 tickBefore;
         (amountOut, tickBefore) = _swapAgainstPool(self.poolManager, key, zeroForOne, amountIn, hook, sqrtPriceLimitX96);
-        amountOut -= BackrunPremium.charge(self, key, zeroForOne ? key.currency1 : key.currency0, tickBefore, amountOut);
+        amountOut -= DynamicFeeOrdering.charge(
+            self, key, zeroForOne ? key.currency1 : key.currency0, tickBefore, amountOut
+        );
         if (amountOut < amountOutMin) revert LimitPriceNotMet();
     }
 

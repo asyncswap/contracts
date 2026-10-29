@@ -36,7 +36,9 @@ if [[ "${1:-}" == "smoke" ]]; then
     --private-key 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d | grep -E "pool|asset|ONCHAIN"
   exit 0
 fi
-FUND="${1:-}"
+# Anvil account 1 always gets funds too: it's the wallet `up.sh smoke` trades from.
+SMOKE_WALLET=0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+FUND="${1:+$1,}$SMOKE_WALLET"
 
 if ! cast chain-id --rpc-url "$RPC" >/dev/null 2>&1; then
   echo "Starting anvil on $RPC (log: $STATE/anvil.log)..."

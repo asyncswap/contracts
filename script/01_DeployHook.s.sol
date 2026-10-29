@@ -25,6 +25,8 @@ contract DeployHookScript is FFIHelper {
     uint160 internal constant HOOK_PREFIX_MASK = uint160(0xFF) << 152;
     /// @dev Canonical Permit2 (same address on every chain).
     address internal constant PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
+    /// @dev Arachnid's deterministic deployment proxy, which the hook salt is mined against.
+    address internal constant CREATE2_DEPLOYER = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
 
     function setUp() public {
         manager = IPoolManager(_getDeployedPoolManager());
@@ -52,7 +54,7 @@ contract DeployHookScript is FFIHelper {
             salt = _mineSaltViaFfi(initCodeHash);
         }
 
-        address predicted = _computeCreate2Address(0x4e59b44847b379578588920cA78FbF26c0B4956C, salt, initCodeHash);
+        address predicted = _computeCreate2Address(CREATE2_DEPLOYER, salt, initCodeHash);
         require((uint160(predicted) & Hooks.ALL_HOOK_MASK) == hookFlags, "salt does not produce required hook flags");
         require((uint160(predicted) & HOOK_PREFIX_MASK) == HOOK_PREFIX, "salt does not produce required 0x91 prefix");
         require(predicted.code.length == 0, "hook already deployed at predicted address");
@@ -64,8 +66,12 @@ contract DeployHookScript is FFIHelper {
         vm.startBroadcast(OWNER);
         router = new Router(manager, AsyncSwap(payable(predicted)), ISignatureTransfer(PERMIT2));
         require(address(router) == predictedRouter, "deployed router address mismatch");
-        hook = new AsyncSwap{salt: salt}(manager, numeraire, OWNER, predictedRouter);
-        require(address(hook) == predicted, "deployed hook address mismatch");
+        // Through the CREATE2 factory explicitly, as the library scripts do: on some chains Forge runs
+        // `new AsyncSwap{salt: salt}` as a CREATE2 from the sender instead, missing the mined address.
+        (bool ok,) = CREATE2_DEPLOYER.call(abi.encodePacked(salt, creationCode, constructorArgs));
+        require(ok, "hook CREATE2 deployment failed");
+        hook = AsyncSwap(payable(predicted));
+        require(address(hook).code.length > 0, "deployed hook address mismatch");
         require(hook.owner() == OWNER, "hook owner mismatch");
         // Pools start with a $10 minimum order (DEPLOY_MIN_ORDER_USD), in the numeraire's base units.
         uint256 minOrderUsd = vm.envOr("DEPLOY_MIN_ORDER_USD", uint256(10));

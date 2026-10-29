@@ -1,6 +1,6 @@
 # AsyncMatching
 
-[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/libraries/AsyncMatching.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/libraries/AsyncMatching.sol)
 
 Linked matching module operating on the hook's order and radix-book storage.
 
@@ -249,7 +249,7 @@ function fillFromPoolLiquidity(
 ### \_poolFillNet
 
 <i>
-  The pool fill's output less the backrun premium; reverts unless it meets the minimum.
+  The pool fill's output less the dynamic fee (`DynamicFeeOrdering`); reverts unless it meets the minimum.
 </i>
 
 ```solidity

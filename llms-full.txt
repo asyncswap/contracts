@@ -9,6 +9,7 @@ Sitemap:
 - [Order lifecycle and priority bids](/protocol/order-lifecycle)
 - [Contract call sequences](/protocol/contract-call-sequences)
 - [Price keys and crossing](/protocol/price-key-crossing)
+- [Dynamic fee ordering](/protocol/dynamic-fee-ordering)
 - [AuditAgent report 1: status](/audit/status)
 - [Contract reference](/reference/): Contracts, libraries, interfaces and types, generated from the NatSpec in src/.
 - [AsyncSwap](/reference/src/AsyncSwap): Uniswap v4 hook that converts an exact-input swap into an open async order: the maker deposits their input via `_beforeSwap`. Crossing orders settle directly at the resting limit; fillers settle unmatched orders.
@@ -26,9 +27,9 @@ Sitemap:
 - [ISignatureTransfer](/reference/src/interfaces/ISignatureTransfer): Minimal subset of Uniswap Permit2's SignatureTransfer interface used by the Router. Canonical Permit2 lives at 0x000000000022D473030F116dDEE9F6B43aC78BA3 on every chain.
 - [AsyncFiller](/reference/src/libraries/AsyncFiller): Stores open async orders and settles fills against them.
 - [AsyncMatching](/reference/src/libraries/AsyncMatching): Linked matching module operating on the hook's order and radix-book storage.
-- [BackrunPremium](/reference/src/libraries/BackrunPremium): Linked library called by `AsyncMatching` in the hook's context.
 - [ClaimTransfers](/reference/src/libraries/ClaimTransfers)
 - [CurrencySettler](/reference/src/libraries/CurrencySettler): Production copy of v4-core's test-only `CurrencySettler`, using safe transfers so tokens that return no data from `transfer` / `transferFrom` (e.g. USDT) settle correctly.
+- [DynamicFeeOrdering](/reference/src/libraries/DynamicFeeOrdering): Linked library called by `AsyncMatching` in the hook's context.
 - [EligiblePrice](/reference/src/libraries/EligiblePrice): Exact-price summaries on a priority-key radix tree.
 - [OrderSignatures](/reference/src/libraries/OrderSignatures): EIP-712 types for signed AsyncSwap actions. Every type spells out the maker, both tokens and the amounts so wallets render a readable message instead of opaque calldata.
 - [RadixPriceTree](/reference/src/libraries/RadixPriceTree): Patricia radix index for uint128 price levels. Inserts and removals traverse at most 128 branch bits; each distinct price creates one leaf and at most one branch node. Node ids released by `remove` are recycled by later inserts, so the id counter only grows with the peak number of simultaneously stored prices and can never be exhausted in practice (2^31 simultaneous levels).
@@ -154,7 +155,7 @@ FeeVault owns claims recorded in PoolManager. Crediting those claims does not ca
 flowchart TB
     subgraph PoolManager["PoolManager (custody)"]
         Escrow["ERC-6909 claims owned by the hook<br/>one balance per currency<br/>= Σ open orders' remaining input<br/>+ escrowed priority bids"]
-        Fees["ERC-6909 claims owned by FeeVault<br/>= 0.02% trade fees and 0.01% pool-fill fees (both currencies)<br/>+ settled priority bids"]
+        Fees["ERC-6909 claims owned by FeeVault<br/>= 0.02% trade fees and 0.01% pool-fill fees (both currencies)<br/>+ half of each dynamic fee<br/>+ settled priority bids"]
         User["ERC-6909 claims owned by makers / fillers<br/>match proceeds and dust refunds (any currency),<br/>native fill proceeds (claim ID 0)"]
         Reserves["Pool reserves<br/>v4 LP positions"]
     end
@@ -165,6 +166,9 @@ flowchart TB
     CounterW -->|fill: output| MakerW
     Escrow -->|0.02% trade fees from each side's proceeds| Fees
     Escrow -->|priority bids| Fees
+    Reserves -->|pool fill output| MakerW
+    Reserves -->|dynamic fee: half| Fees
+    Reserves -->|dynamic fee: half, donated| Reserves
     Fees -->|collect| OwnerW["Owner-chosen recipient"]
     User -->|TokenClaims.redeem /<br/>NativeClaims.redeem| MakerW
 ```
@@ -178,15 +182,15 @@ charged. An LP fill sends 0.01% of the input to the FeeVault and swaps the rest 
 fee for the active v4 positions; it still pays the full minimum. `calculatePoolFee` (a surcharge on top
 of the minimum) and `calculateHookFee` are zero.
 
-Backrun premium (`BackrunPremium`). The first pool fill in a window of 2 blocks records the pool's
+Dynamic fee ordering (`DynamicFeeOrdering`). The first pool fill in a window of 2 blocks records the pool's
 tick before it as the reference. A later pool fill in that window that moves the price back toward the
-reference pays a premium from its output: half the price gap it closes, `amountOut * (gapBefore +
+reference pays a dynamic fee from its output: half the price gap it closes, `amountOut * (gapBefore +
 gapAfter) / 4` in units of 0.01% (one tick), capped at half the output. The gap is averaged over the
 fill's start and end ticks, so splitting a backrun into several orders costs about the same. Half of
-the premium is donated to in-range LPs and half is credited to the FeeVault as claims (all of it to
-the FeeVault if no liquidity is in range). The premium is taken in the fill's output currency; the
+the dynamic fee is donated to in-range LPs and half is credited to the FeeVault as claims (all of it to
+the FeeVault if no liquidity is in range). The dynamic fee is taken in the fill's output currency; the
 maker's minimum must still be met after it. Fills that move the price further from the reference, and
-fills after the window, pay none.
+fills after the window, pay none. See [`dynamic-fee-ordering.md`](/protocol/dynamic-fee-ordering).
 Priority bids are escrowed as hook claims by `addOrder` and settle to the FeeVault: the filled share
 as input fills, the rest when the order closes. They never go to LPs, so liquidity added just before
 a settlement earns none of them.
@@ -260,7 +264,7 @@ are in [`order-lifecycle.md`](/protocol/order-lifecycle). Three facts to keep in
 
 * Book matches and filler fills take 0.02% of what each side receives, credited to the FeeVault as
   ERC-6909 claims inside the PoolManager; the LP-fill path charges 0.02% to active v4 positions and
-  0.01% to the FeeVault, plus a backrun premium on fills that move the price back within 2 blocks of a
+  0.01% to the FeeVault, plus a dynamic fee on fills that move the price back within 2 blocks of a
   pool fill (half to LPs, half to the FeeVault). Matching compares the signed limits, so the fee never changes which orders
   cross. `calculatePoolFee` and `calculateHookFee` are zero.
 * A new order goes to the better venue first. If the pool has active liquidity and its spot price is
@@ -362,8 +366,8 @@ flowchart TD
     H --> I{"Incoming order still open?"}
     I -- "No" --> Z["Order closed; return unused input if any"]
     I -- "Yes" --> J["Try remaining input against pool liquidity"]
-    J --> K{"Full remaining input consumed and minimum output met?"}
-    K -- "Yes" --> L["Settle pool fill; 0.02% LP fee + 0.01% protocol fee; settle remaining bid"]
+    J --> K{"Full remaining input consumed and minimum output met after the dynamic fee?"}
+    K -- "Yes" --> L["Settle pool fill; 0.02% LP fee + 0.01% protocol fee; dynamic fee if it moves the price back within 2 blocks of a pool fill (half to LPs, half to FeeVault); settle remaining bid"]
     L --> Z
     K -- "No / attempt reverts" --> M["Roll back LP attempt only; keep remaining order open"]
     M -- "New crossing order or Router.matchBook" --> N["Bounded book matching; partial fills can remain open"]
@@ -438,6 +442,7 @@ sequenceDiagram
     participant Router
     participant Hook as AsyncSwap hook
     participant Match as AsyncMatching / AsyncFiller
+    participant Fee as DynamicFeeOrdering
     participant Permit as Permit2
     participant Token as ERC-20 / USDC
     participant PM as PoolManager
@@ -510,8 +515,15 @@ sequenceDiagram
         Note over Hook,PM: Hook-originated swap skips this hook's callbacks, it does not create another order.
         PM-->>Match: Actual input and output deltas
         Match->>PM: Restore previous LP fee
-        alt Full remaining input consumed and minimum output met
-            Match->>PM: Pay output, settle remaining bid to FeeVault
+        Match->>Fee: charge(state, key, output, tickBefore, amountOut)
+        Note over Fee,PM: First pool fill in a 2-block window: record the tick before it as the reference, no fee.<br/>Later fill in the window that moves the price back toward it: half the price gap it closes.
+        opt Dynamic fee is due
+            Fee->>PM: donate half of the fee to in-range LPs
+            Fee->>PM: mint the rest to FeeVault as claims
+        end
+        Fee-->>Match: Dynamic fee, taken from the output
+        alt Full remaining input consumed and minimum output met after the dynamic fee
+            Match->>PM: Pay output less the dynamic fee, settle remaining bid to FeeVault
             PM-->>Wallet: ERC-20 proceeds or native claims
             Match-->>Hook: Order removed, liquidity fill event
         else Insufficient liquidity, partial execution, or limit not met
@@ -526,7 +538,7 @@ sequenceDiagram
     Note over Wallet,Relayer: For signed submission, the transaction result returns to the submitter instead.
 ```
 
-The LP fee accrues through PoolManager's position accounting. Priority bids are not paid to LPs: every settled bid goes to the FeeVault. LPs do not receive an external callback on every fill.
+The LP fee and the LPs' half of the dynamic fee accrue through PoolManager's position accounting (the dynamic fee by `donate`); see [`dynamic-fee-ordering.md`](/protocol/dynamic-fee-ordering). Priority bids are not paid to LPs: every settled bid goes to the FeeVault. LPs do not receive an external callback on every fill.
 
 ### Private fillers, continuation, repricing, and cancellation
 
@@ -591,7 +603,7 @@ sequenceDiagram
         Router->>PM: unlock(pool fill action)
         PM->>Router: unlockCallback(data)
         Router->>Hook: tryFillOrderFromPoolLiquidity(order)
-        Note over Hook,PM: Same guarded LP self-call as above, no book-priority check.
+        Note over Hook,PM: Same guarded LP self-call as above, including the dynamic fee, no book-priority check.
         Hook-->>Router: true if filled, false if LP attempt rolled back
         Router-->>PM: Callback complete
         PM-->>Router: Unlock complete
@@ -821,6 +833,93 @@ worst-case gas certificate or universally optimal batch size is claimed.
 
 The updated whitepaper is in the local `asyncswap/whitepaper` checkout. Its new section contains
 integer safety and search arguments, gas curves, and the constrained parameter objective.
+
+# Dynamic fee ordering
+
+A large order that fills against pool liquidity moves the pool price. Whoever trades the price back
+earns the difference: a **backrun**. With only a static fee, that profit goes entirely to the
+backrunner, and the LPs whose liquidity absorbed both trades lose it. Since v1.1.0, **dynamic fee
+ordering** charges a pool fill that moves the price back a **dynamic fee** sized to the gap it closes,
+and splits it between the LPs and the protocol.
+
+The dynamic fee applies only to pool fills (`fillFromPoolLiquidity`, including the pool attempt when a
+new order arrives). Book matches and filler fills settle at the orders' signed limits, move no pool
+price and don't pay it.
+
+## How it works
+
+The logic is in [`DynamicFeeOrdering.sol`](https://github.com/asyncswap/contracts/blob/main/src/libraries/DynamicFeeOrdering.sol), a linked library
+that `AsyncMatching` calls after every pool fill.
+
+1. **Reference.** Each pool stores a reference tick and the block it was set in
+   (`AsyncFiller.State.refTick`, `refBlock`). The first pool fill after the window has expired records
+   the pool's tick from *before* that fill as the new reference, and pays no dynamic fee.
+2. **Window.** The reference holds for `ORDERING_WINDOW` = 2 blocks after the block that set it. A
+   pool fill after that starts a new window.
+3. **Dynamic fee.** A pool fill inside the window that ends closer to the reference than it started
+   pays
+
+   ```text
+   fee = min(amountOut × (gapBefore + gapAfter) / 40_000, amountOut / 2)
+   ```
+
+   where `gapBefore` and `gapAfter` are the distances, in ticks, from the reference to the pool's tick
+   before and after the fill. If the fill crosses the reference, `gapAfter` is 0: the part past the
+   reference closes no gap. One tick is about 0.01%, so `(gapBefore + gapAfter) / 2` is the average
+   price gap over the fill in basis points, and the fee is **half the price gap the fill closes**.
+4. **No dynamic fee** for a fill that moves the price further from the reference, or doesn't move it.
+5. **Split.** Half the dynamic fee is donated to in-range LPs (`PoolManager.donate`). The other half,
+   plus any rounding, is credited to the FeeVault as ERC-6909 claims. If no liquidity is in range
+   after the fill, all of it goes to the FeeVault.
+6. **Maker protection.** The dynamic fee is taken from the fill's output before the maker is paid, and
+   the output that remains must still meet the order's minimum. Otherwise the pool fill reverts, and
+   the order goes to the book or rests, exactly as when a pool fill misses its limit for any other
+   reason.
+
+The 0.01% protocol fee on the input and the 0.02% LP fee still apply to every pool fill; the dynamic
+fee is on top of them.
+
+## Example
+
+From [`test/BackrunCapture.t.sol`](https://github.com/asyncswap/contracts/blob/main/test/BackrunCapture.t.sol), a pool at 1 USDC per asset with deep
+liquidity:
+
+| | Before v1.1.0 | v1.1.0 |
+|---|---|---|
+| Alice sells 2,000 asset into the pool | price drops | price drops; reference set |
+| Bob buys back with the USDC Alice received, same block | static fees only | pays the dynamic fee |
+| Bob's profit, valued at the pre-sell price | 3.39 USDC | 1.34 USDC |
+| LPs and FeeVault capture from Bob's backrun | about 0.6 USDC | 2.65 USDC |
+
+Bob still profits, so pools keep getting brought back to the market price, but most of the gap now
+stays with the LPs and the protocol.
+
+## Splitting a backrun
+
+A fee charged per swap invites splitting: several small backruns each pay a lower rate. Here the
+dynamic fee depends on the gap at each fill's start and end, not on how many fills there are.
+Splitting one backrun into several orders pays roughly the same total, because each piece pays on the
+part of the gap it closes. In the test, five orders earn 1.38 USDC against 1.34 for one; the small
+difference comes from averaging the gap linearly in ticks while the pool's price curve is not linear.
+
+## What it doesn't cover
+
+* **The dynamic fee is in the output currency.** A backrun that buys the asset pays it in the asset;
+  one that sells the asset pays in USDC. Valued at the reference price, the two are the same.
+* **Only within the window.** A backrun that lands more than 2 blocks after the fill that set the
+  reference pays nothing. On chains with short block times, such as Unichain, that's a few seconds.
+* **One reference per window.** If several large fills happen in one window, they're all measured
+  against the price before the first one.
+* **It's an estimate.** The gap is measured in ticks against the pool's own earlier price, not against
+  an outside market price. A fill that moves the pool back after the outside market really moved
+  still pays within the window.
+* **Not yet in the Lean proofs.** The Foundry tests and the uv4 Python model cover it.
+
+## Deployment
+
+`DynamicFeeOrdering` is linked into `AsyncMatching`, which is linked into the hook. `script/deploy.sh`
+deploys it through the shared CREATE2 deployer (`script/00_DeployDynamicFeeOrdering.s.sol`, salt
+`asyncswap.v2.DynamicFeeOrdering`) before `AsyncMatching`, and records it in `deployments/<chainId>/`.
 
 # AuditAgent report 1: status
 
@@ -1088,7 +1187,7 @@ match the code on `main`. Each page links to its source file.
 
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -2350,7 +2449,7 @@ struct UserParams {
 
 # BatchActions
 
-[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/BatchActions.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/BatchActions.sol)
 
 Cancels the caller's orders and redeems the caller's ERC-6909 PoolManager claims
 atomically in one PoolManager unlock.
@@ -2494,7 +2593,7 @@ error OnlyPoolManager();
 
 # BatchCancels
 
-[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/BatchCancels.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/BatchCancels.sol)
 
 Cancels several orders owned by the caller in one PoolManager unlock.
 
@@ -2597,7 +2696,7 @@ error OnlyPoolManager();
 
 # BatchClaims
 
-[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/BatchClaims.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/BatchClaims.sol)
 
 Atomically redeems a caller's PoolManager ERC-6909 claims for several currencies.
 
@@ -2723,7 +2822,7 @@ error ReentrantRedemption();
 
 # FeeVault
 
-[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/FeeVault.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/FeeVault.sol)
 
 Holds and redeems protocol fee claims, never maker escrow.
 
@@ -2830,7 +2929,7 @@ error ZeroAddress();
 
 # ImmutableState
 
-[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/ImmutableState.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/ImmutableState.sol)
 
 **Title:** Immutable State
 
@@ -2882,7 +2981,7 @@ error NotPoolManager();
 
 # MatchingEngine
 
-[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/MatchingEngine.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/MatchingEngine.sol)
 
 **Title:** MatchingEngine
 
@@ -3355,7 +3454,7 @@ struct Book {
 
 # NativeClaims
 
-[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/NativeClaims.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/NativeClaims.sol)
 
 Redeems the caller's PoolManager native ETH claims to a chosen recipient.
 
@@ -3477,7 +3576,7 @@ error ReentrantRedemption();
 
 # Router
 
-[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/Router.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/Router.sol)
 
 **Inherits:** EIP712
 
@@ -3966,7 +4065,7 @@ enum ActionType {
 
 # TokenClaims
 
-[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/TokenClaims.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/TokenClaims.sol)
 
 Redeems the caller's PoolManager currency claims to a chosen recipient.
 
@@ -4090,7 +4189,7 @@ error ReentrantRedemption();
 
 # BaseHook
 
-[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/BaseHook.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/BaseHook.sol)
 
 **Inherits:** IHooks, [ImmutableState](/reference/src/ImmutableState)
 
@@ -4750,7 +4849,7 @@ error HookNotImplemented();
 
 # IFeeOwner
 
-[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/FeeVault.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/FeeVault.sol)
 
 ## Functions
 
@@ -4770,7 +4869,7 @@ function owner() external view returns (address);
 
 # ISignatureTransfer
 
-[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/interfaces/ISignatureTransfer.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/interfaces/ISignatureTransfer.sol)
 
 **Title:** ISignatureTransfer
 
@@ -4863,7 +4962,7 @@ struct SignatureTransferDetails {
 
 # AsyncFiller
 
-[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/libraries/AsyncFiller.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/libraries/AsyncFiller.sol)
 
 **Title:** AsyncFiller
 
@@ -5844,7 +5943,7 @@ struct Book {
 
 # AsyncMatching
 
-[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/libraries/AsyncMatching.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/libraries/AsyncMatching.sol)
 
 Linked matching module operating on the hook's order and radix-book storage.
 
@@ -6093,7 +6192,7 @@ function fillFromPoolLiquidity(
 ### \_poolFillNet
 
 <i>
-  The pool fill's output less the backrun premium; reverts unless it meets the minimum.
+  The pool fill's output less the dynamic fee (`DynamicFeeOrdering`); reverts unless it meets the minimum.
 </i>
 
 ```solidity
@@ -6648,70 +6747,9 @@ struct UpdateParams {
 | newAmountOutMin | `uint256` |  |
 | caller | `address` |  |
 
-# BackrunPremium
-
-[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/libraries/BackrunPremium.sol)
-
-**Title:** Backrun premium on pool-liquidity fills
-
-Linked library called by `AsyncMatching` in the hook's context.
-
-## Constants
-
-### BACKRUN_WINDOW
-
-<i>
-  Blocks a pool fill's starting tick stays the reference that later fills are measured against.
-</i>
-
-```solidity
-uint256 internal constant BACKRUN_WINDOW = 2;
-```
-
-## Functions
-
-<a id="charge-asyncfiller-state-poolkey-currency-int24-uint256" />
-
-### charge
-
-<i>
-  Backrun premium on a pool fill, taken from its output. The first pool fill in a window of
-  `BACKRUN_WINDOW` blocks records its starting tick as the reference. A later fill in the
-  window that moves the price back toward the reference pays half the price gap it closes:
-  `amountOut * avgGap / 2`, with the gap averaged over the fill's start and end ticks (one
-  tick is about 0.01%), so splitting a backrun does not lower its total. Half of the premium
-  is donated to in-range LPs and half credited to the FeeVault as claims.
-</i>
-
-```solidity
-function charge(
-        AsyncFiller.State storage self,
-        PoolKey calldata key,
-        Currency output,
-        int24 tickBefore,
-        uint256 amountOut
-    ) public returns (uint256 premium);
-```
-
-**Parameters**
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| self | `AsyncFiller.State` |  |
-| key | `PoolKey` |  |
-| output | `Currency` |  |
-| tickBefore | `int24` |  |
-| amountOut | `uint256` |  |
-
-**Returns**
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| premium | `uint256` |  |
-
 # ClaimTransfers
 
-[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/libraries/ClaimTransfers.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/libraries/ClaimTransfers.sol)
 
 <i>
   At most 16 makers and the FeeVault can each receive two currencies in eight matches.
@@ -6791,7 +6829,7 @@ struct Batch {
 
 # CurrencySettler
 
-[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/libraries/CurrencySettler.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/libraries/CurrencySettler.sol)
 
 **Title:** CurrencySettler
 
@@ -6840,9 +6878,70 @@ function take(Currency currency, IPoolManager manager, address recipient, uint25
 | amount | `uint256` |  |
 | claims | `bool` | If true, mint ERC-6909 claims instead of transferring tokens. |
 
+# DynamicFeeOrdering
+
+[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/libraries/DynamicFeeOrdering.sol)
+
+**Title:** Dynamic fee ordering on pool-liquidity fills
+
+Linked library called by `AsyncMatching` in the hook's context.
+
+## Constants
+
+### ORDERING_WINDOW
+
+<i>
+  Blocks a pool fill's starting tick stays the reference that later fills are measured against.
+</i>
+
+```solidity
+uint256 internal constant ORDERING_WINDOW = 2;
+```
+
+## Functions
+
+<a id="charge-asyncfiller-state-poolkey-currency-int24-uint256" />
+
+### charge
+
+<i>
+  Dynamic fee on a pool fill that backruns a price move, taken from its output. The first pool fill in a window of
+  `ORDERING_WINDOW` blocks records its starting tick as the reference. A later fill in the
+  window that moves the price back toward the reference pays half the price gap it closes:
+  `amountOut * avgGap / 2`, with the gap averaged over the fill's start and end ticks (one
+  tick is about 0.01%), so splitting a backrun does not lower its total. Half of the fee
+  is donated to in-range LPs and half credited to the FeeVault as claims.
+</i>
+
+```solidity
+function charge(
+        AsyncFiller.State storage self,
+        PoolKey calldata key,
+        Currency output,
+        int24 tickBefore,
+        uint256 amountOut
+    ) public returns (uint256 fee);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| key | `PoolKey` |  |
+| output | `Currency` |  |
+| tickBefore | `int24` |  |
+| amountOut | `uint256` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| fee | `uint256` |  |
+
 # EligiblePrice
 
-[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/libraries/EligiblePrice.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/libraries/EligiblePrice.sol)
 
 Exact-price summaries on a priority-key radix tree.
 
@@ -7021,7 +7120,7 @@ struct Ratio {
 
 # OrderSignatures
 
-[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/libraries/OrderSignatures.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/libraries/OrderSignatures.sol)
 
 **Title:** OrderSignatures
 
@@ -7274,7 +7373,7 @@ function hashCancel(
 
 # RadixPriceTree
 
-[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/libraries/RadixPriceTree.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/libraries/RadixPriceTree.sol)
 
 Patricia radix index for uint128 price levels. Inserts and removals
 traverse at most 128 branch bits; each distinct price creates one
@@ -7490,7 +7589,7 @@ struct Tree {
 
 # TickPrice
 
-[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/libraries/TickPrice.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/libraries/TickPrice.sol)
 
 Book levels on Uniswap v4 ticks: an order sits at the floor tick (spacing 1, 0.01% steps)
 of its exact currency1/currency0 limit. Levels are a fixed relative width at any price and
@@ -7585,7 +7684,7 @@ function floorTick(uint256 num, uint256 den) internal pure returns (int24);
 
 # AsyncOrderLibrary
 
-[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/types/AsyncOrder.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/types/AsyncOrder.sol)
 
 **Title:** AsyncOrderLibrary
 
@@ -7627,7 +7726,7 @@ function orderId(AsyncOrder calldata order) internal view returns (bytes32);
 
 # AsyncOrder
 
-[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/types/AsyncOrder.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/types/AsyncOrder.sol)
 
 Represents an async order for a swap in the Uniswap V4 pool.
 

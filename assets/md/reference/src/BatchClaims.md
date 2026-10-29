@@ -1,6 +1,6 @@
 # BatchClaims
 
-[Git Source](https://github.com/asyncswap/contracts/blob/eff0e7ca5ad2433bf20dd7668ba6175717256ba1/src/BatchClaims.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/e578e5b3753d37bfd6053629c8aed4ad3d31df45/src/BatchClaims.sol)
 
 Atomically redeems a caller's PoolManager ERC-6909 claims for several currencies.
 

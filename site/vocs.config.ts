@@ -25,6 +25,7 @@ export default defineConfig({
   topNav: [
     { text: 'Protocol', link: '/protocol/overview' },
     { text: 'Contracts', link: '/reference' },
+    { text: 'Deployments', link: '/deployments' },
     { text: 'App', link: 'https://app.asyncswap.org' },
   ],
   socials: [{ icon: 'github', link: 'https://github.com/asyncswap/contracts' }],
@@ -40,6 +41,7 @@ export default defineConfig({
         { text: 'Dynamic fee ordering', link: '/protocol/dynamic-fee-ordering' },
       ],
     },
+    { text: 'Deployments', link: '/deployments' },
     {
       text: 'Security',
       items: [{ text: 'Audit status', link: '/audit/status' }],

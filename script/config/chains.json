@@ -582,6 +582,63 @@
         ]
       }
     },
+    "sepolia": {
+      "name": "Ethereum Sepolia",
+      "chainId": 11155111,
+      "network": "testnet",
+      "rpcUrlEnv": "RPC_URL_SEPOLIA",
+      "explorerUrl": "https://sepolia.etherscan.io",
+      "nativeCurrency": {
+        "name": "Sepolia Ether",
+        "symbol": "ETH",
+        "decimals": 18
+      },
+      "contracts": {
+        "poolManager": "0xE03A1074c86CFeDd5C142C4F04F1a1536e203543",
+        "permit2": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+        "usdc": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+        "asyncSwapHook": null,
+        "router": null
+      },
+      "deployment": {
+        "status": "prepared",
+        "script": "script/deploy-sepolia.sh",
+        "requires": [
+          "RPC_URL_SEPOLIA in .env.deploy",
+          "ETH-funded deployer keystore",
+          "test USDC from https://faucet.circle.com for pool liquidity"
+        ]
+      }
+    },
+    "arcTestnet": {
+      "name": "Arc Testnet",
+      "chainId": 5042002,
+      "network": "testnet",
+      "rpcUrlEnv": "RPC_URL_ARC_TESTNET",
+      "explorerUrl": "https://explorer.testnet.arc.io",
+      "nativeCurrency": {
+        "name": "USDC",
+        "symbol": "USDC",
+        "decimals": 18
+      },
+      "contracts": {
+        "poolManager": "0x8366a39CC670B4001A1121B8F6A443A643e40951",
+        "permit2": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+        "usdc": "0x3600000000000000000000000000000000000000",
+        "asyncSwapHook": null,
+        "router": null
+      },
+      "deployment": {
+        "status": "prepared",
+        "script": "script/deploy-arc-testnet.sh",
+        "poolManagerNote": "Not in Uniswap's deployment feed; runtime bytecode matches the Arc mainnet PoolManager at the same address.",
+        "requires": [
+          "RPC_URL_ARC_TESTNET in .env.deploy",
+          "USDC-funded deployer keystore (https://faucet.circle.com)",
+          "never initialize a native-currency pool: native and ERC-20 USDC are the same balance"
+        ]
+      }
+    },
     "anvil": {
       "name": "Anvil",
       "chainId": 31337,

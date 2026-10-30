@@ -22,7 +22,19 @@ const routes = {
   'docs/contract-call-sequences.md': '/protocol/contract-call-sequences',
   'docs/price-key-crossing.md': '/protocol/price-key-crossing',
   'docs/dynamic-fee-ordering.md': '/protocol/dynamic-fee-ordering',
+  'docs/deployments.md': '/deployments',
   'audit/auditagent_report_1_status.md': '/audit/status',
+}
+
+// One-line summaries for the generated guides: vocs reads them from frontmatter into llms.txt.
+const descriptions = {
+  '/protocol/overview': 'Contracts, custody, fees and authorization of the Async Swap hook, in diagrams.',
+  '/protocol/order-lifecycle': 'How an order is placed, matched, filled, repriced and cancelled, and how priority bids are paid.',
+  '/protocol/contract-call-sequences': 'Step-by-step contract calls for placing, matching, filling and cancelling orders.',
+  '/protocol/price-key-crossing': 'How limit prices map to price keys and when two orders cross.',
+  '/protocol/dynamic-fee-ordering': 'The dynamic fee charged on pool fills that move the price back, split between LPs and the protocol.',
+  '/deployments': 'Contract addresses on the four testnets (Unichain Sepolia, Sepolia, Robinhood Chain testnet, Arc testnet); no mainnet yet. Also at /deployments.json.',
+  '/audit/status': 'Status of each finding from the first AuditAgent report.',
 }
 
 function reset(dir) {
@@ -43,6 +55,28 @@ function rewriteLinks(markdown, source) {
   })
 }
 
+/// Every network's registry (deployments/<chainId>/<chainId>.json) with its chains.json entry, for agents and apps.
+function deployments() {
+  const { chains } = JSON.parse(readFileSync(join(repo, 'script/config/chains.json'), 'utf8'))
+  const byId = Object.fromEntries(Object.entries(chains).map(([key, chain]) => [chain.chainId, { key, ...chain }]))
+  const dir = join(repo, 'deployments')
+  return readdirSync(dir)
+    .filter((id) => /^\d+$/.test(id) && existsSync(join(dir, id, `${id}.json`)) && byId[id]?.network !== 'local')
+    .map((id) => {
+      const record = JSON.parse(readFileSync(join(dir, id, `${id}.json`), 'utf8'))
+      const chain = byId[id]
+      return {
+        chainId: record.chainId,
+        name: chain?.name ?? null,
+        network: chain?.network ?? null,
+        explorerUrl: chain?.explorerUrl ?? null,
+        numeraire: chain?.contracts?.usdc ?? null,
+        contracts: record.contracts,
+      }
+    })
+    .sort((a, b) => a.chainId - b.chainId)
+}
+
 function syncGuides() {
   reset(join(pages, 'protocol'))
   reset(join(pages, 'audit'))
@@ -50,8 +84,10 @@ function syncGuides() {
     if (route === '/') continue // the home page is written by hand
     const out = join(pages, `${route.slice(1)}.md`)
     mkdirSync(dirname(out), { recursive: true })
-    writeFileSync(out, rewriteLinks(readFileSync(join(repo, file), 'utf8'), file))
+    const front = descriptions[route] ? `---\ndescription: ${descriptions[route]}\n---\n\n` : ''
+    writeFileSync(out, front + rewriteLinks(readFileSync(join(repo, file), 'utf8'), file))
   }
+  writeFileSync(join(site, 'public/deployments.json'), JSON.stringify(deployments(), null, 2) + '\n')
   reset(join(site, 'public/assets'))
   cpSync(join(repo, 'docs/assets'), join(site, 'public/assets'), { recursive: true })
 }

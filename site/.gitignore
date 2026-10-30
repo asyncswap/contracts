@@ -6,6 +6,8 @@ dist/
 src/generated/
 src/pages/protocol/
 src/pages/audit/
+src/pages/deployments.md
 src/pages/reference/src/
 public/assets/
+public/deployments.json
 src/pages.gen.ts

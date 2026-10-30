@@ -1,6 +1,6 @@
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/af23852caa884e595c9fa61868ce2e1f54b9251f/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/10ad319de88f0a66ffb2c555f3724ab1b0570dba/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -1184,6 +1184,33 @@ event DynamicFeeCharged(
 | toLps | `uint256` |  |
 | toFeeVault | `uint256` |  |
 | refTick | `int24` |  |
+
+### PoolPriceObserved
+
+Mirror of `DynamicFeeOrdering.PoolPriceObserved`, emitted by the linked library in this
+contract's context so indexers can reconstruct completed pool-fill price movements.
+
+```solidity
+event PoolPriceObserved(
+        PoolId indexed poolId,
+        bytes32 indexed orderId,
+        int24 tickBefore,
+        int24 tickAfter,
+        int24 refTick,
+        uint64 observedBlock
+    );
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| orderId | `bytes32` |  |
+| tickBefore | `int24` |  |
+| tickAfter | `int24` |  |
+| refTick | `int24` |  |
+| observedBlock | `uint64` |  |
 
 ## Errors
 

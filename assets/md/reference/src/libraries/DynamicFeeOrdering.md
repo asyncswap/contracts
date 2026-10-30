@@ -1,6 +1,6 @@
 # DynamicFeeOrdering
 
-[Git Source](https://github.com/asyncswap/contracts/blob/af23852caa884e595c9fa61868ce2e1f54b9251f/src/libraries/DynamicFeeOrdering.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/10ad319de88f0a66ffb2c555f3724ab1b0570dba/src/libraries/DynamicFeeOrdering.sol)
 
 **Title:** Dynamic fee ordering on pool-liquidity fills
 
@@ -113,3 +113,33 @@ event DynamicFeeCharged(
 | toLps | `uint256` |  |
 | toFeeVault | `uint256` |  |
 | refTick | `int24` |  |
+
+### PoolPriceObserved
+
+The pool tick before and after a completed pool fill, with the reference used for fee ordering.
+
+<i>
+  Indexers can use these events as the price-movement log; fee calculation uses compact on-chain state.
+</i>
+
+```solidity
+event PoolPriceObserved(
+        PoolId indexed poolId,
+        bytes32 indexed orderId,
+        int24 tickBefore,
+        int24 tickAfter,
+        int24 refTick,
+        uint64 observedBlock
+    );
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| orderId | `bytes32` |  |
+| tickBefore | `int24` |  |
+| tickAfter | `int24` |  |
+| refTick | `int24` |  |
+| observedBlock | `uint64` |  |

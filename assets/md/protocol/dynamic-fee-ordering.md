@@ -47,6 +47,8 @@ Each charge emits `DynamicFeeCharged(poolId, orderId, currency, toLps, toFeeVaul
 hook: the fill's output currency, the LPs' and the FeeVault's shares, and the reference tick it was
 measured against. The fill's `AsyncOrderLiquidityFilled` reports the maker's output after the fee.
 
+Every successful pool fill also emits `PoolPriceObserved(poolId, orderId, tickBefore, tickAfter, refTick, observedBlock)`. Indexers can use these events as a price-movement log to identify large tick moves and evaluate fee settings. The contract stores only the current reference tick and block; it does not need a full on-chain price history to calculate the fee, which continues to scale with the tick gap the fill closes.
+
 ## Example
 
 From [`test/BackrunCapture.t.sol`](https://github.com/asyncswap/contracts/blob/main/test/BackrunCapture.t.sol), a pool at 1 USDC per asset with deep

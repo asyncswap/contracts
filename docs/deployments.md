@@ -8,6 +8,9 @@ The per-chain registries in [`deployments/`](../deployments) are the source of t
 `deployments/<chainId>/<chainId>.json` holds every address with its deployment transaction and start
 block, for indexers and the app.
 
+The docs site serves all of them, with each chain's name, explorer and numeraire, as one file at
+[`/deployments.json`](https://docs.asyncswap.org/deployments.json).
+
 ## Shared libraries
 
 The libraries are created through the deterministic CREATE2 deployer

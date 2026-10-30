@@ -103,9 +103,26 @@ has_code() {
   [[ -n "$code" && "$code" != "0x" ]]
 }
 
+# After a broadcast, load-balanced public RPCs can answer from a node a block or two behind.
+wait_for_code() {
+  local _
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    has_code "$1" && return 0
+    sleep 3
+  done
+  return 1
+}
+
 has_code "$DEPLOY_NUMERAIRE_ADDRESS" || { echo "Refusing: configured USDC $DEPLOY_NUMERAIRE_ADDRESS has no code on $chain_name." >&2; exit 1; }
 has_code "$POOL_MANAGER_ADDRESS" || { echo "Refusing: configured PoolManager $POOL_MANAGER_ADDRESS has no code on $chain_name." >&2; exit 1; }
 has_code "$CREATE2_DEPLOYER" || { echo "Refusing: CREATE2 deployer $CREATE2_DEPLOYER is missing on $chain_name." >&2; exit 1; }
+
+# Forge prices transactions with its local EVM. Where the chain charges more for new state (Sepolia
+# needs ~7x forge's estimate to store contract code), set DEPLOY_GAS_MULTIPLIER (percent, e.g. 800).
+gas_flags=()
+if [[ -n "${DEPLOY_GAS_MULTIPLIER:-}" ]]; then
+  gas_flags=(--gas-estimate-multiplier "$DEPLOY_GAS_MULTIPLIER")
+fi
 
 # ---- owner ----------------------------------------------------------------------------------
 if [[ -z "${DEPLOY_OWNER:-}" ]]; then
@@ -154,13 +171,13 @@ PY
     [[ "$name" == "AsyncSwap" ]] && extra+=(--libraries "$lib_flag" --libraries "$tick_flag")
     [[ "$name" == "AsyncMatching" ]] && extra+=(--libraries "$tick_flag" --libraries "$ordering_flag")
     echo "== $name @ $addr"
-    forge verify-contract --chain "$chain_id" --verifier sourcify --watch "${extra[@]}" "$addr" "$target" \
+    forge verify-contract --chain "$chain_id" --verifier sourcify --watch ${extra[@]+"${extra[@]}"} "$addr" "$target" \
       || echo "   Sourcify verification failed for $name (see above)." >&2
     if [[ -n "$explorer_url" ]]; then
-      forge verify-contract --chain "$chain_id" --verifier blockscout --verifier-url "$explorer_url/api?" "${extra[@]}" "$addr" "$target" \
+      forge verify-contract --chain "$chain_id" --verifier blockscout --verifier-url "$explorer_url/api?" ${extra[@]+"${extra[@]}"} "$addr" "$target" \
         || echo "   Blockscout submission failed for $name (the explorer API may sit behind a bot challenge); upload $out_dir/$name.json manually at $explorer_url/address/$addr#code." >&2
     fi
-    forge verify-contract --chain "$chain_id" --show-standard-json-input "${extra[@]}" "$addr" "$target" > "$out_dir/$name.json"
+    forge verify-contract --chain "$chain_id" --show-standard-json-input ${extra[@]+"${extra[@]}"} "$addr" "$target" > "$out_dir/$name.json"
   }
   verify_one TickPrice "$tick_addr" src/libraries/TickPrice.sol:TickPrice ""
   verify_one DynamicFeeOrdering "$ordering_addr" src/libraries/DynamicFeeOrdering.sol:DynamicFeeOrdering ""
@@ -181,8 +198,8 @@ if ! has_code "$tick_addr"; then
   if [[ "$mode" == "broadcast" ]]; then
     : "${DEPLOYER_ACCOUNT:?Set DEPLOYER_ACCOUNT to a Foundry keystore in .env.deploy}"
     DEPLOY_DRY_RUN=false forge script "$ROOT_DIR/script/00_DeployTickPrice.s.sol" \
-      --rpc-url "$RPC_URL" --sender "$OWNER" --broadcast --account "$DEPLOYER_ACCOUNT"
-    has_code "$tick_addr" || { echo "TickPrice deployment missing" >&2; exit 1; }
+      --rpc-url "$RPC_URL" --sender "$OWNER" --broadcast --account "$DEPLOYER_ACCOUNT" ${gas_flags[@]+"${gas_flags[@]}"}
+    wait_for_code "$tick_addr" || { echo "TickPrice deployment missing" >&2; exit 1; }
   else
     DEPLOY_DRY_RUN=true forge script "$ROOT_DIR/script/00_DeployTickPrice.s.sol" --rpc-url "$RPC_URL" --sender "$OWNER"
   fi
@@ -197,8 +214,8 @@ if ! has_code "$ordering_addr"; then
   if [[ "$mode" == "broadcast" ]]; then
     : "${DEPLOYER_ACCOUNT:?Set DEPLOYER_ACCOUNT to a Foundry keystore in .env.deploy}"
     DEPLOY_DRY_RUN=false forge script "$ROOT_DIR/script/00_DeployDynamicFeeOrdering.s.sol" \
-      --rpc-url "$RPC_URL" --sender "$OWNER" --broadcast --account "$DEPLOYER_ACCOUNT"
-    has_code "$ordering_addr" || { echo "DynamicFeeOrdering deployment missing" >&2; exit 1; }
+      --rpc-url "$RPC_URL" --sender "$OWNER" --broadcast --account "$DEPLOYER_ACCOUNT" ${gas_flags[@]+"${gas_flags[@]}"}
+    wait_for_code "$ordering_addr" || { echo "DynamicFeeOrdering deployment missing" >&2; exit 1; }
   else
     DEPLOY_DRY_RUN=true forge script "$ROOT_DIR/script/00_DeployDynamicFeeOrdering.s.sol" --rpc-url "$RPC_URL" --sender "$OWNER"
   fi
@@ -221,8 +238,8 @@ else
     : "${DEPLOYER_ACCOUNT:?Set DEPLOYER_ACCOUNT to a Foundry keystore in .env.deploy}"
     echo "Deploying AsyncMatching to $lib_addr on $chain_name ($chain_id) from $OWNER."
     DEPLOY_DRY_RUN=false forge script "$ROOT_DIR/script/00_DeployMatchingLibrary.s.sol" --libraries "$tick_flag" --libraries "$ordering_flag" \
-      --rpc-url "$RPC_URL" --sender "$OWNER" --broadcast --account "$DEPLOYER_ACCOUNT"
-    has_code "$lib_addr" || { echo "AsyncMatching has no code at $lib_addr after broadcast." >&2; exit 1; }
+      --rpc-url "$RPC_URL" --sender "$OWNER" --broadcast --account "$DEPLOYER_ACCOUNT" ${gas_flags[@]+"${gas_flags[@]}"}
+    wait_for_code "$lib_addr" || { echo "AsyncMatching has no code at $lib_addr after broadcast." >&2; exit 1; }
   else
     echo "AsyncMatching will be deployed to $lib_addr (simulating)."
     DEPLOY_DRY_RUN=true forge script "$ROOT_DIR/script/00_DeployMatchingLibrary.s.sol" --libraries "$tick_flag" --libraries "$ordering_flag" --rpc-url "$RPC_URL" --sender "$OWNER"
@@ -241,7 +258,7 @@ forge_args=(
 )
 if [[ "$mode" == "broadcast" ]]; then
   : "${DEPLOYER_ACCOUNT:?Set DEPLOYER_ACCOUNT to a Foundry keystore in .env.deploy}"
-  forge_args+=(--broadcast --account "$DEPLOYER_ACCOUNT")
+  forge_args+=(--broadcast --account "$DEPLOYER_ACCOUNT" ${gas_flags[@]+"${gas_flags[@]}"})
   export DEPLOY_DRY_RUN=false
   echo "Broadcasting AsyncSwap + Router on $chain_name ($chain_id) from $OWNER."
 else

@@ -25,10 +25,18 @@ def sync(registry_path: Path, broadcast_path: Path, chain_id: int):
     if parse_quantity(registry["chainId"]) != chain_id:
         raise ValueError("deployment registry chain ID does not match requested chain")
 
+    # A contract created through the CREATE2 factory is a call to the factory, so its receipt has no
+    # contractAddress; Foundry records the created address on the transaction instead.
+    created_by_hash = {
+        tx["hash"].lower(): tx["contractAddress"]
+        for tx in run.get("transactions", [])
+        if tx.get("transactionType") in ("CREATE", "CREATE2") and tx.get("hash") and tx.get("contractAddress")
+    }
+
     receipts_by_address = {}
     for receipt in run.get("receipts", []):
-        address = receipt.get("contractAddress")
         tx_hash = receipt.get("transactionHash")
+        address = receipt.get("contractAddress") or created_by_hash.get((tx_hash or "").lower())
         status = receipt.get("status")
         if not address or not tx_hash:
             continue

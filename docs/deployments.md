@@ -1,9 +1,9 @@
 # Deployments
 
-Async Swap is deployed on four testnets and has no mainnet deployment. Earlier test deployments on
-Unichain and Arc mainnet had bugs and are retired: do not send orders to them. Every contract in the
-table is source-verified on [Sourcify](https://sourcify.dev) (full match), and every hook is owned
-by `0x33ce69DA05c3ad30A3b525625F950fAda8673205`.
+Async Swap is deployed on four testnets and has no mainnet deployment. The earlier deployments on
+Unichain and Arc mainnet were tests, had bugs, and are archived: do not send orders to them. Every
+contract in the table is source-verified on [Sourcify](https://sourcify.dev) (full match), and every
+hook is owned by `0x33ce69DA05c3ad30A3b525625F950fAda8673205`.
 
 ## Contracts
 

@@ -133,6 +133,17 @@ contract AsyncSwap is BaseHook, EIP712 {
         int24 refTick
     );
 
+    /// @notice Mirror of `DynamicFeeOrdering.PoolPriceObserved`, emitted by the linked library in this
+    ///         contract's context so indexers can reconstruct completed pool-fill price movements.
+    event PoolPriceObserved(
+        PoolId indexed poolId,
+        bytes32 indexed orderId,
+        int24 tickBefore,
+        int24 tickAfter,
+        int24 refTick,
+        uint64 observedBlock
+    );
+
     /// @notice Restricts a call to the protocol owner.
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();

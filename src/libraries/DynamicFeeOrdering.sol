@@ -30,6 +30,17 @@ library DynamicFeeOrdering {
         int24 refTick
     );
 
+    /// @notice The pool tick before and after a completed pool fill, with the reference used for fee ordering.
+    /// @dev Indexers can use these events as the price-movement log; fee calculation uses compact on-chain state.
+    event PoolPriceObserved(
+        PoolId indexed poolId,
+        bytes32 indexed orderId,
+        int24 tickBefore,
+        int24 tickAfter,
+        int24 refTick,
+        uint64 observedBlock
+    );
+
     /// @dev Dynamic fee on a pool fill that backruns a price move, taken from its output. The first pool fill in a window of
     ///      `ORDERING_WINDOW` blocks records its starting tick as the reference. A later fill in the
     ///      window that moves the price back toward the reference pays half the price gap it closes:
@@ -44,21 +55,23 @@ library DynamicFeeOrdering {
         int24 tickBefore,
         uint256 amountOut
     ) public returns (uint256 fee) {
-        if (self.refBlock == 0 || block.number > self.refBlock + ORDERING_WINDOW) {
-            (self.refTick, self.refBlock) = (tickBefore, uint64(block.number));
-            return 0;
-        }
         IPoolManager manager = self.poolManager;
         (, int24 tickAfter,,) = manager.getSlot0(key.toId());
-        int256 from = int256(tickBefore) - self.refTick;
-        int256 to = int256(tickAfter) - self.refTick;
-        // Only a fill toward the reference pays; the part past it closes no gap.
-        if (to * from <= 0) to = 0;
-        uint256 gapBefore = SignedMath.abs(from);
-        uint256 gapAfter = SignedMath.abs(to);
-        if (gapAfter >= gapBefore) return 0;
-        fee = Math.min(amountOut * (gapBefore + gapAfter) / 40_000, amountOut / 2);
-        _pay(self, key, id, output, fee);
+        if (self.refBlock == 0 || block.number > self.refBlock + ORDERING_WINDOW) {
+            (self.refTick, self.refBlock) = (tickBefore, uint64(block.number));
+        } else {
+            int256 from = int256(tickBefore) - self.refTick;
+            int256 to = int256(tickAfter) - self.refTick;
+            // Only a fill toward the reference pays; the part past it closes no gap.
+            if (to * from <= 0) to = 0;
+            uint256 gapBefore = SignedMath.abs(from);
+            uint256 gapAfter = SignedMath.abs(to);
+            if (gapAfter < gapBefore) {
+                fee = Math.min(amountOut * (gapBefore + gapAfter) / 40_000, amountOut / 2);
+                _pay(self, key, id, output, fee);
+            }
+        }
+        emit PoolPriceObserved(key.toId(), id, tickBefore, tickAfter, self.refTick, uint64(block.number));
     }
 
     /// @dev Half of `fee` to in-range LPs (all of it to the FeeVault if none are in range), the rest

@@ -20,6 +20,7 @@ contract FeeEventsTest is SetupHook {
     bytes32 constant FEE_ACCRUED = keccak256("OrderFeeAccrued(bytes32,bytes32,address,uint256)");
     bytes32 constant MATCHED = keccak256("AsyncOrdersMatched(bytes32,bytes32,bytes32,uint256,uint256)");
     bytes32 constant DYNAMIC_FEE = keccak256("DynamicFeeCharged(bytes32,bytes32,address,uint256,uint256,int24)");
+    bytes32 constant PRICE_OBSERVED = keccak256("PoolPriceObserved(bytes32,bytes32,int24,int24,int24,uint64)");
 
     function setUp() public override {
         super.setUp();
@@ -81,6 +82,7 @@ contract FeeEventsTest is SetupHook {
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         bool found;
+        bool priceObserved;
         for (uint256 i; i < logs.length; ++i) {
             if (logs[i].emitter == address(hook) && logs[i].topics[0] == DYNAMIC_FEE) {
                 found = true;
@@ -90,8 +92,18 @@ contract FeeEventsTest is SetupHook {
                 assertEq(toVault, manager.balanceOf(vault, currency0.toId()) - vaultBefore, "vault share matches");
                 assertEq(refTick, 0, "reference is the tick before Alice's sell");
             }
+            if (logs[i].emitter == address(hook) && logs[i].topics[0] == PRICE_OBSERVED) {
+                priceObserved = true;
+                (int24 tickBefore, int24 tickAfter, int24 refTick, uint64 observedBlock) =
+                    abi.decode(logs[i].data, (int24, int24, int24, uint64));
+                assertLt(tickBefore, refTick, "backrun starts below the reference tick");
+                assertGt(tickAfter, tickBefore, "backrun moves the tick toward the reference");
+                assertEq(refTick, 0, "price log includes the reference tick");
+                assertEq(observedBlock, uint64(block.number), "price log includes its block");
+            }
         }
         assertTrue(found, "DynamicFeeCharged emitted");
+        assertTrue(priceObserved, "PoolPriceObserved emitted");
     }
 
     function _feeLogged(Vm.Log[] memory logs, bytes32 id, address currency, uint256 amount)

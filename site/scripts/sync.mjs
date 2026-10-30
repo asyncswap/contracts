@@ -33,7 +33,7 @@ const descriptions = {
   '/protocol/contract-call-sequences': 'Step-by-step contract calls for placing, matching, filling and cancelling orders.',
   '/protocol/price-key-crossing': 'How limit prices map to price keys and when two orders cross.',
   '/protocol/dynamic-fee-ordering': 'The dynamic fee charged on pool fills that move the price back, split between LPs and the protocol.',
-  '/deployments': 'Contract addresses on every network (Unichain Sepolia, Sepolia, Robinhood Chain testnet, Arc testnet); also at /deployments.json.',
+  '/deployments': 'Contract addresses on the four testnets (Unichain Sepolia, Sepolia, Robinhood Chain testnet, Arc testnet); no mainnet yet. Also at /deployments.json.',
   '/audit/status': 'Status of each finding from the first AuditAgent report.',
 }
 

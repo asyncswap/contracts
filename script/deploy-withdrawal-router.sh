@@ -17,7 +17,7 @@ PY
 rpc_url="${!rpc_env}"
 # Sepolia charges more deployment gas than the local simulation estimates.
 gas_multiplier=150
-[[ "$chain_id" != 11155111 ]] || gas_multiplier=300
+[[ "$chain_id" != 11155111 ]] || gas_multiplier=800
 args=(script/DeployWithdrawalRouter.s.sol:DeployWithdrawalRouter --rpc-url "$rpc_url" --gas-estimate-multiplier "$gas_multiplier")
 if [[ "$mode" == broadcast ]]; then args+=(--broadcast --account "$DEPLOYER_ACCOUNT"); fi
 forge script "${args[@]}"

@@ -57,6 +57,17 @@ p = pathlib.Path(sys.argv[1])
 print(json.loads(p.read_text()).get('contracts', {}).get('PoolManager', {}).get('address', '') if p.exists() else '')
 PY
 )"
+if [[ "$key" == hyperEvmTestnet && "$mode" == broadcast ]]; then
+  : "${DEPLOYER_ACCOUNT:?Set DEPLOYER_ACCOUNT in .env.deploy}"
+  signer="$(cast wallet address --account "$DEPLOYER_ACCOUNT")"
+  # HyperEVM fast blocks cap at 3M gas; PoolManager's runtime code deposit alone exceeds that.
+  # Big-block routing is an account-level HyperCore setting, not an EVM tx flag.
+  using_big_blocks="$(cast rpc eth_usingBigBlocks "$signer" --rpc-url "$RPC_URL")"
+  [[ "$using_big_blocks" == true ]] || {
+    echo "HyperEVM deployer $signer is not using big blocks. Enable HyperCore evmUserModify usingBigBlocks=true before broadcasting: https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/hyperevm/dual-block-architecture" >&2
+    exit 1
+  }
+fi
 if [[ -z "$manager" ]]; then
   if [[ "$mode" != broadcast ]]; then
     echo "No PoolManager is deployed on $key; run this wrapper in broadcast mode after funding the deployer." >&2

@@ -49,6 +49,10 @@ yet**. Their wrappers first deploy a PoolManager, then the hook and Router. Mega
 [official testnet USDM](https://github.com/megaeth-labs/mega-tokenlist) (18 decimals) as an explicit
 testnet exception to the USDC numeraire plan. HyperEVM uses testnet USDC (6 decimals). The hook
 sets the optional $0.10 priority-bid cap in each numeraire's base units before pools initialize.
+HyperEVM requires the deployer to opt into [big blocks](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/hyperevm/dual-block-architecture)
+through the HyperCore `evmUserModify` action before broadcasting. Its fast blocks allow 3 million
+gas, while PoolManager's runtime code deposit alone needs about 4.83 million. The deployment
+wrapper checks `eth_usingBigBlocks` and stops if the deployer has not opted in.
 
 ## Deploying
 

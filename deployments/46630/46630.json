@@ -35,7 +35,12 @@
       "address": "0x7e4D8A2Aa6052FA76324085Cb60F30173453BDC8",
       "startBlock": 145819535,
       "txHash": "0xf61be601e69a9d854b8fb49b3f392154013ee58d9c62f73fa022616502e299bb"
+    },
+    "WithdrawalRouter": {
+      "address": "0x78d2178052c9d07fef1ffae1c70252119d2de987",
+      "startBlock": 145836237,
+      "txHash": "0x9d36a714a5586b7e1d37ef858caabd2b68591fb5d86d58da066ffd23710f8c9c"
     }
   },
-  "updatedAt": 1793432778
+  "updatedAt": 1793435129
 }

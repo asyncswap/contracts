@@ -51,7 +51,9 @@ contract Router is EIP712 {
         Cancel,
         SwapWithSig,
         MatchBook,
-        PoolLiquidityFill
+        PoolLiquidityFill,
+        CancelAndWithdraw,
+        WithdrawClaims
     }
 
     struct SwapCallback {
@@ -226,6 +228,30 @@ contract Router is EIP712 {
         POOLMANAGER.unlock(abi.encode(SwapCallback({action: ActionType.Cancel, order: order, maxMatches: 0})));
     }
 
+    /// @notice Cancel an owned order and return its remaining input to the owner's wallet.
+    /// @dev Native refunds are redeemed atomically. Approve this Router for claim ID 0 first.
+    ///      Existing claims are untouched; a failed redemption rolls back the cancellation.
+    function cancelAndWithdraw(AsyncOrder calldata order) external {
+        require(msg.sender == order.owner, "Only owner can cancel");
+        POOLMANAGER.unlock(
+            abi.encode(SwapCallback({action: ActionType.CancelAndWithdraw, order: order, maxMatches: 0}))
+        );
+    }
+
+    /// @notice Withdraw the caller's approved ERC-6909 claims directly to their wallet.
+    /// @dev Approve exact currency claim allowances on PoolManager first. No operator grant is needed.
+    function withdrawClaims(Currency[] calldata currencies, uint256[] calldata amounts) external {
+        uint256 length = currencies.length;
+        require(length != 0 && length <= 16 && length == amounts.length, "Invalid claims");
+        for (uint256 i; i < length; ++i) {
+            require(amounts[i] != 0, "Zero claim");
+            for (uint256 j; j < i; ++j) {
+                require(Currency.unwrap(currencies[i]) != Currency.unwrap(currencies[j]), "Duplicate currency");
+            }
+        }
+        POOLMANAGER.unlock(abi.encode(ActionType.WithdrawClaims, msg.sender, currencies, amounts));
+    }
+
     /// @notice Anyone can continue a crossed book after a transaction hits the automatic match cap.
     /// @dev Work is capped at eight matched pairs per unlock to keep gas predictable.
     function matchBook(PoolKey calldata key, uint8 maxMatches) external {
@@ -262,6 +288,14 @@ contract Router is EIP712 {
             asyncFiller := tload(ASYNC_FILLER_LOCATION)
         }
 
+        if (action == uint8(ActionType.WithdrawClaims)) {
+            (, address owner, Currency[] memory currencies, uint256[] memory amounts) =
+                abi.decode(data, (ActionType, address, Currency[], uint256[]));
+            for (uint256 i; i < currencies.length; ++i) {
+                _withdrawClaim(owner, currencies[i], amounts[i]);
+            }
+            return "";
+        }
         SwapCallback memory orderData = abi.decode(data, (SwapCallback));
 
         if (action == uint8(ActionType.Swap) || action == uint8(ActionType.SwapWithSig)) {
@@ -320,6 +354,14 @@ contract Router is EIP712 {
                 _requireUnchanged(orderData.order, id, liveAmountIn, livePrice);
             }
             HOOK.executeOrder(orderData.order, abi.encode(user));
+        } else if (action == uint8(ActionType.CancelAndWithdraw)) {
+            Currency input = orderData.order.zeroForOne ? orderData.order.key.currency0 : orderData.order.key.currency1;
+            address owner = orderData.order.owner;
+            uint256 beforeClaims = input.isAddressZero() ? POOLMANAGER.balanceOf(owner, 0) : 0;
+            HOOK.cancelOrder(orderData.order);
+            if (input.isAddressZero()) {
+                _withdrawClaim(owner, input, POOLMANAGER.balanceOf(owner, 0) - beforeClaims);
+            }
         } else if (action == uint8(ActionType.Cancel)) {
             HOOK.cancelOrder(orderData.order);
         } else if (action == uint8(ActionType.MatchBook)) {
@@ -329,6 +371,14 @@ contract Router is EIP712 {
         }
 
         return "";
+    }
+
+    event ClaimWithdrawn(address indexed owner, Currency indexed currency, uint256 amount);
+
+    function _withdrawClaim(address owner, Currency currency, uint256 amount) private {
+        POOLMANAGER.burn(owner, currency.toId(), amount);
+        POOLMANAGER.take(currency, owner, amount);
+        emit ClaimWithdrawn(owner, currency, amount);
     }
 
     /// @dev Reverts unless the order still reads `(amountIn, amountOutMin)` in the hook.

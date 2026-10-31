@@ -1,6 +1,6 @@
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/29bca56adfcccd1e70d905810d3df3580fe4fa3e/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/ffcca30f5d858d6f9a022187cceed4cdfe76b79a/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -120,6 +120,14 @@ Minimum order, in numeraire base units, that pools initialized from now on start
 
 ```solidity
 uint256 public defaultMinOrder;
+```
+
+### defaultPriorityFeeCap
+
+$0.10 priority-bid cap in numeraire base units for pools initialized from now on.
+
+```solidity
+uint64 public defaultPriorityFeeCap = 100_000;
 ```
 
 ## Functions
@@ -388,6 +396,39 @@ function setDefaultMinOrder(uint256 minimum) external onlyOwner;
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | minimum | `uint256` |  |
+
+<a id="setdefaultpriorityfeecap-uint64" />
+
+### setDefaultPriorityFeeCap
+
+Set the $0.10 priority-bid cap for new pools in numeraire base units.
+
+```solidity
+function setDefaultPriorityFeeCap(uint64 cap) external onlyOwner;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| cap | `uint64` |  |
+
+<a id="setpriorityfeecap-poolkey-uint64" />
+
+### setPriorityFeeCap
+
+Correct an initialized pool's cap when its numeraire has a different decimal scale.
+
+```solidity
+function setPriorityFeeCap(PoolKey calldata key, uint64 cap) external onlyOwner;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| key | `PoolKey` |  |
+| cap | `uint64` |  |
 
 <a id="bestorder-poolid-bool" />
 
@@ -1236,6 +1277,12 @@ error NotOwner();
 
 ```solidity
 error ZeroAddress();
+```
+
+### InvalidPriorityFeeCap
+
+```solidity
+error InvalidPriorityFeeCap();
 ```
 
 ### SignatureExpired

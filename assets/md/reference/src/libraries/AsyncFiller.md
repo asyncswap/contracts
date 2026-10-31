@@ -1,6 +1,6 @@
 # AsyncFiller
 
-[Git Source](https://github.com/asyncswap/contracts/blob/29bca56adfcccd1e70d905810d3df3580fe4fa3e/src/libraries/AsyncFiller.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/ffcca30f5d858d6f9a022187cceed4cdfe76b79a/src/libraries/AsyncFiller.sol)
 
 **Title:** AsyncFiller
 
@@ -27,7 +27,7 @@ uint64 internal constant MAX_PRIORITY_FEE = type(uint64).max;
 ### MIN_PRIORITY_FEE
 
 <i>
-  $0.10 in six-decimal USDC base units. Async Swap pools are configured with USDC as numeraire.
+  Default $0.10 cap for six-decimal numeraires. A pool may override this for other decimals.
 </i>
 
 ```solidity
@@ -127,6 +127,27 @@ function minPriorityFee(uint256 notional) internal pure returns (uint256);
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | notional | `uint256` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint256` |  |
+
+<a id="minpriorityfee-uint256-uint64" />
+
+### minPriorityFee
+
+```solidity
+function minPriorityFee(uint256 notional, uint64 cap) internal pure returns (uint256);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| notional | `uint256` |  |
+| cap | `uint64` |  |
 
 **Returns**
 
@@ -963,6 +984,8 @@ struct State {
 struct Book {
         uint64 nextSequence;
         uint64 openOrderCount;
+        /// @dev $0.10 in this pool's numeraire base units. Zero uses the six-decimal default.
+        uint64 priorityFeeCap;
         RadixPriceTree.Tree bids;
         RadixPriceTree.Tree asks;
         mapping(uint128 price => PriceLevel) bidLevels;
@@ -978,6 +1001,7 @@ struct Book {
 | ---- | ---- | ----------- |
 | nextSequence | `uint64` |  |
 | openOrderCount | `uint64` |  |
+| priorityFeeCap | `uint64` |  |
 | bids | `RadixPriceTree.Tree` |  |
 | asks | `RadixPriceTree.Tree` |  |
 | bidLevels | `mapping(uint128 price => PriceLevel)` |  |

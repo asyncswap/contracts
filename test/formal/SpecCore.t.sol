@@ -441,7 +441,7 @@ contract SpecCoreFormalTest is FormalSlotsB, IUnlockCallback {
         _authorise(s);
         uint64 seq = uint64(uint256(_loadHook(_bookSlot(poolId)))) + 1;
         bytes memory expected;
-        if (pf < _tieredMinFee(zfo ? aom : amt)) {
+        if (pf != 0 && pf < _tieredMinFee(zfo ? aom : amt)) {
             expected = abi.encodeWithSelector(AsyncFiller.PriorityFeeTooSmall.selector);
         } else if (pf > type(uint64).max) {
             expected = abi.encodeWithSelector(AsyncFiller.PriorityFeeTooLarge.selector);

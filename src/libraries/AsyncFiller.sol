@@ -144,7 +144,9 @@ library AsyncFiller {
         bool zeroForOne,
         uint256 priorityFee
     ) internal {
-        if (priorityFee < minPriorityFee(isBuy ? amountIn : amountOutMin)) {
+        // A priority bid is optional. Nonzero bids must meet the minimum to avoid dust bids;
+        // zero bids remain in the time-priority queue behind any paid bids at the same price.
+        if (priorityFee != 0 && priorityFee < minPriorityFee(isBuy ? amountIn : amountOutMin)) {
             revert PriorityFeeTooSmall();
         }
         if (priorityFee > MAX_PRIORITY_FEE) revert PriorityFeeTooLarge();
@@ -275,9 +277,8 @@ library AsyncFiller {
         if (info.amountIn == 0) revert OrderNotFound();
         checkMinimum(self, book, order.key.toId(), info.isBuy, info.zeroForOne, info.amountIn, newAmountOutMin);
         uint256 old = info.amountOutMin;
-        // A sell's bid floor follows its minimum output. Increasing the requested notional must
-        // meet the new floor; unchanged or reduced terms may retain a pro-rated bid.
-        if (!info.isBuy) {
+        // A nonzero sell bid floor follows its minimum output. Zero remains a valid no-bid order.
+        if (!info.isBuy && info.priorityFee != 0) {
             uint256 required = minPriorityFee(newAmountOutMin);
             if (newAmountOutMin > old && info.priorityFee < required) revert PriorityFeeTooSmall();
         }

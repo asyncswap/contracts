@@ -156,7 +156,7 @@ contract AsyncSwapAddOrderFormalTest is FormalSlotsB {
     ///      `ok = true`. The harness evaluates the current tick-price helper, including direction.
     function _predict(AsyncFiller.NewOrder memory o) internal view returns (bool ok, bytes memory err) {
         uint256 fee = o.priorityFee;
-        if (fee < _minFee(o)) {
+        if (fee != 0 && fee < _minFee(o)) {
             return (false, abi.encodeWithSelector(AsyncFiller.PriorityFeeTooSmall.selector));
         }
         if (fee > MAX_FEE) return (false, abi.encodeWithSelector(AsyncFiller.PriorityFeeTooLarge.selector));
@@ -296,7 +296,7 @@ contract AsyncSwapAddOrderFormalTest is FormalSlotsB {
     }
 
     function _checkFeeTooSmall(In memory x, bool viaMatching) internal {
-        x.feeKind = x.feeKind % 2 == 0 ? 0 : 1; // [0, MIN)
+        x.feeKind = 1; // [1, MIN)
         AsyncFiller.NewOrder memory o = _setup(x, 1);
         vm.assume(o.priorityFee < _minFee(o)); // below the order's tiered minimum
         (bool s, bytes memory ret) = _call(a, viaMatching, o);
@@ -304,7 +304,7 @@ contract AsyncSwapAddOrderFormalTest is FormalSlotsB {
         assertEq(ret, abi.encodeWithSelector(AsyncFiller.PriorityFeeTooSmall.selector));
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapAddOrder.lean:125 — priorityFee < min(MIN_PRIORITY_FEE, 0.1% of the order) reverts PriorityFeeTooSmall.
+    /// @notice A nonzero priorityFee below min(MIN_PRIORITY_FEE, 0.1% of the order) reverts PriorityFeeTooSmall; zero is valid.
     function testFuzz_addOrder_feeTooSmall(In memory x) public {
         _checkFeeTooSmall(x, false);
     }
@@ -350,7 +350,7 @@ contract AsyncSwapAddOrderFormalTest is FormalSlotsB {
         if (!s) return;
         uint256 fee = o.priorityFee;
 
-        assertFalse(fee < _minFee(o), "guard 2 passed");
+        assertTrue(fee == 0 || fee >= _minFee(o), "guard 2 passed");
         assertLe(fee, MAX_FEE, "guard 3 passed");
         assertLt(uint256(seq0) + 1, 2 ** 64, "seq fits uint64");
         // _priceKey succeeded (and is pure, so it left storage alone)
@@ -491,7 +491,7 @@ contract AsyncSwapAddOrderFormalTest is FormalSlotsB {
         _checkRun(x, true);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapAddOrder.lean:291 — AsyncMatching.addOrder: order.priorityFee < min(MIN_PRIORITY_FEE, 0.1% of the order) reverts PriorityFeeTooSmall.
+    /// @notice AsyncMatching.addOrder rejects nonzero priority bids below the minimum; zero is valid.
     function testFuzz_matching_addOrder_feeTooSmall(In memory x) public {
         _checkFeeTooSmall(x, true);
     }

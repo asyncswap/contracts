@@ -128,8 +128,8 @@ recompute fees from gross amounts:
 
 `AsyncOrdersMatched` and `AsyncOrderFilled` carry gross amounts; `AsyncOrderLiquidityFilled` carries the
 maker's output after the dynamic fee.
-Priority bids are escrowed as hook claims by `addOrder` and settle to the FeeVault: the filled share
-as input fills, the rest when the order closes. They never go to LPs, so liquidity added just before
+Optional priority bids are escrowed as hook claims by `addOrder` and settle to the FeeVault: the filled share
+as input fills, the rest when the order closes. A zero bid incurs no escrow or transfer. Bids never go to LPs, so liquidity added just before
 a settlement earns none of them.
 
 An order-to-order match pays both sides, and returns any remainder left below the pool minimum, as
@@ -139,7 +139,7 @@ recipient, after approving the redeemer for that claim id. Filler fills and LP f
 ERC-20 output directly. Minting bid
 claims creates hook debt immediately; the PoolManager unlock must settle that debt, including for
 custom executors. The Router pays it with `settleFor(hook)`. All pools rank equal prices by remaining
-bid, then sequence. There is no FIFO mode or mode switch.
+bid, then sequence, so zero-bid orders remain time-prioritized. There is no FIFO mode or mode switch.
 
 The accounting invariant is fuzzed by the matching invariant suites: the hook's claim balance for
 each currency equals the sum of remaining inputs of open orders plus escrowed bids, and nothing is

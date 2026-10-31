@@ -16,8 +16,9 @@ using AsyncOrderLibrary for AsyncOrder global;
 /// @param amountOutMin Minimum amount of output currency the maker accepts. The implicit limit price is
 ///                     `amountOutMin / amountIn`. A filler or direct match must satisfy the live minimum
 ///                     for the amount it consumes.
-/// @param priorityFee  Non-refundable USDC bid for equal-price priority: at least $0.10, or 0.1% of the
-///                     order's USDC notional when that is less. Matched portions, and the remainder on a
+/// @param priorityFee  Optional non-refundable USDC bid for equal-price priority. Zero is valid; a nonzero
+///                     bid must be at least $0.10, or 0.1% of the order's USDC notional when that is less.
+///                     Matched portions, and the remainder on a
 ///                     fill, cancel or dust closure, go to the protocol FeeVault.
 /// @param sqrtPrice    Sqrt-price limit passed to `PoolManager.swap` on submission. The hook consumes
 ///                     the whole input in `beforeSwap`, so the pool never trades against it.

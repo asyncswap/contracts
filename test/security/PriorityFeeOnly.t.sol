@@ -51,9 +51,8 @@ contract BidSkippingExecutor {
     }
 }
 
-/// @notice Every pool orders equal prices by paid bid, then time; there is no FIFO mode and no mode
-///         switch. An order's bid is owed from the moment it is created, so no executor can rest an
-///         order without paying it.
+/// @notice Every pool orders equal prices by paid bid, then time; zero bids are valid and retain
+///         time priority behind paid bids.
 contract PriorityFeeOnlyTest is SetupHook {
     address alice = makeAddr("alice");
     address bob = makeAddr("bob");
@@ -100,10 +99,28 @@ contract PriorityFeeOnlyTest is SetupHook {
         _submit(order);
     }
 
-    /// A pool nobody configured still requires the minimum bid.
-    function test_RevertWhen_NewPoolOrderHasNoBid() public {
-        vm.expectRevert(); // PriorityFeeTooSmall, wrapped by the PoolManager
-        this.submitExternal(_ask(alice, 0));
+    /// A pool nobody configured accepts a zero bid without any USDC allowance.
+    function test_newPoolOrderCanHaveNoBid() public {
+        AsyncOrder memory noBid = _ask(alice, 0);
+        _submit(noBid);
+        bytes32 id = _orderIdFor(alice, true, noBid.salt);
+        assertEq(hook.asyncOrder(poolId, id), noBid.amountIn);
+        assertEq(hook.asyncOrderPriorityFee(poolId, id), 0);
+        assertEq(manager.balanceOf(address(hook), currency1.toId()), 0);
+    }
+
+    function test_zeroBidsKeepTimePriorityAndAllowRepricing() public {
+        AsyncOrder memory first = _ask(alice, 0);
+        _submit(first);
+        AsyncOrder memory second = _ask(bob, 0);
+        _submit(second);
+        (,, bytes32 best,) = hook.bestOrder(poolId, false);
+        assertEq(best, _orderIdFor(alice, true, first.salt));
+        vm.prank(alice);
+        hook.updatePrice(first, 2 ether);
+        (,, best,) = hook.bestOrder(poolId, false);
+        assertEq(best, _orderIdFor(bob, true, second.salt));
+        assertEq(hook.asyncOrderPriorityFee(poolId, _orderIdFor(alice, true, first.salt)), 0);
     }
 
     /// Equal prices queue by bid in a pool nobody configured: the later, higher bid is first.

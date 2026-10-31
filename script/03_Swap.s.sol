@@ -12,7 +12,7 @@ import {Currency} from "v4-core/types/Currency.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 
 /// @notice Submits an async swap order via the Router, authorizing the Router first if needed and
-///         paying the hook's minimum priority bid (or `PRIORITY_FEE`). The hook assigns the salt
+///         optionally paying `PRIORITY_FEE` for equal-price priority. The hook assigns the salt
 ///         from the block the order lands in, so the script saves the order and the block it was
 ///         submitted from; 04_Cancel and 05_Execute read the real salt from the chain.
 contract SwapScript is FFIHelper {

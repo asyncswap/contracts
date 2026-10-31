@@ -262,14 +262,14 @@
       "explorerUrl": "https://testnet-mega.etherscan.io",
       "nativeCurrency": { "name": "Ether", "symbol": "ETH", "decimals": 18 },
       "contracts": {
-        "poolManager": null,
+        "poolManager": "0x67E44b69D10737dF41f5a98078072B817016B871",
         "permit2": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
         "usdc": "0x72d4db19E3AE6f8ed47B5337ab00D69685277cF4",
-        "asyncSwapHook": null,
-        "router": null
+        "asyncSwapHook": "0x91d8D6eDeB81CDCd0a15fF180444B7EeEd50E888",
+        "router": "0xd25159473B1ba2979E92454620dDB86Fa2Af46EB"
       },
       "deployment": {
-        "status": "config_only",
+        "status": "prepared",
         "script": "script/deploy-megaeth-testnet.sh",
         "numeraireNote": "Official MegaETH testnet USDM (MegaUSD), 18 decimals. The usdc field is the deployment script's generic numeraire slot.",
         "requires": ["ETH-funded deployer", "self-deployed PoolManager", "pool initialization"]

@@ -74,7 +74,7 @@ contracts = chain.get("contracts", {})
 addr_re = r"0x[0-9a-fA-F]{40}"
 usdc = contracts.get("usdc")
 if not isinstance(usdc, str) or not re.fullmatch(addr_re, usdc):
-    raise SystemExit(f"{chain['name']} has no verified USDC address in {config_path}.")
+    raise SystemExit(f"{chain['name']} has no verified numeraire address in {config_path}.")
 pool_manager = contracts.get("poolManager")
 if not isinstance(pool_manager, str) or not re.fullmatch(addr_re, pool_manager):
     raise SystemExit(f"{chain['name']} has no PoolManager address in {config_path}.")
@@ -113,7 +113,7 @@ wait_for_code() {
   return 1
 }
 
-has_code "$DEPLOY_NUMERAIRE_ADDRESS" || { echo "Refusing: configured USDC $DEPLOY_NUMERAIRE_ADDRESS has no code on $chain_name." >&2; exit 1; }
+has_code "$DEPLOY_NUMERAIRE_ADDRESS" || { echo "Refusing: configured numeraire $DEPLOY_NUMERAIRE_ADDRESS has no code on $chain_name." >&2; exit 1; }
 has_code "$POOL_MANAGER_ADDRESS" || { echo "Refusing: configured PoolManager $POOL_MANAGER_ADDRESS has no code on $chain_name." >&2; exit 1; }
 has_code "$CREATE2_DEPLOYER" || { echo "Refusing: CREATE2 deployer $CREATE2_DEPLOYER is missing on $chain_name." >&2; exit 1; }
 

@@ -68,6 +68,9 @@ contract AsyncSwap is BaseHook, EIP712 {
     /// @notice Minimum order, in numeraire base units, that pools initialized from now on start with.
     uint256 public defaultMinOrder;
 
+    /// @notice $0.10 priority-bid cap in numeraire base units for pools initialized from now on.
+    uint64 public defaultPriorityFeeCap = 100_000;
+
     /// @notice Pool-level swap-event mirror; bytes32 poolId for indexer compatibility.
     /// @dev    See https://github.com/OpenZeppelin/uniswap-hooks BaseAsyncSwap for the source pattern.
     event HookSwap(
@@ -83,6 +86,7 @@ contract AsyncSwap is BaseHook, EIP712 {
     error UnaccountedNativeOutput();
     error NotOwner();
     error ZeroAddress();
+    error InvalidPriorityFeeCap();
     error SignatureExpired();
     error InvalidSignature();
     error NonceAlreadyUsed();
@@ -235,6 +239,7 @@ contract AsyncSwap is BaseHook, EIP712 {
         asyncOrders[key.toId()].numeraire = numeraire;
         asyncOrders[key.toId()].feeVault = address(feeVault);
         priceBooks[key.toId()].minOrder = defaultMinOrder;
+        priceBooks[key.toId()].priorityFeeCap = defaultPriorityFeeCap;
         return this.beforeInitialize.selector;
     }
 
@@ -297,6 +302,18 @@ contract AsyncSwap is BaseHook, EIP712 {
     /// @notice Set the minimum order new pools start with.
     function setDefaultMinOrder(uint256 minimum) external onlyOwner {
         defaultMinOrder = minimum;
+    }
+
+    /// @notice Set the $0.10 priority-bid cap for new pools in numeraire base units.
+    function setDefaultPriorityFeeCap(uint64 cap) external onlyOwner {
+        if (cap == 0) revert InvalidPriorityFeeCap();
+        defaultPriorityFeeCap = cap;
+    }
+
+    /// @notice Correct an initialized pool's cap when its numeraire has a different decimal scale.
+    function setPriorityFeeCap(PoolKey calldata key, uint64 cap) external onlyOwner {
+        if (cap == 0) revert InvalidPriorityFeeCap();
+        priceBooks[key.toId()].priorityFeeCap = cap;
     }
 
     /// @notice Return the best live limit order for a pool side. `isBuy` is true

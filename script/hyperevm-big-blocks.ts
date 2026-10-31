@@ -9,7 +9,12 @@ const [mode, flag] = process.argv.slice(2);
 if (!["enable", "disable"].includes(mode) || flag !== "--broadcast") {
   throw new Error("Usage: olive exec <account> -- bun script/hyperevm-big-blocks.ts enable|disable --broadcast");
 }
-const account = process.env.DEPLOYER_ACCOUNT;
+const deployEnv = await Bun.file(new URL("../.env.deploy", import.meta.url)).text().catch(() => "");
+function setting(name: string): string | undefined {
+  const line = deployEnv.split(/\r?\n/).find(line => line.startsWith(`${name}=`));
+  return process.env[name] ?? line?.slice(name.length + 1).replace(/^['"]|['"]$/g, "");
+}
+const account = setting("DEPLOYER_ACCOUNT");
 if (!account) throw new Error("Set DEPLOYER_ACCOUNT to the Olive signer name");
 
 async function runCast(args: string[]): Promise<string> {
@@ -23,7 +28,7 @@ async function runCast(args: string[]): Promise<string> {
 
 const signer = await runCast(["wallet", "address", "--account", account]);
 if (!/^0x[0-9a-fA-F]{40}$/.test(signer)) throw new Error("Invalid Olive signer address");
-if (process.env.DEPLOY_OWNER?.toLowerCase() !== signer.toLowerCase()) {
+if (setting("DEPLOY_OWNER")?.toLowerCase() !== signer.toLowerCase()) {
   throw new Error("DEPLOY_OWNER must match the Olive signer");
 }
 

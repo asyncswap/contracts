@@ -1,6 +1,6 @@
 # CurrencySettler
 
-[Git Source](https://github.com/asyncswap/contracts/blob/fe373151eb2cd6cdbd7a60b534a479a0dde5d75e/src/libraries/CurrencySettler.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/97cbdf27bf322f5109418f442275172e22ad8711/src/libraries/CurrencySettler.sol)
 
 **Title:** CurrencySettler
 

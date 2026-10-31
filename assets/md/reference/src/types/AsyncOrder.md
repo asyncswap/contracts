@@ -1,6 +1,6 @@
 # AsyncOrder
 
-[Git Source](https://github.com/asyncswap/contracts/blob/fe373151eb2cd6cdbd7a60b534a479a0dde5d75e/src/types/AsyncOrder.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/97cbdf27bf322f5109418f442275172e22ad8711/src/types/AsyncOrder.sol)
 
 Represents an async order for a swap in the Uniswap V4 pool.
 
@@ -26,6 +26,6 @@ struct AsyncOrder {
 | zeroForOne | `bool` | Direction of the order. true => input is currency0, output is currency1. |
 | amountIn | `uint256` | Amount of input currency the maker escrowed. Direct matching may partially fill it;<br />unused input is returned when the maker's minimum output is satisfied. |
 | amountOutMin | `uint256` | Minimum amount of output currency the maker accepts. The implicit limit price is<br />`amountOutMin / amountIn`. A filler or direct match must satisfy the live minimum<br />for the amount it consumes. |
-| priorityFee | `uint256` | Non-refundable USDC bid for equal-price priority: at least $0.10, or 0.1% of the<br />order's USDC notional when that is less. Matched portions, and the remainder on a<br />fill, cancel or dust closure, go to the protocol FeeVault. |
+| priorityFee | `uint256` | Optional non-refundable USDC bid for equal-price priority. Zero is valid; a nonzero<br />bid must be at least $0.10, or 0.1% of the order's USDC notional when that is less.<br />Matched portions, and the remainder on a<br />fill, cancel or dust closure, go to the protocol FeeVault. |
 | sqrtPrice | `uint160` | Sqrt-price limit passed to `PoolManager.swap` on submission. The hook consumes<br />the whole input in `beforeSwap`, so the pool never trades against it. |
 | salt | `bytes32` | Contract-assigned salt that disambiguates orders. The hook computes this at create<br />time from `keccak256(timestamp, block.number, msg.sender, owner, amountIn,<br/>amountOutMin, priorityFee)` and emits it in `AsyncOrderCreated` so the maker can reference the<br />order in cancel / updatePrice. Submitters pass `bytes32(0)` on create — the value<br />in this slot is only read on cancel / updatePrice / fill paths. |

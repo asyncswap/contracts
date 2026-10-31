@@ -144,14 +144,16 @@ library AsyncFiller {
         bool zeroForOne,
         uint256 priorityFee
     ) internal {
-        if (priorityFee < minPriorityFee(isBuy ? amountIn : amountOutMin)) {
-            revert PriorityFeeTooSmall();
-        }
+        // A priority bid is optional. Nonzero bids must meet the minimum to avoid dust bids;
+        // zero bids remain in the time-priority queue behind any paid bids at the same price.
         if (priorityFee > MAX_PRIORITY_FEE) revert PriorityFeeTooLarge();
         // Escrow the bid now: minting the hook's claims leaves the hook owing the bid to the
         // PoolManager, so the unlock that creates the order cannot end until the bid is paid
         // (the Router does `settleFor(hook)`), exactly as the swap delta makes it pay the input.
-        if (priorityFee != 0) self.numeraire.take(self.poolManager, address(this), priorityFee, true);
+        if (priorityFee != 0) {
+            if (priorityFee < minPriorityFee(isBuy ? amountIn : amountOutMin)) revert PriorityFeeTooSmall();
+            self.numeraire.take(self.poolManager, address(this), priorityFee, true);
+        }
         uint128 price = _priceKey(isBuy, zeroForOne, amountIn, amountOutMin);
         uint64 sequence = ++book.nextSequence;
         self.orders[id] = OrderInfo({
@@ -178,7 +180,8 @@ library AsyncFiller {
     /// @notice The least bid for an order worth `notional` numeraire units: $0.10, or 0.1% of the
     ///         order when that is less (orders under $100).
     function minPriorityFee(uint256 notional) internal pure returns (uint256) {
-        uint256 tiered = Math.mulDiv(notional, PRIORITY_FEE_BPS, 10_000);
+        // 10 bps is exactly 1/1000; integer division preserves the existing rounding down.
+        uint256 tiered = notional / (10_000 / PRIORITY_FEE_BPS);
         return tiered < MIN_PRIORITY_FEE ? tiered : MIN_PRIORITY_FEE;
     }
 
@@ -275,9 +278,8 @@ library AsyncFiller {
         if (info.amountIn == 0) revert OrderNotFound();
         checkMinimum(self, book, order.key.toId(), info.isBuy, info.zeroForOne, info.amountIn, newAmountOutMin);
         uint256 old = info.amountOutMin;
-        // A sell's bid floor follows its minimum output. Increasing the requested notional must
-        // meet the new floor; unchanged or reduced terms may retain a pro-rated bid.
-        if (!info.isBuy) {
+        // A nonzero sell bid floor follows its minimum output. Zero remains a valid no-bid order.
+        if (!info.isBuy && info.priorityFee != 0) {
             uint256 required = minPriorityFee(newAmountOutMin);
             if (newAmountOutMin > old && info.priorityFee < required) revert PriorityFeeTooSmall();
         }

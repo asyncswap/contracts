@@ -10,7 +10,7 @@ fs_permissions = [
 solc_version = "0.8.26"
 # Favor lower execution gas; runtime sizes remain below EIP-170 with linked TickPrice.
 optimizer = true
-optimizer_runs = 43_690
+optimizer_runs = 10_000
 # Tests named `*_finding_*` are counterexamples the bytecode gives to a Formal Mind theorem (see
 # test/formal/README.md, "Findings"). They fail by design until the model is fixed, so the default run
 # skips them; `FOUNDRY_PROFILE=findings forge test` runs exactly those.

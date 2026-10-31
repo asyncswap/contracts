@@ -4,12 +4,12 @@ Current behavior, checked against the contract source. See also [contract call s
 
 ## Order lifecycle
 
-These diagrams describe the current source, not a deployment or mainnet-readiness guarantee. Book matching ranks the best opposing price first; higher escrowed USDC bids break ties at that price, followed by earlier submission. Private fills and explicit LP retries target a specific order and do not enforce the book's global priority queue.
+These diagrams describe the current source, not a deployment or mainnet-readiness guarantee. Book matching ranks the best opposing price first; higher escrowed USDC bids break ties at that price, followed by earlier submission. Zero-bid orders are valid and keep time priority behind paid bids. Private fills and explicit LP retries target a specific order and do not enforce the book's global priority queue.
 
 ```mermaid
 flowchart TD
-    A["Submit order: input amount, minimum output, USDC bid"] --> D["Require pool minimum and tiered bid"]
-    D --> E["Validate executor; escrow input and bid at creation"]
+    A["Submit order: input amount, minimum output, optional USDC bid"] --> D["Require pool minimum; validate minimum only for nonzero bid"]
+    D --> E["Validate executor; escrow input and any nonzero bid at creation"]
     E --> R{"Pool spot price strictly better than the best opposing level?"}
     R -- "No" --> F["Match best opposing prices first; up to 8 pairs"]
     R -- "Yes" --> P["Try the order against pool liquidity first"]
@@ -43,7 +43,7 @@ Sources: [Router](../src/Router.sol), [AsyncSwap](../src/AsyncSwap.sol), [AsyncM
 
 ## Priority-bid settlement
 
-Priority bids are escrowed in USDC and are **non-refundable**. The creation minimum is `min(0.10 USDC, 0.1% of the order’s USDC notional)`, rounded down to base units. An unlock cannot finish with an unpaid bid debt. They rank same-price orders within the book; they do not purchase block inclusion or transaction ordering from the chain.
+Priority bids are optional. An order with no bid pays no priority fee at creation and keeps time priority among other zero-bid orders. A nonzero bid is escrowed in USDC and is **non-refundable**; it must be at least `min(0.10 USDC, 0.1% of the order’s USDC notional)`, rounded down to base units. An unlock cannot finish with an unpaid nonzero bid debt. Bids rank same-price orders within the book; they do not purchase block inclusion or transaction ordering from the chain.
 
 ```mermaid
 flowchart TD
@@ -72,7 +72,7 @@ Bids always go to the FeeVault, whatever liquidity is in range, so liquidity add
 Sources: [`_reduceAfterMatch` and `_settleMatchedPriorityFee`](../src/libraries/AsyncMatching.sol), [`settlePriorityFee`, `fill`, and `cancel`](../src/libraries/AsyncFiller.sol). The [original chat diagrams](historical-matching-diagrams.md) are retained as historical references.
 
 
-Raising a sell's minimum output requires its remaining bid to meet the new notional's bid floor.
+Raising a sell's minimum output requires any nonzero remaining bid to meet the new notional's bid floor; a zero bid remains valid.
 A partially filled sell can retain its prorated bid when repricing to unchanged or lower terms.
 Book selection compares exact prices first, even within a shared tick; fee and queue age only
 break exact-price ties. Settlement age remains the immutable creation sequence.

@@ -193,7 +193,9 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
         if (!hook.isExecutor(c.key.toId(), user, executor)) return (true, false);
         if (amt == 0 || aom == 0) return (true, false);
         bool buy = (c.params.zeroForOne ? c.key.currency0 : c.key.currency1) == hook.numeraire();
-        if (pf < AsyncFiller.minPriorityFee(buy ? amt : aom) || pf > type(uint64).max) return (true, false);
+        if ((pf != 0 && pf < AsyncFiller.minPriorityFee(buy ? amt : aom)) || pf > type(uint64).max) {
+            return (true, false);
+        }
         if (pf != 0 && PoolId.unwrap(c.key.toId()) != PoolId.unwrap(poolId)) return (true, false);
         if (aom > type(uint128).max) return (false, false);
         return (true, true);
@@ -442,7 +444,7 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
             expected = abi.encodeWithSelector(AsyncFiller.NotAuthorizedExecutor.selector);
         } else if (amt == 0 || aom == 0) {
             expected = abi.encodeWithSelector(AsyncFiller.ZeroAmount.selector);
-        } else if (pf < AsyncFiller.minPriorityFee(zeroForOne ? aom : amt)) {
+        } else if (pf != 0 && pf < AsyncFiller.minPriorityFee(zeroForOne ? aom : amt)) {
             expected = abi.encodeWithSelector(AsyncFiller.PriorityFeeTooSmall.selector);
         } else if (pf > type(uint64).max) {
             expected = abi.encodeWithSelector(AsyncFiller.PriorityFeeTooLarge.selector);

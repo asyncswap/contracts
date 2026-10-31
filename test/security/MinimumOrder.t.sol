@@ -253,13 +253,15 @@ contract MinimumOrderTest is SetupHook {
         this.submitExternal(bid);
     }
 
-    /// A sell admitted with a bid that rounds to zero cannot be repriced to terms that need a bid.
-    function test_RevertWhen_updatePrice_raisesSellBidFloor() public {
+    /// A zero bid stays optional when the maker raises the minimum output.
+    function test_updatePrice_zeroBidRemainsOptional() public {
         AsyncOrder memory ask = _order(alice, true, 100e6, 999, 0);
         _submit(ask);
         vm.prank(alice);
-        vm.expectRevert(AsyncFiller.PriorityFeeTooSmall.selector);
         hook.updatePrice(ask, 100e6);
+        (, uint256 minimum) = hook.asyncOrderInfo(poolId, _id(ask));
+        assertEq(minimum, 100e6);
+        assertEq(hook.asyncOrderPriorityFee(poolId, _id(ask)), 0);
     }
 
     /// A $10 sell holds a $0.01 bid; repricing it to $1,000 needs the full $0.10.

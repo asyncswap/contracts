@@ -153,8 +153,8 @@ contract FFIHelper is Script, DeploymentsRegistry {
         revert("AsyncOrderCreated for the saved order not found on chain");
     }
 
-    /// @notice The priority bid an order pays, in numeraire (USDC) base units: `PRIORITY_FEE` if
-    ///         set, otherwise the least bid the hook accepts. Mirrors `AsyncFiller.minPriorityFee`:
+    /// @notice The optional priority bid in numeraire (USDC) base units. Defaults to zero;
+    ///         when `PRIORITY_FEE` is set, it must meet `AsyncFiller.minPriorityFee`:
     ///         min($0.10, 0.1% of the order's USDC notional), where the notional is a buy's input
     ///         or a sell's minimum output.
     function _priorityFee(Currency numeraire, Currency input, uint256 amountIn, uint256 amountOutMin)
@@ -162,12 +162,16 @@ contract FFIHelper is Script, DeploymentsRegistry {
         view
         returns (uint256)
     {
+        uint256 bid = vm.envOr("PRIORITY_FEE", uint256(0));
+        if (bid == 0) return 0;
         uint256 notional = input == numeraire ? amountIn : amountOutMin;
         uint256 tiered = notional * 10 / 10_000;
-        return vm.envOr("PRIORITY_FEE", tiered < 100_000 ? tiered : 100_000);
+        uint256 minimum = tiered < 100_000 ? tiered : 100_000;
+        require(bid >= minimum, "PRIORITY_FEE below minimum");
+        return bid;
     }
 
-    /// @notice Approve the Router for an order's input and its priority bid. The bid is pulled in
+    /// @notice Approve the Router for an order's input and optional priority bid. The bid is pulled in
     ///         the numeraire; when that is also the input, one approval covers both. Native input is
     ///         sent as `msg.value` and needs no approval.
     function _approveOrderFunds(address router, Currency numeraire, Currency input, uint256 amountIn, uint256 bid)

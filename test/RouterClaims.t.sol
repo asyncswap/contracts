@@ -211,4 +211,97 @@ contract RouterClaimsTest is NativeAsyncSwapTest {
         vm.expectRevert("Invalid claims");
         router.withdrawClaims(new Currency[](0), new uint256[](0));
     }
+
+    function testFuzz_updatedRouterCancellationAuthorization(
+        bool makerCalls,
+        bool executorGranted,
+        bool claimApproved,
+        uint256 reportedAmount
+    ) public {
+        AsyncOrder memory order = _openNative();
+        Router updated = new Router(manager, hook, ISignatureTransfer(address(0)));
+        vm.startPrank(alice);
+        hook.setExecutor(poolId, address(updated), executorGranted);
+        if (claimApproved) manager.approve(address(updated), 0, 1 ether);
+        vm.stopPrank();
+        uint256 beforeETH = alice.balance;
+        order.amountIn = reportedAmount;
+        vm.prank(makerCalls ? alice : bob);
+        (bool ok,) = address(updated).call(abi.encodeCall(updated.cancelAndWithdraw, (order)));
+        bool expected = makerCalls && executorGranted && claimApproved;
+        assertEq(ok, expected);
+        assertEq(alice.balance, beforeETH + (expected ? 1 ether : 0));
+        assertEq(manager.balanceOf(alice, 0), 0);
+        assertEq(hook.asyncOrder(poolId, _orderIdFor(alice, true, order.salt)), expected ? 0 : 1 ether);
+        assertEq(hook.router(), address(router));
+    }
+
+    function testFuzz_withdrawClaimsAmountAndAllowance(uint96 amount, uint96 allowance) public {
+        AsyncOrder memory order = _openNative();
+        vm.startPrank(alice);
+        router.cancelOrder(order);
+        manager.approve(address(router), 0, allowance);
+        Currency[] memory currencies = new Currency[](1);
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = amount;
+        uint256 beforeETH = alice.balance;
+        (bool ok,) = address(router).call(abi.encodeCall(router.withdrawClaims, (currencies, amounts)));
+        vm.stopPrank();
+        bool expected = amount > 0 && amount <= 1 ether && amount <= allowance;
+        assertEq(ok, expected);
+        assertEq(alice.balance, beforeETH + (expected ? amount : 0));
+        assertEq(manager.balanceOf(alice, 0), 1 ether - (expected ? amount : 0));
+        assertEq(manager.allowance(alice, address(router), 0), allowance - (expected ? amount : 0));
+    }
+
+    function test_withdrawBatchBoundsRejectMismatchedAndOversizedArrays() public {
+        vm.expectRevert("Invalid claims");
+        router.withdrawClaims(new Currency[](1), new uint256[](0));
+        vm.expectRevert("Invalid claims");
+        router.withdrawClaims(new Currency[](17), new uint256[](17));
+    }
+
+    function test_unlockCallbackRejectsCallsOutsidePoolManager() public {
+        Currency[] memory currencies = new Currency[](1);
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = 1;
+        vm.prank(bob);
+        vm.expectRevert("Caller is not PoolManager");
+        router.unlockCallback(abi.encode(Router.ActionType.WithdrawClaims, alice, currencies, amounts));
+    }
+
+    function test_withdrawNativeAndERC20ClaimsInOneBatch() public {
+        AsyncOrder memory cancelled = _openNative();
+        vm.prank(alice);
+        router.cancelOrder(cancelled);
+        vm.roll(block.number + 1);
+        _openNative();
+        AsyncOrder memory buy = _order(bob, false, 1 ether, 1 ether);
+        vm.startPrank(bob);
+        hook.setExecutor(poolId, address(router), true);
+        router.swap(buy, abi.encode(AsyncSwap.UserParams(bob, address(router), 1 ether, 100_000)));
+        vm.stopPrank();
+        uint256 tokenId = uint256(uint160(address(erc20)));
+        uint256 tokenClaim = manager.balanceOf(alice, tokenId);
+        assertGt(tokenClaim, 0);
+        assertEq(manager.balanceOf(alice, 0), 1 ether);
+        Currency[] memory currencies = new Currency[](2);
+        currencies[1] = currency1;
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = 1 ether;
+        amounts[1] = tokenClaim;
+        uint256 beforeETH = alice.balance;
+        uint256 beforeTokens = erc20.balanceOf(alice);
+        vm.startPrank(alice);
+        manager.approve(address(router), 0, amounts[0]);
+        manager.approve(address(router), tokenId, amounts[1]);
+        router.withdrawClaims(currencies, amounts);
+        vm.stopPrank();
+        assertEq(alice.balance, beforeETH + amounts[0]);
+        assertEq(erc20.balanceOf(alice), beforeTokens + amounts[1]);
+        assertEq(manager.balanceOf(alice, 0), 0);
+        assertEq(manager.balanceOf(alice, tokenId), 0);
+        assertEq(manager.allowance(alice, address(router), 0), 0);
+        assertEq(manager.allowance(alice, address(router), tokenId), 0);
+    }
 }

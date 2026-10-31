@@ -1,0 +1,216 @@
+{
+  "tool": "Gambit v1.0.6 plus five targeted security mutations",
+  "initial": {
+    "survived": 6,
+    "killed": 18
+  },
+  "final": {
+    "killed": 29
+  },
+  "scope": "RouterClaimsTest (22 tests); full unmutated Foundry suite run separately",
+  "mutants": [
+    {
+      "id": "1",
+      "operator": "DeleteExpressionMutation",
+      "status": "killed",
+      "seconds": 8.8,
+      "diff": "--- original\n+++ mutant\n@@ -89,7 +89,8 @@\n     }\n \n     modifier onlyPoolManager() {\n-        require(msg.sender == address(POOLMANAGER), \"Caller is not PoolManager\");\n+        /// DeleteExpressionMutation(`require(msg.sender == address(POOLMANAGER), \"Caller is not PoolManager\")` |==> `assert(true)`) of: `require(msg.sender == address(POOLMANAGER), \"Caller is not PoolManager\");`\n+        assert(true);\n         _;\n     }\n \n"
+    },
+    {
+      "id": "2",
+      "operator": "RequireMutation",
+      "status": "killed",
+      "seconds": 7.6,
+      "diff": "--- original\n+++ mutant\n@@ -89,7 +89,8 @@\n     }\n \n     modifier onlyPoolManager() {\n-        require(msg.sender == address(POOLMANAGER), \"Caller is not PoolManager\");\n+        /// RequireMutation(`msg.sender == address(POOLMANAGER)` |==> `true`) of: `require(msg.sender == address(POOLMANAGER), \"Caller is not PoolManager\");`\n+        require(true, \"Caller is not PoolManager\");\n         _;\n     }\n \n"
+    },
+    {
+      "id": "3",
+      "operator": "DeleteExpressionMutation",
+      "status": "killed",
+      "seconds": 4.7,
+      "diff": "--- original\n+++ mutant\n@@ -232,7 +232,8 @@\n     /// @dev Native refunds are redeemed atomically. Approve this Router for claim ID 0 first.\n     ///      Existing claims are untouched; a failed redemption rolls back the cancellation.\n     function cancelAndWithdraw(AsyncOrder calldata order) external {\n-        require(msg.sender == order.owner, \"Only owner can cancel\");\n+        /// DeleteExpressionMutation(`require(msg.sender == order.owner, \"Only owner can cancel\")` |==> `assert(true)`) of: `require(msg.sender == order.owner, \"Only owner can cancel\");`\n+        assert(true);\n         POOLMANAGER.unlock(\n             abi.encode(SwapCallback({action: ActionType.CancelAndWithdraw, order: order, maxMatches: 0}))\n         );\n"
+    },
+    {
+      "id": "4",
+      "operator": "RequireMutation",
+      "status": "killed",
+      "seconds": 6.6,
+      "diff": "--- original\n+++ mutant\n@@ -232,7 +232,8 @@\n     /// @dev Native refunds are redeemed atomically. Approve this Router for claim ID 0 first.\n     ///      Existing claims are untouched; a failed redemption rolls back the cancellation.\n     function cancelAndWithdraw(AsyncOrder calldata order) external {\n-        require(msg.sender == order.owner, \"Only owner can cancel\");\n+        /// RequireMutation(`msg.sender == order.owner` |==> `true`) of: `require(msg.sender == order.owner, \"Only owner can cancel\");`\n+        require(true, \"Only owner can cancel\");\n         POOLMANAGER.unlock(\n             abi.encode(SwapCallback({action: ActionType.CancelAndWithdraw, order: order, maxMatches: 0}))\n         );\n"
+    },
+    {
+      "id": "5",
+      "operator": "RequireMutation",
+      "status": "killed",
+      "seconds": 14.7,
+      "diff": "--- original\n+++ mutant\n@@ -232,7 +232,8 @@\n     /// @dev Native refunds are redeemed atomically. Approve this Router for claim ID 0 first.\n     ///      Existing claims are untouched; a failed redemption rolls back the cancellation.\n     function cancelAndWithdraw(AsyncOrder calldata order) external {\n-        require(msg.sender == order.owner, \"Only owner can cancel\");\n+        /// RequireMutation(`msg.sender == order.owner` |==> `false`) of: `require(msg.sender == order.owner, \"Only owner can cancel\");`\n+        require(false, \"Only owner can cancel\");\n         POOLMANAGER.unlock(\n             abi.encode(SwapCallback({action: ActionType.CancelAndWithdraw, order: order, maxMatches: 0}))\n         );\n"
+    },
+    {
+      "id": "6",
+      "operator": "DeleteExpressionMutation",
+      "status": "killed",
+      "seconds": 16.6,
+      "diff": "--- original\n+++ mutant\n@@ -242,7 +242,8 @@\n     /// @dev Approve exact currency claim allowances on PoolManager first. No operator grant is needed.\n     function withdrawClaims(Currency[] calldata currencies, uint256[] calldata amounts) external {\n         uint256 length = currencies.length;\n-        require(length != 0 && length <= 16 && length == amounts.length, \"Invalid claims\");\n+        /// DeleteExpressionMutation(`require(length != 0 && length <= 16 && length == amounts.length, \"Invalid claims\")` |==> `assert(true)`) of: `require(length != 0 && length <= 16 && length == amounts.length, \"Invalid claims\");`\n+        assert(true);\n         for (uint256 i; i < length; ++i) {\n             require(amounts[i] != 0, \"Zero claim\");\n             for (uint256 j; j < i; ++j) {\n"
+    },
+    {
+      "id": "7",
+      "operator": "RequireMutation",
+      "status": "killed",
+      "seconds": 7.5,
+      "diff": "--- original\n+++ mutant\n@@ -242,7 +242,8 @@\n     /// @dev Approve exact currency claim allowances on PoolManager first. No operator grant is needed.\n     function withdrawClaims(Currency[] calldata currencies, uint256[] calldata amounts) external {\n         uint256 length = currencies.length;\n-        require(length != 0 && length <= 16 && length == amounts.length, \"Invalid claims\");\n+        /// RequireMutation(`length != 0 && length <= 16 && length == amounts.length` |==> `true`) of: `require(length != 0 && length <= 16 && length == amounts.length, \"Invalid claims\");`\n+        require(true, \"Invalid claims\");\n         for (uint256 i; i < length; ++i) {\n             require(amounts[i] != 0, \"Zero claim\");\n             for (uint256 j; j < i; ++j) {\n"
+    },
+    {
+      "id": "8",
+      "operator": "RequireMutation",
+      "status": "killed",
+      "seconds": 6.7,
+      "diff": "--- original\n+++ mutant\n@@ -242,7 +242,8 @@\n     /// @dev Approve exact currency claim allowances on PoolManager first. No operator grant is needed.\n     function withdrawClaims(Currency[] calldata currencies, uint256[] calldata amounts) external {\n         uint256 length = currencies.length;\n-        require(length != 0 && length <= 16 && length == amounts.length, \"Invalid claims\");\n+        /// RequireMutation(`length != 0 && length <= 16 && length == amounts.length` |==> `false`) of: `require(length != 0 && length <= 16 && length == amounts.length, \"Invalid claims\");`\n+        require(false, \"Invalid claims\");\n         for (uint256 i; i < length; ++i) {\n             require(amounts[i] != 0, \"Zero claim\");\n             for (uint256 j; j < i; ++j) {\n"
+    },
+    {
+      "id": "9",
+      "operator": "SwapArgumentsOperatorMutation",
+      "status": "killed",
+      "seconds": 7.1,
+      "diff": "--- original\n+++ mutant\n@@ -242,7 +242,8 @@\n     /// @dev Approve exact currency claim allowances on PoolManager first. No operator grant is needed.\n     function withdrawClaims(Currency[] calldata currencies, uint256[] calldata amounts) external {\n         uint256 length = currencies.length;\n-        require(length != 0 && length <= 16 && length == amounts.length, \"Invalid claims\");\n+        /// SwapArgumentsOperatorMutation(`length <= 16` |==> `16 <= length`) of: `require(length != 0 && length <= 16 && length == amounts.length, \"Invalid claims\");`\n+        require(length != 0 && 16 <= length && length == amounts.length, \"Invalid claims\");\n         for (uint256 i; i < length; ++i) {\n             require(amounts[i] != 0, \"Zero claim\");\n             for (uint256 j; j < i; ++j) {\n"
+    },
+    {
+      "id": "10",
+      "operator": "DeleteExpressionMutation",
+      "status": "killed",
+      "seconds": 4.9,
+      "diff": "--- original\n+++ mutant\n@@ -244,7 +244,8 @@\n         uint256 length = currencies.length;\n         require(length != 0 && length <= 16 && length == amounts.length, \"Invalid claims\");\n         for (uint256 i; i < length; ++i) {\n-            require(amounts[i] != 0, \"Zero claim\");\n+            /// DeleteExpressionMutation(`require(amounts[i] != 0, \"Zero claim\")` |==> `assert(true)`) of: `require(amounts[i] != 0, \"Zero claim\");`\n+            assert(true);\n             for (uint256 j; j < i; ++j) {\n                 require(Currency.unwrap(currencies[i]) != Currency.unwrap(currencies[j]), \"Duplicate currency\");\n             }\n"
+    },
+    {
+      "id": "11",
+      "operator": "RequireMutation",
+      "status": "killed",
+      "seconds": 4.8,
+      "diff": "--- original\n+++ mutant\n@@ -244,7 +244,8 @@\n         uint256 length = currencies.length;\n         require(length != 0 && length <= 16 && length == amounts.length, \"Invalid claims\");\n         for (uint256 i; i < length; ++i) {\n-            require(amounts[i] != 0, \"Zero claim\");\n+            /// RequireMutation(`amounts[i] != 0` |==> `false`) of: `require(amounts[i] != 0, \"Zero claim\");`\n+            require(false, \"Zero claim\");\n             for (uint256 j; j < i; ++j) {\n                 require(Currency.unwrap(currencies[i]) != Currency.unwrap(currencies[j]), \"Duplicate currency\");\n             }\n"
+    },
+    {
+      "id": "12",
+      "operator": "DeleteExpressionMutation",
+      "status": "killed",
+      "seconds": 4.8,
+      "diff": "--- original\n+++ mutant\n@@ -246,7 +246,8 @@\n         for (uint256 i; i < length; ++i) {\n             require(amounts[i] != 0, \"Zero claim\");\n             for (uint256 j; j < i; ++j) {\n-                require(Currency.unwrap(currencies[i]) != Currency.unwrap(currencies[j]), \"Duplicate currency\");\n+                /// DeleteExpressionMutation(`require(Currency.unwrap(currencies[i]) != Currency.unwrap(currencies[j]), \"Duplicate currency\")` |==> `assert(true)`) of: `require(Currency.unwrap(currencies[i]) != Currency.unwrap(currencies[j]), \"Duplicate currency\");`\n+                assert(true);\n             }\n         }\n         POOLMANAGER.unlock(abi.encode(ActionType.WithdrawClaims, msg.sender, currencies, amounts));\n"
+    },
+    {
+      "id": "13",
+      "operator": "RequireMutation",
+      "status": "killed",
+      "seconds": 7.2,
+      "diff": "--- original\n+++ mutant\n@@ -246,7 +246,8 @@\n         for (uint256 i; i < length; ++i) {\n             require(amounts[i] != 0, \"Zero claim\");\n             for (uint256 j; j < i; ++j) {\n-                require(Currency.unwrap(currencies[i]) != Currency.unwrap(currencies[j]), \"Duplicate currency\");\n+                /// RequireMutation(`Currency.unwrap(currencies[i]) != Currency.unwrap(currencies[j])` |==> `true`) of: `require(Currency.unwrap(currencies[i]) != Currency.unwrap(currencies[j]), \"Duplicate currency\");`\n+                require(true, \"Duplicate currency\");\n             }\n         }\n         POOLMANAGER.unlock(abi.encode(ActionType.WithdrawClaims, msg.sender, currencies, amounts));\n"
+    },
+    {
+      "id": "14",
+      "operator": "RequireMutation",
+      "status": "killed",
+      "seconds": 7.9,
+      "diff": "--- original\n+++ mutant\n@@ -246,7 +246,8 @@\n         for (uint256 i; i < length; ++i) {\n             require(amounts[i] != 0, \"Zero claim\");\n             for (uint256 j; j < i; ++j) {\n-                require(Currency.unwrap(currencies[i]) != Currency.unwrap(currencies[j]), \"Duplicate currency\");\n+                /// RequireMutation(`Currency.unwrap(currencies[i]) != Currency.unwrap(currencies[j])` |==> `false`) of: `require(Currency.unwrap(currencies[i]) != Currency.unwrap(currencies[j]), \"Duplicate currency\");`\n+                require(false, \"Duplicate currency\");\n             }\n         }\n         POOLMANAGER.unlock(abi.encode(ActionType.WithdrawClaims, msg.sender, currencies, amounts));\n"
+    },
+    {
+      "id": "15",
+      "operator": "SwapArgumentsOperatorMutation",
+      "status": "killed",
+      "seconds": 9.4,
+      "diff": "--- original\n+++ mutant\n@@ -245,7 +245,8 @@\n         require(length != 0 && length <= 16 && length == amounts.length, \"Invalid claims\");\n         for (uint256 i; i < length; ++i) {\n             require(amounts[i] != 0, \"Zero claim\");\n-            for (uint256 j; j < i; ++j) {\n+            /// SwapArgumentsOperatorMutation(`j < i` |==> `i < j`) of: `for (uint256 j; j < i; ++j) {`\n+            for (uint256 j; i < j; ++j) {\n                 require(Currency.unwrap(currencies[i]) != Currency.unwrap(currencies[j]), \"Duplicate currency\");\n             }\n         }\n"
+    },
+    {
+      "id": "16",
+      "operator": "DeleteExpressionMutation",
+      "status": "killed",
+      "seconds": 8.7,
+      "diff": "--- original\n+++ mutant\n@@ -245,7 +245,8 @@\n         require(length != 0 && length <= 16 && length == amounts.length, \"Invalid claims\");\n         for (uint256 i; i < length; ++i) {\n             require(amounts[i] != 0, \"Zero claim\");\n-            for (uint256 j; j < i; ++j) {\n+            /// DeleteExpressionMutation(`++j` |==> `assert(true)`) of: `for (uint256 j; j < i; ++j) {`\n+            for (uint256 j; j < i; assert(true)) {\n                 require(Currency.unwrap(currencies[i]) != Currency.unwrap(currencies[j]), \"Duplicate currency\");\n             }\n         }\n"
+    },
+    {
+      "id": "17",
+      "operator": "UnaryOperatorMutation",
+      "status": "killed",
+      "seconds": 5.3,
+      "diff": "--- original\n+++ mutant\n@@ -245,7 +245,8 @@\n         require(length != 0 && length <= 16 && length == amounts.length, \"Invalid claims\");\n         for (uint256 i; i < length; ++i) {\n             require(amounts[i] != 0, \"Zero claim\");\n-            for (uint256 j; j < i; ++j) {\n+            /// UnaryOperatorMutation(`++` |==> `--`) of: `for (uint256 j; j < i; ++j) {`\n+            for (uint256 j; j < i; --j) {\n                 require(Currency.unwrap(currencies[i]) != Currency.unwrap(currencies[j]), \"Duplicate currency\");\n             }\n         }\n"
+    },
+    {
+      "id": "18",
+      "operator": "UnaryOperatorMutation",
+      "status": "killed",
+      "seconds": 13.7,
+      "diff": "--- original\n+++ mutant\n@@ -245,7 +245,8 @@\n         require(length != 0 && length <= 16 && length == amounts.length, \"Invalid claims\");\n         for (uint256 i; i < length; ++i) {\n             require(amounts[i] != 0, \"Zero claim\");\n-            for (uint256 j; j < i; ++j) {\n+            /// UnaryOperatorMutation(`++` |==> `~`) of: `for (uint256 j; j < i; ++j) {`\n+            for (uint256 j; j < i; ~j) {\n                 require(Currency.unwrap(currencies[i]) != Currency.unwrap(currencies[j]), \"Duplicate currency\");\n             }\n         }\n"
+    },
+    {
+      "id": "19",
+      "operator": "SwapArgumentsOperatorMutation",
+      "status": "killed",
+      "seconds": 4.9,
+      "diff": "--- original\n+++ mutant\n@@ -243,7 +243,8 @@\n     function withdrawClaims(Currency[] calldata currencies, uint256[] calldata amounts) external {\n         uint256 length = currencies.length;\n         require(length != 0 && length <= 16 && length == amounts.length, \"Invalid claims\");\n-        for (uint256 i; i < length; ++i) {\n+        /// SwapArgumentsOperatorMutation(`i < length` |==> `length < i`) of: `for (uint256 i; i < length; ++i) {`\n+        for (uint256 i; length < i; ++i) {\n             require(amounts[i] != 0, \"Zero claim\");\n             for (uint256 j; j < i; ++j) {\n                 require(Currency.unwrap(currencies[i]) != Currency.unwrap(currencies[j]), \"Duplicate currency\");\n"
+    },
+    {
+      "id": "20",
+      "operator": "DeleteExpressionMutation",
+      "status": "killed",
+      "seconds": 11.3,
+      "diff": "--- original\n+++ mutant\n@@ -243,7 +243,8 @@\n     function withdrawClaims(Currency[] calldata currencies, uint256[] calldata amounts) external {\n         uint256 length = currencies.length;\n         require(length != 0 && length <= 16 && length == amounts.length, \"Invalid claims\");\n-        for (uint256 i; i < length; ++i) {\n+        /// DeleteExpressionMutation(`++i` |==> `assert(true)`) of: `for (uint256 i; i < length; ++i) {`\n+        for (uint256 i; i < length; assert(true)) {\n             require(amounts[i] != 0, \"Zero claim\");\n             for (uint256 j; j < i; ++j) {\n                 require(Currency.unwrap(currencies[i]) != Currency.unwrap(currencies[j]), \"Duplicate currency\");\n"
+    },
+    {
+      "id": "21",
+      "operator": "UnaryOperatorMutation",
+      "status": "killed",
+      "seconds": 4.8,
+      "diff": "--- original\n+++ mutant\n@@ -243,7 +243,8 @@\n     function withdrawClaims(Currency[] calldata currencies, uint256[] calldata amounts) external {\n         uint256 length = currencies.length;\n         require(length != 0 && length <= 16 && length == amounts.length, \"Invalid claims\");\n-        for (uint256 i; i < length; ++i) {\n+        /// UnaryOperatorMutation(`++` |==> `--`) of: `for (uint256 i; i < length; ++i) {`\n+        for (uint256 i; i < length; --i) {\n             require(amounts[i] != 0, \"Zero claim\");\n             for (uint256 j; j < i; ++j) {\n                 require(Currency.unwrap(currencies[i]) != Currency.unwrap(currencies[j]), \"Duplicate currency\");\n"
+    },
+    {
+      "id": "22",
+      "operator": "UnaryOperatorMutation",
+      "status": "killed",
+      "seconds": 9.3,
+      "diff": "--- original\n+++ mutant\n@@ -243,7 +243,8 @@\n     function withdrawClaims(Currency[] calldata currencies, uint256[] calldata amounts) external {\n         uint256 length = currencies.length;\n         require(length != 0 && length <= 16 && length == amounts.length, \"Invalid claims\");\n-        for (uint256 i; i < length; ++i) {\n+        /// UnaryOperatorMutation(`++` |==> `~`) of: `for (uint256 i; i < length; ++i) {`\n+        for (uint256 i; i < length; ~i) {\n             require(amounts[i] != 0, \"Zero claim\");\n             for (uint256 j; j < i; ++j) {\n                 require(Currency.unwrap(currencies[i]) != Currency.unwrap(currencies[j]), \"Duplicate currency\");\n"
+    },
+    {
+      "id": "23",
+      "operator": "DeleteExpressionMutation",
+      "status": "killed",
+      "seconds": 6.3,
+      "diff": "--- original\n+++ mutant\n@@ -249,7 +249,8 @@\n                 require(Currency.unwrap(currencies[i]) != Currency.unwrap(currencies[j]), \"Duplicate currency\");\n             }\n         }\n-        POOLMANAGER.unlock(abi.encode(ActionType.WithdrawClaims, msg.sender, currencies, amounts));\n+        /// DeleteExpressionMutation(`POOLMANAGER.unlock(abi.encode(ActionType.WithdrawClaims, msg.sender, currencies, amounts))` |==> `assert(true)`) of: `POOLMANAGER.unlock(abi.encode(ActionType.WithdrawClaims, msg.sender, currencies, amounts));`\n+        assert(true);\n     }\n \n     /// @notice Anyone can continue a crossed book after a transaction hits the automatic match cap.\n"
+    },
+    {
+      "id": "24",
+      "operator": "DeleteExpressionMutation",
+      "status": "killed",
+      "seconds": 8.4,
+      "diff": "--- original\n+++ mutant\n@@ -377,7 +377,8 @@\n \n     function _withdrawClaim(address owner, Currency currency, uint256 amount) private {\n         POOLMANAGER.burn(owner, currency.toId(), amount);\n-        POOLMANAGER.take(currency, owner, amount);\n+        /// DeleteExpressionMutation(`POOLMANAGER.take(currency, owner, amount)` |==> `assert(true)`) of: `POOLMANAGER.take(currency, owner, amount);`\n+        assert(true);\n         emit ClaimWithdrawn(owner, currency, amount);\n     }\n \n"
+    },
+    {
+      "id": "25",
+      "operator": "SecurityMutation: redeem pre-existing claims",
+      "status": "killed",
+      "seconds": 6.0,
+      "diff": "--- original\n+++ mutant\n@@ -360,7 +360,7 @@\n             uint256 beforeClaims = input.isAddressZero() ? POOLMANAGER.balanceOf(owner, 0) : 0;\n             HOOK.cancelOrder(orderData.order);\n             if (input.isAddressZero()) {\n-                _withdrawClaim(owner, input, POOLMANAGER.balanceOf(owner, 0) - beforeClaims);\n+                _withdrawClaim(owner, input, POOLMANAGER.balanceOf(owner, 0));\n             }\n         } else if (action == uint8(ActionType.Cancel)) {\n             HOOK.cancelOrder(orderData.order);\n"
+    },
+    {
+      "id": "26",
+      "operator": "SecurityMutation: omit claim burn",
+      "status": "killed",
+      "seconds": 4.7,
+      "diff": "--- original\n+++ mutant\n@@ -376,7 +376,7 @@\n     event ClaimWithdrawn(address indexed owner, Currency indexed currency, uint256 amount);\n \n     function _withdrawClaim(address owner, Currency currency, uint256 amount) private {\n-        POOLMANAGER.burn(owner, currency.toId(), amount);\n+        \n         POOLMANAGER.take(currency, owner, amount);\n         emit ClaimWithdrawn(owner, currency, amount);\n     }\n"
+    },
+    {
+      "id": "27",
+      "operator": "SecurityMutation: redirect recipient",
+      "status": "killed",
+      "seconds": 4.9,
+      "diff": "--- original\n+++ mutant\n@@ -377,7 +377,7 @@\n \n     function _withdrawClaim(address owner, Currency currency, uint256 amount) private {\n         POOLMANAGER.burn(owner, currency.toId(), amount);\n-        POOLMANAGER.take(currency, owner, amount);\n+        POOLMANAGER.take(currency, address(this), amount);\n         emit ClaimWithdrawn(owner, currency, amount);\n     }\n \n"
+    },
+    {
+      "id": "28",
+      "operator": "SecurityMutation: skip cancellation",
+      "status": "killed",
+      "seconds": 4.9,
+      "diff": "--- original\n+++ mutant\n@@ -358,7 +358,6 @@\n             Currency input = orderData.order.zeroForOne ? orderData.order.key.currency0 : orderData.order.key.currency1;\n             address owner = orderData.order.owner;\n             uint256 beforeClaims = input.isAddressZero() ? POOLMANAGER.balanceOf(owner, 0) : 0;\n-            HOOK.cancelOrder(orderData.order);\n             if (input.isAddressZero()) {\n                 _withdrawClaim(owner, input, POOLMANAGER.balanceOf(owner, 0) - beforeClaims);\n             }\n"
+    },
+    {
+      "id": "29",
+      "operator": "SecurityMutation: skip final currency",
+      "status": "killed",
+      "seconds": 4.9,
+      "diff": "--- original\n+++ mutant\n@@ -291,7 +291,7 @@\n         if (action == uint8(ActionType.WithdrawClaims)) {\n             (, address owner, Currency[] memory currencies, uint256[] memory amounts) =\n                 abi.decode(data, (ActionType, address, Currency[], uint256[]));\n-            for (uint256 i; i < currencies.length; ++i) {\n+            for (uint256 i; i + 1 < currencies.length; ++i) {\n                 _withdrawClaim(owner, currencies[i], amounts[i]);\n             }\n             return \"\";\n"
+    }
+  ]
+}

@@ -76,8 +76,17 @@ import json, sys
 print(json.load(open(sys.argv[1]))['contracts']['PoolManager']['address'])
 PY
 )"
+  python3 "$ROOT_DIR/script/sync-poolmanager-receipt.py" \
+    --chain-id "$chain_id" --registry "$registry" \
+    --broadcast "$ROOT_DIR/broadcast/00_DeployPoolManager.s.sol/$chain_id/run-latest.json"
 fi
-[[ "$(cast code "$manager" --rpc-url "$RPC_URL")" != 0x ]] || {
+manager_code=0x
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  manager_code="$(cast code "$manager" --rpc-url "$RPC_URL")"
+  [[ "$manager_code" != 0x ]] && break
+  sleep 2
+done
+[[ "$manager_code" != 0x ]] || {
   echo "PoolManager has no code at $manager on $key" >&2; exit 1;
 }
 

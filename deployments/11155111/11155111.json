@@ -2,18 +2,18 @@
   "chainId": 11155111,
   "contracts": {
     "TickPrice": {
-      "address": "0xd74BD0774EE57bb9939B9bA2127C2911039C27F6",
-      "startBlock": 12028896,
+      "address": "0x5Be5a3101085c53Ddd96d8Cb627b7189db11bBc8",
+      "startBlock": 12030505,
       "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
     },
     "DynamicFeeOrdering": {
-      "address": "0xa6bc8acdF560D6C6169C442AF441e7fF53fC1A33",
-      "startBlock": 12028898,
+      "address": "0x5Ad5872419407eF4fa9492a71C465F599Cd2EcA4",
+      "startBlock": 12030506,
       "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
     },
     "AsyncMatching": {
-      "address": "0xAc9c2C38534f3d984d49f4830a5e07edA6F1e1F5",
-      "startBlock": 12028899,
+      "address": "0xBb48d6a1597E9ABA42a2832E779E1A435E02e5f4",
+      "startBlock": 12030507,
       "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
     },
     "PoolManager": {
@@ -22,20 +22,20 @@
       "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
     },
     "AsyncSwap": {
-      "address": "0x91720308BB0b6018e5F2480C10DB52dEd100e888",
-      "startBlock": 12028907,
-      "txHash": "0xf767900cadfb63d372ff61317b95da772fc1024d724fd9d3154d8dcf683d940b"
+      "address": "0x91fDcbe3aef56f988104c1BBC5AD90cCDe016888",
+      "startBlock": 12030514,
+      "txHash": "0xfac365252d5f6a6dec7b78c0dc6025675d9497827f61de074a044035c8724a01"
     },
     "Router": {
-      "address": "0xd25159473B1ba2979E92454620dDB86Fa2Af46EB",
-      "startBlock": 12028907,
-      "txHash": "0x7cc07440c594c32b6516e77c3f5838343a826cde2c5c9b7b76706aa13da400c6"
+      "address": "0x42369Df244d88D88f2a21b1089Ed52d7F56aF4f6",
+      "startBlock": 12030514,
+      "txHash": "0xbff3195bd3fe6421e8eb5a294a835bbe3f2790ee5227bbd5de183db752bd3e5c"
     },
     "FeeVault": {
-      "address": "0x4125560F702993F0f26E2d1B7E1793DAEaB2bE1a",
-      "startBlock": 12028907,
-      "txHash": "0xf767900cadfb63d372ff61317b95da772fc1024d724fd9d3154d8dcf683d940b"
+      "address": "0x3Cbc3b7B0429E53986132283DD4C381935b05c07",
+      "startBlock": 12030514,
+      "txHash": "0xfac365252d5f6a6dec7b78c0dc6025675d9497827f61de074a044035c8724a01"
     }
   },
-  "updatedAt": 1793390281
+  "updatedAt": 1793409661
 }

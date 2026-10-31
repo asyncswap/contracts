@@ -40,6 +40,11 @@
         "address": "0x5242ccbD1C03537Fe4BFc3Ae604493BFbAfc859c",
         "startBlock": 66580115,
         "txHash": "0x326a073ef82a908aea65595b8f389520b02b67a818dc5032a78c84bbe1b9e098"
+      },
+      "WithdrawalRouter": {
+        "address": "0x023b3dc1d065887e492efd2e4474d91dd4be0341",
+        "startBlock": 66582590,
+        "txHash": "0x2c249e8361b6abcc9b7bea71bf4447601d8868dd79854cbdd45c6f914c084148"
       }
     }
   },
@@ -84,6 +89,11 @@
         "address": "0x7e4D8A2Aa6052FA76324085Cb60F30173453BDC8",
         "startBlock": 145819535,
         "txHash": "0xf61be601e69a9d854b8fb49b3f392154013ee58d9c62f73fa022616502e299bb"
+      },
+      "WithdrawalRouter": {
+        "address": "0x78d2178052c9d07fef1ffae1c70252119d2de987",
+        "startBlock": 145836237,
+        "txHash": "0x9d36a714a5586b7e1d37ef858caabd2b68591fb5d86d58da066ffd23710f8c9c"
       }
     }
   },
@@ -128,6 +138,11 @@
         "address": "0x533bf96ef69a2E9E94E8f42983439C25d7dDAbb1",
         "startBlock": 69975723,
         "txHash": "0x4d71be2669ce1944cca5513649ad2a9b61a64d7135388def445a4711a493e449"
+      },
+      "WithdrawalRouter": {
+        "address": "0x78d2178052c9d07fef1ffae1c70252119d2de987",
+        "startBlock": 69980614,
+        "txHash": "0xf5d090723ed6fd42cb04c64501d353b23dd66ba67d7ccb64ddbd996fbe6e63aa"
       }
     }
   },
@@ -172,6 +187,11 @@
         "address": "0x6eb5f30a80b38CF9bB3B87C1A6972DC387853948",
         "startBlock": 12032423,
         "txHash": "0xcbb399522fc0fea5d712023dbcae4795639dbc08a395f4185abbc2ec45c009dc"
+      },
+      "WithdrawalRouter": {
+        "address": "0x778fe1232a5f128ba792bc72831e34a0e3f546a2",
+        "startBlock": 12032638,
+        "txHash": "0x9c6140ff3f07ffbe8370cc2d1d620a81fa64b022cc63aa3d1f5ddc8859dc2106"
       }
     }
   }

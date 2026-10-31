@@ -75,3 +75,21 @@ Raising a sell's minimum output requires any nonzero remaining bid to meet the n
 A partially filled sell can retain its prorated bid when repricing to unchanged or lower terms.
 Book selection compares exact prices first, even within a shared tick; fee and queue age only
 break exact-price ties. Settlement age remains the immutable creation sequence.
+
+### Cancel and withdraw
+
+The updated Router exposes `cancelAndWithdraw(order)`. The maker authorizes that
+Router as an executor for the pool and approves its exact native claim allowance
+on PoolManager (claim ID 0). Cancellation and withdrawal then execute atomically:
+the remaining native input goes directly to the maker's wallet, while pre-existing
+claims are left untouched. ERC20 cancellation already returns real tokens.
+A failed withdrawal reverts the cancellation as well.
+
+`withdrawClaims(currencies, amounts)` redeems existing native or ERC20 PoolManager
+claims to the caller's wallet. Approve each currency's ERC-6909 claim ID on
+PoolManager; an ERC20 approval is not a claim approval. The Router accepts up to
+16 distinct currencies and never withdraws another wallet's claims.
+
+For existing immutable hooks, an updated Router can be deployed alongside the
+creation Router. The registry records it as `WithdrawalRouter`; `Router` remains
+the original creation route. Existing orders and balances do not move.

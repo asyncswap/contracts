@@ -1,6 +1,6 @@
 # Router
 
-[Git Source](https://github.com/asyncswap/contracts/blob/97cbdf27bf322f5109418f442275172e22ad8711/src/Router.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/29bca56adfcccd1e70d905810d3df3580fe4fa3e/src/Router.sol)
 
 **Inherits:** EIP712
 
@@ -234,6 +234,48 @@ function cancelOrder(AsyncOrder calldata order) external;
 | ---- | ---- | ----------- |
 | order | `AsyncOrder` |  |
 
+<a id="cancelandwithdraw-asyncorder" />
+
+### cancelAndWithdraw
+
+Cancel an owned order and return its remaining input to the owner's wallet.
+
+<i>
+  Native refunds are redeemed atomically. Approve this Router for claim ID 0 first.
+  Existing claims are untouched; a failed redemption rolls back the cancellation.
+</i>
+
+```solidity
+function cancelAndWithdraw(AsyncOrder calldata order) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+
+<a id="withdrawclaims-currency-uint256" />
+
+### withdrawClaims
+
+Withdraw the caller's approved ERC-6909 claims directly to their wallet.
+
+<i>
+  Approve exact currency claim allowances on PoolManager first. No operator grant is needed.
+</i>
+
+```solidity
+function withdrawClaims(Currency[] calldata currencies, uint256[] calldata amounts) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| currencies | `Currency[]` |  |
+| amounts | `uint256[]` |  |
+
 <a id="matchbook-poolkey-uint8" />
 
 ### matchBook
@@ -297,6 +339,22 @@ function unlockCallback(bytes calldata data) external onlyPoolManager returns (b
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | \<none> | `bytes` |  |
+
+<a id="_withdrawclaim-address-currency-uint256" />
+
+### \_withdrawClaim
+
+```solidity
+function _withdrawClaim(address owner, Currency currency, uint256 amount) private;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| owner | `address` |  |
+| currency | `Currency` |  |
+| amount | `uint256` |  |
 
 <a id="_requireunchanged-asyncorder-bytes32-uint256-uint256" />
 
@@ -386,6 +444,22 @@ function _orderId(AsyncOrder memory order) private view returns (bytes32);
 | ---- | ---- | ----------- |
 | \<none> | `bytes32` |  |
 
+## Events
+
+### ClaimWithdrawn
+
+```solidity
+event ClaimWithdrawn(address indexed owner, Currency indexed currency, uint256 amount);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| owner | `address` |  |
+| currency | `Currency` |  |
+| amount | `uint256` |  |
+
 ## Errors
 
 ### SignatureExpired
@@ -472,7 +546,9 @@ enum ActionType {
         Cancel,
         SwapWithSig,
         MatchBook,
-        PoolLiquidityFill
+        PoolLiquidityFill,
+        CancelAndWithdraw,
+        WithdrawClaims
     }
 ```
 
@@ -486,3 +562,5 @@ enum ActionType {
 | SwapWithSig |  |
 | MatchBook |  |
 | PoolLiquidityFill |  |
+| CancelAndWithdraw |  |
+| WithdrawClaims |  |

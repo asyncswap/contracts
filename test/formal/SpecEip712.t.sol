@@ -448,7 +448,10 @@ contract AsyncSwapCtorSpecFormalTest is SpecEip712Constants, FormalImmutablesC {
         h = new CtorHarness(IPoolManager(pm), Currency.wrap(num), owner_, address(0xCAFE));
         (, bytes32[] memory writes) = vm.accesses(address(h));
         for (uint256 i; i < writes.length; i++) {
-            assertTrue(writes[i] == bytes32(OWNER_SLOT) || writes[i] == bytes32(DEFAULT_PRIORITY_CAP_SLOT), "storage: owner and default priority cap are written");
+            assertTrue(
+                writes[i] == bytes32(OWNER_SLOT) || writes[i] == bytes32(DEFAULT_PRIORITY_CAP_SLOT),
+                "storage: owner and default priority cap are written"
+            );
         }
         assertEq(vm.load(address(h), bytes32(OWNER_SLOT)), bytes32(uint256(uint160(owner_))), "owner := _owner");
         assertEq(uint256(vm.load(address(h), bytes32(DEFAULT_PRIORITY_CAP_SLOT))), 100_000, "default priority cap");

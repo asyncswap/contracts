@@ -113,7 +113,10 @@ contract AsyncSwapConstructorFormalTest is Test {
         (, bytes32[] memory writes) = vm.accesses(a);
         assertGt(writes.length, 0, "owner is written");
         for (uint256 i; i < writes.length; i++) {
-            assertTrue(writes[i] == bytes32(OWNER_SLOT) || writes[i] == bytes32(DEFAULT_PRIORITY_CAP_SLOT), "only owner and default priority cap are written");
+            assertTrue(
+                writes[i] == bytes32(OWNER_SLOT) || writes[i] == bytes32(DEFAULT_PRIORITY_CAP_SLOT),
+                "only owner and default priority cap are written"
+            );
         }
         assertEq(vm.load(a, bytes32(OWNER_SLOT)), bytes32(uint256(uint160(owner_))), "owner := _owner");
         assertEq(uint256(vm.load(a, bytes32(DEFAULT_PRIORITY_CAP_SLOT))), 100_000, "default priority cap");

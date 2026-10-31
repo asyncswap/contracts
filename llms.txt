@@ -8,7 +8,7 @@ An on-chain order book and matching engine built as a Uniswap v4 hook: limit ord
 - [Contract call sequences](/protocol/contract-call-sequences): Step-by-step contract calls for placing, matching, filling and cancelling orders.
 - [Price keys and crossing](/protocol/price-key-crossing): How limit prices map to price keys and when two orders cross.
 - [Dynamic fee ordering](/protocol/dynamic-fee-ordering): The dynamic fee charged on pool fills that move the price back, split between LPs and the protocol.
-- [Deployments](/deployments): Contract addresses on the four testnets (Unichain Sepolia, Sepolia, Robinhood Chain testnet, Arc testnet); no mainnet yet. Also at /deployments.json.
+- [Deployments](/deployments): Contract addresses on the five testnets (Unichain Sepolia, Sepolia, Robinhood Chain testnet, Arc testnet, MegaETH testnet); no mainnet yet. Also at /deployments.json.
 - [AuditAgent report 1: status](/audit/status): Status of each finding from the first AuditAgent report.
 - [Contract reference](/reference/): Contracts, libraries, interfaces and types, generated from the NatSpec in src/.
 - [AsyncSwap](/reference/src/AsyncSwap): Uniswap v4 hook that converts an exact-input swap into an open async order: the maker deposits their input via `_beforeSwap`. Crossing orders settle directly at the resting limit; fillers settle unmatched orders.

@@ -49,6 +49,50 @@
     }
   },
   {
+    "chainId": 6343,
+    "name": "MegaETH Testnet",
+    "network": "testnet",
+    "explorerUrl": "https://testnet-mega.etherscan.io",
+    "numeraire": "0x72d4db19E3AE6f8ed47B5337ab00D69685277cF4",
+    "contracts": {
+      "PoolManager": {
+        "address": "0x67E44b69D10737dF41f5a98078072B817016B871",
+        "startBlock": 33751320,
+        "txHash": "0x01d524a3537a19964599168521bfa25a8b84fc74f64bc43808678b019c788788"
+      },
+      "TickPrice": {
+        "address": "0x9ac4279497F6edf18444E3Af42B61a8E454F68B8",
+        "startBlock": 33751328,
+        "txHash": "0x2c88e5bc6d74a5a20a670e355735388933c594a28e79698c6fcf41b9878ac2cb"
+      },
+      "DynamicFeeOrdering": {
+        "address": "0x468B68a3F345f9BA1BC4082Cda3d88Ce91320dC8",
+        "startBlock": 33751335,
+        "txHash": "0xdad923c174ec5452dbab96479dd46b11ade3073ade67aeea4546f9ef782f9302"
+      },
+      "AsyncMatching": {
+        "address": "0x4bc1764768395b484d8bF33eB41AcfB2d42F4A07",
+        "startBlock": 33751342,
+        "txHash": "0x6b43a13ea66b48fa3314dbcbc7e550075b6bbc9a56dbcf85fe3edcbad9c9983f"
+      },
+      "AsyncSwap": {
+        "address": "0x91d8D6eDeB81CDCd0a15fF180444B7EeEd50E888",
+        "startBlock": 33751390,
+        "txHash": "0x83fde3c4ea0f2eceb3ca8904dcfa6e459784a5d3103c06aa4c8ff0b69e39ca60"
+      },
+      "Router": {
+        "address": "0xd25159473B1ba2979E92454620dDB86Fa2Af46EB",
+        "startBlock": 33751389,
+        "txHash": "0xa3119049dc7b280ee07a8f48f5f68d313e9ae1a981b0b56f46e4a145ba7b8806"
+      },
+      "FeeVault": {
+        "address": "0x148aca6BE722AB11C9c3a06CfE6764c226af0De0",
+        "startBlock": 33751390,
+        "txHash": "0x83fde3c4ea0f2eceb3ca8904dcfa6e459784a5d3103c06aa4c8ff0b69e39ca60"
+      }
+    }
+  },
+  {
     "chainId": 46630,
     "name": "Robinhood Chain Testnet",
     "network": "testnet",

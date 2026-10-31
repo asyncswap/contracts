@@ -10,7 +10,7 @@ Sitemap:
 - [Contract call sequences](/protocol/contract-call-sequences): Step-by-step contract calls for placing, matching, filling and cancelling orders.
 - [Price keys and crossing](/protocol/price-key-crossing): How limit prices map to price keys and when two orders cross.
 - [Dynamic fee ordering](/protocol/dynamic-fee-ordering): The dynamic fee charged on pool fills that move the price back, split between LPs and the protocol.
-- [Deployments](/deployments): Contract addresses on the four testnets (Unichain Sepolia, Sepolia, Robinhood Chain testnet, Arc testnet); no mainnet yet. Also at /deployments.json.
+- [Deployments](/deployments): Contract addresses on the five testnets (Unichain Sepolia, Sepolia, Robinhood Chain testnet, Arc testnet, MegaETH testnet); no mainnet yet. Also at /deployments.json.
 - [AuditAgent report 1: status](/audit/status): Status of each finding from the first AuditAgent report.
 - [Contract reference](/reference/): Contracts, libraries, interfaces and types, generated from the NatSpec in src/.
 - [AsyncSwap](/reference/src/AsyncSwap): Uniswap v4 hook that converts an exact-input swap into an open async order: the maker deposits their input via `_beforeSwap`. Crossing orders settle directly at the resting limit; fillers settle unmatched orders.
@@ -962,22 +962,22 @@ deploys it through the shared CREATE2 deployer (`script/00_DeployDynamicFeeOrder
 
 # Deployments
 
-Async Swap is deployed on four testnets and has no mainnet deployment. The earlier deployments on
+Async Swap is deployed on five testnets and has no mainnet deployment. The earlier deployments on
 Unichain and Arc mainnet were tests, had bugs, and are archived: do not send orders to them. The current testnet addresses and hook start blocks below match the per-chain deployment registries.
 
 ## Contracts
 
-| | Unichain Sepolia (1301) | Ethereum Sepolia (11155111) | Robinhood Chain testnet (46630) | Arc testnet (5042002) |
-| --- | --- | --- | --- | --- |
-| `AsyncSwap` (hook) | [`0x919F4c9F5eA50d04F72fe72F9ADdC2BaE42eA888`](https://sepolia.uniscan.xyz/address/0x919F4c9F5eA50d04F72fe72F9ADdC2BaE42eA888) | [`0x916373De182757f70048b6993519f9E681e86888`](https://sepolia.etherscan.io/address/0x916373De182757f70048b6993519f9E681e86888) | [`0x91bd732b4BEB3aF4b29Dd631aC83bE7ebbbFA888`](https://explorer.testnet.chain.robinhood.com/address/0x91bd732b4BEB3aF4b29Dd631aC83bE7ebbbFA888) | [`0x91502692bc33610F803DA85507A29DA1dC266888`](https://explorer.testnet.arc.io/address/0x91502692bc33610F803DA85507A29DA1dC266888) |
-| `Router` | [`0x8FbeA6a4C4DD44616fc2eDf9fcb9Fd36da6d886F`](https://sepolia.uniscan.xyz/address/0x8FbeA6a4C4DD44616fc2eDf9fcb9Fd36da6d886F) | [`0x2CCdFB7085e6e42e814cA8E7055483d1ccE95c38`](https://sepolia.etherscan.io/address/0x2CCdFB7085e6e42e814cA8E7055483d1ccE95c38) | [`0xE35C5df17676809b25995bE17d3a59498C75BC59`](https://explorer.testnet.chain.robinhood.com/address/0xE35C5df17676809b25995bE17d3a59498C75BC59) | [`0xE35C5df17676809b25995bE17d3a59498C75BC59`](https://explorer.testnet.arc.io/address/0xE35C5df17676809b25995bE17d3a59498C75BC59) |
-| `FeeVault` | [`0x5242ccbD1C03537Fe4BFc3Ae604493BFbAfc859c`](https://sepolia.uniscan.xyz/address/0x5242ccbD1C03537Fe4BFc3Ae604493BFbAfc859c) | [`0x6eb5f30a80b38CF9bB3B87C1A6972DC387853948`](https://sepolia.etherscan.io/address/0x6eb5f30a80b38CF9bB3B87C1A6972DC387853948) | [`0x7e4D8A2Aa6052FA76324085Cb60F30173453BDC8`](https://explorer.testnet.chain.robinhood.com/address/0x7e4D8A2Aa6052FA76324085Cb60F30173453BDC8) | [`0x533bf96ef69a2E9E94E8f42983439C25d7dDAbb1`](https://explorer.testnet.arc.io/address/0x533bf96ef69a2E9E94E8f42983439C25d7dDAbb1) |
-| `AsyncMatching` | [`0x04ceEeeb17C3e75B0F6D1fBE6486Cf2Da8cC01d2`](https://sepolia.uniscan.xyz/address/0x04ceEeeb17C3e75B0F6D1fBE6486Cf2Da8cC01d2) | [`0x04ceEeeb17C3e75B0F6D1fBE6486Cf2Da8cC01d2`](https://sepolia.etherscan.io/address/0x04ceEeeb17C3e75B0F6D1fBE6486Cf2Da8cC01d2) | [`0x04ceEeeb17C3e75B0F6D1fBE6486Cf2Da8cC01d2`](https://explorer.testnet.chain.robinhood.com/address/0x04ceEeeb17C3e75B0F6D1fBE6486Cf2Da8cC01d2) | [`0x04ceEeeb17C3e75B0F6D1fBE6486Cf2Da8cC01d2`](https://explorer.testnet.arc.io/address/0x04ceEeeb17C3e75B0F6D1fBE6486Cf2Da8cC01d2) |
-| `TickPrice` | [`0xb08191f43308E1759586236b140368E4351a6506`](https://sepolia.uniscan.xyz/address/0xb08191f43308E1759586236b140368E4351a6506) | [`0xb08191f43308E1759586236b140368E4351a6506`](https://sepolia.etherscan.io/address/0xb08191f43308E1759586236b140368E4351a6506) | [`0xb08191f43308E1759586236b140368E4351a6506`](https://explorer.testnet.chain.robinhood.com/address/0xb08191f43308E1759586236b140368E4351a6506) | [`0xb08191f43308E1759586236b140368E4351a6506`](https://explorer.testnet.arc.io/address/0xb08191f43308E1759586236b140368E4351a6506) |
-| `DynamicFeeOrdering` | [`0xe7359f9c28Ea618D224847fc94614269458B99a3`](https://sepolia.uniscan.xyz/address/0xe7359f9c28Ea618D224847fc94614269458B99a3) | [`0xe7359f9c28Ea618D224847fc94614269458B99a3`](https://sepolia.etherscan.io/address/0xe7359f9c28Ea618D224847fc94614269458B99a3) | [`0xe7359f9c28Ea618D224847fc94614269458B99a3`](https://explorer.testnet.chain.robinhood.com/address/0xe7359f9c28Ea618D224847fc94614269458B99a3) | [`0xe7359f9c28Ea618D224847fc94614269458B99a3`](https://explorer.testnet.arc.io/address/0xe7359f9c28Ea618D224847fc94614269458B99a3) |
-| PoolManager | [`0x00B036B58a818B1BC34d502D3fE730Db729e62AC`](https://sepolia.uniscan.xyz/address/0x00B036B58a818B1BC34d502D3fE730Db729e62AC) | [`0xE03A1074c86CFeDd5C142C4F04F1a1536e203543`](https://sepolia.etherscan.io/address/0xE03A1074c86CFeDd5C142C4F04F1a1536e203543) | [`0x8366a39CC670B4001A1121B8F6A443A643e40951`](https://explorer.testnet.chain.robinhood.com/address/0x8366a39CC670B4001A1121B8F6A443A643e40951) | [`0x8366a39CC670B4001A1121B8F6A443A643e40951`](https://explorer.testnet.arc.io/address/0x8366a39CC670B4001A1121B8F6A443A643e40951) |
-| Numeraire | USDC [`0x31d0220469e10c4e71834a79b1f276d740d3768f`](https://sepolia.uniscan.xyz/address/0x31d0220469e10c4e71834a79b1f276d740d3768f) | Circle test USDC [`0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238`](https://sepolia.etherscan.io/address/0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238) | Paxos USDG [`0x7E955252E15c84f5768B83c41a71F9eba181802F`](https://explorer.testnet.chain.robinhood.com/address/0x7E955252E15c84f5768B83c41a71F9eba181802F) | USDC [`0x3600000000000000000000000000000000000000`](https://explorer.testnet.arc.io/address/0x3600000000000000000000000000000000000000) |
-| Hook start block | 66,580,115 | 12,032,423 | 145,819,535 | 69,975,723 |
+| | Unichain Sepolia (1301) | Ethereum Sepolia (11155111) | Robinhood Chain testnet (46630) | Arc testnet (5042002) | MegaETH testnet (6343) |
+| --- | --- | --- | --- | --- | --- |
+| `AsyncSwap` (hook) | [`0x919F4c9F5eA50d04F72fe72F9ADdC2BaE42eA888`](https://sepolia.uniscan.xyz/address/0x919F4c9F5eA50d04F72fe72F9ADdC2BaE42eA888) | [`0x916373De182757f70048b6993519f9E681e86888`](https://sepolia.etherscan.io/address/0x916373De182757f70048b6993519f9E681e86888) | [`0x91bd732b4BEB3aF4b29Dd631aC83bE7ebbbFA888`](https://explorer.testnet.chain.robinhood.com/address/0x91bd732b4BEB3aF4b29Dd631aC83bE7ebbbFA888) | [`0x91502692bc33610F803DA85507A29DA1dC266888`](https://explorer.testnet.arc.io/address/0x91502692bc33610F803DA85507A29DA1dC266888) | [`0x91d8D6eDeB81CDCd0a15fF180444B7EeEd50E888`](https://testnet-mega.etherscan.io/address/0x91d8D6eDeB81CDCd0a15fF180444B7EeEd50E888) |
+| `Router` | [`0x8FbeA6a4C4DD44616fc2eDf9fcb9Fd36da6d886F`](https://sepolia.uniscan.xyz/address/0x8FbeA6a4C4DD44616fc2eDf9fcb9Fd36da6d886F) | [`0x2CCdFB7085e6e42e814cA8E7055483d1ccE95c38`](https://sepolia.etherscan.io/address/0x2CCdFB7085e6e42e814cA8E7055483d1ccE95c38) | [`0xE35C5df17676809b25995bE17d3a59498C75BC59`](https://explorer.testnet.chain.robinhood.com/address/0xE35C5df17676809b25995bE17d3a59498C75BC59) | [`0xE35C5df17676809b25995bE17d3a59498C75BC59`](https://explorer.testnet.arc.io/address/0xE35C5df17676809b25995bE17d3a59498C75BC59) | [`0xd25159473B1ba2979E92454620dDB86Fa2Af46EB`](https://testnet-mega.etherscan.io/address/0xd25159473B1ba2979E92454620dDB86Fa2Af46EB) |
+| `FeeVault` | [`0x5242ccbD1C03537Fe4BFc3Ae604493BFbAfc859c`](https://sepolia.uniscan.xyz/address/0x5242ccbD1C03537Fe4BFc3Ae604493BFbAfc859c) | [`0x6eb5f30a80b38CF9bB3B87C1A6972DC387853948`](https://sepolia.etherscan.io/address/0x6eb5f30a80b38CF9bB3B87C1A6972DC387853948) | [`0x7e4D8A2Aa6052FA76324085Cb60F30173453BDC8`](https://explorer.testnet.chain.robinhood.com/address/0x7e4D8A2Aa6052FA76324085Cb60F30173453BDC8) | [`0x533bf96ef69a2E9E94E8f42983439C25d7dDAbb1`](https://explorer.testnet.arc.io/address/0x533bf96ef69a2E9E94E8f42983439C25d7dDAbb1) | [`0x148aca6BE722AB11C9c3a06CfE6764c226af0De0`](https://testnet-mega.etherscan.io/address/0x148aca6BE722AB11C9c3a06CfE6764c226af0De0) |
+| `AsyncMatching` | [`0x04ceEeeb17C3e75B0F6D1fBE6486Cf2Da8cC01d2`](https://sepolia.uniscan.xyz/address/0x04ceEeeb17C3e75B0F6D1fBE6486Cf2Da8cC01d2) | [`0x04ceEeeb17C3e75B0F6D1fBE6486Cf2Da8cC01d2`](https://sepolia.etherscan.io/address/0x04ceEeeb17C3e75B0F6D1fBE6486Cf2Da8cC01d2) | [`0x04ceEeeb17C3e75B0F6D1fBE6486Cf2Da8cC01d2`](https://explorer.testnet.chain.robinhood.com/address/0x04ceEeeb17C3e75B0F6D1fBE6486Cf2Da8cC01d2) | [`0x04ceEeeb17C3e75B0F6D1fBE6486Cf2Da8cC01d2`](https://explorer.testnet.arc.io/address/0x04ceEeeb17C3e75B0F6D1fBE6486Cf2Da8cC01d2) | [`0x4bc1764768395b484d8bF33eB41AcfB2d42F4A07`](https://testnet-mega.etherscan.io/address/0x4bc1764768395b484d8bF33eB41AcfB2d42F4A07) |
+| `TickPrice` | [`0xb08191f43308E1759586236b140368E4351a6506`](https://sepolia.uniscan.xyz/address/0xb08191f43308E1759586236b140368E4351a6506) | [`0xb08191f43308E1759586236b140368E4351a6506`](https://sepolia.etherscan.io/address/0xb08191f43308E1759586236b140368E4351a6506) | [`0xb08191f43308E1759586236b140368E4351a6506`](https://explorer.testnet.chain.robinhood.com/address/0xb08191f43308E1759586236b140368E4351a6506) | [`0xb08191f43308E1759586236b140368E4351a6506`](https://explorer.testnet.arc.io/address/0xb08191f43308E1759586236b140368E4351a6506) | [`0x9ac4279497F6edf18444E3Af42B61a8E454F68B8`](https://testnet-mega.etherscan.io/address/0x9ac4279497F6edf18444E3Af42B61a8E454F68B8) |
+| `DynamicFeeOrdering` | [`0xe7359f9c28Ea618D224847fc94614269458B99a3`](https://sepolia.uniscan.xyz/address/0xe7359f9c28Ea618D224847fc94614269458B99a3) | [`0xe7359f9c28Ea618D224847fc94614269458B99a3`](https://sepolia.etherscan.io/address/0xe7359f9c28Ea618D224847fc94614269458B99a3) | [`0xe7359f9c28Ea618D224847fc94614269458B99a3`](https://explorer.testnet.chain.robinhood.com/address/0xe7359f9c28Ea618D224847fc94614269458B99a3) | [`0xe7359f9c28Ea618D224847fc94614269458B99a3`](https://explorer.testnet.arc.io/address/0xe7359f9c28Ea618D224847fc94614269458B99a3) | [`0x468B68a3F345f9BA1BC4082Cda3d88Ce91320dC8`](https://testnet-mega.etherscan.io/address/0x468B68a3F345f9BA1BC4082Cda3d88Ce91320dC8) |
+| PoolManager | [`0x00B036B58a818B1BC34d502D3fE730Db729e62AC`](https://sepolia.uniscan.xyz/address/0x00B036B58a818B1BC34d502D3fE730Db729e62AC) | [`0xE03A1074c86CFeDd5C142C4F04F1a1536e203543`](https://sepolia.etherscan.io/address/0xE03A1074c86CFeDd5C142C4F04F1a1536e203543) | [`0x8366a39CC670B4001A1121B8F6A443A643e40951`](https://explorer.testnet.chain.robinhood.com/address/0x8366a39CC670B4001A1121B8F6A443A643e40951) | [`0x8366a39CC670B4001A1121B8F6A443A643e40951`](https://explorer.testnet.arc.io/address/0x8366a39CC670B4001A1121B8F6A443A643e40951) | [`0x67E44b69D10737dF41f5a98078072B817016B871`](https://testnet-mega.etherscan.io/address/0x67E44b69D10737dF41f5a98078072B817016B871) |
+| Numeraire | USDC [`0x31d0220469e10c4e71834a79b1f276d740d3768f`](https://sepolia.uniscan.xyz/address/0x31d0220469e10c4e71834a79b1f276d740d3768f) | Circle test USDC [`0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238`](https://sepolia.etherscan.io/address/0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238) | Paxos USDG [`0x7E955252E15c84f5768B83c41a71F9eba181802F`](https://explorer.testnet.chain.robinhood.com/address/0x7E955252E15c84f5768B83c41a71F9eba181802F) | USDC [`0x3600000000000000000000000000000000000000`](https://explorer.testnet.arc.io/address/0x3600000000000000000000000000000000000000) | USDM [`0x72d4db19E3AE6f8ed47B5337ab00D69685277cF4`](https://testnet-mega.etherscan.io/address/0x72d4db19E3AE6f8ed47B5337ab00D69685277cF4) |
+| Hook start block | 66,580,115 | 12,032,423 | 145,819,535 | 69,975,723 | 33,751,390 |
 
 How to read the table:
 
@@ -985,10 +985,11 @@ How to read the table:
   its Uniswap v4 permission bits, so it differs by chain, and `FeeVault` is created by the hook's
   constructor. Router addresses depend on the deployer nonce on each chain.
 * **`AsyncMatching`, `TickPrice`, `DynamicFeeOrdering`** are linked libraries, created through the
-  deterministic CREATE2 deployer (`0x4e59b44847b379578588920cA78FbF26c0B4956C`) with fixed salts,
-  so they have the same address on every chain.
-* **PoolManager** is the Uniswap v4 singleton the hook is attached to. The four deployed testnets
-  use existing instances; new testnets without one require a local PoolManager deployment.
+  deterministic CREATE2 deployer (`0x4e59b44847b379578588920cA78FbF26c0B4956C`) with fixed salts.
+  Identical bytecode gets the same address on every chain; MegaETH's libraries were built from newer
+  code, so their addresses differ.
+* **PoolManager** is the Uniswap v4 singleton the hook is attached to. The first four testnets
+  use existing instances; MegaETH uses a self-owned deployment.
 * **Numeraire** is the stablecoin every pool is priced in.
 * **Hook start block** is where an indexer should start reading the hook's events.
 
@@ -1005,12 +1006,10 @@ at [`/deployments.json`](https://docs.asyncswap.org/deployments.json).
 | Ethereum Sepolia | 11155111 | ETH | Storing contract code costs about 7× Foundry's local estimate: deploy with `DEPLOY_GAS_MULTIPLIER=800`. |
 | Robinhood Chain testnet | 46630 | ETH | No Circle USDC; the numeraire is Paxos USDG (6 decimals) from [faucet.paxos.com](https://faucet.paxos.com). An Arbitrum chain: `block.number` inside contracts is the L1 block, so start blocks come from receipts. |
 | Arc testnet | 5042002 | USDC | Gas is paid in USDC ([faucet.circle.com](https://faucet.circle.com)), and the numeraire is the ERC-20 interface to that same balance. **Never initialize a pool with the native currency.** Uniswap does not list Arc testnet; this PoolManager's runtime bytecode is identical to the official Arc mainnet PoolManager at the same address. |
+| MegaETH testnet | 6343 | ETH | No USDC; the numeraire is the [official testnet USDM](https://github.com/megaeth-labs/mega-tokenlist) (18 decimals), an explicit testnet exception to the USDC numeraire plan. The hook's optional $0.10 priority-bid cap is set to 10¹⁷ USDM base units. The PoolManager is a self-owned deployment. No pool is initialized yet. |
 
-MegaETH testnet (6343) and HyperEVM testnet (998) are prepared but have **no Async Swap deployment
-yet**. Their wrappers first deploy a PoolManager, then the hook and Router. MegaETH uses the
-[official testnet USDM](https://github.com/megaeth-labs/mega-tokenlist) (18 decimals) as an explicit
-testnet exception to the USDC numeraire plan. HyperEVM uses testnet USDC (6 decimals). The hook
-sets the optional $0.10 priority-bid cap in each numeraire's base units before pools initialize.
+HyperEVM testnet (998) is prepared but has **no Async Swap deployment yet**. It uses testnet
+USDC (6 decimals). Its wrapper first deploys a PoolManager, then the hook and Router.
 HyperEVM requires the deployer to opt into [big blocks](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/hyperevm/dual-block-architecture)
 through the HyperCore `evmUserModify` action before broadcasting. Its fast blocks allow 3 million
 gas, while PoolManager's runtime code deposit alone needs about 4.83 million. The deployment
@@ -1318,7 +1317,7 @@ match the code on `main`. Each page links to its source file.
 
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/ffcca30f5d858d6f9a022187cceed4cdfe76b79a/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6f6966f193ee06bf86cbe4a8f3904539ce31f12e/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -2681,7 +2680,7 @@ struct UserParams {
 
 # BatchActions
 
-[Git Source](https://github.com/asyncswap/contracts/blob/ffcca30f5d858d6f9a022187cceed4cdfe76b79a/src/BatchActions.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6f6966f193ee06bf86cbe4a8f3904539ce31f12e/src/BatchActions.sol)
 
 Cancels the caller's orders and redeems the caller's ERC-6909 PoolManager claims
 atomically in one PoolManager unlock.
@@ -2825,7 +2824,7 @@ error OnlyPoolManager();
 
 # BatchCancels
 
-[Git Source](https://github.com/asyncswap/contracts/blob/ffcca30f5d858d6f9a022187cceed4cdfe76b79a/src/BatchCancels.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6f6966f193ee06bf86cbe4a8f3904539ce31f12e/src/BatchCancels.sol)
 
 Cancels several orders owned by the caller in one PoolManager unlock.
 
@@ -2928,7 +2927,7 @@ error OnlyPoolManager();
 
 # BatchClaims
 
-[Git Source](https://github.com/asyncswap/contracts/blob/ffcca30f5d858d6f9a022187cceed4cdfe76b79a/src/BatchClaims.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6f6966f193ee06bf86cbe4a8f3904539ce31f12e/src/BatchClaims.sol)
 
 Atomically redeems a caller's PoolManager ERC-6909 claims for several currencies.
 
@@ -3054,7 +3053,7 @@ error ReentrantRedemption();
 
 # FeeVault
 
-[Git Source](https://github.com/asyncswap/contracts/blob/ffcca30f5d858d6f9a022187cceed4cdfe76b79a/src/FeeVault.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6f6966f193ee06bf86cbe4a8f3904539ce31f12e/src/FeeVault.sol)
 
 Holds and redeems protocol fee claims, never maker escrow.
 
@@ -3161,7 +3160,7 @@ error ZeroAddress();
 
 # ImmutableState
 
-[Git Source](https://github.com/asyncswap/contracts/blob/ffcca30f5d858d6f9a022187cceed4cdfe76b79a/src/ImmutableState.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6f6966f193ee06bf86cbe4a8f3904539ce31f12e/src/ImmutableState.sol)
 
 **Title:** Immutable State
 
@@ -3213,7 +3212,7 @@ error NotPoolManager();
 
 # MatchingEngine
 
-[Git Source](https://github.com/asyncswap/contracts/blob/ffcca30f5d858d6f9a022187cceed4cdfe76b79a/src/MatchingEngine.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6f6966f193ee06bf86cbe4a8f3904539ce31f12e/src/MatchingEngine.sol)
 
 **Title:** MatchingEngine
 
@@ -3686,7 +3685,7 @@ struct Book {
 
 # NativeClaims
 
-[Git Source](https://github.com/asyncswap/contracts/blob/ffcca30f5d858d6f9a022187cceed4cdfe76b79a/src/NativeClaims.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6f6966f193ee06bf86cbe4a8f3904539ce31f12e/src/NativeClaims.sol)
 
 Redeems the caller's PoolManager native ETH claims to a chosen recipient.
 
@@ -3808,7 +3807,7 @@ error ReentrantRedemption();
 
 # Router
 
-[Git Source](https://github.com/asyncswap/contracts/blob/ffcca30f5d858d6f9a022187cceed4cdfe76b79a/src/Router.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6f6966f193ee06bf86cbe4a8f3904539ce31f12e/src/Router.sol)
 
 **Inherits:** EIP712
 
@@ -4375,7 +4374,7 @@ enum ActionType {
 
 # TokenClaims
 
-[Git Source](https://github.com/asyncswap/contracts/blob/ffcca30f5d858d6f9a022187cceed4cdfe76b79a/src/TokenClaims.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6f6966f193ee06bf86cbe4a8f3904539ce31f12e/src/TokenClaims.sol)
 
 Redeems the caller's PoolManager currency claims to a chosen recipient.
 
@@ -4499,7 +4498,7 @@ error ReentrantRedemption();
 
 # BaseHook
 
-[Git Source](https://github.com/asyncswap/contracts/blob/ffcca30f5d858d6f9a022187cceed4cdfe76b79a/src/BaseHook.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6f6966f193ee06bf86cbe4a8f3904539ce31f12e/src/BaseHook.sol)
 
 **Inherits:** IHooks, [ImmutableState](/reference/src/ImmutableState)
 
@@ -5159,7 +5158,7 @@ error HookNotImplemented();
 
 # IFeeOwner
 
-[Git Source](https://github.com/asyncswap/contracts/blob/ffcca30f5d858d6f9a022187cceed4cdfe76b79a/src/FeeVault.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6f6966f193ee06bf86cbe4a8f3904539ce31f12e/src/FeeVault.sol)
 
 ## Functions
 
@@ -5179,7 +5178,7 @@ function owner() external view returns (address);
 
 # ISignatureTransfer
 
-[Git Source](https://github.com/asyncswap/contracts/blob/ffcca30f5d858d6f9a022187cceed4cdfe76b79a/src/interfaces/ISignatureTransfer.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6f6966f193ee06bf86cbe4a8f3904539ce31f12e/src/interfaces/ISignatureTransfer.sol)
 
 **Title:** ISignatureTransfer
 
@@ -5272,7 +5271,7 @@ struct SignatureTransferDetails {
 
 # AsyncFiller
 
-[Git Source](https://github.com/asyncswap/contracts/blob/ffcca30f5d858d6f9a022187cceed4cdfe76b79a/src/libraries/AsyncFiller.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6f6966f193ee06bf86cbe4a8f3904539ce31f12e/src/libraries/AsyncFiller.sol)
 
 **Title:** AsyncFiller
 
@@ -6282,7 +6281,7 @@ struct Book {
 
 # AsyncMatching
 
-[Git Source](https://github.com/asyncswap/contracts/blob/ffcca30f5d858d6f9a022187cceed4cdfe76b79a/src/libraries/AsyncMatching.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6f6966f193ee06bf86cbe4a8f3904539ce31f12e/src/libraries/AsyncMatching.sol)
 
 Linked matching module operating on the hook's order and radix-book storage.
 
@@ -7090,7 +7089,7 @@ struct UpdateParams {
 
 # ClaimTransfers
 
-[Git Source](https://github.com/asyncswap/contracts/blob/ffcca30f5d858d6f9a022187cceed4cdfe76b79a/src/libraries/ClaimTransfers.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6f6966f193ee06bf86cbe4a8f3904539ce31f12e/src/libraries/ClaimTransfers.sol)
 
 <i>
   At most 16 makers and the FeeVault can each receive two currencies in eight matches.
@@ -7170,7 +7169,7 @@ struct Batch {
 
 # CurrencySettler
 
-[Git Source](https://github.com/asyncswap/contracts/blob/ffcca30f5d858d6f9a022187cceed4cdfe76b79a/src/libraries/CurrencySettler.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6f6966f193ee06bf86cbe4a8f3904539ce31f12e/src/libraries/CurrencySettler.sol)
 
 **Title:** CurrencySettler
 
@@ -7221,7 +7220,7 @@ function take(Currency currency, IPoolManager manager, address recipient, uint25
 
 # DynamicFeeOrdering
 
-[Git Source](https://github.com/asyncswap/contracts/blob/ffcca30f5d858d6f9a022187cceed4cdfe76b79a/src/libraries/DynamicFeeOrdering.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6f6966f193ee06bf86cbe4a8f3904539ce31f12e/src/libraries/DynamicFeeOrdering.sol)
 
 **Title:** Dynamic fee ordering on pool-liquidity fills
 
@@ -7367,7 +7366,7 @@ event PoolPriceObserved(
 
 # EligiblePrice
 
-[Git Source](https://github.com/asyncswap/contracts/blob/ffcca30f5d858d6f9a022187cceed4cdfe76b79a/src/libraries/EligiblePrice.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6f6966f193ee06bf86cbe4a8f3904539ce31f12e/src/libraries/EligiblePrice.sol)
 
 Exact-price summaries on a priority-key radix tree.
 
@@ -7546,7 +7545,7 @@ struct Ratio {
 
 # OrderSignatures
 
-[Git Source](https://github.com/asyncswap/contracts/blob/ffcca30f5d858d6f9a022187cceed4cdfe76b79a/src/libraries/OrderSignatures.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6f6966f193ee06bf86cbe4a8f3904539ce31f12e/src/libraries/OrderSignatures.sol)
 
 **Title:** OrderSignatures
 
@@ -7799,7 +7798,7 @@ function hashCancel(
 
 # RadixPriceTree
 
-[Git Source](https://github.com/asyncswap/contracts/blob/ffcca30f5d858d6f9a022187cceed4cdfe76b79a/src/libraries/RadixPriceTree.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6f6966f193ee06bf86cbe4a8f3904539ce31f12e/src/libraries/RadixPriceTree.sol)
 
 Patricia radix index for uint128 price levels. Inserts and removals
 traverse at most 128 branch bits; each distinct price creates one
@@ -8015,7 +8014,7 @@ struct Tree {
 
 # TickPrice
 
-[Git Source](https://github.com/asyncswap/contracts/blob/ffcca30f5d858d6f9a022187cceed4cdfe76b79a/src/libraries/TickPrice.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6f6966f193ee06bf86cbe4a8f3904539ce31f12e/src/libraries/TickPrice.sol)
 
 Book levels on Uniswap v4 ticks: an order sits at the floor tick (spacing 1, 0.01% steps)
 of its exact currency1/currency0 limit. Levels are a fixed relative width at any price and
@@ -8110,7 +8109,7 @@ function floorTick(uint256 num, uint256 den) internal pure returns (int24);
 
 # AsyncOrderLibrary
 
-[Git Source](https://github.com/asyncswap/contracts/blob/ffcca30f5d858d6f9a022187cceed4cdfe76b79a/src/types/AsyncOrder.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6f6966f193ee06bf86cbe4a8f3904539ce31f12e/src/types/AsyncOrder.sol)
 
 **Title:** AsyncOrderLibrary
 
@@ -8152,7 +8151,7 @@ function orderId(AsyncOrder calldata order) internal view returns (bytes32);
 
 # AsyncOrder
 
-[Git Source](https://github.com/asyncswap/contracts/blob/ffcca30f5d858d6f9a022187cceed4cdfe76b79a/src/types/AsyncOrder.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6f6966f193ee06bf86cbe4a8f3904539ce31f12e/src/types/AsyncOrder.sol)
 
 Represents an async order for a swap in the Uniswap V4 pool.
 

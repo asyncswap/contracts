@@ -109,6 +109,18 @@ contract PriorityFeeOnlyTest is SetupHook {
         assertEq(manager.balanceOf(address(hook), currency1.toId()), 0);
     }
 
+    function test_18DecimalNumeraireUsesScaledOptionalBidFloor() public {
+        hook.setPriorityFeeCap(key, 0.1 ether);
+        AsyncOrder memory order = _ask(alice, 100_000);
+        order.amountIn = 100 ether;
+        order.amountOutMin = 100 ether;
+        vm.expectRevert();
+        this.submitExternal(order);
+
+        order.priorityFee = 0.1 ether;
+        _submit(order);
+    }
+
     function test_zeroBidsKeepTimePriorityAndAllowRepricing() public {
         AsyncOrder memory first = _ask(alice, 0);
         _submit(first);

@@ -157,6 +157,27 @@
         ]
       }
     },
+    "hyperEvmTestnet": {
+      "name": "HyperEVM Testnet",
+      "chainId": 998,
+      "network": "testnet",
+      "rpcUrlEnv": "RPC_URL_HYPEREVM_TESTNET",
+      "explorerUrl": "https://testnet.purrsec.com",
+      "nativeCurrency": { "name": "HYPE", "symbol": "HYPE", "decimals": 18 },
+      "contracts": {
+        "poolManager": null,
+        "permit2": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+        "usdc": "0x2B3370eE501B4a559b57D449569354196457D8Ab",
+        "asyncSwapHook": null,
+        "router": null
+      },
+      "deployment": {
+        "status": "config_only",
+        "script": "script/deploy-hyperevm-testnet.sh",
+        "numeraireNote": "Six-decimal testnet USDC. PoolManager must be deployed locally before the hook.",
+        "requires": ["HYPE-funded deployer", "self-deployed PoolManager", "pool initialization"]
+      }
+    },
     "ink": {
       "name": "Ink",
       "chainId": 57073,
@@ -231,6 +252,27 @@
           "verified USDC address",
           "deployment and pool configuration"
         ]
+      }
+    },
+    "megaEthTestnet": {
+      "name": "MegaETH Testnet",
+      "chainId": 6343,
+      "network": "testnet",
+      "rpcUrlEnv": "RPC_URL_MEGAETH_TESTNET",
+      "explorerUrl": "https://testnet-mega.etherscan.io",
+      "nativeCurrency": { "name": "Ether", "symbol": "ETH", "decimals": 18 },
+      "contracts": {
+        "poolManager": null,
+        "permit2": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+        "usdc": "0x72d4db19E3AE6f8ed47B5337ab00D69685277cF4",
+        "asyncSwapHook": null,
+        "router": null
+      },
+      "deployment": {
+        "status": "config_only",
+        "script": "script/deploy-megaeth-testnet.sh",
+        "numeraireNote": "Official MegaETH testnet USDM (MegaUSD), 18 decimals. The usdc field is the deployment script's generic numeraire slot.",
+        "requires": ["ETH-funded deployer", "self-deployed PoolManager", "pool initialization"]
       }
     },
     "monad": {

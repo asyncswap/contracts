@@ -423,6 +423,7 @@ contract RouterSpecEip712FormalTest is SpecEip712DomainChecks {
 ///         checked by `test/formal/AsyncSwapConstructor.t.sol`.
 contract AsyncSwapCtorSpecFormalTest is SpecEip712Constants, FormalImmutablesC {
     uint256 constant OWNER_SLOT = 4;
+    uint256 constant DEFAULT_PRIORITY_CAP_SLOT = 8;
 
     IPoolManager manager;
     MockERC20 usdc;
@@ -447,9 +448,13 @@ contract AsyncSwapCtorSpecFormalTest is SpecEip712Constants, FormalImmutablesC {
         h = new CtorHarness(IPoolManager(pm), Currency.wrap(num), owner_, address(0xCAFE));
         (, bytes32[] memory writes) = vm.accesses(address(h));
         for (uint256 i; i < writes.length; i++) {
-            assertEq(writes[i], bytes32(OWNER_SLOT), "storage: only owner is written");
+            assertTrue(
+                writes[i] == bytes32(OWNER_SLOT) || writes[i] == bytes32(DEFAULT_PRIORITY_CAP_SLOT),
+                "storage: owner and default priority cap are written"
+            );
         }
         assertEq(vm.load(address(h), bytes32(OWNER_SLOT)), bytes32(uint256(uint160(owner_))), "owner := _owner");
+        assertEq(uint256(vm.load(address(h), bytes32(DEFAULT_PRIORITY_CAP_SLOT))), 100_000, "default priority cap");
     }
 
     function _sep(bytes32 hn, bytes32 hv, uint256 chainId, address self) internal pure returns (bytes32) {

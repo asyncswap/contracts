@@ -29,7 +29,7 @@ library AsyncFiller {
     using StateLibrary for IPoolManager;
 
     uint64 internal constant MAX_PRIORITY_FEE = type(uint64).max;
-    /// @dev $0.10 in six-decimal USDC base units. Async Swap pools are configured with USDC as numeraire.
+    /// @dev Default $0.10 cap for six-decimal numeraires. A pool may override this for other decimals.
     uint64 internal constant MIN_PRIORITY_FEE = 100_000;
     /// @dev Below a $100 order the least bid is 10 bps of the order instead: min($0.10, 0.1% of it).
     uint256 internal constant PRIORITY_FEE_BPS = 10;
@@ -91,6 +91,8 @@ library AsyncFiller {
     struct Book {
         uint64 nextSequence;
         uint64 openOrderCount;
+        /// @dev $0.10 in this pool's numeraire base units. Zero uses the six-decimal default.
+        uint64 priorityFeeCap;
         RadixPriceTree.Tree bids;
         RadixPriceTree.Tree asks;
         mapping(uint128 price => PriceLevel) bidLevels;
@@ -151,7 +153,9 @@ library AsyncFiller {
         // PoolManager, so the unlock that creates the order cannot end until the bid is paid
         // (the Router does `settleFor(hook)`), exactly as the swap delta makes it pay the input.
         if (priorityFee != 0) {
-            if (priorityFee < minPriorityFee(isBuy ? amountIn : amountOutMin)) revert PriorityFeeTooSmall();
+            if (priorityFee < minPriorityFee(isBuy ? amountIn : amountOutMin, book.priorityFeeCap)) {
+                revert PriorityFeeTooSmall();
+            }
             self.numeraire.take(self.poolManager, address(this), priorityFee, true);
         }
         uint128 price = _priceKey(isBuy, zeroForOne, amountIn, amountOutMin);
@@ -180,9 +184,14 @@ library AsyncFiller {
     /// @notice The least bid for an order worth `notional` numeraire units: $0.10, or 0.1% of the
     ///         order when that is less (orders under $100).
     function minPriorityFee(uint256 notional) internal pure returns (uint256) {
+        return minPriorityFee(notional, MIN_PRIORITY_FEE);
+    }
+
+    function minPriorityFee(uint256 notional, uint64 cap) internal pure returns (uint256) {
         // 10 bps is exactly 1/1000; integer division preserves the existing rounding down.
         uint256 tiered = notional / (10_000 / PRIORITY_FEE_BPS);
-        return tiered < MIN_PRIORITY_FEE ? tiered : MIN_PRIORITY_FEE;
+        uint256 effectiveCap = cap == 0 ? MIN_PRIORITY_FEE : cap;
+        return tiered < effectiveCap ? tiered : effectiveCap;
     }
 
     /// @notice Reverts unless the order is worth at least the pool's minimum in the numeraire: a buy's
@@ -280,7 +289,7 @@ library AsyncFiller {
         uint256 old = info.amountOutMin;
         // A nonzero sell bid floor follows its minimum output. Zero remains a valid no-bid order.
         if (!info.isBuy && info.priorityFee != 0) {
-            uint256 required = minPriorityFee(newAmountOutMin);
+            uint256 required = minPriorityFee(newAmountOutMin, book.priorityFeeCap);
             if (newAmountOutMin > old && info.priorityFee < required) revert PriorityFeeTooSmall();
         }
         _remove(self, book, id);

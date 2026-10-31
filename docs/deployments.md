@@ -25,8 +25,8 @@ How to read the table:
 - **`AsyncMatching`, `TickPrice`, `DynamicFeeOrdering`** are linked libraries, created through the
   deterministic CREATE2 deployer (`0x4e59b44847b379578588920cA78FbF26c0B4956C`) with fixed salts,
   so they have the same address on every chain.
-- **PoolManager** is the Uniswap v4 singleton the hook is attached to; Async Swap does not deploy
-  it.
+- **PoolManager** is the Uniswap v4 singleton the hook is attached to. The four deployed testnets
+  use existing instances; new testnets without one require a local PoolManager deployment.
 - **Numeraire** is the stablecoin every pool is priced in.
 - **Hook start block** is where an indexer should start reading the hook's events.
 
@@ -44,6 +44,28 @@ at [`/deployments.json`](https://docs.asyncswap.org/deployments.json).
 | Robinhood Chain testnet | 46630 | ETH | No Circle USDC; the numeraire is Paxos USDG (6 decimals) from [faucet.paxos.com](https://faucet.paxos.com). An Arbitrum chain: `block.number` inside contracts is the L1 block, so start blocks come from receipts. |
 | Arc testnet | 5042002 | USDC | Gas is paid in USDC ([faucet.circle.com](https://faucet.circle.com)), and the numeraire is the ERC-20 interface to that same balance. **Never initialize a pool with the native currency.** Uniswap does not list Arc testnet; this PoolManager's runtime bytecode is identical to the official Arc mainnet PoolManager at the same address. |
 
+MegaETH testnet (6343) and HyperEVM testnet (998) are prepared but have **no Async Swap deployment
+yet**. Their wrappers first deploy a PoolManager, then the hook and Router. MegaETH uses the
+[official testnet USDM](https://github.com/megaeth-labs/mega-tokenlist) (18 decimals) as an explicit
+testnet exception to the USDC numeraire plan. HyperEVM uses testnet USDC (6 decimals). The hook
+sets the optional $0.10 priority-bid cap in each numeraire's base units before pools initialize.
+HyperEVM requires the deployer to opt into [big blocks](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/hyperevm/dual-block-architecture)
+through the HyperCore `evmUserModify` action before broadcasting. Its fast blocks allow 3 million
+gas, while PoolManager's runtime code deposit alone needs about 4.83 million. The deployment
+wrapper checks `eth_usingBigBlocks` and stops if the deployer has not opted in.
+After the deployer receives a HyperCore testnet asset and HYPE for EVM gas, enable routing
+without exporting its private key:
+
+```bash
+olive exec new-deployer -- bun script/hyperevm-big-blocks.ts enable --broadcast
+olive exec new-deployer -- script/deploy-hyperevm-testnet.sh broadcast
+olive exec new-deployer -- bun script/hyperevm-big-blocks.ts disable --broadcast
+```
+
+The helper signs the HyperCore action through the Olive keystore and checks that the signature
+recovers to `DEPLOY_OWNER` before submitting it. The final command restores fast-block routing
+after contract deployment.
+
 ## Deploying
 
 `script/deploy.sh <chain-key> [dry-run|broadcast|verify]` deploys the libraries (when missing), the
@@ -52,6 +74,11 @@ hook and the Router, then writes the registry. Each network has a wrapper:
 `deploy-arc-testnet.sh`. Chain addresses come from
 [`script/config/chains.json`](../script/config/chains.json); RPCs and the keystore account come from
 `.env.deploy` (see [`.env.deploy.example`](../.env.deploy.example)).
+
+For a testnet without a PoolManager, use `deploy-megaeth-testnet.sh` or
+`deploy-hyperevm-testnet.sh`. Each wrapper checks the chain, token decimals and dependencies,
+deploys the PoolManager once, then runs `deploy.sh`. The signer in `DEPLOYER_ACCOUNT` must equal
+`DEPLOY_OWNER` for these deployments. Fund that address with the network's gas token first.
 
 With the keystore enrolled in Olive, Touch ID signs each step:
 

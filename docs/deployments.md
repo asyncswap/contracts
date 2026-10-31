@@ -53,6 +53,18 @@ HyperEVM requires the deployer to opt into [big blocks](https://hyperliquid.gitb
 through the HyperCore `evmUserModify` action before broadcasting. Its fast blocks allow 3 million
 gas, while PoolManager's runtime code deposit alone needs about 4.83 million. The deployment
 wrapper checks `eth_usingBigBlocks` and stops if the deployer has not opted in.
+After the deployer receives a HyperCore testnet asset and HYPE for EVM gas, enable routing
+without exporting its private key:
+
+```bash
+olive exec new-deployer -- bun script/hyperevm-big-blocks.ts enable --broadcast
+olive exec new-deployer -- script/deploy-hyperevm-testnet.sh broadcast
+olive exec new-deployer -- bun script/hyperevm-big-blocks.ts disable --broadcast
+```
+
+The helper signs the HyperCore action through the Olive keystore and checks that the signature
+recovers to `DEPLOY_OWNER` before submitting it. The final command restores fast-block routing
+after contract deployment.
 
 ## Deploying
 

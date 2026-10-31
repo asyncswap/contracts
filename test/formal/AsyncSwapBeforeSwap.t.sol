@@ -193,7 +193,9 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
         if (!hook.isExecutor(c.key.toId(), user, executor)) return (true, false);
         if (amt == 0 || aom == 0) return (true, false);
         bool buy = (c.params.zeroForOne ? c.key.currency0 : c.key.currency1) == hook.numeraire();
-        if ((pf != 0 && pf < AsyncFiller.minPriorityFee(buy ? amt : aom)) || pf > type(uint64).max) return (true, false);
+        if ((pf != 0 && pf < AsyncFiller.minPriorityFee(buy ? amt : aom)) || pf > type(uint64).max) {
+            return (true, false);
+        }
         if (pf != 0 && PoolId.unwrap(c.key.toId()) != PoolId.unwrap(poolId)) return (true, false);
         if (aom > type(uint128).max) return (false, false);
         return (true, true);

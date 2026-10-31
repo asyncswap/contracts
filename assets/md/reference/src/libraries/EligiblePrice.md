@@ -1,6 +1,6 @@
 # EligiblePrice
 
-[Git Source](https://github.com/asyncswap/contracts/blob/10ad319de88f0a66ffb2c555f3724ab1b0570dba/src/libraries/EligiblePrice.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/fe373151eb2cd6cdbd7a60b534a479a0dde5d75e/src/libraries/EligiblePrice.sol)
 
 Exact-price summaries on a priority-key radix tree.
 

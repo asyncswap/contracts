@@ -100,15 +100,33 @@ abstract contract PocSignedBase is SetupHook {
         return _orderIdFor(order.owner, order.zeroForOne, order.salt);
     }
 
-    function _cancelSig(AsyncOrder memory order, uint256 amountIn, uint256 nonce, uint256 deadline)
-        internal
-        view
-        returns (bytes memory)
-    {
+    function _cancelSig(AsyncOrder memory order, uint256 nonce, uint256 deadline) internal view returns (bytes memory) {
         bytes32 structHash = OrderSignatures.hashCancel(
-            order, _id(order), amountIn, hook.orderCreatedSequence(poolId, _id(order)), nonce, deadline
+            order, _id(order), hook.orderCreatedSequence(poolId, _id(order)), nonce, deadline
         );
         return _sign(_digest(router.DOMAIN_SEPARATOR(), structHash));
+    }
+
+    /// @dev A maker's signed reprice of `order` from `amountIn` to `newAmountOutMin`, against its current reprice count.
+    function _repriceSig(
+        AsyncOrder memory order,
+        uint256 amountIn,
+        uint256 newAmountOutMin,
+        uint256 nonce,
+        uint256 deadline
+    ) internal view returns (bytes memory) {
+        bytes32 id = _id(order);
+        bytes32 structHash = OrderSignatures.hashUpdatePrice(
+            order,
+            id,
+            amountIn,
+            newAmountOutMin,
+            hook.orderCreatedSequence(poolId, id),
+            hook.orderReprices(poolId, id),
+            nonce,
+            deadline
+        );
+        return _sign(_digest(hook.DOMAIN_SEPARATOR(), structHash));
     }
 
     /// @dev Plain Router order (RouterMulticall pattern), salt predicted.

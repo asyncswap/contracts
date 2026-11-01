@@ -16,20 +16,11 @@ import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 contract RouterCancelWithSigFormalTest is FormalProbesA {
     using PoolIdLibrary for PoolKey;
 
-    function _cancelDigest(AsyncOrder memory o, uint256 amountIn, uint256 nonce, uint256 deadline)
-        internal
-        view
-        returns (bytes32)
-    {
+    function _cancelDigest(AsyncOrder memory o, uint256 nonce, uint256 deadline) internal view returns (bytes32) {
         return _digest(
             router.DOMAIN_SEPARATOR(),
             OrderSignatures.hashCancel(
-                o,
-                _routerOrderId(o),
-                amountIn,
-                hook.orderCreatedSequence(o.key.toId(), _routerOrderId(o)),
-                nonce,
-                deadline
+                o, _routerOrderId(o), hook.orderCreatedSequence(o.key.toId(), _routerOrderId(o)), nonce, deadline
             )
         );
     }
@@ -92,9 +83,10 @@ contract RouterCancelWithSigFormalTest is FormalProbesA {
         router.cancelWithSig(o, nonce, deadline, sig);
     }
 
-    /// @notice formal/Refinement/Swarm/RouterCancelWithSig.lean:118 — with a fresh nonce, a revert of the
-    ///         `HOOK.asyncOrderInfo(poolId, orderId)` view is the call's revert.
-    function testFuzz_cancelWithSig_info_revert(
+    /// @notice formal/Refinement/Swarm/RouterCancelWithSig.lean:118 (semantics changed by L-01; Lean statement
+    ///         needs updating) — the cancel digest no longer covers the order's size, so the Router never reads
+    ///         `HOOK.asyncOrderInfo`: with that view reverting, a bad signature still reverts `InvalidSignature`.
+    function testFuzz_cancelWithSig_neverReadsOrderInfo(
         address caller,
         AsyncOrder memory o,
         uint256 nonce,
@@ -104,11 +96,12 @@ contract RouterCancelWithSigFormalTest is FormalProbesA {
     ) public {
         vm.assume(deadline >= block.timestamp);
         _authRouter(o);
+        vm.assume(!SignatureChecker.isValidSignatureNow(o.owner, _cancelDigest(o, nonce, deadline), sig));
         vm.mockCallRevert(
             address(hook), abi.encodeCall(AsyncSwap.asyncOrderInfo, (o.key.toId(), _routerOrderId(o))), err
         );
         vm.prank(caller);
-        vm.expectRevert(err);
+        vm.expectRevert(Router.InvalidSignature.selector);
         router.cancelWithSig(o, nonce, deadline, sig);
     }
 
@@ -128,7 +121,7 @@ contract RouterCancelWithSigFormalTest is FormalProbesA {
         uint256 pk = _keyed(o, pkSeed);
         vm.assume(deadline >= block.timestamp);
         _mockInfo(o, amountIn);
-        bytes32 digest = _cancelDigest(o, amountIn, nonce, deadline);
+        bytes32 digest = _cancelDigest(o, nonce, deadline);
         bytes memory sig = randomBytes ? junk : _sig(_pk(otherSeed), digest);
         vm.assume(!SignatureChecker.isValidSignatureNow(o.owner, digest, sig)); // the theorem's hS
         pk;
@@ -151,7 +144,7 @@ contract RouterCancelWithSigFormalTest is FormalProbesA {
         uint256 pk = _keyed(o, pkSeed);
         vm.assume(deadline >= block.timestamp);
         _mockInfo(o, amountIn);
-        bytes memory sig = _sig(pk, _cancelDigest(o, amountIn, nonce, deadline));
+        bytes memory sig = _sig(pk, _cancelDigest(o, nonce, deadline));
         _mockUnlockOk();
         vm.expectCall(address(manager), 0, abi.encodeCall(IPoolManager.unlock, (_cb(2, o, 0))), 1);
         vm.prank(caller);
@@ -163,7 +156,6 @@ contract RouterCancelWithSigFormalTest is FormalProbesA {
         uint256 pkSeed;
         uint256 otherSeed;
         uint256 amountIn;
-        uint256 signedAmountIn;
         uint256 nonce;
         uint256 signedNonce;
         uint256 deadline;
@@ -173,19 +165,19 @@ contract RouterCancelWithSigFormalTest is FormalProbesA {
     }
 
     /// @notice formal/Refinement/Swarm/RouterCancelWithSig.lean:178 — any successful run had a live deadline,
-    ///         a fresh `(owner, nonce)`, and `isValidSignatureNow(owner, digest(live amountIn, nonce, deadline))`.
+    ///         a fresh `(owner, nonce)`, and `isValidSignatureNow(owner, digest(nonce, deadline))`. (Semantics
+    ///         changed by L-01: the digest no longer covers the live amountIn; Lean statement needs updating.)
     function testFuzz_cancelWithSig_ok_inv(AsyncOrder memory o, Inv memory s) public {
         uint256 pk = _keyed(o, s.pkSeed);
         uint8 b = s.bad & s.noise;
         if (b & 1 == 0) s.deadline = bound(s.deadline, block.timestamp, type(uint256).max);
         if (b & 2 != 0) vm.store(address(hook), _cancelNonceSlot(o.owner, s.nonce), bytes32(uint256(1)));
         if (b & 4 == 0) s.otherSeed = s.pkSeed;
-        if (b & 8 == 0) s.signedAmountIn = s.amountIn;
         if (b & 16 == 0) s.signedNonce = s.nonce;
         if (b & 32 == 0) s.signedDeadline = s.deadline;
         pk;
         _mockInfo(o, s.amountIn);
-        bytes memory sig = _sig(_pk(s.otherSeed), _cancelDigest(o, s.signedAmountIn, s.signedNonce, s.signedDeadline));
+        bytes memory sig = _sig(_pk(s.otherSeed), _cancelDigest(o, s.signedNonce, s.signedDeadline));
         bool freshBefore = vm.load(address(hook), _cancelNonceSlot(o.owner, s.nonce)) == bytes32(0);
         _mockUnlockOk();
         vm.prank(s.caller);
@@ -194,7 +186,7 @@ contract RouterCancelWithSigFormalTest is FormalProbesA {
             assertGe(s.deadline, block.timestamp, "deadline held");
             assertTrue(freshBefore, "(owner, nonce) was fresh");
             assertTrue(
-                SignatureChecker.isValidSignatureNow(o.owner, _cancelDigest(o, s.amountIn, s.nonce, s.deadline), sig),
+                SignatureChecker.isValidSignatureNow(o.owner, _cancelDigest(o, s.nonce, s.deadline), sig),
                 "signature valid for owner over the live cancel digest"
             );
         }
@@ -217,7 +209,7 @@ contract RouterCancelWithSigFormalTest is FormalProbesA {
         vm.assume(deadline >= block.timestamp && caller != address(0));
         vm.assume(otherMaker != o.owner || otherNonce != nonce);
         _mockInfo(o, amountIn);
-        bytes memory sig = _sig(pk, _cancelDigest(o, amountIn, nonce, deadline));
+        bytes memory sig = _sig(pk, _cancelDigest(o, nonce, deadline));
         bytes32 slot = _cancelNonceSlot(o.owner, nonce);
         bytes32 otherSlot = _cancelNonceSlot(otherMaker, otherNonce);
         bytes32 otherBefore = vm.load(address(hook), otherSlot);
@@ -274,7 +266,7 @@ contract RouterCancelWithSigFormalTest is FormalProbesA {
         token0.approve(address(router), type(uint256).max);
         (AsyncOrder memory o,) = _placeOrder(maker, true, 1 ether, 0.9 ether);
         uint256 deadline = block.timestamp + 1 hours;
-        bytes memory sig = _sig(pk, _cancelDigest(o, 1 ether, nonce, deadline));
+        bytes memory sig = _sig(pk, _cancelDigest(o, nonce, deadline));
         vm.prank(relayer);
         router.cancelWithSig(o, nonce, deadline, sig);
 

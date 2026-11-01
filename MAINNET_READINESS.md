@@ -68,10 +68,10 @@ script. The local demo deploys a new mock-USDC market; it is not a mainnet liqui
   Source: <https://developers.uniswap.org/docs/protocols/v4/deployments>
 - USDC: `0x078D782b760474a361dDA0AF3839290b0EF57AD6`. Revalidate issuer address and decimals in the final
   rehearsal.
-- Runtime sizes (`forge build --sizes`, `optimizer_runs = 10_000`, 2026-11-01, after the M-01, L-02 and M-02
-  fixes): AsyncSwap 22,988 bytes, AsyncMatching 23,866, Router 22,130, FeeVault 2,320, TokenClaims 2,110,
-  NativeClaims 1,964. All under the 24,576-byte EIP-170 limit, but the margins are thin: AsyncMatching has
-  only 710 bytes left, the hook 1,588 and the Router 2,446. Budget audit
+- Runtime sizes (`forge build --sizes`, `optimizer_runs = 10_000`, 2026-11-01, after the M-01, L-02, M-02
+  and L-01 fixes): AsyncSwap 23,367 bytes, AsyncMatching 24,022, Router 21,925, FeeVault 2,320, TokenClaims
+  2,110, NativeClaims 1,964. All under the 24,576-byte EIP-170 limit, but the margins are thin: AsyncMatching
+  has only 554 bytes left, the hook 1,209 and the Router 2,651. Budget audit
   fixes against those margins, prefer moving logic into linked libraries over growing the hook, and
   recheck after every change.
 - The deployment wrapper checks library code presence, not exact runtime identity. Pin and verify the
@@ -106,9 +106,6 @@ script. The local demo deploys a new mock-USDC market; it is not a mainnet liqui
   integrated throughput.
 - Rehearse the pinned deployment script on a Unichain fork, then verify the final bytecode and publish
   sources.
-- Decide on executor revocation: revoking the Router strands an EOA maker's live orders until it grants
-  the Router again (see `test/security/ExecutorRevocation.t.sol`). Either block revocation while orders
-  are live or let the Router cancel for the owner regardless.
 - Deploy the claim redeemers with the core contracts: `script/DeployTokenClaims.s.sol` and
   `script/DeployNativeClaims.s.sol` (not broadcast yet).
 - Ship the claim experience in the indexer and frontend before launch: match proceeds and native proceeds

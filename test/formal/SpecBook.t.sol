@@ -514,6 +514,7 @@ contract SpecBookFormalTest is Test {
                 isBuy: x.isBuy,
                 zeroForOne: (x.junk >> 1) & 1 == 1,
                 sequence: x.seq,
+                reprices: 0,
                 priorityFee: x.fee,
                 priorityKey: uint128(x.junk >> 11),
                 createdSequence: x.seq

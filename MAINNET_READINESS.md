@@ -85,10 +85,12 @@ script. The local demo deploys a new mock-USDC market; it is not a mainnet liqui
 - Pool parameters are constructor arguments with no setter: `DEPLOY_MIN_ORDER_USD` (default $10) and an
   asset precision of 4 (0.0001 token). The constructor derives the $0.10 bid cap and the base-unit
   minimum from USDC's decimals. Confirm both values before broadcast; changing them means a new hook.
-- The Router's MEV tax gas is a constructor argument with no setter: `DEPLOY_MEV_TAX_GAS` (default 20,000,000).
-  The tax is the transaction's priority fee per gas times it, so it only works as intended on a chain that
-  orders by priority fee. Confirm Unichain's ordering and typical wallet priority fees before broadcast, and
-  have the frontend send orders with a zero priority fee.
+- The Router's MEV tax gas is a constructor argument with no setter, set per chain in
+  `script/config/chains.json` (`deployment.mevTaxGas`, with `deployment.ordering`): 20,000,000 on Unichain,
+  whose blocks are ordered by priority fee, and 0 where ordering is by arrival, by builders or unconfirmed.
+  `deploy.sh` refuses a chain without a value, or with a nonzero value on a chain not ordered by priority fee.
+  Confirm Unichain's ordering and typical wallet priority fees before broadcast, and have the frontend send
+  orders with a zero priority fee.
 
 ## Before the audit starts
 

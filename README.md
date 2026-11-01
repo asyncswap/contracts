@@ -16,7 +16,7 @@ every push to `main` that touches them; preview it locally with `cd site && bun 
 - [Order lifecycle and priority bids](docs/order-lifecycle.md): matching, fills, cancellation, and bid settlement.
 - [Contract call sequences](docs/contract-call-sequences.md): calls, callbacks, responses, and withdrawals.
 - [Price-key crossing](docs/price-key-crossing.md): price comparisons and rounding.
-- [Dynamic fee ordering](docs/dynamic-fee-ordering.md): the dynamic fee on pool fills that backrun a price move, and who receives it.
+- [Dynamic fee ordering](docs/dynamic-fee-ordering.md): the dynamic fee on pool fills that backrun a price move, and who receives it. Open question: does charging half the price gap capture enough of a backrun's MEV for LPs and the protocol, or should the right to backrun a pool fill be auctioned through USDC priority bids, the way book matching already auctions ordering?
 
 ## Build and deployment
 

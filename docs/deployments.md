@@ -26,6 +26,10 @@ How to read the table:
   deterministic CREATE2 deployer (`0x4e59b44847b379578588920cA78FbF26c0B4956C`) with fixed salts.
   Identical bytecode gets the same address on every chain; MegaETH's libraries were built from newer
   code, so their addresses differ.
+- **These hooks predate fixed pool parameters.** Their owner can still change each pool's minimum
+  order and bid cap, only the owner can open pools, there is no 0.0001-token asset floor, and their
+  Routers have no `multicall`. The next deployment takes the minimum in dollars and an asset precision
+  as constructor arguments and derives the bid cap from the numeraire's decimals, with no setters.
 - **PoolManager** is the Uniswap v4 singleton the hook is attached to. The first four testnets
   use existing instances; MegaETH uses a self-owned deployment.
 - **Numeraire** is the stablecoin every pool is priced in.

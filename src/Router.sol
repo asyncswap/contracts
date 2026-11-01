@@ -18,10 +18,11 @@ import {AsyncSwap} from "src/AsyncSwap.sol";
 
 /// @title Router
 /// @author @msakiart
-/// @notice Thin entrypoint for makers (`swap`), fillers (`fillOrder`), and makers cancelling orders
-///         (`cancelOrder`). All three actions go through `IPoolManager.unlock` so the hook can
-///         operate on PM debts. Native payouts/refunds are PoolManager claims (ID 0),
-///         redeemable through NativeClaims after approval; ERC20 payouts remain direct.
+/// @notice Thin entrypoint for makers (`swap`, `cancelOrder`, `cancelAndWithdraw`, `withdrawClaims`), fillers
+///         (`fillOrder`) and keepers (`matchBook`, `fillFromPoolLiquidity`), batched with `multicall`. Each action
+///         goes through `IPoolManager.unlock` so the hook can operate on PM debts. Native payouts/refunds are
+///         PoolManager claims (ID 0), redeemable through NativeClaims or `withdrawClaims`; ERC20 payouts remain
+///         direct.
 ///
 ///         Gasless variants (`swapWithSig`, `cancelWithSig`) take the maker's EIP-712 signature so a
 ///         relayer can submit. Signed creates pull input through Permit2 with the order as witness,

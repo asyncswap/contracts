@@ -8,7 +8,7 @@ These diagrams describe the current source, not a deployment or mainnet-readines
 
 ```mermaid
 flowchart TD
-    A["Submit order: input amount, minimum output, optional USDC bid"] --> D["Require pool minimum; validate minimum only for nonzero bid"]
+    A["Submit order: input amount, minimum output, optional USDC bid"] --> D["Require pool minimum (USDC leg) and 0.0001-token asset floor; validate bid minimum only for nonzero bid"]
     D --> E["Validate executor; escrow input and any nonzero bid at creation"]
     E --> R{"Pool spot price strictly better than the best opposing level?"}
     R -- "No" --> F["Match best opposing prices first; up to 8 pairs"]
@@ -90,6 +90,13 @@ A failed withdrawal reverts the cancellation as well.
 claims to the caller's wallet. Approve each currency's ERC-6909 claim ID on
 PoolManager; an ERC20 approval is not a claim approval. The Router accepts up to
 16 distinct currencies and never withdraws another wallet's claims.
+
+`Router.multicall(calls)` batches these with `cancelOrder` and other Router calls in
+one atomic transaction, each running as the caller: for example, cancel several
+orders and withdraw the resulting claims together. If any call fails, the whole
+batch reverts. It replaces the earlier BatchActions, BatchCancels and BatchClaims
+contracts, which needed their own executor and operator grants. `multicall` is not
+payable, so send native-value calls on their own.
 
 For existing immutable hooks, an updated Router can be deployed alongside the
 creation Router. The registry records it as `WithdrawalRouter`; `Router` remains

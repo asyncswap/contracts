@@ -26,8 +26,13 @@ liquidity, and anyone can permissionlessly fill a resting order.
   ones the hook makes to fill a resting order from pool liquidity, and those pay active LPs
   0.02% and the protocol 0.01%. Book matches and filler fills take 0.02% of what each side receives.
 - **Proceeds you can always claim.** A book match credits both sides as PoolManager claims, which
-  you redeem to any address through `TokenClaims` (ERC-20) or `NativeClaims` (ETH). A recipient a
-  token refuses cannot block matching.
+  you redeem to any address through `TokenClaims` (ERC-20) or `NativeClaims` (ETH), or to your own
+  wallet through `Router.withdrawClaims`. A recipient a token refuses cannot block matching.
+- **Rules the owner cannot change.** Anyone can open a USDC pool on the hook. The minimum order, the
+  $0.10 priority-bid cap and the 0.0001-token asset floor are fixed when the hook is deployed; the
+  owner can only collect fees, sweep stranded balances and transfer ownership.
+- **Batch your actions.** `Router.multicall` cancels several orders and withdraws claims in one
+  atomic transaction, with no extra approvals.
 
 ## Where to start
 

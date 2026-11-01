@@ -167,20 +167,24 @@ Test: `test/security/RouterOrderWindow.t.sol` `test_pendingOrder_notMatchableBef
 Async Swap targets institutional-size orders; small trades are better served by the AMM. Measured in
 numeraire (USDC) base units:
 
-- **Minimum order.** Each pool has a minimum (`setMinOrder(key, amount)`, owner only); pools start with
-  the hook's `defaultMinOrder` (`setDefaultMinOrder`). `script/01_DeployHook.s.sol` sets it to $10
-  (`DEPLOY_MIN_ORDER_USD`, scaled by the numeraire's `decimals()`). A buy's input must be at least the
-  minimum; a sell's minimum output must be, and so must its input valued at the pool's current price,
-  which keeps out sells that ask for the minimum but offer almost nothing. `updatePrice` re-checks it.
-  The pool price is an estimate: an empty pool still shows its creation price, so this is an admission
-  gate, not an oracle.
+- **Minimum order.** Fixed at deployment for every pool, with no setter: the hook's constructor takes it
+  in whole dollars (`DEPLOY_MIN_ORDER_USD`, $10 by default) and scales it by the numeraire's
+  `decimals()`. A buy's input must be at least the minimum, and so must a sell's minimum output.
+  `updatePrice` re-checks it. An earlier version also valued a sell's input at the pool's current
+  price; that check was dropped when pool creation became permissionless, because whoever opens a pool
+  chooses that price.
+- **Asset floor.** Each order must also trade at least 0.0001 of a whole asset token on its asset side
+  (a sell's input, a buy's minimum output), from the asset's `decimals()` read when the pool opens. It
+  blocks literal dust such as 1-wei sells; it limits quantity, not value.
 - **Remainders.** A partial match that leaves an order worth less than the minimum, by its own terms
   (no pool price), closes it and returns the remaining input as claims after both orders are reduced.
-- **Tiered bid.** The least bid is `min($0.10, 0.1% of the order)`: $0.10 from $100 up, down to $0.01
-  at the $10 minimum.
+- **Tiered bid.** The least nonzero bid is `min($0.10, 0.1% of the order)`: $0.10 from $100 up, down
+  to $0.01 at the $10 minimum. The $0.10 cap is `10^(decimals - 1)` of the numeraire, derived by the
+  constructor.
 
 Tests: `test/security/MinimumOrder.t.sol`, including a sell and a buy remainder refunded below the
-minimum, and the value check on a pool whose numeraire is `currency0`. Formal tests updated: the `addOrder` and `CreateOrderSpec`
+minimum and a pool opened by a stranger at an extreme price, `test/security/AssetPrecision.t.sol` and
+`test/Numeraire.t.sol` (the minimum and cap at 6 and 18 numeraire decimals). Formal tests updated: the `addOrder` and `CreateOrderSpec`
 fee guards, and `beforeInitialize`'s write set (now also `priceBooks[id].minOrder`).
 
 Hook size: `updatePriceWithSig` called the internal `AsyncFiller.updatePrice`, inlining it into the

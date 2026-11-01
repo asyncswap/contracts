@@ -207,7 +207,7 @@ sequenceDiagram
     end
 ```
 
-Signed alternatives are `Hook.updatePriceWithSig` and `Router.cancelWithSig`; a relayer can submit the maker's signature. Signature checks precede the corresponding state change or cancellation unlock. Any uncaught revert rolls back the whole transaction, including transfers and bid settlements.
+To cancel several orders at once, the maker sends `Router.multicall([cancelOrder(a), cancelOrder(b), ...])`: each call above runs in turn as the maker, with its own unlock, and one failure reverts them all. A `withdrawClaims` call can follow in the same batch. Signed alternatives are `Hook.updatePriceWithSig` and `Router.cancelWithSig`; a relayer can submit the maker's signature. Signature checks precede the corresponding state change or cancellation unlock. Any uncaught revert rolls back the whole transaction, including transfers and bid settlements.
 
 ### Pool setup, liquidity providers, and withdrawals
 
@@ -230,8 +230,9 @@ sequenceDiagram
 
     Operator->>PM: initialize(key, sqrtPriceX96)
     PM->>Hook: beforeInitialize(...)
-    Hook->>Hook: Require configured USDC and dynamic-fee pool
+    Hook->>Hook: Require configured USDC and dynamic-fee pool (any caller may initialize)
     Hook->>Hook: Copy the deployment minimum order and bid cap to the pool
+    Hook->>Hook: Read the asset's decimals and store its 0.0001-token floor
     Hook-->>PM: beforeInitialize selector
     PM-->>Operator: Initialized tick, Initialize event
     LP->>LM: Add funded liquidity in a chosen tick range

@@ -79,7 +79,12 @@ script. The local demo deploys a new mock-USDC market; it is not a mainnet liqui
 - `AsyncMatching` deploys through CREATE2 with the salt `keccak256("asyncswap.v2.AsyncMatching")`, which
   fixes its address across chains. Keep it unless a new address is intended.
 - Owner in the current script: `0xb1F0982E02f9F71E60512fd47471d76610CcB556`. Confirm the final owner,
-  operational permissions and funding before broadcast.
+  operational permissions and funding before broadcast. The owner can transfer ownership, `sweep` the
+  hook's stranded raw balance and collect FeeVault fees. It cannot open or close pools or change pool
+  parameters.
+- Pool parameters are constructor arguments with no setter: `DEPLOY_MIN_ORDER_USD` (default $10) and an
+  asset precision of 4 (0.0001 token). The constructor derives the $0.10 bid cap and the base-unit
+  minimum from USDC's decimals. Confirm both values before broadcast; changing them means a new hook.
 
 ## Before the audit starts
 
@@ -95,6 +100,9 @@ script. The local demo deploys a new mock-USDC market; it is not a mainnet liqui
   integrated throughput.
 - Rehearse the pinned deployment script on a Unichain fork, then verify the final bytecode and publish
   sources.
+- Decide on executor revocation: revoking the Router strands an EOA maker's live orders until it grants
+  the Router again (see `test/security/ExecutorRevocation.t.sol`). Either block revocation while orders
+  are live or let the Router cancel for the owner regardless.
 - Deploy the claim redeemers with the core contracts: `script/DeployTokenClaims.s.sol` and
   `script/DeployNativeClaims.s.sol` (not broadcast yet).
 - Ship the claim experience in the indexer and frontend before launch: match proceeds and native proceeds

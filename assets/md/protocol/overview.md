@@ -290,9 +290,11 @@ operator rights. It is not payable: native-value actions (`swap` with native inp
 native output) must be sent on their own, so no two calls can count one `msg.value`. For the same reason a
 taxed action inside `multicall` needs a transaction with no priority fee.
 
-Revoking the Router with `setExecutor(poolId, router, false)` strands the maker's live orders on that
-pool: Router cancels and fills revert until the maker grants it again, while book matching can still
-consume them. A contract maker can cancel directly from its own unlock; an EOA has to re-grant first.
+Revoking the Router with `setExecutor(poolId, router, false)` stops Router fills of the maker's orders on
+that pool until the maker grants it again; book matching can still consume them. It never traps them: the
+hook lets its own Router cancel without a grant, because the Router cancels only for `order.owner`
+(`cancelOrder`, `cancelAndWithdraw`) or with the owner's signature (`cancelWithSig`), and a cancel only
+returns input to the owner. Any other executor still needs the maker's grant.
 
 Signed maker actions use unordered nonces: `AsyncSwap.nonceUsed` for `SetExecutor`,
 `UpdatePrice` and `CancelOrder` (the Router burns cancel nonces through `AsyncSwap.useNonce`, so
@@ -329,8 +331,11 @@ See also [`price-key-crossing.md`](/protocol/price-key-crossing) for how truncat
 whether two orders cross, and [mainnet readiness](https://github.com/asyncswap/contracts/blob/main/MAINNET_READINESS.md) for the release gate.
 
 Signed cancellation typed data includes `uint64 createdSequence` after `orderId`; read it through
-`orderCreatedSequence(poolId, orderId)`. Signed repricing instead includes `uint64 sequence`, the order's
-current queue sequence (from `orderBookOrder`), which every reprice moves on: an unrelayed reprice
-signature cannot undo a later reprice, and replacing an identically identified order does not revive
-old signatures of either kind. Repricing signatures made with `createdSequence` must be signed again.
+`orderCreatedSequence(poolId, orderId)`. It does not include the order's size: a cancel covers whatever
+remains, so a partial match before it lands cannot void it. Signed repricing includes the order's size when
+signed, `uint64 createdSequence` and `uint32 reprices` (`orderReprices(poolId, orderId)`), and the relayer
+passes that size to `updatePriceWithSig`. The size and new minimum are a price: if matches have shrunk the
+order, the hook applies it to the remainder, rounding the minimum up. Only reprices move `reprices`, so an
+unrelayed reprice signature cannot undo a later reprice, and replacing an identically identified order does
+not revive old signatures of either kind. See [`repricing-signatures.md`](https://github.com/asyncswap/contracts/blob/main/docs/repricing-signatures.md).
 `invalidateNonce` revokes the shared grant, reprice, and cancel nonce space.

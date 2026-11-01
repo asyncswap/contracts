@@ -1,6 +1,6 @@
 # OrderSignatures
 
-[Git Source](https://github.com/asyncswap/contracts/blob/60fe093d7aae1cfe7c8565237ab030aad0d45f07/src/libraries/OrderSignatures.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7d09cfaccb98252068945596ea6058dffa186a9a/src/libraries/OrderSignatures.sol)
 
 **Title:** OrderSignatures
 
@@ -69,7 +69,7 @@ bytes32 internal constant SET_EXECUTOR_TYPEHASH = keccak256(
 
 ```solidity
 bytes32 internal constant UPDATE_PRICE_TYPEHASH = keccak256(
-        "UpdatePrice(address maker,address tokenIn,address tokenOut,uint256 amountIn,uint256 newAmountOutMin,bytes32 orderId,uint64 sequence,uint256 nonce,uint256 deadline)"
+        "UpdatePrice(address maker,address tokenIn,address tokenOut,uint256 amountIn,uint256 newAmountOutMin,bytes32 orderId,uint64 createdSequence,uint32 reprices,uint256 nonce,uint256 deadline)"
     );
 ```
 
@@ -77,7 +77,7 @@ bytes32 internal constant UPDATE_PRICE_TYPEHASH = keccak256(
 
 ```solidity
 bytes32 internal constant CANCEL_ORDER_TYPEHASH = keccak256(
-        "CancelOrder(address maker,address tokenIn,address tokenOut,uint256 amountIn,bytes32 orderId,uint64 createdSequence,uint256 nonce,uint256 deadline)"
+        "CancelOrder(address maker,address tokenIn,address tokenOut,bytes32 orderId,uint64 createdSequence,uint256 nonce,uint256 deadline)"
     );
 ```
 
@@ -180,7 +180,7 @@ function hashSetExecutor(
 | ---- | ---- | ----------- |
 | \<none> | `bytes32` |  |
 
-<a id="hashupdateprice-asyncorder-bytes32-uint256-uint256-uint64-uint256-uint256" />
+<a id="hashupdateprice-asyncorder-bytes32-uint256-uint256-uint64-uint32-uint256-uint256" />
 
 ### hashUpdatePrice
 
@@ -190,7 +190,8 @@ function hashUpdatePrice(
         bytes32 orderId,
         uint256 amountIn,
         uint256 newAmountOutMin,
-        uint64 sequence,
+        uint64 createdSequence,
+        uint32 reprices,
         uint256 nonce,
         uint256 deadline
     ) internal pure returns (bytes32);
@@ -202,9 +203,10 @@ function hashUpdatePrice(
 | ---- | ---- | ----------- |
 | order | `AsyncOrder` |  |
 | orderId | `bytes32` |  |
-| amountIn | `uint256` | the order's stored input, so the maker sees the size of the order they reprice. |
+| amountIn | `uint256` | The order's input when the maker signs, so the maker sees the size of the order they reprice.<br />`amountIn` and `newAmountOutMin` together are the new price: if partial matches shrink the order<br />before the reprice lands, the hook scales the minimum to the remainder. |
 | newAmountOutMin | `uint256` |  |
-| sequence | `uint64` | The order's queue sequence, which every reprice and every recreation moves on, so a<br />signature can neither undo a later reprice nor apply to an identical replacement. |
+| createdSequence | `uint64` | The order's creation sequence, so the signature cannot apply to an identical<br />replacement order with the same id. |
+| reprices | `uint32` | How many times the order has been repriced, so a signature cannot undo a later reprice.<br />Matches do not move it. |
 | nonce | `uint256` |  |
 | deadline | `uint256` |  |
 
@@ -214,20 +216,21 @@ function hashUpdatePrice(
 | ---- | ---- | ----------- |
 | \<none> | `bytes32` |  |
 
-<a id="hashcancel-asyncorder-bytes32-uint256-uint64-uint256-uint256" />
+<a id="hashcancel-asyncorder-bytes32-uint64-uint256-uint256" />
 
 ### hashCancel
 
 <i>
   Carries a nonce: order ids can recur (identical order re-placed in the same block after a
-  cancel), so order deletion alone does not stop a signed cancel from being replayed.
+  cancel), so order deletion alone does not stop a signed cancel from being replayed. It does not
+  commit to the order's size: a cancel covers whatever remains, so a partial match before it lands
+  cannot void it.
 </i>
 
 ```solidity
 function hashCancel(
         AsyncOrder memory order,
         bytes32 orderId,
-        uint256 amountIn,
         uint64 createdSequence,
         uint256 nonce,
         uint256 deadline
@@ -240,7 +243,6 @@ function hashCancel(
 | ---- | ---- | ----------- |
 | order | `AsyncOrder` |  |
 | orderId | `bytes32` |  |
-| amountIn | `uint256` |  |
 | createdSequence | `uint64` |  |
 | nonce | `uint256` |  |
 | deadline | `uint256` |  |

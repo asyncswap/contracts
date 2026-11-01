@@ -1,6 +1,6 @@
 # AsyncFiller
 
-[Git Source](https://github.com/asyncswap/contracts/blob/60fe093d7aae1cfe7c8565237ab030aad0d45f07/src/libraries/AsyncFiller.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7d09cfaccb98252068945596ea6058dffa186a9a/src/libraries/AsyncFiller.sol)
 
 **Title:** AsyncFiller
 
@@ -826,6 +826,8 @@ struct OrderInfo {
         bool isBuy;
         bool zeroForOne;
         uint64 sequence;
+        /// @dev Maker reprices so far; signed reprices commit to it (`OrderSignatures.hashUpdatePrice`).
+        uint32 reprices;
         /// @dev The bid, escrowed as hook claims since the order was created.
         uint64 priorityFee;
         uint128 priorityKey;
@@ -845,6 +847,7 @@ struct OrderInfo {
 | isBuy | `bool` |  |
 | zeroForOne | `bool` |  |
 | sequence | `uint64` |  |
+| reprices | `uint32` |  |
 | priorityFee | `uint64` |  |
 | priorityKey | `uint128` |  |
 | createdSequence | `uint64` |  |

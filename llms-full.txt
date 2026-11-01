@@ -378,9 +378,11 @@ operator rights. It is not payable: native-value actions (`swap` with native inp
 native output) must be sent on their own, so no two calls can count one `msg.value`. For the same reason a
 taxed action inside `multicall` needs a transaction with no priority fee.
 
-Revoking the Router with `setExecutor(poolId, router, false)` strands the maker's live orders on that
-pool: Router cancels and fills revert until the maker grants it again, while book matching can still
-consume them. A contract maker can cancel directly from its own unlock; an EOA has to re-grant first.
+Revoking the Router with `setExecutor(poolId, router, false)` stops Router fills of the maker's orders on
+that pool until the maker grants it again; book matching can still consume them. It never traps them: the
+hook lets its own Router cancel without a grant, because the Router cancels only for `order.owner`
+(`cancelOrder`, `cancelAndWithdraw`) or with the owner's signature (`cancelWithSig`), and a cancel only
+returns input to the owner. Any other executor still needs the maker's grant.
 
 Signed maker actions use unordered nonces: `AsyncSwap.nonceUsed` for `SetExecutor`,
 `UpdatePrice` and `CancelOrder` (the Router burns cancel nonces through `AsyncSwap.useNonce`, so
@@ -417,10 +419,13 @@ See also [`price-key-crossing.md`](/protocol/price-key-crossing) for how truncat
 whether two orders cross, and [mainnet readiness](https://github.com/asyncswap/contracts/blob/main/MAINNET_READINESS.md) for the release gate.
 
 Signed cancellation typed data includes `uint64 createdSequence` after `orderId`; read it through
-`orderCreatedSequence(poolId, orderId)`. Signed repricing instead includes `uint64 sequence`, the order's
-current queue sequence (from `orderBookOrder`), which every reprice moves on: an unrelayed reprice
-signature cannot undo a later reprice, and replacing an identically identified order does not revive
-old signatures of either kind. Repricing signatures made with `createdSequence` must be signed again.
+`orderCreatedSequence(poolId, orderId)`. It does not include the order's size: a cancel covers whatever
+remains, so a partial match before it lands cannot void it. Signed repricing includes the order's size when
+signed, `uint64 createdSequence` and `uint32 reprices` (`orderReprices(poolId, orderId)`), and the relayer
+passes that size to `updatePriceWithSig`. The size and new minimum are a price: if matches have shrunk the
+order, the hook applies it to the remainder, rounding the minimum up. Only reprices move `reprices`, so an
+unrelayed reprice signature cannot undo a later reprice, and replacing an identically identified order does
+not revive old signatures of either kind. See [`repricing-signatures.md`](https://github.com/asyncswap/contracts/blob/main/docs/repricing-signatures.md).
 `invalidateNonce` revokes the shared grant, reprice, and cancel nonce space.
 
 # Order lifecycle and priority bids
@@ -1424,7 +1429,7 @@ match the code on `main`. Each page links to its source file.
 
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/60fe093d7aae1cfe7c8565237ab030aad0d45f07/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7d09cfaccb98252068945596ea6058dffa186a9a/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -1973,6 +1978,29 @@ function orderCreatedSequence(PoolId poolId, bytes32 id) external view returns (
 | ---- | ---- | ----------- |
 | \<none> | `uint64` |  |
 
+<a id="orderreprices-poolid-bytes32" />
+
+### orderReprices
+
+How many times the order has been repriced: a signed `UpdatePrice` commits to it.
+
+```solidity
+function orderReprices(PoolId poolId, bytes32 id) external view returns (uint32);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| id | `bytes32` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint32` |  |
+
 <a id="isexecutor-poolid-address-address" />
 
 ### isExecutor
@@ -2217,6 +2245,11 @@ function updatePrice(AsyncOrder calldata order, uint256 newAmountOutMin) externa
 Maker cancels an unfilled order. Must be called via an authorized executor inside
 an `IPoolManager.unlock` context. The executor must have asserted maker identity.
 
+<i>
+  The trusted Router needs no grant: it cancels only for `order.owner` or with the owner's signature,
+  and a cancel only returns input to the owner, so revoking the Router never traps a maker's orders.
+</i>
+
 ```solidity
 function cancelOrder(AsyncOrder calldata order) external;
 ```
@@ -2335,7 +2368,7 @@ function setExecutorWithSig(
 | deadline | `uint256` |  |
 | signature | `bytes` |  |
 
-<a id="updatepricewithsig-asyncorder-uint256-uint256-uint256-bytes" />
+<a id="updatepricewithsig-asyncorder-uint256-uint256-uint256-uint256-bytes" />
 
 ### updatePriceWithSig
 
@@ -2344,6 +2377,7 @@ Signed `updatePrice`: anyone may submit the maker's EIP-712 `UpdatePrice` messag
 ```solidity
 function updatePriceWithSig(
         AsyncOrder calldata order,
+        uint256 amountIn,
         uint256 newAmountOutMin,
         uint256 nonce,
         uint256 deadline,
@@ -2356,10 +2390,51 @@ function updatePriceWithSig(
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | order | `AsyncOrder` |  |
+| amountIn | `uint256` | The order's input the maker signed against. If matches have since shrunk the order, the<br />signed price applies to the remainder: its minimum is `newAmountOutMin` scaled down, rounded up. |
 | newAmountOutMin | `uint256` |  |
 | nonce | `uint256` |  |
 | deadline | `uint256` |  |
 | signature | `bytes` |  |
+
+<a id="_verifyreprice-asyncorder-bytes32-uint256-uint256-uint256-uint256-bytes" />
+
+### \_verifyReprice
+
+<i>
+  Verifies a signed `UpdatePrice` against the order's creation sequence and reprice count, and returns
+  its minimum for the order's live input: orders only shrink, so a live input above the signed one means
+  the signature was for another order, and a smaller one gets the signed price, rounded up.
+</i>
+
+```solidity
+function _verifyReprice(
+        AsyncOrder calldata order,
+        bytes32 id,
+        uint256 amountIn,
+        uint256 newAmountOutMin,
+        uint256 nonce,
+        uint256 deadline,
+        bytes calldata signature
+    ) private returns (uint256);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| id | `bytes32` |  |
+| amountIn | `uint256` |  |
+| newAmountOutMin | `uint256` |  |
+| nonce | `uint256` |  |
+| deadline | `uint256` |  |
+| signature | `bytes` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint256` |  |
 
 <a id="invalidatenonce-uint256" />
 
@@ -2377,7 +2452,7 @@ function invalidateNonce(uint256 nonce) external;
 | ---- | ---- | ----------- |
 | nonce | `uint256` |  |
 
-<a id="usenonce-poolid-address-uint256" />
+<a id="usenonce-address-uint256" />
 
 ### useNonce
 
@@ -2385,16 +2460,16 @@ Burns `maker`'s nonce for a signature the Router verified itself (`cancelWithSig
 Every maker signature shares this one nonce space, so `invalidateNonce` revokes those
 signatures too, and only the trusted Router may burn one: any other executor could
 void the maker's signed actions on every pool.
+The Router needs no grant here, so a maker who revoked it can still cancel by signature.
 
 ```solidity
-function useNonce(PoolId poolId, address maker, uint256 nonce) external;
+function useNonce(address maker, uint256 nonce) external;
 ```
 
 **Parameters**
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| poolId | `PoolId` |  |
 | maker | `address` |  |
 | nonce | `uint256` |  |
 
@@ -2794,7 +2869,7 @@ struct UserParams {
 
 # FeeVault
 
-[Git Source](https://github.com/asyncswap/contracts/blob/60fe093d7aae1cfe7c8565237ab030aad0d45f07/src/FeeVault.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7d09cfaccb98252068945596ea6058dffa186a9a/src/FeeVault.sol)
 
 Holds and redeems protocol fee claims, never maker escrow.
 
@@ -2901,7 +2976,7 @@ error ZeroAddress();
 
 # ImmutableState
 
-[Git Source](https://github.com/asyncswap/contracts/blob/60fe093d7aae1cfe7c8565237ab030aad0d45f07/src/ImmutableState.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7d09cfaccb98252068945596ea6058dffa186a9a/src/ImmutableState.sol)
 
 **Title:** Immutable State
 
@@ -2953,7 +3028,7 @@ error NotPoolManager();
 
 # MatchingEngine
 
-[Git Source](https://github.com/asyncswap/contracts/blob/60fe093d7aae1cfe7c8565237ab030aad0d45f07/src/MatchingEngine.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7d09cfaccb98252068945596ea6058dffa186a9a/src/MatchingEngine.sol)
 
 **Title:** MatchingEngine
 
@@ -3426,7 +3501,7 @@ struct Book {
 
 # NativeClaims
 
-[Git Source](https://github.com/asyncswap/contracts/blob/60fe093d7aae1cfe7c8565237ab030aad0d45f07/src/NativeClaims.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7d09cfaccb98252068945596ea6058dffa186a9a/src/NativeClaims.sol)
 
 Redeems the caller's PoolManager native ETH claims to a chosen recipient.
 
@@ -3548,7 +3623,7 @@ error ReentrantRedemption();
 
 # Router
 
-[Git Source](https://github.com/asyncswap/contracts/blob/60fe093d7aae1cfe7c8565237ab030aad0d45f07/src/Router.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7d09cfaccb98252068945596ea6058dffa186a9a/src/Router.sol)
 
 **Inherits:** EIP712, Multicall
 
@@ -4215,7 +4290,7 @@ enum ActionType {
 
 # TokenClaims
 
-[Git Source](https://github.com/asyncswap/contracts/blob/60fe093d7aae1cfe7c8565237ab030aad0d45f07/src/TokenClaims.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7d09cfaccb98252068945596ea6058dffa186a9a/src/TokenClaims.sol)
 
 Redeems the caller's PoolManager currency claims to a chosen recipient.
 
@@ -4339,7 +4414,7 @@ error ReentrantRedemption();
 
 # BaseHook
 
-[Git Source](https://github.com/asyncswap/contracts/blob/60fe093d7aae1cfe7c8565237ab030aad0d45f07/src/BaseHook.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7d09cfaccb98252068945596ea6058dffa186a9a/src/BaseHook.sol)
 
 **Inherits:** IHooks, [ImmutableState](/reference/src/ImmutableState)
 
@@ -4999,7 +5074,7 @@ error HookNotImplemented();
 
 # IFeeOwner
 
-[Git Source](https://github.com/asyncswap/contracts/blob/60fe093d7aae1cfe7c8565237ab030aad0d45f07/src/FeeVault.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7d09cfaccb98252068945596ea6058dffa186a9a/src/FeeVault.sol)
 
 ## Functions
 
@@ -5019,7 +5094,7 @@ function owner() external view returns (address);
 
 # ISignatureTransfer
 
-[Git Source](https://github.com/asyncswap/contracts/blob/60fe093d7aae1cfe7c8565237ab030aad0d45f07/src/interfaces/ISignatureTransfer.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7d09cfaccb98252068945596ea6058dffa186a9a/src/interfaces/ISignatureTransfer.sol)
 
 **Title:** ISignatureTransfer
 
@@ -5112,7 +5187,7 @@ struct SignatureTransferDetails {
 
 # AsyncFiller
 
-[Git Source](https://github.com/asyncswap/contracts/blob/60fe093d7aae1cfe7c8565237ab030aad0d45f07/src/libraries/AsyncFiller.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7d09cfaccb98252068945596ea6058dffa186a9a/src/libraries/AsyncFiller.sol)
 
 **Title:** AsyncFiller
 
@@ -5938,6 +6013,8 @@ struct OrderInfo {
         bool isBuy;
         bool zeroForOne;
         uint64 sequence;
+        /// @dev Maker reprices so far; signed reprices commit to it (`OrderSignatures.hashUpdatePrice`).
+        uint32 reprices;
         /// @dev The bid, escrowed as hook claims since the order was created.
         uint64 priorityFee;
         uint128 priorityKey;
@@ -5957,6 +6034,7 @@ struct OrderInfo {
 | isBuy | `bool` |  |
 | zeroForOne | `bool` |  |
 | sequence | `uint64` |  |
+| reprices | `uint32` |  |
 | priorityFee | `uint64` |  |
 | priorityKey | `uint128` |  |
 | createdSequence | `uint64` |  |
@@ -6091,7 +6169,7 @@ struct Book {
 
 # AsyncMatching
 
-[Git Source](https://github.com/asyncswap/contracts/blob/60fe093d7aae1cfe7c8565237ab030aad0d45f07/src/libraries/AsyncMatching.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7d09cfaccb98252068945596ea6058dffa186a9a/src/libraries/AsyncMatching.sol)
 
 Linked matching module operating on the hook's order and radix-book storage.
 
@@ -6985,7 +7063,7 @@ struct UpdateParams {
 
 # ClaimTransfers
 
-[Git Source](https://github.com/asyncswap/contracts/blob/60fe093d7aae1cfe7c8565237ab030aad0d45f07/src/libraries/ClaimTransfers.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7d09cfaccb98252068945596ea6058dffa186a9a/src/libraries/ClaimTransfers.sol)
 
 <i>
   At most 16 makers and the FeeVault can each receive two currencies in eight matches.
@@ -7065,7 +7143,7 @@ struct Batch {
 
 # CurrencySettler
 
-[Git Source](https://github.com/asyncswap/contracts/blob/60fe093d7aae1cfe7c8565237ab030aad0d45f07/src/libraries/CurrencySettler.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7d09cfaccb98252068945596ea6058dffa186a9a/src/libraries/CurrencySettler.sol)
 
 **Title:** CurrencySettler
 
@@ -7116,7 +7194,7 @@ function take(Currency currency, IPoolManager manager, address recipient, uint25
 
 # DynamicFeeOrdering
 
-[Git Source](https://github.com/asyncswap/contracts/blob/60fe093d7aae1cfe7c8565237ab030aad0d45f07/src/libraries/DynamicFeeOrdering.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7d09cfaccb98252068945596ea6058dffa186a9a/src/libraries/DynamicFeeOrdering.sol)
 
 **Title:** Dynamic fee ordering on pool-liquidity fills
 
@@ -7262,7 +7340,7 @@ event PoolPriceObserved(
 
 # EligiblePrice
 
-[Git Source](https://github.com/asyncswap/contracts/blob/60fe093d7aae1cfe7c8565237ab030aad0d45f07/src/libraries/EligiblePrice.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7d09cfaccb98252068945596ea6058dffa186a9a/src/libraries/EligiblePrice.sol)
 
 Exact-price summaries on a priority-key radix tree.
 
@@ -7441,7 +7519,7 @@ struct Ratio {
 
 # OrderSignatures
 
-[Git Source](https://github.com/asyncswap/contracts/blob/60fe093d7aae1cfe7c8565237ab030aad0d45f07/src/libraries/OrderSignatures.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7d09cfaccb98252068945596ea6058dffa186a9a/src/libraries/OrderSignatures.sol)
 
 **Title:** OrderSignatures
 
@@ -7510,7 +7588,7 @@ bytes32 internal constant SET_EXECUTOR_TYPEHASH = keccak256(
 
 ```solidity
 bytes32 internal constant UPDATE_PRICE_TYPEHASH = keccak256(
-        "UpdatePrice(address maker,address tokenIn,address tokenOut,uint256 amountIn,uint256 newAmountOutMin,bytes32 orderId,uint64 sequence,uint256 nonce,uint256 deadline)"
+        "UpdatePrice(address maker,address tokenIn,address tokenOut,uint256 amountIn,uint256 newAmountOutMin,bytes32 orderId,uint64 createdSequence,uint32 reprices,uint256 nonce,uint256 deadline)"
     );
 ```
 
@@ -7518,7 +7596,7 @@ bytes32 internal constant UPDATE_PRICE_TYPEHASH = keccak256(
 
 ```solidity
 bytes32 internal constant CANCEL_ORDER_TYPEHASH = keccak256(
-        "CancelOrder(address maker,address tokenIn,address tokenOut,uint256 amountIn,bytes32 orderId,uint64 createdSequence,uint256 nonce,uint256 deadline)"
+        "CancelOrder(address maker,address tokenIn,address tokenOut,bytes32 orderId,uint64 createdSequence,uint256 nonce,uint256 deadline)"
     );
 ```
 
@@ -7621,7 +7699,7 @@ function hashSetExecutor(
 | ---- | ---- | ----------- |
 | \<none> | `bytes32` |  |
 
-<a id="hashupdateprice-asyncorder-bytes32-uint256-uint256-uint64-uint256-uint256" />
+<a id="hashupdateprice-asyncorder-bytes32-uint256-uint256-uint64-uint32-uint256-uint256" />
 
 ### hashUpdatePrice
 
@@ -7631,7 +7709,8 @@ function hashUpdatePrice(
         bytes32 orderId,
         uint256 amountIn,
         uint256 newAmountOutMin,
-        uint64 sequence,
+        uint64 createdSequence,
+        uint32 reprices,
         uint256 nonce,
         uint256 deadline
     ) internal pure returns (bytes32);
@@ -7643,9 +7722,10 @@ function hashUpdatePrice(
 | ---- | ---- | ----------- |
 | order | `AsyncOrder` |  |
 | orderId | `bytes32` |  |
-| amountIn | `uint256` | the order's stored input, so the maker sees the size of the order they reprice. |
+| amountIn | `uint256` | The order's input when the maker signs, so the maker sees the size of the order they reprice.<br />`amountIn` and `newAmountOutMin` together are the new price: if partial matches shrink the order<br />before the reprice lands, the hook scales the minimum to the remainder. |
 | newAmountOutMin | `uint256` |  |
-| sequence | `uint64` | The order's queue sequence, which every reprice and every recreation moves on, so a<br />signature can neither undo a later reprice nor apply to an identical replacement. |
+| createdSequence | `uint64` | The order's creation sequence, so the signature cannot apply to an identical<br />replacement order with the same id. |
+| reprices | `uint32` | How many times the order has been repriced, so a signature cannot undo a later reprice.<br />Matches do not move it. |
 | nonce | `uint256` |  |
 | deadline | `uint256` |  |
 
@@ -7655,20 +7735,21 @@ function hashUpdatePrice(
 | ---- | ---- | ----------- |
 | \<none> | `bytes32` |  |
 
-<a id="hashcancel-asyncorder-bytes32-uint256-uint64-uint256-uint256" />
+<a id="hashcancel-asyncorder-bytes32-uint64-uint256-uint256" />
 
 ### hashCancel
 
 <i>
   Carries a nonce: order ids can recur (identical order re-placed in the same block after a
-  cancel), so order deletion alone does not stop a signed cancel from being replayed.
+  cancel), so order deletion alone does not stop a signed cancel from being replayed. It does not
+  commit to the order's size: a cancel covers whatever remains, so a partial match before it lands
+  cannot void it.
 </i>
 
 ```solidity
 function hashCancel(
         AsyncOrder memory order,
         bytes32 orderId,
-        uint256 amountIn,
         uint64 createdSequence,
         uint256 nonce,
         uint256 deadline
@@ -7681,7 +7762,6 @@ function hashCancel(
 | ---- | ---- | ----------- |
 | order | `AsyncOrder` |  |
 | orderId | `bytes32` |  |
-| amountIn | `uint256` |  |
 | createdSequence | `uint64` |  |
 | nonce | `uint256` |  |
 | deadline | `uint256` |  |
@@ -7694,7 +7774,7 @@ function hashCancel(
 
 # RadixPriceTree
 
-[Git Source](https://github.com/asyncswap/contracts/blob/60fe093d7aae1cfe7c8565237ab030aad0d45f07/src/libraries/RadixPriceTree.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7d09cfaccb98252068945596ea6058dffa186a9a/src/libraries/RadixPriceTree.sol)
 
 Patricia radix index for uint128 price levels. Inserts and removals
 traverse at most 128 branch bits; each distinct price creates one
@@ -7910,7 +7990,7 @@ struct Tree {
 
 # TickPrice
 
-[Git Source](https://github.com/asyncswap/contracts/blob/60fe093d7aae1cfe7c8565237ab030aad0d45f07/src/libraries/TickPrice.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7d09cfaccb98252068945596ea6058dffa186a9a/src/libraries/TickPrice.sol)
 
 Book levels on Uniswap v4 ticks: an order sits at the floor tick (spacing 1, 0.01% steps)
 of its exact currency1/currency0 limit. Levels are a fixed relative width at any price and
@@ -8005,7 +8085,7 @@ function floorTick(uint256 num, uint256 den) internal pure returns (int24);
 
 # AsyncOrderLibrary
 
-[Git Source](https://github.com/asyncswap/contracts/blob/60fe093d7aae1cfe7c8565237ab030aad0d45f07/src/types/AsyncOrder.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7d09cfaccb98252068945596ea6058dffa186a9a/src/types/AsyncOrder.sol)
 
 **Title:** AsyncOrderLibrary
 
@@ -8047,7 +8127,7 @@ function orderId(AsyncOrder calldata order) internal view returns (bytes32);
 
 # AsyncOrder
 
-[Git Source](https://github.com/asyncswap/contracts/blob/60fe093d7aae1cfe7c8565237ab030aad0d45f07/src/types/AsyncOrder.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7d09cfaccb98252068945596ea6058dffa186a9a/src/types/AsyncOrder.sol)
 
 Represents an async order for a swap in the Uniswap V4 pool.
 

@@ -1,6 +1,6 @@
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/60fe093d7aae1cfe7c8565237ab030aad0d45f07/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7d09cfaccb98252068945596ea6058dffa186a9a/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -549,6 +549,29 @@ function orderCreatedSequence(PoolId poolId, bytes32 id) external view returns (
 | ---- | ---- | ----------- |
 | \<none> | `uint64` |  |
 
+<a id="orderreprices-poolid-bytes32" />
+
+### orderReprices
+
+How many times the order has been repriced: a signed `UpdatePrice` commits to it.
+
+```solidity
+function orderReprices(PoolId poolId, bytes32 id) external view returns (uint32);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| id | `bytes32` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint32` |  |
+
 <a id="isexecutor-poolid-address-address" />
 
 ### isExecutor
@@ -793,6 +816,11 @@ function updatePrice(AsyncOrder calldata order, uint256 newAmountOutMin) externa
 Maker cancels an unfilled order. Must be called via an authorized executor inside
 an `IPoolManager.unlock` context. The executor must have asserted maker identity.
 
+<i>
+  The trusted Router needs no grant: it cancels only for `order.owner` or with the owner's signature,
+  and a cancel only returns input to the owner, so revoking the Router never traps a maker's orders.
+</i>
+
 ```solidity
 function cancelOrder(AsyncOrder calldata order) external;
 ```
@@ -911,7 +939,7 @@ function setExecutorWithSig(
 | deadline | `uint256` |  |
 | signature | `bytes` |  |
 
-<a id="updatepricewithsig-asyncorder-uint256-uint256-uint256-bytes" />
+<a id="updatepricewithsig-asyncorder-uint256-uint256-uint256-uint256-bytes" />
 
 ### updatePriceWithSig
 
@@ -920,6 +948,7 @@ Signed `updatePrice`: anyone may submit the maker's EIP-712 `UpdatePrice` messag
 ```solidity
 function updatePriceWithSig(
         AsyncOrder calldata order,
+        uint256 amountIn,
         uint256 newAmountOutMin,
         uint256 nonce,
         uint256 deadline,
@@ -932,10 +961,51 @@ function updatePriceWithSig(
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | order | `AsyncOrder` |  |
+| amountIn | `uint256` | The order's input the maker signed against. If matches have since shrunk the order, the<br />signed price applies to the remainder: its minimum is `newAmountOutMin` scaled down, rounded up. |
 | newAmountOutMin | `uint256` |  |
 | nonce | `uint256` |  |
 | deadline | `uint256` |  |
 | signature | `bytes` |  |
+
+<a id="_verifyreprice-asyncorder-bytes32-uint256-uint256-uint256-uint256-bytes" />
+
+### \_verifyReprice
+
+<i>
+  Verifies a signed `UpdatePrice` against the order's creation sequence and reprice count, and returns
+  its minimum for the order's live input: orders only shrink, so a live input above the signed one means
+  the signature was for another order, and a smaller one gets the signed price, rounded up.
+</i>
+
+```solidity
+function _verifyReprice(
+        AsyncOrder calldata order,
+        bytes32 id,
+        uint256 amountIn,
+        uint256 newAmountOutMin,
+        uint256 nonce,
+        uint256 deadline,
+        bytes calldata signature
+    ) private returns (uint256);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| id | `bytes32` |  |
+| amountIn | `uint256` |  |
+| newAmountOutMin | `uint256` |  |
+| nonce | `uint256` |  |
+| deadline | `uint256` |  |
+| signature | `bytes` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint256` |  |
 
 <a id="invalidatenonce-uint256" />
 
@@ -953,7 +1023,7 @@ function invalidateNonce(uint256 nonce) external;
 | ---- | ---- | ----------- |
 | nonce | `uint256` |  |
 
-<a id="usenonce-poolid-address-uint256" />
+<a id="usenonce-address-uint256" />
 
 ### useNonce
 
@@ -961,16 +1031,16 @@ Burns `maker`'s nonce for a signature the Router verified itself (`cancelWithSig
 Every maker signature shares this one nonce space, so `invalidateNonce` revokes those
 signatures too, and only the trusted Router may burn one: any other executor could
 void the maker's signed actions on every pool.
+The Router needs no grant here, so a maker who revoked it can still cancel by signature.
 
 ```solidity
-function useNonce(PoolId poolId, address maker, uint256 nonce) external;
+function useNonce(address maker, uint256 nonce) external;
 ```
 
 **Parameters**
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| poolId | `PoolId` |  |
 | maker | `address` |  |
 | nonce | `uint256` |  |
 

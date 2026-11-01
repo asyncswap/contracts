@@ -57,7 +57,8 @@ contract DeployHookScript is FFIHelper {
             OWNER,
             predictedRouter,
             minOrderUsd * 10 ** decimals,
-            uint64(10 ** decimals / 10)
+            uint64(10 ** decimals / 10),
+            uint8(4) // orders trade at least 0.0001 of a whole asset token
         );
         bytes32 initCodeHash = keccak256(abi.encodePacked(creationCode, constructorArgs));
 

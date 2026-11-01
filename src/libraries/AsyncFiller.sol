@@ -97,6 +97,8 @@ library AsyncFiller {
         mapping(uint128 price => PriceLevel) askLevels;
         /// @dev Least order size in numeraire base units (0: none); see `checkMinimum`.
         uint256 minOrder;
+        /// @dev Least asset amount an order may trade, from the asset's decimals and the hook's precision.
+        uint256 minAssetAmount;
     }
 
     event AsyncOrderCreated(
@@ -131,6 +133,7 @@ library AsyncFiller {
     error PriorityFeeTooLarge();
     error PriorityFeeTooSmall();
     error BelowMinimumOrder();
+    error BelowMinimumAssetAmount();
 
     function addOrder(
         State storage self,
@@ -191,10 +194,12 @@ library AsyncFiller {
         return tiered < effectiveCap ? tiered : effectiveCap;
     }
 
-    /// @notice Reverts unless the order's numeraire leg is at least the pool's minimum: a buy's input, a
-    ///         sell's minimum output. Neither reads the pool price, which whoever initializes the pool sets.
+    /// @notice Reverts unless the order's numeraire leg is at least the pool's minimum (a buy's input, a
+    ///         sell's minimum output) and its asset leg at least the pool's asset floor (a sell's input, a buy's minimum
+    ///         output). Neither reads the pool price, which whoever initializes the pool sets.
     function checkMinimum(Book storage book, bool isBuy, uint256 amountIn, uint256 amountOutMin) internal view {
         if ((isBuy ? amountIn : amountOutMin) < book.minOrder) revert BelowMinimumOrder();
+        if ((isBuy ? amountOutMin : amountIn) < book.minAssetAmount) revert BelowMinimumAssetAmount();
     }
 
     function settlePriorityFee(

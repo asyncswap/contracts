@@ -23,7 +23,7 @@ import {PoolIdLibrary} from "v4-core/types/PoolId.sol";
 /// @dev Only bypasses permission-address mining for constructor rejection tests.
 contract NumeraireConstructorHarness is AsyncSwap {
     constructor(IPoolManager manager, Currency quote, address owner_, address router_, uint64 cap)
-        AsyncSwap(manager, quote, owner_, router_, 0, cap)
+        AsyncSwap(manager, quote, owner_, router_, 0, cap, type(uint8).max)
     {}
 
     function validateHookAddress(BaseHook) internal pure override {}
@@ -52,7 +52,13 @@ contract NumeraireTest is Test {
         deployCodeTo(
             "AsyncSwap.sol",
             abi.encode(
-                manager, Currency.wrap(address(usdc)), address(this), address(router), uint256(0), uint64(100_000)
+                manager,
+                Currency.wrap(address(usdc)),
+                address(this),
+                address(router),
+                uint256(0),
+                uint64(100_000),
+                type(uint8).max
             ),
             address(flags)
         );

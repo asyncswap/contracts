@@ -72,6 +72,10 @@ contract AsyncSwap is BaseHook, EIP712 {
     /// @notice $0.10 priority-bid cap in numeraire base units, fixed at deployment for every pool.
     uint64 public immutable priorityFeeCap;
 
+    /// @notice Decimal places of a whole asset token an order may trade, fixed at deployment: with 4, every order
+    ///         trades at least 0.0001 token on its asset side. 36 or more leaves only a 1-unit floor.
+    uint8 public immutable assetPrecision;
+
     /// @notice Pool-level swap-event mirror; bytes32 poolId for indexer compatibility.
     /// @dev    See https://github.com/OpenZeppelin/uniswap-hooks BaseAsyncSwap for the source pattern.
     event HookSwap(
@@ -184,13 +188,15 @@ contract AsyncSwap is BaseHook, EIP712 {
     ///                predicted address.
     /// @param _minOrder Minimum order in numeraire base units (0: none).
     /// @param _priorityFeeCap $0.10 in numeraire base units: the most a priority-bid floor can require.
+    /// @param _assetPrecision Decimal places of a whole asset token an order may trade (4: at least 0.0001 token).
     constructor(
         IPoolManager _poolManager,
         Currency _numeraire,
         address _owner,
         address _router,
         uint256 _minOrder,
-        uint64 _priorityFeeCap
+        uint64 _priorityFeeCap,
+        uint8 _assetPrecision
     ) BaseHook(_poolManager) EIP712("AsyncSwap", "1") {
         if (Currency.unwrap(_numeraire).code.length == 0) revert InvalidNumeraire();
         if (_owner == address(0) || _router == address(0)) revert ZeroAddress();
@@ -199,6 +205,7 @@ contract AsyncSwap is BaseHook, EIP712 {
         router = _router;
         minOrder = _minOrder;
         priorityFeeCap = _priorityFeeCap;
+        assetPrecision = _assetPrecision;
         owner = _owner;
         feeVault = new FeeVault(_poolManager);
         emit OwnershipTransferred(address(0), _owner);
@@ -244,6 +251,8 @@ contract AsyncSwap is BaseHook, EIP712 {
         asyncOrders[key.toId()].feeVault = address(feeVault);
         priceBooks[key.toId()].minOrder = minOrder;
         priceBooks[key.toId()].priorityFeeCap = priorityFeeCap;
+        priceBooks[key.toId()].minAssetAmount =
+            _minAssetAmount(key.currency0 == numeraire ? key.currency1 : key.currency0);
         return this.beforeInitialize.selector;
     }
 
@@ -278,6 +287,19 @@ contract AsyncSwap is BaseHook, EIP712 {
         return this.beforeAddLiquidity.selector;
     }
 
+    /// @dev 10^(decimals - assetPrecision) base units of `asset`, at least 1. Native ETH has 18 decimals. A token
+    ///      without a readable `decimals()` gets the 1-unit floor, and reported decimals are capped at 36.
+    function _minAssetAmount(Currency asset) private view returns (uint256) {
+        uint256 decimals = 18;
+        if (!asset.isAddressZero()) {
+            (bool ok, bytes memory ret) = Currency.unwrap(asset).staticcall(abi.encodeWithSignature("decimals()"));
+            if (!ok || ret.length < 32) return 1;
+            decimals = abi.decode(ret, (uint256));
+            if (decimals > 36) decimals = 36;
+        }
+        return decimals > assetPrecision ? 10 ** (decimals - assetPrecision) : 1;
+    }
+
     /// @notice Read an order's currently-open input amount. Returns 0 if the order does not exist.
     function asyncOrder(PoolId poolId, bytes32 orderId) external view returns (uint256 amountIn) {
         return asyncOrders[poolId].orders[orderId].amountIn;
@@ -296,6 +318,11 @@ contract AsyncSwap is BaseHook, EIP712 {
     /// @notice The priority bid an order escrowed when it was created.
     function asyncOrderPriorityFee(PoolId poolId, bytes32 orderId) external view returns (uint256) {
         return asyncOrders[poolId].orders[orderId].priorityFee;
+    }
+
+    /// @notice The least asset amount an order on this pool may trade (0 if not initialized).
+    function minAssetAmount(PoolId poolId) external view returns (uint256) {
+        return priceBooks[poolId].minAssetAmount;
     }
 
     /// @notice Return the best live limit order for a pool side. `isBuy` is true

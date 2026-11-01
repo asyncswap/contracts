@@ -194,7 +194,13 @@ contract MatchingInvariantTest is StdInvariant, Test {
         deployCodeTo(
             "AsyncSwap.sol",
             abi.encode(
-                manager, Currency.wrap(address(usdc)), address(this), address(router), uint256(0), uint64(100_000)
+                manager,
+                Currency.wrap(address(usdc)),
+                address(this),
+                address(router),
+                uint256(0),
+                uint64(100_000),
+                type(uint8).max
             ),
             address(flags)
         );

@@ -82,7 +82,9 @@ contract FormalBase is SetupHook {
             flags,
             abi.encodePacked(
                 type(AsyncSwap).creationCode,
-                abi.encode(manager, currency1, address(this), address(router), uint256(0), uint64(100_000))
+                abi.encode(
+                    manager, currency1, address(this), address(router), uint256(0), uint64(100_000), type(uint8).max
+                )
             )
         );
         (bool ok, bytes memory runtime) = flags.call("");

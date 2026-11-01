@@ -75,7 +75,15 @@ contract HookBalanceIsolationTest is Test {
         SelfExecutingMaker d = new SelfExecutingMaker(manager, hook, key);
         deployCodeTo(
             "AsyncSwap.sol",
-            abi.encode(manager, Currency.wrap(address(t1)), address(this), address(d), uint256(0), uint64(100_000)),
+            abi.encode(
+                manager,
+                Currency.wrap(address(t1)),
+                address(this),
+                address(d),
+                uint256(0),
+                uint64(100_000),
+                type(uint8).max
+            ),
             address(flags)
         );
         manager.initialize(key, 2 ** 96);

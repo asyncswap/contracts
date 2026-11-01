@@ -49,7 +49,15 @@ contract UnichainForkTest is Test {
         router = new Router(MANAGER, AsyncSwap(payable(address(fixture))), ISignatureTransfer(PERMIT2));
         deployCodeTo(
             "AsyncSwap.sol",
-            abi.encode(MANAGER, Currency.wrap(USDC), address(this), address(router), uint256(0), uint64(100_000)),
+            abi.encode(
+                MANAGER,
+                Currency.wrap(USDC),
+                address(this),
+                address(router),
+                uint256(0),
+                uint64(100_000),
+                type(uint8).max
+            ),
             fixture
         );
         hook = AsyncSwap(payable(fixture));

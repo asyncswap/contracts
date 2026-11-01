@@ -48,7 +48,7 @@ contract AsyncSwapDeployer {
         address predictedRouter = _createAddress(address(this), 2);
         bytes memory initCode = abi.encodePacked(
             type(AsyncSwap).creationCode,
-            abi.encode(manager, numeraire, owner, predictedRouter, uint256(0), uint64(100_000))
+            abi.encode(manager, numeraire, owner, predictedRouter, uint256(0), uint64(100_000), type(uint8).max)
         );
         bytes32 initCodeHash = keccak256(initCode);
         uint256 salt;

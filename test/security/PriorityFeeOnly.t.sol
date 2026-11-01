@@ -142,7 +142,9 @@ contract PriorityFeeOnlyTest is PriorityFeeOnlyBase {
         k = PoolKey(key.currency0, key.currency1, key.fee, key.tickSpacing, h);
         e = new BidSkippingExecutor(manager, h, k);
         deployCodeTo(
-            "AsyncSwap.sol", abi.encode(manager, currency1, address(this), address(e), uint256(0), uint64(100_000)), at
+            "AsyncSwap.sol",
+            abi.encode(manager, currency1, address(this), address(e), uint256(0), uint64(100_000), type(uint8).max),
+            at
         );
         manager.initialize(k, 2 ** 96);
         topUp(address(e), 10 ether);

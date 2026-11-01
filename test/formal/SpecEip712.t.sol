@@ -472,7 +472,7 @@ contract AsyncSwapCtorSpecFormalTest is SpecEip712Constants, FormalImmutablesC {
         bytes32 sep = _sep(HASH_ASYNCSWAP, HASH_ONE, block.chainid, self);
         assertEq(h.minOrder(), 0, "minOrder");
         assertEq(h.priorityFeeCap(), 100_000, "priorityFeeCap");
-        bytes32[] memory expected = new bytes32[](12);
+        bytes32[] memory expected = new bytes32[](13);
         expected[0] = bytes32(uint256(uint160(pm)));
         expected[1] = bytes32(uint256(uint160(_withCode(which))));
         expected[2] = bytes32(uint256(uint160(vault)));
@@ -485,6 +485,7 @@ contract AsyncSwapCtorSpecFormalTest is SpecEip712Constants, FormalImmutablesC {
         expected[9] = sep;
         expected[10] = bytes32(uint256(uint160(address(0xCAFE))));
         expected[11] = bytes32(uint256(100_000)); // priorityFeeCap; the harness's zero minOrder is invisible
+        expected[12] = bytes32(uint256(type(uint8).max)); // assetPrecision
         _assertImmutables(_immutables("AsyncSwapConstructor.t.sol:CtorHarness", self), expected);
         assertEq(h.domainSeparatorV4(), sep, "cached separator in the deployment environment");
     }

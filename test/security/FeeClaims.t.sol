@@ -16,7 +16,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 ///      tested separately.
 contract FeeTestHook is AsyncSwap {
     constructor(IPoolManager manager, Currency numeraire, address owner_, address router_)
-        AsyncSwap(manager, numeraire, owner_, router_, 0, 100_000)
+        AsyncSwap(manager, numeraire, owner_, router_, 0, 100_000, type(uint8).max)
     {}
 
     function calculatePoolFee(uint24, uint256 amount) public pure override returns (uint256) {

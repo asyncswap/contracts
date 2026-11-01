@@ -13,7 +13,7 @@ import {Currency} from "v4-core/types/Currency.sol";
 ///      exposes the internal `_domainSeparatorV4`.
 contract CtorHarness is AsyncSwap {
     constructor(IPoolManager manager, Currency quote, address owner_, address router_)
-        AsyncSwap(manager, quote, owner_, router_, 0, 100_000)
+        AsyncSwap(manager, quote, owner_, router_, 0, 100_000, type(uint8).max)
     {}
 
     function validateHookAddress(BaseHook) internal pure override {}

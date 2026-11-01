@@ -25,6 +25,7 @@ contract SetupHook is Test {
     /// @dev Constructor parameters for `_deployHook`: a suite sets them before `super.setUp()`.
     uint256 hookMinOrder;
     uint64 hookPriorityFeeCap = 100_000;
+    uint8 hookAssetPrecision = type(uint8).max; // no asset floor beyond 1 unit
     IPoolManager manager;
     AsyncSwap hook;
     Router router;
@@ -83,7 +84,9 @@ contract SetupHook is Test {
     function _deployHook() internal {
         deployCodeTo(
             "AsyncSwap.sol",
-            abi.encode(manager, currency1, address(this), address(router), hookMinOrder, hookPriorityFeeCap),
+            abi.encode(
+                manager, currency1, address(this), address(router), hookMinOrder, hookPriorityFeeCap, hookAssetPrecision
+            ),
             _hookAddress()
         );
         hook = AsyncSwap(payable(_hookAddress()));

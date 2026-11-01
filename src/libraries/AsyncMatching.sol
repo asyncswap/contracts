@@ -316,6 +316,9 @@ library AsyncMatching {
             ""
         );
         manager.updateDynamicLPFee(key, previousFee);
+        // A fill that runs out of in-range liquidity leaves the pool where no liquidity is active, and the
+        // check above would then refuse every later fill: refuse this one instead, so the order uses the book.
+        if (manager.getLiquidity(key.toId()) == 0) revert NoActiveLiquidity();
         int128 inputDelta = zeroForOne ? delta.amount0() : delta.amount1();
         int128 outputDelta = zeroForOne ? delta.amount1() : delta.amount0();
         // Without a limit the whole input must be used; with one the swap may stop at it.

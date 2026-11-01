@@ -37,3 +37,23 @@ skill ([`call-analysis`](https://github.com/asyncswap/skills/tree/2e9aca64980e7c
 | L-01 | Low | A small partial match voids a maker's relayed cancel or reprice | ✅ Fixed | [Report](lsp_security_review_2026-11-01.md#l-01-a-small-partial-match-voids-a-makers-relayed-cancel-or-reprice); cancels cover whatever remains and reprices apply their price to the remainder; `test/security/poc/SignedCancelGrief.t.sol` |
 | L-02 | Low | Pool squatting before a token is deployed disables its asset floor | ✅ Fixed | [Report](lsp_security_review_2026-11-01.md#l-02-pool-squatting-disables-the-asset-floor); an asset with no code reverts `AssetHasNoCode`; `test/security/poc/PoolSquatAssetFloor.t.sol` |
 | I-01 | Informational | Fee rounding on dust remainders (only with minimums off) | Acknowledged | [Report](lsp_security_review_2026-11-01.md#i-01-fee-rounding-on-dust-remainders); `test/security/poc/DustTradeFee.t.sol` |
+
+## Pashov solidity-auditor review (2026-11-01)
+
+[pashov_security_review_2026-11-01.md](pashov_security_review_2026-11-01.md): three passes of the
+[Pashov `solidity-auditor`](https://github.com/pashov/skills) skill (v4.1, 12 agents per pass) over `src/` and
+`script/` at `7d09cfa`. 11 findings and 29 leads. Regression tests: `test/security/PashovFindings.t.sol`.
+
+| # | Conf | Finding | Status | Notes |
+|---|---|---|---|---|
+| 1 | 90 | The backrun fee charges the whole output of a fill that crosses the reference tick | ✅ Fixed | Only the share before the reference pays |
+| 2 | 90 | A dust order at the end key turns off pool fills for the other side | ✅ Fixed | The pool-first limit stays inside v4's accepted range |
+| 3 | 85 | The venue choice ignores the dynamic fee | ✅ Fixed | Inside the window, a fill back toward the reference counts half its gap worse |
+| 4 | 85 | A maker that sets itself as executor fills from the pool with no MEV tax | Acknowledged | No user loses funds; the tax covers Router creation and fills only |
+| 5 | 85 | A direct `updatePrice` makes an old order cross with no MEV tax | Acknowledged | As 4 |
+| 6 | 85 | Reprice plus `matchBook` pays no MEV tax | Acknowledged | As 4 |
+| 7 | 75 | Ceil rounding on a partial match makes the remainder's limit worse | Open | Rounding down lets a worse dust remainder jump ahead (`test_worsePriceCannotJumpAheadWithBidOrAge`); a real fix stores the signed ratio |
+| 8 | 75 | A pool-first fill parks the price in an empty range and freezes pool fills | ✅ Fixed | A pool fill that would leave no active liquidity reverts |
+| 9 | 75 | Any caller runs the hook's `matchBook` with no unlock and no Router | Acknowledged | As 4; matching moves only claims and respects every limit |
+| 10 | 75 | A copied executor grant submitted first reverts the relayer's `swapWithSig` | ✅ Fixed | A grant whose nonce is spent is skipped |
+| 11 | 75 | The pool-first limit stops one tick past the best resting price | ✅ Fixed | One tick higher for a swap that lowers the tick |

@@ -46,7 +46,7 @@ contract UnichainForkTest is Test {
         );
         address fixture = address((uint160(0xA5) << 152) | flags);
         assertEq(fixture.code.length, 0, "fixture address occupied");
-        router = new Router(MANAGER, AsyncSwap(payable(address(fixture))), ISignatureTransfer(PERMIT2));
+        router = new Router(MANAGER, AsyncSwap(payable(address(fixture))), ISignatureTransfer(PERMIT2), 0);
         deployCodeTo(
             "AsyncSwap.sol",
             abi.encode(MANAGER, Currency.wrap(USDC), address(this), address(router), uint256(0), type(uint8).max),

@@ -25,7 +25,7 @@ contract DeployWithdrawalRouter is Script {
         );
         ISignatureTransfer permit2 = current.PERMIT2();
         vm.startBroadcast();
-        withdrawalRouter = new Router(manager, hook, permit2);
+        withdrawalRouter = new Router(manager, hook, permit2, current.MEV_TAX_GAS());
         vm.stopBroadcast();
     }
 }

@@ -77,7 +77,7 @@ contract RouterClaimsTest is NativeAsyncSwapTest {
 
     function test_updatedRouterCancelsExistingHookOrdersAfterExecutorGrant() public {
         AsyncOrder memory order = _openNative();
-        Router updated = new Router(manager, hook, ISignatureTransfer(address(0)));
+        Router updated = new Router(manager, hook, ISignatureTransfer(address(0)), 0);
         uint256 beforeETH = alice.balance;
         vm.startPrank(alice);
         manager.approve(address(updated), 0, 1 ether);
@@ -219,7 +219,7 @@ contract RouterClaimsTest is NativeAsyncSwapTest {
         uint256 reportedAmount
     ) public {
         AsyncOrder memory order = _openNative();
-        Router updated = new Router(manager, hook, ISignatureTransfer(address(0)));
+        Router updated = new Router(manager, hook, ISignatureTransfer(address(0)), 0);
         vm.startPrank(alice);
         hook.setExecutor(poolId, address(updated), executorGranted);
         if (claimApproved) manager.approve(address(updated), 0, 1 ether);

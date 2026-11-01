@@ -32,7 +32,7 @@ const descriptions = {
   '/protocol/order-lifecycle': 'How an order is placed, matched, filled, repriced and cancelled, and how priority bids are paid.',
   '/protocol/contract-call-sequences': 'Step-by-step contract calls for placing, matching, filling and cancelling orders.',
   '/protocol/price-key-crossing': 'How limit prices map to price keys and when two orders cross.',
-  '/protocol/dynamic-fee-ordering': 'The dynamic fee charged on pool fills that move the price back, split between LPs and the protocol.',
+  '/protocol/dynamic-fee-ordering': 'How Async Swap captures backrun MEV with a dynamic fee on pool fills that move the price back, split between LPs and the protocol.',
   '/deployments': 'Contract addresses on the five testnets (Unichain Sepolia, Sepolia, Robinhood Chain testnet, Arc testnet, MegaETH testnet); no mainnet yet. Also at /deployments.json.',
   '/audit/status': 'Status of each finding from the first AuditAgent report.',
 }

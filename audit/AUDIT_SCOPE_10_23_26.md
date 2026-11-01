@@ -1,5 +1,7 @@
 # Audit scope: Async Swap (2026-10-23)
 
+> Superseded by [`AUDIT_SCOPE_11_01_26.md`](AUDIT_SCOPE_11_01_26.md). Kept for history.
+
 Supersedes [`AUDIT_SCOPE_10_19_26.md`](AUDIT_SCOPE_10_19_26.md), which froze the code at `dc8042d`.
 
 - **Repository:** <https://github.com/asyncswap/contracts>

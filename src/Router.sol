@@ -5,6 +5,7 @@ import {ISignatureTransfer} from "@async-swap/interfaces/ISignatureTransfer.sol"
 import {OrderSignatures} from "@async-swap/libraries/OrderSignatures.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import {CurrencySettler} from "@async-swap/libraries/CurrencySettler.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -25,7 +26,12 @@ import {AsyncSwap} from "src/AsyncSwap.sol";
 ///         Gasless variants (`swapWithSig`, `cancelWithSig`) take the maker's EIP-712 signature so a
 ///         relayer can submit. Signed creates pull input through Permit2 with the order as witness,
 ///         so the wallet shows the full order (tokens, amounts, pool) in one readable message.
-contract Router is EIP712 {
+///
+///         `multicall` runs several of these as one atomic transaction, each as the caller (for example,
+///         cancel many orders and withdraw the claims). It is not payable, so native-value actions
+///         (`swap` with native input, `fillOrder` with native output) cannot reuse one `msg.value`.
+///         Each action keeps its own PoolManager unlock and sets the transient slots it reads.
+contract Router is EIP712, Multicall {
     using CurrencySettler for Currency;
     using CurrencyLibrary for Currency;
     using SafeCast for *;

@@ -177,7 +177,13 @@ contract FeeCollectTest is Test {
                 | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
         );
         router = new Router(manager, AsyncSwap(payable(address(flags))), ISignatureTransfer(Permit2Bytecode.PERMIT2));
-        deployCodeTo("AsyncSwap.sol", abi.encode(manager, tok, address(this), address(router)), address(flags));
+        // The 18-decimal mock stands in for 6-decimal USDC: the hook derives its $0.10 bid cap from decimals.
+        vm.mockCall(Currency.unwrap(tok), abi.encodeWithSignature("decimals()"), abi.encode(uint8(6)));
+        deployCodeTo(
+            "AsyncSwap.sol",
+            abi.encode(manager, tok, address(this), address(router), uint256(0), type(uint8).max),
+            address(flags)
+        );
         hook = AsyncSwap(payable(address(flags)));
         vault = hook.feeVault();
         key = PoolKey({currency0: eth, currency1: tok, fee: LPFeeLibrary.DYNAMIC_FEE_FLAG, tickSpacing: 1, hooks: hook});

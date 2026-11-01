@@ -5,30 +5,24 @@ import {FormalSlotsB} from "./FormalSlotsB.sol";
 import {AsyncSwap} from "@async-swap/AsyncSwap.sol";
 import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 import {Currency} from "v4-core/types/Currency.sol";
-import {PoolKey} from "v4-core/types/PoolKey.sol";
 
 /// @notice Bytecode checks of `formal/Refinement/Swarm/AsyncSwapOnlyOwner.lean`. The modifier is exercised
-///         through every `onlyOwner` entry point: `transferOwnership`, `sweep`, `setOrderingMode`.
+///         through every `onlyOwner` entry point: `transferOwnership`, `sweep`.
 contract AsyncSwapOnlyOwnerFormalTest is FormalSlotsB {
     function _setOwner(address o) internal {
         vm.store(address(hook), bytes32(OWNER_SLOT), bytes32(uint256(uint160(o))));
     }
 
-    /// @dev Calldata for gated entry point `which % 3` with fuzzed body arguments.
-    function _gated(uint8 which, address arg, bool mode) internal view returns (bytes memory) {
-        which %= 3;
-        if (which == 0) return abi.encodeCall(AsyncSwap.transferOwnership, (arg));
-        if (which == 1) return abi.encodeCall(AsyncSwap.sweep, (currency0, arg));
-        PoolKey memory k = key;
-        k.fee = uint24(uint160(arg)); // arbitrary key: a pool with no open orders
-        return abi.encodeCall(AsyncSwap.setMinOrder, (k, mode ? 100_000 : 0));
+    /// @dev Calldata for gated entry point `which % 2` with fuzzed body arguments.
+    function _gated(uint8 which, address arg, bool) internal view returns (bytes memory) {
+        if (which % 2 == 0) return abi.encodeCall(AsyncSwap.transferOwnership, (arg));
+        return abi.encodeCall(AsyncSwap.sweep, (currency0, arg));
     }
 
     /// @dev The body's own outcome when run by the owner (what `k env w` evaluates to): `ZeroAddress` for
     ///      a zero target in transferOwnership/sweep, success otherwise.
     function _bodyReverts(uint8 which, address arg) internal pure returns (bool, bytes4) {
-        which %= 3;
-        if (which < 2 && arg == address(0)) return (true, AsyncSwap.ZeroAddress.selector);
+        if (arg == address(0)) return (true, AsyncSwap.ZeroAddress.selector);
         return (false, bytes4(0));
     }
 

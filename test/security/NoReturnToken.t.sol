@@ -46,7 +46,9 @@ contract NoReturnTokenTest is Test {
         router = new Router(manager, AsyncSwap(payable(address(flags))), ISignatureTransfer(Permit2Bytecode.PERMIT2));
         deployCodeTo(
             "AsyncSwap.sol",
-            abi.encode(manager, Currency.wrap(address(usdc)), address(this), address(router)),
+            abi.encode(
+                manager, Currency.wrap(address(usdc)), address(this), address(router), uint256(0), type(uint8).max
+            ),
             address(flags)
         );
         hook = AsyncSwap(payable(address(flags)));

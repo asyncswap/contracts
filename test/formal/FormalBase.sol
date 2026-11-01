@@ -81,7 +81,8 @@ contract FormalBase is SetupHook {
         vm.etch(
             flags,
             abi.encodePacked(
-                type(AsyncSwap).creationCode, abi.encode(manager, currency1, address(this), address(router))
+                type(AsyncSwap).creationCode,
+                abi.encode(manager, currency1, address(this), address(router), uint256(0), type(uint8).max)
             )
         );
         (bool ok, bytes memory runtime) = flags.call("");

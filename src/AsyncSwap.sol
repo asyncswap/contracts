@@ -8,6 +8,7 @@ import {RadixPriceTree} from "@async-swap/libraries/RadixPriceTree.sol";
 import {TickPrice} from "@async-swap/libraries/TickPrice.sol";
 import {AsyncOrder, AsyncOrderLibrary} from "@async-swap/types/AsyncOrder.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import {CurrencySettler} from "@async-swap/libraries/CurrencySettler.sol";
 import {IPoolManager, ModifyLiquidityParams, SwapParams} from "v4-core/interfaces/IPoolManager.sol";
@@ -65,11 +66,16 @@ contract AsyncSwap is BaseHook, EIP712 {
     /// @notice Unordered nonces consumed by signed maker actions (`setExecutorWithSig`, `updatePriceWithSig`).
     mapping(address maker => mapping(uint256 nonce => bool)) public nonceUsed;
 
-    /// @notice Minimum order, in numeraire base units, that pools initialized from now on start with.
-    uint256 public defaultMinOrder;
+    /// @notice Minimum order in numeraire base units (0: none), fixed at deployment for every pool so the
+    ///         owner cannot change the rules under live orders.
+    uint256 public immutable minOrder;
 
-    /// @notice $0.10 priority-bid cap in numeraire base units for pools initialized from now on.
-    uint64 public defaultPriorityFeeCap = 100_000;
+    /// @notice $0.10 in numeraire base units, `10^(decimals - 1)`: the most a priority-bid floor can require.
+    uint64 public immutable priorityFeeCap;
+
+    /// @notice Decimal places of a whole asset token an order may trade, fixed at deployment: with 4, every order
+    ///         trades at least 0.0001 token on its asset side. 36 or more leaves only a 1-unit floor.
+    uint8 public immutable assetPrecision;
 
     /// @notice Pool-level swap-event mirror; bytes32 poolId for indexer compatibility.
     /// @dev    See https://github.com/OpenZeppelin/uniswap-hooks BaseAsyncSwap for the source pattern.
@@ -86,7 +92,7 @@ contract AsyncSwap is BaseHook, EIP712 {
     error UnaccountedNativeOutput();
     error NotOwner();
     error ZeroAddress();
-    error InvalidPriorityFeeCap();
+    error UnsupportedNumeraireDecimals();
     error SignatureExpired();
     error InvalidSignature();
     error NonceAlreadyUsed();
@@ -181,14 +187,27 @@ contract AsyncSwap is BaseHook, EIP712 {
     ///               constructor from the deterministic deployer, which could never act as owner.
     /// @param _router The Router, deployed after the hook (it takes the hook in its constructor): pass its
     ///                predicted address.
-    constructor(IPoolManager _poolManager, Currency _numeraire, address _owner, address _router)
-        BaseHook(_poolManager)
-        EIP712("AsyncSwap", "1")
-    {
+    /// @param _minOrderUsd Minimum order in whole numeraire units, e.g. dollars (0: none). The constructor scales it
+    ///                     and the $0.10 bid cap by the numeraire's own `decimals()`, so neither can be mis-scaled.
+    /// @param _assetPrecision Decimal places of a whole asset token an order may trade (4: at least 0.0001 token).
+    constructor(
+        IPoolManager _poolManager,
+        Currency _numeraire,
+        address _owner,
+        address _router,
+        uint256 _minOrderUsd,
+        uint8 _assetPrecision
+    ) BaseHook(_poolManager) EIP712("AsyncSwap", "1") {
         if (Currency.unwrap(_numeraire).code.length == 0) revert InvalidNumeraire();
         if (_owner == address(0) || _router == address(0)) revert ZeroAddress();
+        uint8 decimals = IERC20Metadata(Currency.unwrap(_numeraire)).decimals();
+        // 10^19 is the largest power of ten a uint64 cap holds.
+        if (decimals == 0 || decimals > 20) revert UnsupportedNumeraireDecimals();
         numeraire = _numeraire;
         router = _router;
+        minOrder = _minOrderUsd * 10 ** decimals;
+        priorityFeeCap = uint64(10 ** (decimals - 1));
+        assetPrecision = _assetPrecision;
         owner = _owner;
         feeVault = new FeeVault(_poolManager);
         emit OwnershipTransferred(address(0), _owner);
@@ -224,22 +243,18 @@ contract AsyncSwap is BaseHook, EIP712 {
     }
 
     /// @inheritdoc BaseHook
-    /// @dev Only the owner opens pools: the initial price feeds the sell-side minimum check, so an
-    ///      extreme price set by anyone else could block every sell on the pool.
-    function _beforeInitialize(address sender, PoolKey calldata key, uint160)
-        internal
-        virtual
-        override
-        returns (bytes4)
-    {
-        if (sender != owner) revert NotOwner();
+    /// @dev Anyone may open a pool that pairs the numeraire with a dynamic fee. No order check reads the
+    ///      pool price, so the initializer's choice of price cannot block orders.
+    function _beforeInitialize(address, PoolKey calldata key, uint160) internal virtual override returns (bytes4) {
         if (!(key.currency0 == numeraire || key.currency1 == numeraire)) revert NumeraireRequired();
         if (key.fee != LPFeeLibrary.DYNAMIC_FEE_FLAG) revert DynamicFeeRequired();
         asyncOrders[key.toId()].poolManager = poolManager;
         asyncOrders[key.toId()].numeraire = numeraire;
         asyncOrders[key.toId()].feeVault = address(feeVault);
-        priceBooks[key.toId()].minOrder = defaultMinOrder;
-        priceBooks[key.toId()].priorityFeeCap = defaultPriorityFeeCap;
+        priceBooks[key.toId()].minOrder = minOrder;
+        priceBooks[key.toId()].priorityFeeCap = priorityFeeCap;
+        priceBooks[key.toId()].minAssetAmount =
+            _minAssetAmount(key.currency0 == numeraire ? key.currency1 : key.currency0);
         return this.beforeInitialize.selector;
     }
 
@@ -274,6 +289,19 @@ contract AsyncSwap is BaseHook, EIP712 {
         return this.beforeAddLiquidity.selector;
     }
 
+    /// @dev 10^(decimals - assetPrecision) base units of `asset`, at least 1. Native ETH has 18 decimals. A token
+    ///      without a readable `decimals()` gets the 1-unit floor, and reported decimals are capped at 36.
+    function _minAssetAmount(Currency asset) private view returns (uint256) {
+        uint256 decimals = 18;
+        if (!asset.isAddressZero()) {
+            (bool ok, bytes memory ret) = Currency.unwrap(asset).staticcall(abi.encodeWithSignature("decimals()"));
+            if (!ok || ret.length < 32) return 1;
+            decimals = abi.decode(ret, (uint256));
+            if (decimals > 36) decimals = 36;
+        }
+        return decimals > assetPrecision ? 10 ** (decimals - assetPrecision) : 1;
+    }
+
     /// @notice Read an order's currently-open input amount. Returns 0 if the order does not exist.
     function asyncOrder(PoolId poolId, bytes32 orderId) external view returns (uint256 amountIn) {
         return asyncOrders[poolId].orders[orderId].amountIn;
@@ -294,26 +322,9 @@ contract AsyncSwap is BaseHook, EIP712 {
         return asyncOrders[poolId].orders[orderId].priorityFee;
     }
 
-    /// @notice Set a pool's minimum order, in numeraire base units (0: none).
-    function setMinOrder(PoolKey calldata key, uint256 minimum) external onlyOwner {
-        AsyncFiller.setMinOrder(priceBooks[key.toId()], key.toId(), minimum);
-    }
-
-    /// @notice Set the minimum order new pools start with.
-    function setDefaultMinOrder(uint256 minimum) external onlyOwner {
-        defaultMinOrder = minimum;
-    }
-
-    /// @notice Set the $0.10 priority-bid cap for new pools in numeraire base units.
-    function setDefaultPriorityFeeCap(uint64 cap) external onlyOwner {
-        if (cap == 0) revert InvalidPriorityFeeCap();
-        defaultPriorityFeeCap = cap;
-    }
-
-    /// @notice Correct an initialized pool's cap when its numeraire has a different decimal scale.
-    function setPriorityFeeCap(PoolKey calldata key, uint64 cap) external onlyOwner {
-        if (cap == 0) revert InvalidPriorityFeeCap();
-        priceBooks[key.toId()].priorityFeeCap = cap;
+    /// @notice The least asset amount an order on this pool may trade (0 if not initialized).
+    function minAssetAmount(PoolId poolId) external view returns (uint256) {
+        return priceBooks[poolId].minAssetAmount;
     }
 
     /// @notice Return the best live limit order for a pool side. `isBuy` is true
@@ -625,6 +636,11 @@ contract AsyncSwap is BaseHook, EIP712 {
         emit AsyncFiller.AsyncOrderCreated(poolId, id, hookData.user, zeroForOne, amountIn, hookData.amountOutMin, salt);
     }
 
+    /// TODO Revoking the Router strands the maker's live orders on this pool: Router.cancelOrder and
+    ///      cancelWithSig revert (AsyncFiller.cancel needs the executor), and so do fillOrder and
+    ///      fillFromPoolLiquidity. An EOA can't call cancelOrder from its own unlock, so its input is
+    ///      stuck until it re-grants. Matching still consumes those orders. Either block revocation
+    ///      while orders are live or let the Router cancel on the owner's behalf regardless.
     /// @notice Maker explicitly authorises an executor (typically the Router) to submit
     ///         and fill orders on their behalf. Without this grant, `_createOrder` reverts
     ///         on the maker's first swap. Pass `allow = false` to revoke an executor.

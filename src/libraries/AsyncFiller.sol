@@ -11,7 +11,6 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {RadixPriceTree} from "@async-swap/libraries/RadixPriceTree.sol";
 import {EligiblePrice} from "@async-swap/libraries/EligiblePrice.sol";
 import {TickPrice} from "@async-swap/libraries/TickPrice.sol";
-import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
 
 /// @title AsyncFiller
 /// @author @msakiart
@@ -26,7 +25,6 @@ library AsyncFiller {
     using CurrencySettler for Currency;
     using PoolIdLibrary for PoolKey;
     using RadixPriceTree for RadixPriceTree.Tree;
-    using StateLibrary for IPoolManager;
 
     uint64 internal constant MAX_PRIORITY_FEE = type(uint64).max;
     /// @dev Default $0.10 cap for six-decimal numeraires. A pool may override this for other decimals.
@@ -99,6 +97,8 @@ library AsyncFiller {
         mapping(uint128 price => PriceLevel) askLevels;
         /// @dev Least order size in numeraire base units (0: none); see `checkMinimum`.
         uint256 minOrder;
+        /// @dev Least asset amount an order may trade, from the asset's decimals and the hook's precision.
+        uint256 minAssetAmount;
     }
 
     event AsyncOrderCreated(
@@ -124,7 +124,6 @@ library AsyncFiller {
     event OrderFeeAccrued(PoolId indexed poolId, bytes32 indexed orderId, Currency indexed currency, uint256 amount);
     event PriorityFeeDonated(PoolId indexed poolId, bytes32 indexed orderId, address indexed maker, uint256 amount);
     event PriorityFeeForfeited(PoolId indexed poolId, bytes32 indexed orderId, address indexed maker, uint256 amount);
-    event MinOrderSet(PoolId indexed poolId, uint256 minOrder);
 
     error OrderAlreadyExists();
     error OrderNotFound();
@@ -134,6 +133,7 @@ library AsyncFiller {
     error PriorityFeeTooLarge();
     error PriorityFeeTooSmall();
     error BelowMinimumOrder();
+    error BelowMinimumAssetAmount();
 
     function addOrder(
         State storage self,
@@ -194,37 +194,12 @@ library AsyncFiller {
         return tiered < effectiveCap ? tiered : effectiveCap;
     }
 
-    /// @notice Reverts unless the order is worth at least the pool's minimum in the numeraire: a buy's
-    ///         input; a sell's minimum output and its input at the pool's current price. The price
-    ///         check keeps out sells that ask for the minimum but offer almost nothing.
-    function checkMinimum(
-        State storage self,
-        Book storage book,
-        PoolId poolId,
-        bool isBuy,
-        bool zeroForOne,
-        uint256 amountIn,
-        uint256 amountOutMin
-    ) internal view {
-        uint256 minimum = book.minOrder;
-        if (minimum == 0) return;
-        if (isBuy) {
-            if (amountIn < minimum) revert BelowMinimumOrder();
-            return;
-        }
-        if (amountOutMin < minimum) revert BelowMinimumOrder();
-        (uint160 sqrtPriceX96,,,) = self.poolManager.getSlot0(poolId);
-        // The numeraire is the sell's output: currency1 when it sells token 0. Amounts fit int128 and
-        // the price is within v4's bounds, so neither product overflows.
-        uint256 value = zeroForOne
-            ? Math.mulDiv(Math.mulDiv(amountIn, sqrtPriceX96, 2 ** 96), sqrtPriceX96, 2 ** 96)
-            : Math.mulDiv(Math.mulDiv(amountIn, 2 ** 96, sqrtPriceX96), 2 ** 96, sqrtPriceX96);
-        if (value < minimum) revert BelowMinimumOrder();
-    }
-
-    function setMinOrder(Book storage book, PoolId poolId, uint256 minimum) internal {
-        book.minOrder = minimum;
-        emit MinOrderSet(poolId, minimum);
+    /// @notice Reverts unless the order's numeraire leg is at least the pool's minimum (a buy's input, a
+    ///         sell's minimum output) and its asset leg at least the pool's asset floor (a sell's input, a buy's minimum
+    ///         output). Neither reads the pool price, which whoever initializes the pool sets.
+    function checkMinimum(Book storage book, bool isBuy, uint256 amountIn, uint256 amountOutMin) internal view {
+        if ((isBuy ? amountIn : amountOutMin) < book.minOrder) revert BelowMinimumOrder();
+        if ((isBuy ? amountOutMin : amountIn) < book.minAssetAmount) revert BelowMinimumAssetAmount();
     }
 
     function settlePriorityFee(
@@ -285,7 +260,7 @@ library AsyncFiller {
         if (newAmountOutMin == 0) revert ZeroAmount();
         OrderInfo storage info = self.orders[id];
         if (info.amountIn == 0) revert OrderNotFound();
-        checkMinimum(self, book, order.key.toId(), info.isBuy, info.zeroForOne, info.amountIn, newAmountOutMin);
+        checkMinimum(book, info.isBuy, info.amountIn, newAmountOutMin);
         uint256 old = info.amountOutMin;
         // A nonzero sell bid floor follows its minimum output. Zero remains a valid no-bid order.
         if (!info.isBuy && info.priorityFee != 0) {

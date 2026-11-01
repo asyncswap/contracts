@@ -294,11 +294,15 @@ contract AsyncSwap is BaseHook, EIP712 {
         return asyncOrders[poolId].orders[orderId].priorityFee;
     }
 
+    /// TODO make this configurable in constructor instead of
+    ///      allowing the  owner to change it as they want.
     /// @notice Set a pool's minimum order, in numeraire base units (0: none).
     function setMinOrder(PoolKey calldata key, uint256 minimum) external onlyOwner {
         AsyncFiller.setMinOrder(priceBooks[key.toId()], key.toId(), minimum);
     }
 
+    /// TODO make this configurable in constructor instead of
+    ///      allowing the  owner to change it as they want.
     /// @notice Set the minimum order new pools start with.
     function setDefaultMinOrder(uint256 minimum) external onlyOwner {
         defaultMinOrder = minimum;
@@ -625,6 +629,11 @@ contract AsyncSwap is BaseHook, EIP712 {
         emit AsyncFiller.AsyncOrderCreated(poolId, id, hookData.user, zeroForOne, amountIn, hookData.amountOutMin, salt);
     }
 
+    /// TODO Revoking the Router strands the maker's live orders on this pool: Router.cancelOrder and
+    ///      cancelWithSig revert (AsyncFiller.cancel needs the executor), and so do fillOrder and
+    ///      fillFromPoolLiquidity. An EOA can't call cancelOrder from its own unlock, so its input is
+    ///      stuck until it re-grants. Matching still consumes those orders. Either block revocation
+    ///      while orders are live or let the Router cancel on the owner's behalf regardless.
     /// @notice Maker explicitly authorises an executor (typically the Router) to submit
     ///         and fill orders on their behalf. Without this grant, `_createOrder` reverts
     ///         on the maker's first swap. Pass `allow = false` to revoke an executor.

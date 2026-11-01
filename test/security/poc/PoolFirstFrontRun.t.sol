@@ -10,9 +10,10 @@ import {ModifyLiquidityParams} from "v4-core/types/PoolOperation.sol";
 import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 
-/// @notice Candidate 5: a pool-first attempt is all-or-nothing and capped at the best resting level. An ask placed just
-///         inside the buy's pool path makes the pool attempt revert (PartialLiquidityFill), so the buy matches the
-///         ask at a price worse than the pool's average fill.
+/// @notice Regression for M-02 (audit/lsp_security_review_2026-11-01.md). A pool-first attempt used to be all-or-nothing
+///         and capped at the best resting level: an ask placed just inside the buy's pool path made it revert, so the
+///         buy matched the ask at a price worse than the pool's average fill. The pool now fills up to the ask's level
+///         and only the rest matches the ask, so the front-run neither costs the maker nor pays the attacker.
 contract PoolFirstFrontRunPoc is SetupHook {
     using StateLibrary for IPoolManager;
 
@@ -86,7 +87,7 @@ contract PoolFirstFrontRunPoc is SetupHook {
         assertGt(got, BUY_MIN);
     }
 
-    function test_poc_frontRunAskForcesWorseBookMatch() public {
+    function test_frontRunAskNoLongerForcesWorseBookMatch() public {
         // Reference: what the pool alone would have given (snapshot/revert).
         uint256 snap = vm.snapshotState();
         uint256 poolOnly = _aliceBuy();
@@ -102,9 +103,7 @@ contract PoolFirstFrontRunPoc is SetupHook {
         uint256 got = _aliceBuy();
         emit log_named_uint("pool-only: alice token0 received", poolOnly);
         emit log_named_uint("attacked: alice token0 received", got);
-        emit log_named_uint("alice shortfall token0", poolOnly - got);
-        emit log_named_uint("alice shortfall bps x100", (poolOnly - got) * 1_000_000 / poolOnly);
-        assertLt(got, poolOnly, "maker received less than pool-only execution");
+        assertGe(got, poolOnly, "the maker does at least as well as the pool alone");
 
         // Attacker closes: cancel the ask remainder, then buy back token0 through the pool with the token1 earned.
         vm.prank(attacker);
@@ -118,5 +117,7 @@ contract PoolFirstFrontRunPoc is SetupHook {
         int256 pnl1 = int256(_bal1(attacker)) - int256(atk1Before);
         emit log_named_int("attacker net token0 after buyback", pnl0);
         emit log_named_int("attacker net token1 after buyback", pnl1);
+        assertEq(pnl1, 0, "every token1 earned was spent buying back");
+        assertLt(pnl0, 0, "the round trip loses the attacker token0");
     }
 }

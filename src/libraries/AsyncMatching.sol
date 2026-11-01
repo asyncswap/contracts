@@ -180,53 +180,113 @@ library AsyncMatching {
     }
 
     /// @notice Execute an order against active v4 LP positions if they meet the signed minimum.
-    /// @dev Reverts atomically on insufficient liquidity/output or partial execution. The caller
-    ///      catches this across a self-call so the resting order is preserved.
+    /// @dev Reverts atomically on insufficient liquidity or output; the caller catches this across a self-call so
+    ///      the resting order is preserved. Without a price limit the whole order must fill. With one (the best
+    ///      book level, when the pool goes first) the swap may stop there: the filled part must meet the maker's
+    ///      limit pro rata, and the rest stays on the book with the maker's own limit for the book to match.
     function fillFromPoolLiquidity(
         AsyncFiller.State storage self,
         AsyncFiller.Book storage book,
         PoolKey calldata key,
         bytes32 id,
-        address maker,
         address hook,
-        uint256 protocolFee,
         uint160 sqrtPriceLimitX96
     ) public {
         AsyncFiller.OrderInfo storage info = self.orders[id];
-        // The hook has already moved the protocol's 0.01% of the input to the vault; the rest is
-        // swapped, paying the 0.02% LP fee.
-        uint256 amountIn = info.amountIn - protocolFee;
-        uint256 amountOutMin = info.amountOutMin;
         if (info.amountIn == 0) revert AsyncFiller.OrderNotFound();
-        bool zeroForOne = info.zeroForOne;
-        uint256 priorityFee = info.priorityFee;
-        // Close the order before the maker's payout, which can run recipient code.
-        AsyncFiller._remove(self, book, id);
-        delete self.orders[id];
-        uint256 amountOut = _poolFillNet(self, key, id, zeroForOne, amountIn, amountOutMin, hook, sqrtPriceLimitX96);
-        Currency output = zeroForOne ? key.currency1 : key.currency0;
-        output.take(self.poolManager, maker, amountOut, output.isAddressZero());
-        AsyncFiller.settlePriorityFee(self, key, id, maker, priorityFee, hook);
-        emit AsyncOrderLiquidityFilled(key.toId(), id, maker, amountIn, amountOut);
+        (uint256 swapped, uint256 consumed, uint256 amountOut) = _poolFillNet(self, key, id, hook, sqrtPriceLimitX96);
+        address maker = info.owner;
+        Currency output = info.zeroForOne ? key.currency1 : key.currency0;
+        if (consumed == info.amountIn) {
+            uint256 priorityFee = info.priorityFee;
+            // Close the order before the maker's payout, which can run recipient code.
+            AsyncFiller._remove(self, book, id);
+            delete self.orders[id];
+            output.take(self.poolManager, maker, amountOut, output.isAddressZero());
+            AsyncFiller.settlePriorityFee(self, key, id, maker, priorityFee, hook);
+        } else {
+            // The order stays live, so the output is credited as claims and no recipient code runs. The filled
+            // share of the priority bid is spent; a remainder below the minimum is kept for the book to match
+            // (`closeBelowMinimum` refunds what the book leaves).
+            _reduceAfterPoolFill(self, book, key, id, consumed);
+            output.take(self.poolManager, maker, amountOut, true);
+        }
+        emit AsyncOrderLiquidityFilled(key.toId(), id, maker, swapped, amountOut);
     }
 
-    /// @dev The pool fill's output less the dynamic fee (`DynamicFeeOrdering`); reverts unless it meets the minimum.
+    function _reduceAfterPoolFill(
+        AsyncFiller.State storage self,
+        AsyncFiller.Book storage book,
+        PoolKey calldata key,
+        bytes32 id,
+        uint256 consumed
+    ) private {
+        ClaimTransfers.Batch memory batch;
+        _reduceAfterMatch(self, book, key, ReductionParams(id, consumed, 0), batch, false);
+        ClaimTransfers.flush(batch, self.poolManager);
+    }
+
+    /// @notice Close a live order left below the pool minimum and return its input as claims; its unfilled
+    ///         priority bid is spent, as for a book match that leaves dust.
+    function closeBelowMinimum(
+        AsyncFiller.State storage self,
+        AsyncFiller.Book storage book,
+        PoolKey calldata key,
+        bytes32 id
+    ) public {
+        AsyncFiller.OrderInfo storage info = self.orders[id];
+        uint256 amountIn = info.amountIn;
+        if (amountIn == 0 || (info.isBuy ? amountIn : info.amountOutMin) >= book.minOrder) return;
+        address maker = info.owner;
+        Currency input = info.zeroForOne ? key.currency0 : key.currency1;
+        ClaimTransfers.Batch memory batch;
+        _reduceAfterMatch(self, book, key, ReductionParams(id, 0, 0), batch, true);
+        ClaimTransfers.credit(batch, self.poolManager, input, maker, amountIn);
+        ClaimTransfers.flush(batch, self.poolManager);
+    }
+
+    /// @dev Swap the order's input less the protocol's 0.01% (rounded up, paid to the vault), then take the dynamic
+    ///      fee (`DynamicFeeOrdering`) from the output. A swap stopped short at `sqrtPriceLimitX96` pays the 0.01% on
+    ///      what it swapped. Returns the input swapped, the input used including the 0.01%, and the net output,
+    ///      reverting unless the output meets the maker's limit on the input used.
     function _poolFillNet(
         AsyncFiller.State storage self,
         PoolKey calldata key,
         bytes32 id,
-        bool zeroForOne,
-        uint256 amountIn,
-        uint256 amountOutMin,
         address hook,
         uint160 sqrtPriceLimitX96
-    ) private returns (uint256 amountOut) {
+    ) private returns (uint256 swapped, uint256 consumed, uint256 amountOut) {
+        AsyncFiller.OrderInfo storage info = self.orders[id];
+        uint256 protocolFee = (info.amountIn + 9_999) / 10_000;
+        uint256 swapIn = info.amountIn - protocolFee;
         int24 tickBefore;
-        (amountOut, tickBefore) = _swapAgainstPool(self.poolManager, key, zeroForOne, amountIn, hook, sqrtPriceLimitX96);
-        amountOut -= DynamicFeeOrdering.charge(
-            self, key, id, zeroForOne ? key.currency1 : key.currency0, tickBefore, amountOut
-        );
-        if (amountOut < amountOutMin) revert LimitPriceNotMet();
+        (swapped, amountOut, tickBefore) =
+            _swapAgainstPool(self.poolManager, key, info.zeroForOne, swapIn, hook, sqrtPriceLimitX96);
+        // A swap stopped at the best book level pays the 0.01% on what it swapped; the book takes the rest.
+        if (swapped != swapIn) protocolFee = Math.mulDiv(protocolFee, swapped, swapIn, Math.Rounding.Ceil);
+        consumed = swapped + protocolFee;
+        amountOut -= _chargeFees(self, key, id, protocolFee, tickBefore, amountOut);
+        if (amountOut < Math.mulDiv(info.amountOutMin, consumed, info.amountIn, Math.Rounding.Ceil)) {
+            revert LimitPriceNotMet();
+        }
+    }
+
+    /// @dev Pay the 0.01% from the input's escrow to the vault and charge the dynamic fee on the output; returns
+    ///      the dynamic fee.
+    function _chargeFees(
+        AsyncFiller.State storage self,
+        PoolKey calldata key,
+        bytes32 id,
+        uint256 protocolFee,
+        int24 tickBefore,
+        uint256 amountOut
+    ) private returns (uint256) {
+        bool zeroForOne = self.orders[id].zeroForOne;
+        Currency input = zeroForOne ? key.currency0 : key.currency1;
+        self.poolManager.transfer(self.feeVault, input.toId(), protocolFee);
+        emit AsyncFiller.OrderFeeAccrued(key.toId(), id, input, protocolFee);
+        return
+            DynamicFeeOrdering.charge(self, key, id, zeroForOne ? key.currency1 : key.currency0, tickBefore, amountOut);
     }
 
     function _swapAgainstPool(
@@ -236,7 +296,7 @@ library AsyncMatching {
         uint256 amountIn,
         address hook,
         uint160 sqrtPriceLimitX96
-    ) private returns (uint256 amountOut, int24 tickBefore) {
+    ) private returns (uint256 swapped, uint256 amountOut, int24 tickBefore) {
         if (manager.getLiquidity(key.toId()) == 0) revert NoActiveLiquidity();
         Currency input = zeroForOne ? key.currency0 : key.currency1;
         input.settle(manager, hook, amountIn, true);
@@ -248,7 +308,7 @@ library AsyncMatching {
             SwapParams(
                 zeroForOne,
                 -amountIn.toInt256(),
-                // A limit (the best book level) stops the swap there; a swap that stops short reverts below.
+                // A limit (the best book level) stops the swap there.
                 sqrtPriceLimitX96 != 0
                     ? sqrtPriceLimitX96
                     : zeroForOne ? TickMath.MIN_SQRT_PRICE + 1 : TickMath.MAX_SQRT_PRICE - 1
@@ -258,8 +318,12 @@ library AsyncMatching {
         manager.updateDynamicLPFee(key, previousFee);
         int128 inputDelta = zeroForOne ? delta.amount0() : delta.amount1();
         int128 outputDelta = zeroForOne ? delta.amount1() : delta.amount0();
-        if (inputDelta != -amountIn.toInt128()) revert PartialLiquidityFill();
+        // Without a limit the whole input must be used; with one the swap may stop at it.
+        if (sqrtPriceLimitX96 == 0 && inputDelta != -amountIn.toInt128()) revert PartialLiquidityFill();
         if (outputDelta <= 0) revert LimitPriceNotMet();
+        swapped = uint256(uint128(-inputDelta));
+        // Input the swap left unused goes back into escrow as claims.
+        if (swapped < amountIn) manager.mint(hook, input.toId(), amountIn - swapped);
         amountOut = uint256(uint128(outputDelta));
     }
 
@@ -369,10 +433,11 @@ library AsyncMatching {
         ClaimTransfers.Batch memory batch
     ) private returns (uint256 sellRefund, uint256 buyRefund) {
         sellRefund = _reduceAfterMatch(
-            self, book, key, ReductionParams(sellId, amounts.assetAmount, amounts.quoteAmount), batch
+            self, book, key, ReductionParams(sellId, amounts.assetAmount, amounts.quoteAmount), batch, true
         );
-        buyRefund =
-            _reduceAfterMatch(self, book, key, ReductionParams(buyId, amounts.quoteAmount, amounts.assetAmount), batch);
+        buyRefund = _reduceAfterMatch(
+            self, book, key, ReductionParams(buyId, amounts.quoteAmount, amounts.assetAmount), batch, true
+        );
     }
 
     function _transferEscrow(
@@ -390,7 +455,8 @@ library AsyncMatching {
         AsyncFiller.Book storage book,
         PoolKey calldata key,
         ReductionParams memory params,
-        ClaimTransfers.Batch memory batch
+        ClaimTransfers.Batch memory batch,
+        bool closeDust
     ) private returns (uint256) {
         AsyncFiller.OrderInfo storage info = self.orders[params.id];
         uint256 oldInput = info.amountIn;
@@ -405,7 +471,7 @@ library AsyncMatching {
         // The order closes when its input is used up, or when what is left is worth less than the
         // pool minimum by the order's own terms (no pool price involved); the caller then returns
         // the remaining input after both reductions. Settling the unfilled bid calls no maker code.
-        if (remainingInput == 0 || (info.isBuy ? remainingInput : remainingMinimum) < book.minOrder) {
+        if (remainingInput == 0 || (closeDust && (info.isBuy ? remainingInput : remainingMinimum) < book.minOrder)) {
             _creditPriorityFee(self, key, params.id, info.owner, unfilledPriorityFee, batch);
             AsyncFiller._remove(self, book, params.id);
             delete self.orders[params.id];

@@ -15,7 +15,7 @@ import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 ///         input, a sell's minimum output, and a sell's input at the pool's current price. A partial
 ///         match that leaves less than the minimum refunds the remainder. In PriorityFee mode the
 ///         least bid is min($0.10, 0.1% of the order).
-contract MinimumOrderTest is SetupHook {
+abstract contract MinimumOrderBase is SetupHook {
     using PoolIdLibrary for PoolKey;
 
     uint256 constant MIN = 10 ether; // "$10" for this 18-decimal numeraire
@@ -23,7 +23,7 @@ contract MinimumOrderTest is SetupHook {
     address alice = makeAddr("alice");
     address bob = makeAddr("bob");
 
-    function setUp() public override {
+    function setUp() public virtual override {
         super.setUp();
         topUp(alice, 1_000 ether);
         topUp(bob, 1_000 ether);
@@ -72,24 +72,39 @@ contract MinimumOrderTest is SetupHook {
         return _orderIdFor(order.owner, order.zeroForOne, order.salt);
     }
 
+    /// @dev The 0.02% trade fee, rounded up.
+    function _fee(uint256 x) internal pure returns (uint256) {
+        return Math.mulDiv(x, 2, 10_000, Math.Rounding.Ceil);
+    }
+
+    /// @dev External hop so `vm.expectRevert` sees the Router call as one call.
+    function submitExternal(AsyncOrder memory order) external {
+        _submit(order);
+    }
+}
+
+/// @notice A hook deployed with a minimum of 10 (in numeraire units) holds every pool to it.
+contract MinimumOrderTest is MinimumOrderBase {
+    function setUp() public override {
+        hookMinOrder = MIN;
+        super.setUp();
+    }
+
     /* ------------------------------------------------------------------ admission */
 
     function test_RevertWhen_BuyBelowMinimum() public {
-        hook.setMinOrder(key, MIN);
         AsyncOrder memory bid = _order(bob, false, MIN - 1, MIN, 100_000);
         vm.expectRevert(); // the hook's revert is wrapped by the PoolManager
         this.submitExternal(bid);
     }
 
     function test_buyAtMinimum_rests() public {
-        hook.setMinOrder(key, MIN);
         AsyncOrder memory bid = _order(bob, false, MIN, MIN, 100_000);
         _submit(bid);
         assertEq(hook.asyncOrder(poolId, _id(bid)), MIN);
     }
 
     function test_RevertWhen_SellAsksBelowMinimum() public {
-        hook.setMinOrder(key, MIN);
         AsyncOrder memory ask = _order(alice, true, 100 ether, MIN - 1, 100_000);
         vm.expectRevert();
         this.submitExternal(ask);
@@ -97,21 +112,18 @@ contract MinimumOrderTest is SetupHook {
 
     /// A sell asking for plenty but offering almost nothing, at the pool's 1:1 price, is below the minimum.
     function test_RevertWhen_SellInputWorthLessThanMinimum() public {
-        hook.setMinOrder(key, MIN);
         AsyncOrder memory ask = _order(alice, true, 1, 100 ether, 100_000);
         vm.expectRevert();
         this.submitExternal(ask);
     }
 
     function test_sellAtMinimum_rests() public {
-        hook.setMinOrder(key, MIN);
         AsyncOrder memory ask = _order(alice, true, MIN, MIN, 100_000);
         _submit(ask);
         assertEq(hook.asyncOrder(poolId, _id(ask)), MIN);
     }
 
     function test_RevertWhen_UpdatePriceBelowMinimum() public {
-        hook.setMinOrder(key, MIN);
         AsyncOrder memory ask = _order(alice, true, 20 ether, 20 ether, 100_000);
         _submit(ask);
         vm.prank(alice);
@@ -123,7 +135,6 @@ contract MinimumOrderTest is SetupHook {
 
     /// The ask is matched down to 5, below the minimum of 10: the order closes and the 5 return to alice.
     function test_partialMatchRemainderBelowMinimum_refunded() public {
-        hook.setMinOrder(key, MIN);
         AsyncOrder memory ask = _order(alice, true, 15 ether, 15 ether, 100_000);
         uint256 aliceToken0Before = token0.balanceOf(alice);
         _submit(ask);
@@ -135,13 +146,7 @@ contract MinimumOrderTest is SetupHook {
     }
 
     /// The resting bid is matched down to 5 of numeraire, below the minimum: it closes and the 5 return to bob.
-    /// @dev The 0.02% trade fee, rounded up.
-    function _fee(uint256 x) internal pure returns (uint256) {
-        return Math.mulDiv(x, 2, 10_000, Math.Rounding.Ceil);
-    }
-
     function test_partialMatchBuyRemainderBelowMinimum_refunded() public {
-        hook.setMinOrder(key, MIN);
         AsyncOrder memory bid = _order(bob, false, 15 ether, 15 ether, 100_000);
         uint256 bobToken1Before = token1.balanceOf(bob);
         _submit(bid);
@@ -180,7 +185,6 @@ contract MinimumOrderTest is SetupHook {
             hooks: hook
         });
         manager.initialize(k, 2 ** 96);
-        hook.setMinOrder(k, MIN);
         asset.mint(alice, 100 ether);
         vm.startPrank(alice);
         hook.setExecutor(k.toId(), address(router), true);
@@ -214,8 +218,12 @@ contract MinimumOrderTest is SetupHook {
 
     /* ------------------------------------------------------------------ configuration */
 
-    function test_newPoolsTakeTheDefaultMinimum() public {
-        hook.setDefaultMinOrder(MIN);
+    function test_minimumIsFixedAtDeployment() public view {
+        assertEq(hook.minOrder(), MIN);
+    }
+
+    /// The bid side of a second pool is also held to the deployment minimum.
+    function test_newPoolsTakeTheHookMinimum() public {
         PoolKey memory key2 = PoolKey({
             currency0: currency0, currency1: currency1, fee: LPFeeLibrary.DYNAMIC_FEE_FLAG, tickSpacing: 2, hooks: hook
         });
@@ -228,16 +236,10 @@ contract MinimumOrderTest is SetupHook {
         vm.expectRevert();
         this.submitExternal(bid);
     }
+}
 
-    function test_RevertWhen_NonOwnerSetsMinimum() public {
-        vm.startPrank(alice);
-        vm.expectRevert(AsyncSwap.NotOwner.selector);
-        hook.setMinOrder(key, MIN);
-        vm.expectRevert(AsyncSwap.NotOwner.selector);
-        hook.setDefaultMinOrder(MIN);
-        vm.stopPrank();
-    }
-
+/// @notice With no minimum, a bid's floor is min($0.10, 0.1% of the order).
+contract MinimumOrderTieredBidTest is MinimumOrderBase {
     /* ------------------------------------------------------------------ tiered bid */
 
     /// A $50 order (6-decimal amounts) needs a bid of 0.1%, $0.05, not the full $0.10.
@@ -262,16 +264,6 @@ contract MinimumOrderTest is SetupHook {
         (, uint256 minimum) = hook.asyncOrderInfo(poolId, _id(ask));
         assertEq(minimum, 100e6);
         assertEq(hook.asyncOrderPriorityFee(poolId, _id(ask)), 0);
-    }
-
-    /// A $10 sell holds a $0.01 bid; repricing it to $1,000 needs the full $0.10.
-    function test_RevertWhen_updatePrice_raisesSellBidFloor_withMinimum() public {
-        hook.setMinOrder(key, 10e6);
-        AsyncOrder memory ask = _order(alice, true, 1_000e6, 10e6, 10_000);
-        _submit(ask);
-        vm.prank(alice);
-        vm.expectRevert(AsyncFiller.PriorityFeeTooSmall.selector);
-        hook.updatePrice(ask, 1_000e6);
     }
 
     function test_updatePrice_withinSellBidFloor() public {
@@ -310,9 +302,21 @@ contract MinimumOrderTest is SetupHook {
         (, uint256 out) = hook.asyncOrderInfo(poolId, _id(bid));
         assertEq(out, 1_000e6);
     }
+}
 
-    /// @dev External hop so `vm.expectRevert` sees the Router call as one call.
-    function submitExternal(AsyncOrder memory order) external {
-        _submit(order);
+/// @notice A $10 minimum does not stop the sell bid floor from applying on a reprice.
+contract MinimumOrderBidFloorTest is MinimumOrderBase {
+    function setUp() public override {
+        hookMinOrder = 10e6;
+        super.setUp();
+    }
+
+    /// A $10 sell holds a $0.01 bid; repricing it to $1,000 needs the full $0.10.
+    function test_RevertWhen_updatePrice_raisesSellBidFloor_withMinimum() public {
+        AsyncOrder memory ask = _order(alice, true, 1_000e6, 10e6, 10_000);
+        _submit(ask);
+        vm.prank(alice);
+        vm.expectRevert(AsyncFiller.PriorityFeeTooSmall.selector);
+        hook.updatePrice(ask, 1_000e6);
     }
 }

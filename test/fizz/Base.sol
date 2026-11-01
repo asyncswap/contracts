@@ -49,8 +49,10 @@ contract AsyncSwapDeployer {
 
     constructor(IPoolManager manager, Currency numeraire, address owner) {
         address predictedRouter = _createAddress(address(this), 2);
-        bytes memory initCode =
-            abi.encodePacked(type(AsyncSwap).creationCode, abi.encode(manager, numeraire, owner, predictedRouter));
+        bytes memory initCode = abi.encodePacked(
+            type(AsyncSwap).creationCode,
+            abi.encode(manager, numeraire, owner, predictedRouter, uint256(0), uint64(100_000))
+        );
         bytes32 initCodeHash = keccak256(initCode);
         uint256 salt;
         while (uint160(_create2Address(salt, initCodeHash)) & MASK != FLAGS) {

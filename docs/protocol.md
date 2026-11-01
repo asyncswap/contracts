@@ -15,7 +15,7 @@ flowchart LR
         Relayer["Relayer<br/>(submits signed orders)"]
         Keeper["Anyone<br/>(matchBook, fillFromPoolLiquidity)"]
         LP["v4 LP<br/>(adds range liquidity)"]
-        Owner["Protocol owner<br/>(FeeVault.collect, sweep, minimum order size)"]
+        Owner["Protocol owner<br/>(FeeVault.collect, sweep)"]
     end
 
     subgraph Periphery
@@ -42,7 +42,7 @@ flowchart LR
     Keeper -->|matchBook, fillFromPoolLiquidity| Router
     LP -->|modifyLiquidity| PM
     Owner -->|collect| Vault
-    Owner -->|sweep, setMinOrder| Hook
+    Owner -->|sweep| Hook
 
     Router -->|unlock → unlockCallback| PM
     Router -->|signed input| Permit2
@@ -236,7 +236,7 @@ flowchart LR
     subgraph OwnerRights["Protocol owner (two-step transfer)"]
         o1["FeeVault.collect(currency, recipient)"]
         o2["sweep(currency, to) — hook's raw balance only"]
-        o3["setMinOrder(key, minimum), setDefaultMinOrder(minimum)"]
+        o3["minimum order and bid cap: fixed at deployment, no setter"]
         o4["no pause, no upgrade, no access to escrow"]
     end
     subgraph Public["Anyone"]

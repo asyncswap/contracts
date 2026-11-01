@@ -22,6 +22,9 @@ contract SetupHook is Test {
     using PoolIdLibrary for PoolKey;
 
     address owner = makeAddr("deployer");
+    /// @dev Constructor parameters for `_deployHook`: a suite sets them before `super.setUp()`.
+    uint256 hookMinOrder;
+    uint64 hookPriorityFeeCap = 100_000;
     IPoolManager manager;
     AsyncSwap hook;
     Router router;
@@ -78,7 +81,11 @@ contract SetupHook is Test {
 
     /// @dev Deploys the hook with `router` as its one trusted swap caller: `_deployRouter` runs first.
     function _deployHook() internal {
-        deployCodeTo("AsyncSwap.sol", abi.encode(manager, currency1, address(this), address(router)), _hookAddress());
+        deployCodeTo(
+            "AsyncSwap.sol",
+            abi.encode(manager, currency1, address(this), address(router), hookMinOrder, hookPriorityFeeCap),
+            _hookAddress()
+        );
         hook = AsyncSwap(payable(_hookAddress()));
     }
 

@@ -65,11 +65,12 @@ contract AsyncSwap is BaseHook, EIP712 {
     /// @notice Unordered nonces consumed by signed maker actions (`setExecutorWithSig`, `updatePriceWithSig`).
     mapping(address maker => mapping(uint256 nonce => bool)) public nonceUsed;
 
-    /// @notice Minimum order, in numeraire base units, that pools initialized from now on start with.
-    uint256 public defaultMinOrder;
+    /// @notice Minimum order in numeraire base units (0: none), fixed at deployment for every pool so the
+    ///         owner cannot change the rules under live orders.
+    uint256 public immutable minOrder;
 
-    /// @notice $0.10 priority-bid cap in numeraire base units for pools initialized from now on.
-    uint64 public defaultPriorityFeeCap = 100_000;
+    /// @notice $0.10 priority-bid cap in numeraire base units, fixed at deployment for every pool.
+    uint64 public immutable priorityFeeCap;
 
     /// @notice Pool-level swap-event mirror; bytes32 poolId for indexer compatibility.
     /// @dev    See https://github.com/OpenZeppelin/uniswap-hooks BaseAsyncSwap for the source pattern.
@@ -181,14 +182,23 @@ contract AsyncSwap is BaseHook, EIP712 {
     ///               constructor from the deterministic deployer, which could never act as owner.
     /// @param _router The Router, deployed after the hook (it takes the hook in its constructor): pass its
     ///                predicted address.
-    constructor(IPoolManager _poolManager, Currency _numeraire, address _owner, address _router)
-        BaseHook(_poolManager)
-        EIP712("AsyncSwap", "1")
-    {
+    /// @param _minOrder Minimum order in numeraire base units (0: none).
+    /// @param _priorityFeeCap $0.10 in numeraire base units: the most a priority-bid floor can require.
+    constructor(
+        IPoolManager _poolManager,
+        Currency _numeraire,
+        address _owner,
+        address _router,
+        uint256 _minOrder,
+        uint64 _priorityFeeCap
+    ) BaseHook(_poolManager) EIP712("AsyncSwap", "1") {
         if (Currency.unwrap(_numeraire).code.length == 0) revert InvalidNumeraire();
         if (_owner == address(0) || _router == address(0)) revert ZeroAddress();
+        if (_priorityFeeCap == 0) revert InvalidPriorityFeeCap();
         numeraire = _numeraire;
         router = _router;
+        minOrder = _minOrder;
+        priorityFeeCap = _priorityFeeCap;
         owner = _owner;
         feeVault = new FeeVault(_poolManager);
         emit OwnershipTransferred(address(0), _owner);
@@ -238,8 +248,8 @@ contract AsyncSwap is BaseHook, EIP712 {
         asyncOrders[key.toId()].poolManager = poolManager;
         asyncOrders[key.toId()].numeraire = numeraire;
         asyncOrders[key.toId()].feeVault = address(feeVault);
-        priceBooks[key.toId()].minOrder = defaultMinOrder;
-        priceBooks[key.toId()].priorityFeeCap = defaultPriorityFeeCap;
+        priceBooks[key.toId()].minOrder = minOrder;
+        priceBooks[key.toId()].priorityFeeCap = priorityFeeCap;
         return this.beforeInitialize.selector;
     }
 
@@ -292,32 +302,6 @@ contract AsyncSwap is BaseHook, EIP712 {
     /// @notice The priority bid an order escrowed when it was created.
     function asyncOrderPriorityFee(PoolId poolId, bytes32 orderId) external view returns (uint256) {
         return asyncOrders[poolId].orders[orderId].priorityFee;
-    }
-
-    /// TODO make this configurable in constructor instead of
-    ///      allowing the  owner to change it as they want.
-    /// @notice Set a pool's minimum order, in numeraire base units (0: none).
-    function setMinOrder(PoolKey calldata key, uint256 minimum) external onlyOwner {
-        AsyncFiller.setMinOrder(priceBooks[key.toId()], key.toId(), minimum);
-    }
-
-    /// TODO make this configurable in constructor instead of
-    ///      allowing the  owner to change it as they want.
-    /// @notice Set the minimum order new pools start with.
-    function setDefaultMinOrder(uint256 minimum) external onlyOwner {
-        defaultMinOrder = minimum;
-    }
-
-    /// @notice Set the $0.10 priority-bid cap for new pools in numeraire base units.
-    function setDefaultPriorityFeeCap(uint64 cap) external onlyOwner {
-        if (cap == 0) revert InvalidPriorityFeeCap();
-        defaultPriorityFeeCap = cap;
-    }
-
-    /// @notice Correct an initialized pool's cap when its numeraire has a different decimal scale.
-    function setPriorityFeeCap(PoolKey calldata key, uint64 cap) external onlyOwner {
-        if (cap == 0) revert InvalidPriorityFeeCap();
-        priceBooks[key.toId()].priorityFeeCap = cap;
     }
 
     /// @notice Return the best live limit order for a pool side. `isBuy` is true

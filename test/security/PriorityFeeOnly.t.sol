@@ -51,13 +51,11 @@ contract BidSkippingExecutor {
     }
 }
 
-/// @notice Every pool orders equal prices by paid bid, then time; zero bids are valid and retain
-///         time priority behind paid bids.
-contract PriorityFeeOnlyTest is SetupHook {
+abstract contract PriorityFeeOnlyBase is SetupHook {
     address alice = makeAddr("alice");
     address bob = makeAddr("bob");
 
-    function setUp() public override {
+    function setUp() public virtual override {
         super.setUp();
         topUp(alice, 1_000 ether);
         topUp(bob, 1_000 ether);
@@ -98,7 +96,11 @@ contract PriorityFeeOnlyTest is SetupHook {
     function submitExternal(AsyncOrder memory order) external {
         _submit(order);
     }
+}
 
+/// @notice Every pool orders equal prices by paid bid, then time; zero bids are valid and retain
+///         time priority behind paid bids.
+contract PriorityFeeOnlyTest is PriorityFeeOnlyBase {
     /// A pool nobody configured accepts a zero bid without any USDC allowance.
     function test_newPoolOrderCanHaveNoBid() public {
         AsyncOrder memory noBid = _ask(alice, 0);
@@ -107,18 +109,6 @@ contract PriorityFeeOnlyTest is SetupHook {
         assertEq(hook.asyncOrder(poolId, id), noBid.amountIn);
         assertEq(hook.asyncOrderPriorityFee(poolId, id), 0);
         assertEq(manager.balanceOf(address(hook), currency1.toId()), 0);
-    }
-
-    function test_18DecimalNumeraireUsesScaledOptionalBidFloor() public {
-        hook.setPriorityFeeCap(key, 0.1 ether);
-        AsyncOrder memory order = _ask(alice, 100_000);
-        order.amountIn = 100 ether;
-        order.amountOutMin = 100 ether;
-        vm.expectRevert();
-        this.submitExternal(order);
-
-        order.priorityFee = 0.1 ether;
-        _submit(order);
     }
 
     function test_zeroBidsKeepTimePriorityAndAllowRepricing() public {
@@ -151,7 +141,9 @@ contract PriorityFeeOnlyTest is SetupHook {
         h = AsyncSwap(payable(at));
         k = PoolKey(key.currency0, key.currency1, key.fee, key.tickSpacing, h);
         e = new BidSkippingExecutor(manager, h, k);
-        deployCodeTo("AsyncSwap.sol", abi.encode(manager, currency1, address(this), address(e)), at);
+        deployCodeTo(
+            "AsyncSwap.sol", abi.encode(manager, currency1, address(this), address(e), uint256(0), uint64(100_000)), at
+        );
         manager.initialize(k, 2 ** 96);
         topUp(address(e), 10 ether);
     }
@@ -197,5 +189,25 @@ contract PriorityFeeOnlyTest is SetupHook {
                 abi.encodeWithSignature("setOrderingMode((address,address,uint24,int24,address),uint8)", key, uint8(0))
             );
         assertFalse(ok, "setOrderingMode still exists");
+    }
+}
+
+/// @notice A hook deployed for an 18-decimal numeraire scales its $0.10 bid cap to 0.1 ether.
+contract PriorityFeeCap18DecimalTest is PriorityFeeOnlyBase {
+    function setUp() public override {
+        hookPriorityFeeCap = 0.1 ether;
+        super.setUp();
+    }
+
+    function test_18DecimalNumeraireUsesScaledOptionalBidFloor() public {
+        assertEq(hook.priorityFeeCap(), 0.1 ether);
+        AsyncOrder memory order = _ask(alice, 100_000);
+        order.amountIn = 100 ether;
+        order.amountOutMin = 100 ether;
+        vm.expectRevert();
+        this.submitExternal(order);
+
+        order.priorityFee = 0.1 ether;
+        _submit(order);
     }
 }

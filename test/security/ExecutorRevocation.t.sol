@@ -3,7 +3,6 @@ pragma solidity ^0.8.26;
 
 import {SetupHook} from "../SetupHook.t.sol";
 import {AsyncSwap} from "@async-swap/AsyncSwap.sol";
-import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {MockERC20} from "../utils/MockERC20.sol";
 
@@ -128,16 +127,5 @@ contract ExecutorRevocationTest is SetupHook {
         vm.stopPrank();
         assertEq(hook.asyncOrder(poolId, _id(ask)), 0, "carol filled");
         assertGt(token0.balanceOf(carol), 0, "carol received the maker's input");
-    }
-
-    /// The owner raising a pool's minimum blocks reprices of orders that were valid when placed.
-    function test_RevertWhen_OwnerRaisesMinimumAboveLiveOrder() public {
-        AsyncOrder memory ask = _order(alice, true, 5 ether, 5 ether);
-        _submit(ask);
-
-        hook.setMinOrder(key, 10 ether);
-        vm.prank(alice);
-        vm.expectRevert(AsyncFiller.BelowMinimumOrder.selector);
-        hook.updatePrice(ask, 6 ether);
     }
 }

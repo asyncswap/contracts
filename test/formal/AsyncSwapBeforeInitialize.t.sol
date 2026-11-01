@@ -84,7 +84,7 @@ contract AsyncSwapBeforeInitializeFormalTest is FormalBase {
 
     /// @dev Assert the post-state the theorem names: the three fields of `asyncOrders[key.toId()]`
     ///      hold (poolManager, numeraire, feeVault), the pool's minimum order is the hook's
-    ///      `defaultMinOrder`, and these four slots are the only hook writes.
+    ///      `minOrder`, and these four slots are the only hook writes.
     function _assertWrites(PoolKey memory k) internal {
         (, bytes32[] memory writes) = vm.accesses(address(hook));
         uint256 b = _base(k);
@@ -97,8 +97,8 @@ contract AsyncSwapBeforeInitializeFormalTest is FormalBase {
                 "write outside asyncOrders[id].{pm,num,vault}, minOrder, priority cap"
             );
         }
-        assertEq(uint256(_loadHook(bytes32(m))), hook.defaultMinOrder(), "minOrder := defaultMinOrder");
-        assertEq(uint64(uint256(_loadHook(bytes32(p))) >> 128), hook.defaultPriorityFeeCap(), "priority cap");
+        assertEq(uint256(_loadHook(bytes32(m))), hook.minOrder(), "minOrder := hook.minOrder");
+        assertEq(uint64(uint256(_loadHook(bytes32(p))) >> 128), hook.priorityFeeCap(), "priority cap");
         assertEq(address(uint160(uint256(_loadHook(bytes32(b))))), address(manager), "poolManager");
         assertEq(address(uint160(uint256(_loadHook(bytes32(b + 1))))), _num(), "numeraire");
         assertEq(address(uint160(uint256(_loadHook(bytes32(b + 2))))), address(hook.feeVault()), "feeVault");

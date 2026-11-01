@@ -477,7 +477,9 @@ contract PoolLiquidityFillSixDecimalTest is Test {
         router = new Router(manager, AsyncSwap(payable(address(flags))), ISignatureTransfer(Permit2Bytecode.PERMIT2));
         deployCodeTo(
             "AsyncSwap.sol",
-            abi.encode(manager, Currency.wrap(address(usdc)), address(this), address(router)),
+            abi.encode(
+                manager, Currency.wrap(address(usdc)), address(this), address(router), uint256(0), uint64(100_000)
+            ),
             address(flags)
         );
         hook = AsyncSwap(payable(address(flags)));

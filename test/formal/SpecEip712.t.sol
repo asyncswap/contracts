@@ -423,7 +423,6 @@ contract RouterSpecEip712FormalTest is SpecEip712DomainChecks {
 ///         checked by `test/formal/AsyncSwapConstructor.t.sol`.
 contract AsyncSwapCtorSpecFormalTest is SpecEip712Constants, FormalImmutablesC {
     uint256 constant OWNER_SLOT = 4;
-    uint256 constant DEFAULT_PRIORITY_CAP_SLOT = 8;
 
     IPoolManager manager;
     MockERC20 usdc;
@@ -448,13 +447,9 @@ contract AsyncSwapCtorSpecFormalTest is SpecEip712Constants, FormalImmutablesC {
         h = new CtorHarness(IPoolManager(pm), Currency.wrap(num), owner_, address(0xCAFE));
         (, bytes32[] memory writes) = vm.accesses(address(h));
         for (uint256 i; i < writes.length; i++) {
-            assertTrue(
-                writes[i] == bytes32(OWNER_SLOT) || writes[i] == bytes32(DEFAULT_PRIORITY_CAP_SLOT),
-                "storage: owner and default priority cap are written"
-            );
+            assertEq(writes[i], bytes32(OWNER_SLOT), "storage: only owner is written");
         }
         assertEq(vm.load(address(h), bytes32(OWNER_SLOT)), bytes32(uint256(uint160(owner_))), "owner := _owner");
-        assertEq(uint256(vm.load(address(h), bytes32(DEFAULT_PRIORITY_CAP_SLOT))), 100_000, "default priority cap");
     }
 
     function _sep(bytes32 hn, bytes32 hv, uint256 chainId, address self) internal pure returns (bytes32) {
@@ -475,7 +470,9 @@ contract AsyncSwapCtorSpecFormalTest is SpecEip712Constants, FormalImmutablesC {
         assertEq(Currency.unwrap(h.numeraire()), _withCode(which), "numeraire");
         assertEq(h.router(), address(0xCAFE), "router");
         bytes32 sep = _sep(HASH_ASYNCSWAP, HASH_ONE, block.chainid, self);
-        bytes32[] memory expected = new bytes32[](11);
+        assertEq(h.minOrder(), 0, "minOrder");
+        assertEq(h.priorityFeeCap(), 100_000, "priorityFeeCap");
+        bytes32[] memory expected = new bytes32[](12);
         expected[0] = bytes32(uint256(uint160(pm)));
         expected[1] = bytes32(uint256(uint160(_withCode(which))));
         expected[2] = bytes32(uint256(uint160(vault)));
@@ -487,6 +484,7 @@ contract AsyncSwapCtorSpecFormalTest is SpecEip712Constants, FormalImmutablesC {
         expected[8] = bytes32(uint256(uint160(self)));
         expected[9] = sep;
         expected[10] = bytes32(uint256(uint160(address(0xCAFE))));
+        expected[11] = bytes32(uint256(100_000)); // priorityFeeCap; the harness's zero minOrder is invisible
         _assertImmutables(_immutables("AsyncSwapConstructor.t.sol:CtorHarness", self), expected);
         assertEq(h.domainSeparatorV4(), sep, "cached separator in the deployment environment");
     }

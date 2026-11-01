@@ -124,7 +124,6 @@ library AsyncFiller {
     event OrderFeeAccrued(PoolId indexed poolId, bytes32 indexed orderId, Currency indexed currency, uint256 amount);
     event PriorityFeeDonated(PoolId indexed poolId, bytes32 indexed orderId, address indexed maker, uint256 amount);
     event PriorityFeeForfeited(PoolId indexed poolId, bytes32 indexed orderId, address indexed maker, uint256 amount);
-    event MinOrderSet(PoolId indexed poolId, uint256 minOrder);
 
     error OrderAlreadyExists();
     error OrderNotFound();
@@ -220,11 +219,6 @@ library AsyncFiller {
             ? Math.mulDiv(Math.mulDiv(amountIn, sqrtPriceX96, 2 ** 96), sqrtPriceX96, 2 ** 96)
             : Math.mulDiv(Math.mulDiv(amountIn, 2 ** 96, sqrtPriceX96), 2 ** 96, sqrtPriceX96);
         if (value < minimum) revert BelowMinimumOrder();
-    }
-
-    function setMinOrder(Book storage book, PoolId poolId, uint256 minimum) internal {
-        book.minOrder = minimum;
-        emit MinOrderSet(poolId, minimum);
     }
 
     function settlePriorityFee(

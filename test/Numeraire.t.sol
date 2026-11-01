@@ -22,8 +22,8 @@ import {PoolIdLibrary} from "v4-core/types/PoolId.sol";
 
 /// @dev Only bypasses permission-address mining for constructor rejection tests.
 contract NumeraireConstructorHarness is AsyncSwap {
-    constructor(IPoolManager manager, Currency quote, address owner_, address router_)
-        AsyncSwap(manager, quote, owner_, router_)
+    constructor(IPoolManager manager, Currency quote, address owner_, address router_, uint64 cap)
+        AsyncSwap(manager, quote, owner_, router_, 0, cap)
     {}
 
     function validateHookAddress(BaseHook) internal pure override {}
@@ -51,7 +51,9 @@ contract NumeraireTest is Test {
         router = new Router(manager, AsyncSwap(payable(address(flags))), ISignatureTransfer(Permit2Bytecode.PERMIT2));
         deployCodeTo(
             "AsyncSwap.sol",
-            abi.encode(manager, Currency.wrap(address(usdc)), address(this), address(router)),
+            abi.encode(
+                manager, Currency.wrap(address(usdc)), address(this), address(router), uint256(0), uint64(100_000)
+            ),
             address(flags)
         );
         hook = AsyncSwap(payable(address(flags)));
@@ -80,27 +82,41 @@ contract NumeraireTest is Test {
 
     function test_rejectZeroNumeraire() public {
         vm.expectRevert(AsyncSwap.InvalidNumeraire.selector);
-        new NumeraireConstructorHarness(manager, Currency.wrap(address(0)), address(this), address(0xCAFE));
+        new NumeraireConstructorHarness(manager, Currency.wrap(address(0)), address(this), address(0xCAFE), 100_000);
     }
 
     function test_rejectNonContractNumeraire() public {
         vm.expectRevert(AsyncSwap.InvalidNumeraire.selector);
-        new NumeraireConstructorHarness(manager, Currency.wrap(makeAddr("not a token")), address(this), address(0xCAFE));
+        new NumeraireConstructorHarness(
+            manager, Currency.wrap(makeAddr("not a token")), address(this), address(0xCAFE), 100_000
+        );
     }
 
     /// @dev CREATE2 deployments run the constructor from the deterministic deployer, so the owner
     ///      must come from the argument, never from `msg.sender`.
     function test_ownerIsExplicitArgumentNotDeployer() public {
         address protocolOwner = makeAddr("protocol owner");
-        AsyncSwap h =
-            new NumeraireConstructorHarness(manager, Currency.wrap(address(usdc)), protocolOwner, address(0xCAFE));
+        AsyncSwap h = new NumeraireConstructorHarness(
+            manager, Currency.wrap(address(usdc)), protocolOwner, address(0xCAFE), 100_000
+        );
         assertEq(h.owner(), protocolOwner);
         assertTrue(h.owner() != address(this));
     }
 
     function test_rejectZeroOwner() public {
         vm.expectRevert(AsyncSwap.ZeroAddress.selector);
-        new NumeraireConstructorHarness(manager, Currency.wrap(address(usdc)), address(0), address(0xCAFE));
+        new NumeraireConstructorHarness(manager, Currency.wrap(address(usdc)), address(0), address(0xCAFE), 100_000);
+    }
+
+    function test_rejectZeroPriorityFeeCap() public {
+        vm.expectRevert(AsyncSwap.InvalidPriorityFeeCap.selector);
+        new NumeraireConstructorHarness(manager, Currency.wrap(address(usdc)), address(this), address(0xCAFE), 0);
+    }
+
+    /// The minimum order and bid cap are immutables: no owner call can change them for any pool.
+    function test_poolParametersFixedAtDeployment() public view {
+        assertEq(hook.minOrder(), 0);
+        assertEq(hook.priorityFeeCap(), 100_000);
     }
 
     function test_acceptNumeraireOnEitherSortedSide() public {

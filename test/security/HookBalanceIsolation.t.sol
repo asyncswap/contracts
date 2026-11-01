@@ -74,7 +74,9 @@ contract HookBalanceIsolationTest is Test {
         // The worst case: the self-executing maker is the hook's one trusted swap caller.
         SelfExecutingMaker d = new SelfExecutingMaker(manager, hook, key);
         deployCodeTo(
-            "AsyncSwap.sol", abi.encode(manager, Currency.wrap(address(t1)), address(this), address(d)), address(flags)
+            "AsyncSwap.sol",
+            abi.encode(manager, Currency.wrap(address(t1)), address(this), address(d), uint256(0), uint64(100_000)),
+            address(flags)
         );
         manager.initialize(key, 2 ** 96);
 

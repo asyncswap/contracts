@@ -13,7 +13,7 @@ import {Currency} from "v4-core/types/Currency.sol";
 ///      exposes the internal `_domainSeparatorV4`.
 contract CtorHarness is AsyncSwap {
     constructor(IPoolManager manager, Currency quote, address owner_, address router_)
-        AsyncSwap(manager, quote, owner_, router_)
+        AsyncSwap(manager, quote, owner_, router_, 0, 100_000)
     {}
 
     function validateHookAddress(BaseHook) internal pure override {}
@@ -32,7 +32,6 @@ contract AsyncSwapConstructorFormalTest is Test {
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
     uint256 constant OWNER_SLOT = 4;
     uint256 constant PENDING_OWNER_SLOT = 5;
-    uint256 constant DEFAULT_PRIORITY_CAP_SLOT = 8;
 
     IPoolManager manager;
     MockERC20 usdc;
@@ -113,13 +112,9 @@ contract AsyncSwapConstructorFormalTest is Test {
         (, bytes32[] memory writes) = vm.accesses(a);
         assertGt(writes.length, 0, "owner is written");
         for (uint256 i; i < writes.length; i++) {
-            assertTrue(
-                writes[i] == bytes32(OWNER_SLOT) || writes[i] == bytes32(DEFAULT_PRIORITY_CAP_SLOT),
-                "only owner and default priority cap are written"
-            );
+            assertEq(writes[i], bytes32(OWNER_SLOT), "only owner is written");
         }
         assertEq(vm.load(a, bytes32(OWNER_SLOT)), bytes32(uint256(uint160(owner_))), "owner := _owner");
-        assertEq(uint256(vm.load(a, bytes32(DEFAULT_PRIORITY_CAP_SLOT))), 100_000, "default priority cap");
     }
 
     /// @notice formal/Refinement/Swarm/AsyncSwapConstructor.lean:104 — from fresh storage, the deployed state is

@@ -177,7 +177,11 @@ contract FeeCollectTest is Test {
                 | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
         );
         router = new Router(manager, AsyncSwap(payable(address(flags))), ISignatureTransfer(Permit2Bytecode.PERMIT2));
-        deployCodeTo("AsyncSwap.sol", abi.encode(manager, tok, address(this), address(router)), address(flags));
+        deployCodeTo(
+            "AsyncSwap.sol",
+            abi.encode(manager, tok, address(this), address(router), uint256(0), uint64(100_000)),
+            address(flags)
+        );
         hook = AsyncSwap(payable(address(flags)));
         vault = hook.feeVault();
         key = PoolKey({currency0: eth, currency1: tok, fee: LPFeeLibrary.DYNAMIC_FEE_FLAG, tickSpacing: 1, hooks: hook});

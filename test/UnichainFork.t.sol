@@ -47,7 +47,11 @@ contract UnichainForkTest is Test {
         address fixture = address((uint160(0xA5) << 152) | flags);
         assertEq(fixture.code.length, 0, "fixture address occupied");
         router = new Router(MANAGER, AsyncSwap(payable(address(fixture))), ISignatureTransfer(PERMIT2));
-        deployCodeTo("AsyncSwap.sol", abi.encode(MANAGER, Currency.wrap(USDC), address(this), address(router)), fixture);
+        deployCodeTo(
+            "AsyncSwap.sol",
+            abi.encode(MANAGER, Currency.wrap(USDC), address(this), address(router), uint256(0), uint64(100_000)),
+            fixture
+        );
         hook = AsyncSwap(payable(fixture));
         key = PoolKey(Currency.wrap(address(0)), Currency.wrap(USDC), LPFeeLibrary.DYNAMIC_FEE_FLAG, 1, hook);
         MANAGER.initialize(key, SQRT_PRICE);

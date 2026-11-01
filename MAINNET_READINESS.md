@@ -68,10 +68,10 @@ script. The local demo deploys a new mock-USDC market; it is not a mainnet liqui
   Source: <https://developers.uniswap.org/docs/protocols/v4/deployments>
 - USDC: `0x078D782b760474a361dDA0AF3839290b0EF57AD6`. Revalidate issuer address and decimals in the final
   rehearsal.
-- Runtime sizes (`forge build --sizes`, `optimizer_runs = 10_000`, 2026-11-01, `main` at `81ba6b8`):
-  AsyncSwap 23,288 bytes, AsyncMatching 22,626, Router 21,860, FeeVault 2,320, TokenClaims 2,110,
+- Runtime sizes (`forge build --sizes`, `optimizer_runs = 10_000`, 2026-11-01, after the M-01 and L-02 fixes):
+  AsyncSwap 23,355 bytes, AsyncMatching 22,626, Router 21,631, FeeVault 2,320, TokenClaims 2,110,
   NativeClaims 1,964. All under the 24,576-byte EIP-170 limit, but the margins are thin: the hook has
-  1,288 bytes left (down from 5,339 on 2026-10-23), AsyncMatching 1,950 and Router 2,716. Budget audit
+  1,221 bytes left (down from 5,339 on 2026-10-23), AsyncMatching 1,950 and Router 2,945. Budget audit
   fixes against those margins, prefer moving logic into linked libraries over growing the hook, and
   recheck after every change.
 - The deployment wrapper checks library code presence, not exact runtime identity. Pin and verify the

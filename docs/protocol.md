@@ -76,7 +76,8 @@ dynamic-fee flag (`beforeInitialize`). Every order must meet two floors, both fi
 - **Asset floor**, on the asset leg (a sell's input, a buy's minimum output): at least 0.0001 of a whole
   token, `10^(decimals - assetPrecision)` base units with the deployed precision of 4. The hook reads
   the asset's `decimals()` once when the pool opens (native ETH counts as 18; a token without
-  `decimals()` gets a 1-unit floor). This blocks literal dust such as 1-wei sells; it limits quantity,
+  `decimals()` gets a 1-unit floor). An asset address with no code is rejected, so nobody can open a
+  pool before its token exists and pin that floor at 1 unit. This blocks literal dust such as 1-wei sells; it limits quantity,
   not value.
 
 Neither floor, nor the $0.10 priority-bid cap (`10^(decimals - 1)` of the numeraire), has a setter: the
@@ -209,7 +210,8 @@ sequenceDiagram
 Signed orders follow the same path through `swapWithSig`. The maker signs one Permit2
 `PermitWitnessTransferFrom` whose witness is `OrderSignatures.hashOrder(order)`, so the signature
 both moves the input and commits to the order. A relayer can also attach a signed `SetExecutor` grant
-for the maker's first order on a pool.
+for the maker's first order on a pool. A supplied grant is always applied and its nonce spent, so it
+cannot be replayed to re-authorize the Router after the maker revokes it.
 
 ## 4. Everything after placement
 

@@ -47,7 +47,7 @@ sequenceDiagram
     Router->>PM: swap(exact input, hook data)
     PM->>Hook: beforeSwap(...)
     Hook->>PM: mint input escrow claims to hook
-    Hook->>Match: Validate and add order to price book
+    Hook->>Match: Check pool minimum (USDC leg) and asset floor, add order to price book
     Match->>PM: mint bid escrow claims to hook, hook owes bid
     Match-->>Hook: Order recorded
     Note over Hook,Match: AsyncOrderCreated event, order is not matched until input and bid funding finish.
@@ -84,8 +84,8 @@ sequenceDiagram
     Match-->>Hook: Matched pair count
     opt Incoming order still has a remainder
         Hook->>Hook: External self-call fillOrderFromPoolLiquidity(order, id)
+        Hook->>PM: transfer 0.01% of the input claims to FeeVault (protocol fee)
         Hook->>Match: fillFromPoolLiquidity(...)
-        Hook->>Vault: Credit 0.01% of the input as protocol fee claims
         Match->>PM: Burn the rest of the input claims, temporarily set 0.02% LP fee
         Match->>PM: swap(remaining exact input)
         Note over Hook,PM: Hook-originated swap skips this hook's callbacks, it does not create another order.
@@ -139,14 +139,15 @@ sequenceDiagram
         Note over Caller,Hook: Native output requires exact gross ETH, forwarded by Router to hook before unlock.<br/>ERC-20 output requires filler approval to Router.
         Router->>PM: unlock(fill action)
         PM->>Router: unlockCallback(data)
-        Router->>Hook: Read live minimum and surcharge (calculatePoolFee, zero)
-        Hook-->>Router: Live minimum
-        Router->>Router: Require the minimum no greater than maxPrice
+        Router->>Hook: Read live input, minimum and surcharge (calculatePoolFee, zero)
+        Hook-->>Router: Live input and minimum
+        Router->>Router: Require live input at least order.amountIn and the minimum no greater than maxPrice
         opt ERC-20 output
             Router->>PM: sync(output token)
             Router->>Token: transferFrom(filler, PoolManager, gross output)
             Token-->>Router: Transfer succeeds
             Router->>PM: settleFor(hook)
+            Router->>Hook: Re-read the order, revert if it changed during the transfer
         end
         Router->>Hook: executeOrder(order, filler)
         Hook->>Match: fill(...), validate executor and open order
@@ -195,15 +196,26 @@ sequenceDiagram
         Router->>PM: unlock(cancel action)
         PM->>Router: unlockCallback(data)
         Router->>Hook: cancelOrder(order)
-        Hook->>Match: Validate executor, remove open order
+        Hook->>Match: Validate owner or executor, remove open order
         Match->>PM: Burn input claims and return remaining input
         PM-->>Maker: ERC-20 refund or native claims
-        Match->>PM: Settle non-refundable remaining bid to LPs or FeeVault
+        Match->>PM: Settle non-refundable remaining bid to FeeVault
         Match-->>Hook: AsyncOrderCancelled event
         Hook-->>Router: Cancellation complete
         Router-->>PM: Callback complete
         PM-->>Router: Unlock complete
         Router-->>Maker: Transaction succeeds
+    else Maker batches cancels and a withdrawal
+        Maker->>Router: multicall([cancelOrder(a), cancelOrder(b), withdrawClaims(currencies, amounts)])
+        loop Each call, run by the Router as the maker
+            Router->>PM: unlock(that call's action)
+            PM->>Router: unlockCallback(data)
+            Router->>Hook: cancelOrder(order), as in the cancel above
+            Router->>PM: or burn(maker, claim ID, amount) and take(currency, maker, amount)
+            Router-->>PM: Callback complete
+        end
+        PM-->>Maker: Refunds and withdrawn claims
+        Router-->>Maker: Transaction succeeds, or every call reverts together
     end
 ```
 
@@ -221,6 +233,7 @@ sequenceDiagram
     actor LP as Liquidity provider
     actor Holder as Claim holder
     participant LM as v4 liquidity manager
+    participant Router
     participant Hook as AsyncSwap hook
     participant PM as PoolManager
     participant Native as NativeClaims
@@ -271,6 +284,17 @@ sequenceDiagram
     Tokens-->>PM: Callback complete, ClaimsRedeemed event
     PM-->>Tokens: Unlock complete
     Tokens-->>Holder: Redemption complete
+
+    Holder->>PM: approve(Router, each claim ID, exact amount)
+    PM-->>Holder: Claim allowances recorded
+    Holder->>Router: withdrawClaims(currencies, amounts), up to 16 distinct currencies
+    Router->>PM: unlock(withdrawal)
+    PM->>Router: unlockCallback(data)
+    Router->>PM: burn(holder, claim ID, amount) and take(currency, holder, amount), per currency
+    PM-->>Holder: ERC-20 and ETH payments to the holder's own wallet
+    Router-->>PM: Callback complete, ClaimWithdrawn events
+    PM-->>Router: Unlock complete
+    Router-->>Holder: Withdrawal complete
 
     Admin->>Vault: collect(currency, recipient)
     Vault->>Hook: owner()

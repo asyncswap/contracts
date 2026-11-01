@@ -1,18 +1,25 @@
 ---
-title: Async Swap
-description: An on-chain order book and matching engine built as a Uniswap v4 hook.
+title: Async Swap, an MEV-capturing on-chain order book DEX on Uniswap v4
+description: An MEV-capturing DEX built as a Uniswap v4 hook. An on-chain order book and matching engine for USDC limit orders, where priority bids auction ordering to the protocol and a dynamic fee returns backrun profit to LPs.
 ---
 
 ![Async Swap](/assets/async-swap-banner.png)
 
 # Async Swap
 
-Async Swap is an on-chain order book and matching engine built as a Uniswap v4 hook. Traders set a
+Async Swap is an MEV-capturing DEX: an on-chain order book and matching engine built as a Uniswap
+v4 hook. Value that searchers usually take from ordering and backruns goes to the protocol and LPs
+instead. Traders set a
 limit price for assets paired with USDC. Orders match with other traders or with the pool's active
 liquidity, and anyone can permissionlessly fill a resting order.
 
 - **Price, then bid, then time.** Book matching ranks orders by price. Among orders at the same
   price, a higher escrowed USDC priority bid goes first, and earlier orders break equal bids.
+- **Ordering MEV is auctioned, not extracted.** Priority bids are paid in USDC to the protocol's
+  FeeVault, so jumping the queue at a price costs the bidder, not other traders.
+- **Backruns pay LPs.** A pool fill that moves the price back within two blocks of another pool
+  fill pays a dynamic fee of half the price gap it closes, split between LPs and the protocol. See
+  [dynamic fee ordering](/protocol/dynamic-fee-ordering).
 - **Orders rest until they execute.** Unfilled amounts stay open for later matching, a pool fill,
   a filler, repricing or cancellation.
 - **No swap touches the curve directly.** Every swap becomes an order. The only AMM swaps are the
@@ -29,6 +36,7 @@ liquidity, and anyone can permissionlessly fill a resting order.
 | Understand the contracts, custody and fees | [Protocol overview](/protocol/overview) |
 | Follow an order from placement to settlement, and how priority bids are paid | [Order lifecycle and priority bids](/protocol/order-lifecycle) |
 | See every call, callback and withdrawal step | [Contract call sequences](/protocol/contract-call-sequences) |
+| See how backrun MEV is captured for LPs | [Dynamic fee ordering](/protocol/dynamic-fee-ordering) |
 | Check how prices are compared and rounded | [Price keys and crossing](/protocol/price-key-crossing) |
 | Review audit findings and their fixes | [Audit status](/audit/status) |
 | Look up a contract, function or event | [Contract reference](/reference) |

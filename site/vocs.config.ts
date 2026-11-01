@@ -5,7 +5,7 @@ import { sidebar as referenceSidebar } from './src/generated/reference-sidebar.t
 export default defineConfig({
   title: 'Async Swap',
   description:
-    'An on-chain order book and matching engine built as a Uniswap v4 hook: limit orders against USDC, matched by price, priority bid and time.',
+    'An MEV-capturing DEX built as a Uniswap v4 hook: an on-chain order book and matching engine for limit orders against USDC, matched by price, priority bid and time. Priority bids auction ordering to the protocol and a dynamic fee returns backrun profit to LPs.',
   // vocs emits <base href={baseUrl}>, so it is set only for the published build (the docs workflow);
   // left unset, local `dev`/`preview` load everything from localhost.
   baseUrl: process.env.DOCS_BASE_URL,

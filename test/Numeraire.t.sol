@@ -138,8 +138,13 @@ contract NumeraireTest is Test {
     }
 
     function test_acceptNumeraireOnEitherSortedSide() public {
-        PoolKey memory low = _key(address(1), address(usdc));
-        PoolKey memory high = _key(address(usdc), address(type(uint160).max));
+        // Deployed assets at the extremes of the address range: the hook rejects an asset with no code.
+        address lowAsset = address(0x1000);
+        address highAsset = address(type(uint160).max - 0xff);
+        deployCodeTo("test/utils/MockERC20.sol:MockERC20", abi.encode("Low", "LOW", uint8(18)), lowAsset);
+        deployCodeTo("test/utils/MockERC20.sol:MockERC20", abi.encode("High", "HI", uint8(18)), highAsset);
+        PoolKey memory low = _key(lowAsset, address(usdc));
+        PoolKey memory high = _key(address(usdc), highAsset);
         assertEq(Currency.unwrap(low.currency1), address(usdc));
         assertEq(Currency.unwrap(high.currency0), address(usdc));
         manager.initialize(low, 2 ** 96);

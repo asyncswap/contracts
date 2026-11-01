@@ -56,9 +56,25 @@ contract AsyncSwapBeforeInitializeFormalTest is FormalBase {
         return _key(num0 ? _num() : c0, num1 ? _num() : c1, dyn ? DYN : fee, ts, hooks);
     }
 
+    /// @dev The asset leg (the non-numeraire currency) must be native or have code (L-02 fix).
+    function _assetOk(PoolKey memory k) internal view returns (bool) {
+        address asset =
+            Currency.unwrap(k.currency0) == _num() ? Currency.unwrap(k.currency1) : Currency.unwrap(k.currency0);
+        return asset == address(0) || asset.code.length != 0;
+    }
+
+    /// @dev Give a fuzzed asset address code, so success-path checks exercise a deployed token.
+    function _deployed(address asset) internal returns (address) {
+        // Precompiles cannot be etched; they have no code, so the hook rejects them as assets anyway.
+        vm.assume(asset != address(vm) && (asset == address(0) || uint160(asset) > 0x100));
+        if (asset != address(0) && asset.code.length == 0) vm.etch(asset, hex"00");
+        return asset;
+    }
+
     function _guards(address caller, PoolKey memory k) internal view returns (bool) {
         return caller == address(manager)
-            && (Currency.unwrap(k.currency0) == _num() || Currency.unwrap(k.currency1) == _num()) && k.fee == DYN;
+            && (Currency.unwrap(k.currency0) == _num() || Currency.unwrap(k.currency1) == _num()) && k.fee == DYN
+            && _assetOk(k);
     }
 
     function _base(PoolKey memory k) internal pure returns (uint256) {
@@ -134,9 +150,26 @@ contract AsyncSwapBeforeInitializeFormalTest is FormalBase {
         uint160 sp
     ) public {
         vm.assume(sender != hook.owner());
+        other = _deployed(other);
         PoolKey memory k = _key(numIs0 ? _num() : other, numIs0 ? other : _num(), DYN, ts, hooks);
         (bool ok,) = _call(address(manager), sender, k, sp);
         assertTrue(ok, "a non-owner opens the pool");
+    }
+
+    /// @notice L-02 fix: a pool whose asset has no code yet cannot be opened, so nobody can squat a token's pool
+    ///         before it is deployed and pin its asset floor at 1 unit.
+    function testFuzz_beforeInitialize_rejectsCodelessAsset(
+        address sender,
+        address other,
+        bool numIs0,
+        int24 ts,
+        uint160 sp
+    ) public {
+        vm.assume(other != address(0) && other.code.length == 0 && other != _num());
+        PoolKey memory k = _key(numIs0 ? _num() : other, numIs0 ? other : _num(), DYN, ts, address(hook));
+        vm.prank(address(manager));
+        vm.expectRevert(AsyncSwap.AssetHasNoCode.selector);
+        hook.beforeInitialize(sender, k, sp);
     }
 
     /// @notice formal/Refinement/Swarm/AsyncSwapBeforeInitialize.lean:58 — from the PoolManager, a key with no numeraire leg reverts `NumeraireRequired`.
@@ -185,6 +218,7 @@ contract AsyncSwapBeforeInitializeFormalTest is FormalBase {
         address hooks,
         uint160 sp
     ) public {
+        other = _deployed(other);
         PoolKey memory k = _key(numIs0 ? _num() : other, numIs0 ? other : _num(), DYN, ts, hooks);
         vm.record();
         (bool ok, bytes memory ret) = _call(address(manager), sender, k, sp);
@@ -204,6 +238,7 @@ contract AsyncSwapBeforeInitializeFormalTest is FormalBase {
         bool withOrder
     ) public {
         if (withOrder) _placeOrder(alice, true, 1 ether, 1 ether);
+        other = _deployed(other);
         PoolKey memory k = _key(numIs0 ? _num() : other, numIs0 ? other : _num(), DYN, ts, hooks);
         vm.record();
         (bool ok, bytes memory ret) = _call(address(manager), sender, k, sp);
@@ -225,7 +260,7 @@ contract AsyncSwapBeforeInitializeFormalTest is FormalBase {
         }
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeInitialize.lean:124 — succeeds iff sender is the PoolManager, a leg is the numeraire, and fee is the dynamic flag.
+    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeInitialize.lean:124 — succeeds iff sender is the PoolManager, a leg is the numeraire, and fee is the dynamic flag; extended by the L-02 fix: the asset leg is native or has code (Lean statement needs updating).
     function testFuzz_beforeInitialize_succeeds_iff(In memory x) public {
         address caller = x.fromManager ? address(manager) : x.caller;
         PoolKey memory k = _steeredKey(x.c0, x.c1, x.num0, x.num1, x.fee, x.dyn, x.ts, x.hooks);
@@ -244,6 +279,7 @@ contract AsyncSwapBeforeInitializeFormalTest is FormalBase {
         bool withOrder
     ) public {
         if (withOrder) _placeOrder(alice, true, 1 ether, 1 ether);
+        other = _deployed(other);
         PoolKey memory k = _key(numIs0 ? _num() : other, numIs0 ? other : _num(), DYN, ts, hooks);
         // Fields of the fixture pool and the plain state variables, before.
         uint256 fb = _base(key);

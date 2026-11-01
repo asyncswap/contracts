@@ -32,8 +32,8 @@ skill ([`call-analysis`](https://github.com/asyncswap/skills/tree/2e9aca64980e7c
 
 | ID | Severity | Finding | Status | Evidence |
 |----|----------|---------|--------|----------|
-| M-01 | Medium | A leftover signed `SetExecutor` grant from `swapWithSig` can undo a maker's revocation | Open | [Report](lsp_security_review_2026-11-01.md#m-01-a-leftover-signed-setexecutor-grant-can-undo-a-makers-revocation); `test/security/poc/GrantReplay.t.sol` |
+| M-01 | Medium | A leftover signed `SetExecutor` grant from `swapWithSig` can undo a maker's revocation | ✅ Fixed | [Report](lsp_security_review_2026-11-01.md#m-01-a-leftover-signed-setexecutor-grant-can-undo-a-makers-revocation); a supplied grant is always applied and spent; `test/security/poc/GrantReplay.t.sol` |
 | M-02 | Medium | A front-run ask can force a new order onto the book at a worse price than the pool (needs mempool ordering) | Open | [Report](lsp_security_review_2026-11-01.md#m-02-a-front-run-ask-can-force-a-new-order-onto-the-book-at-a-worse-price-than-the-pool); `test/security/poc/PoolFirstFrontRun.t.sol` |
 | L-01 | Low | A small partial match voids a maker's relayed cancel or reprice | Open | [Report](lsp_security_review_2026-11-01.md#l-01-a-small-partial-match-voids-a-makers-relayed-cancel-or-reprice); `test/security/poc/SignedCancelGrief.t.sol` |
-| L-02 | Low | Pool squatting before a token is deployed disables its asset floor | Open | [Report](lsp_security_review_2026-11-01.md#l-02-pool-squatting-disables-the-asset-floor); `test/security/poc/PoolSquatAssetFloor.t.sol` |
+| L-02 | Low | Pool squatting before a token is deployed disables its asset floor | ✅ Fixed | [Report](lsp_security_review_2026-11-01.md#l-02-pool-squatting-disables-the-asset-floor); an asset with no code reverts `AssetHasNoCode`; `test/security/poc/PoolSquatAssetFloor.t.sol` |
 | I-01 | Informational | Fee rounding on dust remainders (only with minimums off) | Acknowledged | [Report](lsp_security_review_2026-11-01.md#i-01-fee-rounding-on-dust-remainders); `test/security/poc/DustTradeFee.t.sol` |

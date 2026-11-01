@@ -7,13 +7,17 @@ import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {MockERC20} from "../../utils/MockERC20.sol";
 import {LPFeeLibrary} from "v4-core/libraries/LPFeeLibrary.sol";
 import {TickMath} from "v4-core/libraries/TickMath.sol";
+import {CustomRevert} from "v4-core/libraries/CustomRevert.sol";
+import {Hooks} from "v4-core/libraries/Hooks.sol";
+import {IHooks} from "v4-core/interfaces/IHooks.sol";
 import {Currency} from "v4-core/types/Currency.sol";
 import {PoolId} from "v4-core/types/PoolId.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 
-/// @notice Candidate 3: `_minAssetAmount` staticcalls `decimals()`; on an address with no code the call succeeds with
-///         empty data -> `ret.length < 32` -> floor 1. A squatter who initializes the pool before the token is
-///         deployed fixes the asset floor at 1 wei for that PoolKey forever.
+/// @notice Regression for L-02 (audit/lsp_security_review_2026-11-01.md). `_minAssetAmount` used to staticcall
+///         `decimals()` on an address with no code, which succeeds with empty data and gave a 1-unit floor: a squatter
+///         who initialized the pool before the token was deployed fixed its asset floor at 1 wei forever. An asset
+///         with no code now reverts `AssetHasNoCode`, so the pool can only be opened once the token exists.
 contract PoolSquatAssetFloorPoc is SetupHook {
     using PoolIdLibrary for PoolKey;
 
@@ -60,34 +64,34 @@ contract PoolSquatAssetFloorPoc is SetupHook {
         _sell(k, asset, amountIn, amountOutMin);
     }
 
-    function test_poc_squattedPoolHasOneWeiFloor() public {
+    function test_cannotSquatPoolBeforeTokenIsDeployed() public {
         address predicted = vm.computeCreateAddress(tokenDeployer, vm.getNonce(tokenDeployer));
         assertEq(predicted.code.length, 0);
         PoolKey memory squat = _keyFor(predicted, 1);
 
-        // Squatter opens the canonical pool before the token exists, at an arbitrary extreme price.
+        // The squatter cannot open the canonical pool before the token exists.
         vm.prank(squatter);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CustomRevert.WrappedError.selector,
+                address(hook),
+                IHooks.beforeInitialize.selector,
+                abi.encodeWithSelector(AsyncSwap.AssetHasNoCode.selector),
+                abi.encodeWithSelector(Hooks.HookCallFailed.selector)
+            )
+        );
         manager.initialize(squat, TickMath.MAX_SQRT_PRICE - 1);
-        emit log_named_uint("squatted pool asset floor", hook.minAssetAmount(squat.toId()));
-        assertEq(hook.minAssetAmount(squat.toId()), 1, "floor fixed at 1 wei");
+        assertEq(hook.minAssetAmount(squat.toId()), 0, "pool not opened");
 
-        // Token launches at the predicted address (18 decimals).
+        // Once the token launches at the predicted address, the same key opens with the proper floor.
         vm.prank(tokenDeployer);
         MockERC20 asset = new MockERC20("Launch", "LNCH", 18);
         assertEq(address(asset), predicted);
         asset.mint(alice, 1 ether);
-
-        // 1-wei sell (asking the $10 minimum) is accepted on the squatted pool despite precision 4.
-        uint256 stored = _sell(squat, address(asset), 1, 10e6);
-        emit log_named_uint("1-wei sell stored on squatted pool", stored);
-        assertEq(stored, 1);
-        assertLt(stored, 1e14 * 80 / 100, "below the intended 1e14 floor");
-
-        // Mitigation available: a fresh key (tickSpacing 2) for the same token gets the proper floor.
-        PoolKey memory fresh = _keyFor(address(asset), 2);
-        manager.initialize(fresh, 2 ** 96);
-        emit log_named_uint("fresh pool (spacing 2) floor", hook.minAssetAmount(fresh.toId()));
-        assertEq(hook.minAssetAmount(fresh.toId()), 1e14);
+        manager.initialize(squat, 2 ** 96);
+        assertEq(hook.minAssetAmount(squat.toId()), 1e14, "canonical pool gets the 0.0001-token floor");
+        vm.expectRevert(); // BelowMinimumAssetAmount wrapped by PoolManager
+        this.sellExternal(squat, address(asset), 1, 10e6);
     }
 
     /// Control: the pool initialized after the token exists has the 1e14 floor and rejects 1-wei sells.

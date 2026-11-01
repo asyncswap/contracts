@@ -76,7 +76,8 @@ contract Router is EIP712, Multicall {
     }
 
     /// @notice Optional signed `SetExecutor` grant, submitted to the hook ahead of the maker's first
-    ///         gasless order on a pool. Leave `signature` empty when the Router is already authorized.
+    ///         gasless order on a pool. A supplied grant is always applied and its nonce spent, so leave
+    ///         `signature` empty when the Router is already authorized.
     struct ExecutorGrant {
         uint256 nonce;
         uint256 deadline;
@@ -185,7 +186,9 @@ contract Router is EIP712, Multicall {
     function swapWithSig(AsyncOrder calldata order, PermitData calldata permit, ExecutorGrant calldata grant) external {
         Currency input = order.zeroForOne ? order.key.currency0 : order.key.currency1;
         require(!input.isAddressZero(), "Native input needs swap()");
-        if (grant.signature.length != 0 && !HOOK.isExecutor(order.key.toId(), order.owner, address(this))) {
+        // Always apply a supplied grant, which spends its nonce. A skipped grant would stay valid in public calldata,
+        // and anyone could replay it to re-authorize the Router after the maker revokes it.
+        if (grant.signature.length != 0) {
             HOOK.setExecutorWithSig(
                 order.key, order.owner, address(this), true, grant.nonce, grant.deadline, grant.signature
             );

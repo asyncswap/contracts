@@ -93,6 +93,7 @@ contract AsyncSwap is BaseHook, EIP712 {
     error NotOwner();
     error ZeroAddress();
     error UnsupportedNumeraireDecimals();
+    error AssetHasNoCode();
     error SignatureExpired();
     error InvalidSignature();
     error NonceAlreadyUsed();
@@ -290,10 +291,12 @@ contract AsyncSwap is BaseHook, EIP712 {
     }
 
     /// @dev 10^(decimals - assetPrecision) base units of `asset`, at least 1. Native ETH has 18 decimals. A token
-    ///      without a readable `decimals()` gets the 1-unit floor, and reported decimals are capped at 36.
+    ///      without a readable `decimals()` gets the 1-unit floor, and reported decimals are capped at 36. An asset
+    ///      with no code reverts: a pool opened before its token is deployed would otherwise keep a 1-unit floor.
     function _minAssetAmount(Currency asset) private view returns (uint256) {
         uint256 decimals = 18;
         if (!asset.isAddressZero()) {
+            if (Currency.unwrap(asset).code.length == 0) revert AssetHasNoCode();
             (bool ok, bytes memory ret) = Currency.unwrap(asset).staticcall(abi.encodeWithSignature("decimals()"));
             if (!ok || ret.length < 32) return 1;
             decimals = abi.decode(ret, (uint256));

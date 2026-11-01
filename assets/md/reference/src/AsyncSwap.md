@@ -1,6 +1,6 @@
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/81ba6b8081cd0a14a141591616a5f8409d55b349/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9fddf384806296d86e2066f735c36f956d6e9f73/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -310,7 +310,8 @@ function _beforeAddLiquidity(address, PoolKey calldata, ModifyLiquidityParams ca
 
 <i>
   10^(decimals - assetPrecision) base units of `asset`, at least 1. Native ETH has 18 decimals. A token
-  without a readable `decimals()` gets the 1-unit floor, and reported decimals are capped at 36.
+  without a readable `decimals()` gets the 1-unit floor, and reported decimals are capped at 36. An asset
+  with no code reverts: a pool opened before its token is deployed would otherwise keep a 1-unit floor.
 </i>
 
 ```solidity
@@ -724,8 +725,8 @@ function tryFillOrderFromPoolLiquidity(AsyncOrder calldata order) external retur
   The self-call boundary makes a failed AMM attempt atomic while preserving the resting
   order. PoolManager skips hook callbacks when the hook itself is the swap caller, so this
   swap does not create an order.
-  `sqrtPriceLimitX96` is a price the swap may not cross (0 for none): the whole order fills
-  before it, or the call reverts.
+  `sqrtPriceLimitX96` is a price the swap may not cross (0 for none). Without one the whole order
+  fills or the call reverts; with one the pool may fill part and leave the rest on the book.
 </i>
 
 ```solidity
@@ -1283,6 +1284,12 @@ error ZeroAddress();
 
 ```solidity
 error UnsupportedNumeraireDecimals();
+```
+
+### AssetHasNoCode
+
+```solidity
+error AssetHasNoCode();
 ```
 
 ### SignatureExpired

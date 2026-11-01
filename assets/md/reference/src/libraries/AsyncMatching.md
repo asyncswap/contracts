@@ -1,6 +1,6 @@
 # AsyncMatching
 
-[Git Source](https://github.com/asyncswap/contracts/blob/81ba6b8081cd0a14a141591616a5f8409d55b349/src/libraries/AsyncMatching.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9fddf384806296d86e2066f735c36f956d6e9f73/src/libraries/AsyncMatching.sol)
 
 Linked matching module operating on the hook's order and radix-book storage.
 
@@ -207,15 +207,17 @@ function _bookPair(AsyncFiller.State storage self, AsyncFiller.Book storage book
 | bidId | `bytes32` |  |
 | askId | `bytes32` |  |
 
-<a id="fillfrompoolliquidity-asyncfiller-state-asyncfiller-book-poolkey-bytes32-address-address-uint256-uint160" />
+<a id="fillfrompoolliquidity-asyncfiller-state-asyncfiller-book-poolkey-bytes32-address-uint160" />
 
 ### fillFromPoolLiquidity
 
 Execute an order against active v4 LP positions if they meet the signed minimum.
 
 <i>
-  Reverts atomically on insufficient liquidity/output or partial execution. The caller
-  catches this across a self-call so the resting order is preserved.
+  Reverts atomically on insufficient liquidity or output; the caller catches this across a self-call so
+  the resting order is preserved. Without a price limit the whole order must fill. With one (the best
+  book level, when the pool goes first) the swap may stop there: the filled part must meet the maker's
+  limit pro rata, and the rest stays on the book with the maker's own limit for the book to match.
 </i>
 
 ```solidity
@@ -224,9 +226,7 @@ function fillFromPoolLiquidity(
         AsyncFiller.Book storage book,
         PoolKey calldata key,
         bytes32 id,
-        address maker,
         address hook,
-        uint256 protocolFee,
         uint160 sqrtPriceLimitX96
     ) public;
 ```
@@ -239,17 +239,67 @@ function fillFromPoolLiquidity(
 | book | `AsyncFiller.Book` |  |
 | key | `PoolKey` |  |
 | id | `bytes32` |  |
-| maker | `address` |  |
 | hook | `address` |  |
-| protocolFee | `uint256` |  |
 | sqrtPriceLimitX96 | `uint160` |  |
 
-<a id="_poolfillnet-asyncfiller-state-poolkey-bytes32-bool-uint256-uint256-address-uint160" />
+<a id="_reduceafterpoolfill-asyncfiller-state-asyncfiller-book-poolkey-bytes32-uint256" />
+
+### \_reduceAfterPoolFill
+
+```solidity
+function _reduceAfterPoolFill(
+        AsyncFiller.State storage self,
+        AsyncFiller.Book storage book,
+        PoolKey calldata key,
+        bytes32 id,
+        uint256 consumed
+    ) private;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| book | `AsyncFiller.Book` |  |
+| key | `PoolKey` |  |
+| id | `bytes32` |  |
+| consumed | `uint256` |  |
+
+<a id="closebelowminimum-asyncfiller-state-asyncfiller-book-poolkey-bytes32" />
+
+### closeBelowMinimum
+
+Close a live order left below the pool minimum and return its input as claims; its unfilled
+priority bid is spent, as for a book match that leaves dust.
+
+```solidity
+function closeBelowMinimum(
+        AsyncFiller.State storage self,
+        AsyncFiller.Book storage book,
+        PoolKey calldata key,
+        bytes32 id
+    ) public;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| book | `AsyncFiller.Book` |  |
+| key | `PoolKey` |  |
+| id | `bytes32` |  |
+
+<a id="_poolfillnet-asyncfiller-state-poolkey-bytes32-address-uint160" />
 
 ### \_poolFillNet
 
 <i>
-  The pool fill's output less the dynamic fee (`DynamicFeeOrdering`); reverts unless it meets the minimum.
+  Swap the order's input less the protocol's 0.01% (rounded up, paid to the vault), then take the dynamic
+  fee (`DynamicFeeOrdering`) from the output. A swap stopped short at `sqrtPriceLimitX96` pays the 0.01% on
+  what it swapped. Returns the input swapped, the input used including the 0.01%, and the net output,
+  reverting unless the output meets the maker's limit on the input used.
 </i>
 
 ```solidity
@@ -257,12 +307,9 @@ function _poolFillNet(
         AsyncFiller.State storage self,
         PoolKey calldata key,
         bytes32 id,
-        bool zeroForOne,
-        uint256 amountIn,
-        uint256 amountOutMin,
         address hook,
         uint160 sqrtPriceLimitX96
-    ) private returns (uint256 amountOut);
+    ) private returns (uint256 swapped, uint256 consumed, uint256 amountOut);
 ```
 
 **Parameters**
@@ -272,9 +319,6 @@ function _poolFillNet(
 | self | `AsyncFiller.State` |  |
 | key | `PoolKey` |  |
 | id | `bytes32` |  |
-| zeroForOne | `bool` |  |
-| amountIn | `uint256` |  |
-| amountOutMin | `uint256` |  |
 | hook | `address` |  |
 | sqrtPriceLimitX96 | `uint160` |  |
 
@@ -282,7 +326,46 @@ function _poolFillNet(
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
+| swapped | `uint256` |  |
+| consumed | `uint256` |  |
 | amountOut | `uint256` |  |
+
+<a id="_chargefees-asyncfiller-state-poolkey-bytes32-uint256-int24-uint256" />
+
+### \_chargeFees
+
+<i>
+  Pay the 0.01% from the input's escrow to the vault and charge the dynamic fee on the output; returns
+  the dynamic fee.
+</i>
+
+```solidity
+function _chargeFees(
+        AsyncFiller.State storage self,
+        PoolKey calldata key,
+        bytes32 id,
+        uint256 protocolFee,
+        int24 tickBefore,
+        uint256 amountOut
+    ) private returns (uint256);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| key | `PoolKey` |  |
+| id | `bytes32` |  |
+| protocolFee | `uint256` |  |
+| tickBefore | `int24` |  |
+| amountOut | `uint256` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint256` |  |
 
 <a id="_swapagainstpool-ipoolmanager-poolkey-bool-uint256-address-uint160" />
 
@@ -296,7 +379,7 @@ function _swapAgainstPool(
         uint256 amountIn,
         address hook,
         uint160 sqrtPriceLimitX96
-    ) private returns (uint256 amountOut, int24 tickBefore);
+    ) private returns (uint256 swapped, uint256 amountOut, int24 tickBefore);
 ```
 
 **Parameters**
@@ -314,6 +397,7 @@ function _swapAgainstPool(
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
+| swapped | `uint256` |  |
 | amountOut | `uint256` |  |
 | tickBefore | `int24` |  |
 
@@ -492,7 +576,7 @@ function _transferEscrow(
 | amount | `uint256` |  |
 | batch | `ClaimTransfers.Batch` |  |
 
-<a id="_reduceaftermatch-asyncfiller-state-asyncfiller-book-poolkey-reductionparams-claimtransfers-batch" />
+<a id="_reduceaftermatch-asyncfiller-state-asyncfiller-book-poolkey-reductionparams-claimtransfers-batch-bool" />
 
 ### \_reduceAfterMatch
 
@@ -502,7 +586,8 @@ function _reduceAfterMatch(
         AsyncFiller.Book storage book,
         PoolKey calldata key,
         ReductionParams memory params,
-        ClaimTransfers.Batch memory batch
+        ClaimTransfers.Batch memory batch,
+        bool closeDust
     ) private returns (uint256);
 ```
 
@@ -515,6 +600,7 @@ function _reduceAfterMatch(
 | key | `PoolKey` |  |
 | params | `ReductionParams` |  |
 | batch | `ClaimTransfers.Batch` |  |
+| closeDust | `bool` |  |
 
 **Returns**
 

@@ -11,8 +11,8 @@ a:I["4d561a553cc0",[],"Link",1]
 b:I["bae3a65432e2",[],"MermaidClient",1]
 :HL["/assets/index-WiFgDrt1.css","style"]
 :HL["/assets/_root-B14WUx1Z.css","style"]
-:HL["/assets/vocs-group-icons-f93f77597006.css","style"]
-c:T156d,sequenceDiagram
+:HL["/assets/vocs-group-icons-03df9934015e.css","style"]
+c:T17c7,sequenceDiagram
     autonumber
     actor User as Maker
     participant App as App
@@ -50,7 +50,7 @@ c:T156d,sequenceDiagram
     Router->>PM: swap(exact input, hook data)
     PM->>Hook: beforeSwap(...)
     Hook->>PM: mint input escrow claims to hook
-    Hook->>Match: Validate and add order to price book
+    Hook->>Match: Check pool minimum (USDC leg) and asset floor, add order to price book
     Match->>PM: mint bid escrow claims to hook, hook owes bid
     Match-->>Hook: Order recorded
     Note over Hook,Match: AsyncOrderCreated event, order is not matched until input and bid funding finish.
@@ -73,7 +73,7 @@ c:T156d,sequenceDiagram
         Router->>PM: settleFor(hook)
     end
     Router->>Hook: matchNewOrder(order)
-    Note over Hook,PM: If the pool has active liquidity and its spot tick beats the best opposing level,<br/>the pool fill below runs first and the book takes only what it leaves.
+    Note over Hook,PM: If the pool has active liquidity and its spot tick beats the best opposing level,<br/>the pool fill below runs first, limited at that level, and the book takes what it leaves.<br/>A remainder below the pool minimum that the book leaves is then refunded as claims.
     Hook->>Match: matchIncoming(...)
     loop Up to 8 executable crossing pairs
         Match->>Match: Best bid and best ask across the whole book (price, then bid, then time)
@@ -88,12 +88,13 @@ c:T156d,sequenceDiagram
     opt Incoming order still has a remainder
         Hook->>Hook: External self-call fillOrderFromPoolLiquidity(order, id)
         Hook->>Match: fillFromPoolLiquidity(...)
-        Hook->>Vault: Credit 0.01% of the input as protocol fee claims
-        Match->>PM: Burn the rest of the input claims, temporarily set 0.02% LP fee
+        Match->>PM: Burn the input claims less 0.01%, temporarily set 0.02% LP fee
         Match->>PM: swap(remaining exact input)
         Note over Hook,PM: Hook-originated swap skips this hook's callbacks, it does not create another order.
         PM-->>Match: Actual input and output deltas
         Match->>PM: Restore previous LP fee
+        Match->>PM: Mint back any input the swap left unused (only a swap limited at the book level stops short)
+        Match->>PM: transfer 0.01% of the input swapped to FeeVault (protocol fee)
         Match->>Fee: charge(state, key, output, tickBefore, amountOut)
         Note over Fee,PM: First pool fill in a 2-block window: record the tick before it as the reference, no fee.<br/>Later fill in the window that moves the price back toward it: half the price gap it closes.
         opt Dynamic fee is due
@@ -105,7 +106,11 @@ c:T156d,sequenceDiagram
             Match->>PM: Pay output less the dynamic fee, settle remaining bid to FeeVault
             PM-->>Wallet: ERC-20 proceeds or native claims
             Match-->>Hook: Order removed, liquidity fill event
-        else Insufficient liquidity, partial execution, or limit not met
+        else Pool first, stopped at the book level, pro-rata minimum met
+            Match->>Match: Reduce the order, keeping the maker's limit; settle the filled bid share
+            Match->>PM: Credit output less the dynamic fee as claims
+            Match-->>Hook: Order stays open for the book, liquidity fill event
+        else Insufficient liquidity, partial execution without a limit, or limit not met
             Match-->>Hook: Self-call reverts, caught by matchNewOrder
             Note over Hook,PM: Only LP attempt rolls back, prior book fills and open remainder survive.
         end
@@ -114,11 +119,11 @@ c:T156d,sequenceDiagram
     Router-->>PM: Callback complete
     PM-->>Router: Unlock completes if all currency deltas are settled
     Router-->>Wallet: Direct transaction succeeds
-    Note over Wallet,Relayer: For signed submission, the transaction result returns to the submitter instead.0:{"root":[["$undefined"],["$","html",null,{"data-vocs":true,"lang":"en","style":{"colorScheme":"light dark","--vocs-color-accent":"light-dark(#111111, #F2F2F2)"},"suppressHydrationWarning":true,"children":[["$","head",null,{"children":[["$","meta",null,{"charSet":"utf-8"}],["$","meta",null,{"name":"viewport","content":"width=device-width, initial-scale=1"}],["$","link",null,{"rel":"stylesheet","href":"/assets/index-WiFgDrt1.css"}],["$","link",null,{"rel":"stylesheet","href":"/assets/_root-B14WUx1Z.css"}],["$","link",null,{"rel":"stylesheet","href":"/assets/vocs-group-icons-f93f77597006.css"}],["$","$L1",null,{"includeJsonLd":false}]]}],["$","body",null,{"data-version":"1.0","children":[["$","$L2",null,{"children":["$","$L4",null,{}]}],["$","$L6",null,{}]]}]]}]],"route:/protocol/contract-call-sequences":["$","$L7",null,{"id":"page:/protocol/contract-call-sequences"}],"page:/protocol/contract-call-sequences":["$","$L8",null,{"frontmatter":{"title":"Contract call sequences","description":"Step-by-step contract calls for placing, matching, filling and cancelling orders.","filePath":"protocol/contract-call-sequences.md"},"children":[["$","$L1",null,{}],["$","$L9",null,{"children":[["$","h1",null,{"data-v":"","id":"contract-call-sequences","children":"Contract call sequences"}],"\n",["$","p",null,{"data-v":"","children":["The ",["$","$La",null,{"href":"/protocol/overview#3-placing-an-order","data-v":true,"children":"protocol overview","data-v-link":true,"to":"/protocol/overview#3-placing-an-order"}]," contains the short order sequence; this page contains the detailed sequences. See ",["$","$La",null,{"href":"/protocol/order-lifecycle","data-v":true,"children":"order lifecycle and priority bids","data-v-link":true,"to":"/protocol/order-lifecycle"}]," for the flowcharts."]}],"\n",["$","p",null,{"data-v":"","children":"Solid arrows are calls or actions; dashed arrows are returns or delivered results. Each sequence groups related transactions; it is not one transaction from top to bottom. The app and wallet represent the user interface, not trusted settlement components. An indexer may observe emitted events for discovery, but neither an API nor an indexer is required by the contracts."}],"\n",["$","p",null,{"data-v":"","children":[["$","code",null,{"data-v":true,"children":"AsyncMatching"}]," is a linked external library called in the hook's context. ",["$","code",null,{"data-v":true,"children":"AsyncFiller"}],", the price tree, and currency-settlement helpers operate on that same context; they are not independent custodians. Arrows from the matching library to PoolManager therefore execute as the hook. ERC-6909 claims and LP fee accounting live inside PoolManager."]}],"\n",["$","h3",null,{"data-v":"","id":"user-order-book-matching-and-lp-fallback","children":["User order, book matching, and LP fallback",["$","$La",null,{"aria-label":"Copy link and go to this section","className":"heading-anchor","title":"Copy link and go to this section","href":"/protocol/contract-call-sequences#user-order-book-matching-and-lp-fallback","children":["$","svg",null,{"className":"heading-anchor-icon","xmlns":"http://www.w3.org/2000/svg","width":"0.75em","height":"0.75em","viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","strokeWidth":"2","strokeLinecap":"round","strokeLinejoin":"round","children":[["$","path",null,{"d":"M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"}],["$","path",null,{"d":"M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"}]]}],"data-v-link":true,"data-v":true,"to":"/protocol/contract-call-sequences#user-order-book-matching-and-lp-fallback"}]]}],"\n",["$","div",null,{"data-v-mermaid-container":true,"children":["$","$Lb",null,{"chart":"$c"}]}],"\n","$Ld","\n","$Le","\n","$Lf","\n","$L10","\n","$L11","\n","$L12","\n","$L13","\n","$L14","\n","$L15","\n","$L16"]}]]}],"ROUTE":["/protocol/contract-call-sequences",""],"IS_STATIC":true,"HAS404":true,"_buildId":"GCTrErFs","_etags":{"root":1,"route:/protocol/contract-call-sequences":1,"page:/protocol/contract-call-sequences":1}}
+    Note over Wallet,Relayer: For signed submission, the transaction result returns to the submitter instead.0:{"root":[["$undefined"],["$","html",null,{"data-vocs":true,"lang":"en","style":{"colorScheme":"light dark","--vocs-color-accent":"light-dark(#111111, #F2F2F2)"},"suppressHydrationWarning":true,"children":[["$","head",null,{"children":[["$","meta",null,{"charSet":"utf-8"}],["$","meta",null,{"name":"viewport","content":"width=device-width, initial-scale=1"}],["$","link",null,{"rel":"stylesheet","href":"/assets/index-WiFgDrt1.css"}],["$","link",null,{"rel":"stylesheet","href":"/assets/_root-B14WUx1Z.css"}],["$","link",null,{"rel":"stylesheet","href":"/assets/vocs-group-icons-03df9934015e.css"}],["$","$L1",null,{"includeJsonLd":false}]]}],["$","body",null,{"data-version":"1.0","children":[["$","$L2",null,{"children":["$","$L4",null,{}]}],["$","$L6",null,{}]]}]]}]],"route:/protocol/contract-call-sequences":["$","$L7",null,{"id":"page:/protocol/contract-call-sequences"}],"page:/protocol/contract-call-sequences":["$","$L8",null,{"frontmatter":{"title":"Contract call sequences","description":"Step-by-step contract calls for opening pools and placing, matching, filling, cancelling (alone or batched) and redeeming orders.","filePath":"protocol/contract-call-sequences.md"},"children":[["$","$L1",null,{}],["$","$L9",null,{"children":[["$","h1",null,{"data-v":"","id":"contract-call-sequences","children":"Contract call sequences"}],"\n",["$","p",null,{"data-v":"","children":["The ",["$","$La",null,{"href":"/protocol/overview#3-placing-an-order","data-v":true,"children":"protocol overview","data-v-link":true,"to":"/protocol/overview#3-placing-an-order"}]," contains the short order sequence; this page contains the detailed sequences. See ",["$","$La",null,{"href":"/protocol/order-lifecycle","data-v":true,"children":"order lifecycle and priority bids","data-v-link":true,"to":"/protocol/order-lifecycle"}]," for the flowcharts."]}],"\n",["$","p",null,{"data-v":"","children":"Solid arrows are calls or actions; dashed arrows are returns or delivered results. Each sequence groups related transactions; it is not one transaction from top to bottom. The app and wallet represent the user interface, not trusted settlement components. An indexer may observe emitted events for discovery, but neither an API nor an indexer is required by the contracts."}],"\n",["$","p",null,{"data-v":"","children":[["$","code",null,{"data-v":true,"children":"AsyncMatching"}]," is a linked external library called in the hook's context. ",["$","code",null,{"data-v":true,"children":"AsyncFiller"}],", the price tree, and currency-settlement helpers operate on that same context; they are not independent custodians. Arrows from the matching library to PoolManager therefore execute as the hook. ERC-6909 claims and LP fee accounting live inside PoolManager."]}],"\n",["$","h3",null,{"data-v":"","id":"user-order-book-matching-and-lp-fallback","children":["User order, book matching, and LP fallback",["$","$La",null,{"aria-label":"Copy link and go to this section","className":"heading-anchor","title":"Copy link and go to this section","href":"/protocol/contract-call-sequences#user-order-book-matching-and-lp-fallback","children":["$","svg",null,{"className":"heading-anchor-icon","xmlns":"http://www.w3.org/2000/svg","width":"0.75em","height":"0.75em","viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","strokeWidth":"2","strokeLinecap":"round","strokeLinejoin":"round","children":[["$","path",null,{"d":"M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"}],["$","path",null,{"d":"M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"}]]}],"data-v-link":true,"data-v":true,"to":"/protocol/contract-call-sequences#user-order-book-matching-and-lp-fallback"}]]}],"\n",["$","div",null,{"data-v-mermaid-container":true,"children":["$","$Lb",null,{"chart":"$c"}]}],"\n","$Ld","\n","$Le","\n","$Lf","\n","$L10","\n","$L11","\n","$L12","\n","$L13","\n","$L14","\n","$L15","\n","$L16"]}]]}],"ROUTE":["/protocol/contract-call-sequences",""],"IS_STATIC":true,"HAS404":true,"_buildId":"AjRcSHdV","_etags":{"root":1,"route:/protocol/contract-call-sequences":1,"page:/protocol/contract-call-sequences":1}}
 d:["$","p",null,{"data-v":"","children":["The LP fee and the LPs' half of the dynamic fee accrue through PoolManager's position accounting (the dynamic fee by ",["$","code",null,{"data-v":true,"children":"donate"}],"); see ",["$","code",null,{"data-v":true,"children":["$","$La",null,{"href":"/protocol/dynamic-fee-ordering","data-v":true,"children":"dynamic-fee-ordering.md","data-v-link":true,"to":"/protocol/dynamic-fee-ordering"}]}],". Priority bids are not paid to LPs: every settled bid goes to the FeeVault. LPs do not receive an external callback on every fill."]}]
 e:["$","h3",null,{"data-v":"","id":"private-fillers-continuation-repricing-and-cancellation","children":["Private fillers, continuation, repricing, and cancellation",["$","$La",null,{"aria-label":"Copy link and go to this section","className":"heading-anchor","title":"Copy link and go to this section","href":"/protocol/contract-call-sequences#private-fillers-continuation-repricing-and-cancellation","children":["$","svg",null,{"className":"heading-anchor-icon","xmlns":"http://www.w3.org/2000/svg","width":"0.75em","height":"0.75em","viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","strokeWidth":"2","strokeLinecap":"round","strokeLinejoin":"round","children":[["$","path",null,{"d":"M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"}],["$","path",null,{"d":"M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"}]]}],"data-v-link":true,"data-v":true,"to":"/protocol/contract-call-sequences#private-fillers-continuation-repricing-and-cancellation"}]]}]
 f:["$","p",null,{"data-v":"","children":"These are alternative actions on open orders. Private fills and LP retries require the Router to remain authorized by the maker. Book continuation is permissionless and processes at most eight pairs per call."}]
-17:T10ca,sequenceDiagram
+17:T13e7,sequenceDiagram
     autonumber
     actor Maker as Maker / wallet
     actor Caller as Filler or public caller
@@ -136,14 +141,15 @@ f:["$","p",null,{"data-v":"","children":"These are alternative actions on open o
         Note over Caller,Hook: Native output requires exact gross ETH, forwarded by Router to hook before unlock.<br/>ERC-20 output requires filler approval to Router.
         Router->>PM: unlock(fill action)
         PM->>Router: unlockCallback(data)
-        Router->>Hook: Read live minimum and surcharge (calculatePoolFee, zero)
-        Hook-->>Router: Live minimum
-        Router->>Router: Require the minimum no greater than maxPrice
+        Router->>Hook: Read live input, minimum and surcharge (calculatePoolFee, zero)
+        Hook-->>Router: Live input and minimum
+        Router->>Router: Require live input at least order.amountIn and the minimum no greater than maxPrice
         opt ERC-20 output
             Router->>PM: sync(output token)
             Router->>Token: transferFrom(filler, PoolManager, gross output)
             Token-->>Router: Transfer succeeds
             Router->>PM: settleFor(hook)
+            Router->>Hook: Re-read the order, revert if it changed during the transfer
         end
         Router->>Hook: executeOrder(order, filler)
         Hook->>Match: fill(...), validate executor and open order
@@ -192,26 +198,38 @@ f:["$","p",null,{"data-v":"","children":"These are alternative actions on open o
         Router->>PM: unlock(cancel action)
         PM->>Router: unlockCallback(data)
         Router->>Hook: cancelOrder(order)
-        Hook->>Match: Validate executor, remove open order
+        Hook->>Match: Validate owner or executor, remove open order
         Match->>PM: Burn input claims and return remaining input
         PM-->>Maker: ERC-20 refund or native claims
-        Match->>PM: Settle non-refundable remaining bid to LPs or FeeVault
+        Match->>PM: Settle non-refundable remaining bid to FeeVault
         Match-->>Hook: AsyncOrderCancelled event
         Hook-->>Router: Cancellation complete
         Router-->>PM: Callback complete
         PM-->>Router: Unlock complete
         Router-->>Maker: Transaction succeeds
+    else Maker batches cancels and a withdrawal
+        Maker->>Router: multicall([cancelOrder(a), cancelOrder(b), withdrawClaims(currencies, amounts)])
+        loop Each call, run by the Router as the maker
+            Router->>PM: unlock(that call's action)
+            PM->>Router: unlockCallback(data)
+            Router->>Hook: cancelOrder(order), as in the cancel above
+            Router->>PM: or burn(maker, claim ID, amount) and take(currency, maker, amount)
+            Router-->>PM: Callback complete
+        end
+        PM-->>Maker: Refunds and withdrawn claims
+        Router-->>Maker: Transaction succeeds, or every call reverts together
     end10:["$","div",null,{"data-v-mermaid-container":true,"children":["$","$Lb",null,{"chart":"$17"}]}]
-11:["$","p",null,{"data-v":"","children":["Signed alternatives are ",["$","code",null,{"data-v":true,"children":"Hook.updatePriceWithSig"}]," and ",["$","code",null,{"data-v":true,"children":"Router.cancelWithSig"}],"; a relayer can submit the maker's signature. Signature checks precede the corresponding state change or cancellation unlock. Any uncaught revert rolls back the whole transaction, including transfers and bid settlements."]}]
+11:["$","p",null,{"data-v":"","children":["To cancel several orders at once, the maker sends ",["$","code",null,{"data-v":true,"children":"Router.multicall([cancelOrder(a), cancelOrder(b), ...])"}],": each call above runs in turn as the maker, with its own unlock, and one failure reverts them all. A ",["$","code",null,{"data-v":true,"children":"withdrawClaims"}]," call can follow in the same batch. Signed alternatives are ",["$","code",null,{"data-v":true,"children":"Hook.updatePriceWithSig"}]," and ",["$","code",null,{"data-v":true,"children":"Router.cancelWithSig"}],"; a relayer can submit the maker's signature. Signature checks precede the corresponding state change or cancellation unlock. Any uncaught revert rolls back the whole transaction, including transfers and bid settlements."]}]
 12:["$","h3",null,{"data-v":"","id":"pool-setup-liquidity-providers-and-withdrawals","children":["Pool setup, liquidity providers, and withdrawals",["$","$La",null,{"aria-label":"Copy link and go to this section","className":"heading-anchor","title":"Copy link and go to this section","href":"/protocol/contract-call-sequences#pool-setup-liquidity-providers-and-withdrawals","children":["$","svg",null,{"className":"heading-anchor-icon","xmlns":"http://www.w3.org/2000/svg","width":"0.75em","height":"0.75em","viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","strokeWidth":"2","strokeLinecap":"round","strokeLinejoin":"round","children":[["$","path",null,{"d":"M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"}],["$","path",null,{"d":"M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"}]]}],"data-v-link":true,"data-v":true,"to":"/protocol/contract-call-sequences#pool-setup-liquidity-providers-and-withdrawals"}]]}]
 13:["$","p",null,{"data-v":"","children":"The liquidity manager below is a compatible Uniswap v4 periphery contract, not Async Swap's order Router. Its precise user-facing methods depend on the chosen periphery; the PoolManager calls shown are the common execution path. Setup and withdrawals are separate transactions from order execution."}]
-18:Tb0e,sequenceDiagram
+18:Tddc,sequenceDiagram
     autonumber
     actor Operator as Pool initializer
     actor Admin as Protocol owner
     actor LP as Liquidity provider
     actor Holder as Claim holder
     participant LM as v4 liquidity manager
+    participant Router
     participant Hook as AsyncSwap hook
     participant PM as PoolManager
     participant Native as NativeClaims
@@ -221,8 +239,9 @@ f:["$","p",null,{"data-v":"","children":"These are alternative actions on open o
 
     Operator->>PM: initialize(key, sqrtPriceX96)
     PM->>Hook: beforeInitialize(...)
-    Hook->>Hook: Require configured USDC and dynamic-fee pool
+    Hook->>Hook: Require configured USDC and dynamic-fee pool (any caller may initialize)
     Hook->>Hook: Copy the deployment minimum order and bid cap to the pool
+    Hook->>Hook: Reject an asset with no code, read its decimals and store its 0.0001-token floor
     Hook-->>PM: beforeInitialize selector
     PM-->>Operator: Initialized tick, Initialize event
     LP->>LM: Add funded liquidity in a chosen tick range
@@ -261,6 +280,17 @@ f:["$","p",null,{"data-v":"","children":"These are alternative actions on open o
     Tokens-->>PM: Callback complete, ClaimsRedeemed event
     PM-->>Tokens: Unlock complete
     Tokens-->>Holder: Redemption complete
+
+    Holder->>PM: approve(Router, each claim ID, exact amount)
+    PM-->>Holder: Claim allowances recorded
+    Holder->>Router: withdrawClaims(currencies, amounts), up to 16 distinct currencies
+    Router->>PM: unlock(withdrawal)
+    PM->>Router: unlockCallback(data)
+    Router->>PM: burn(holder, claim ID, amount) and take(currency, holder, amount), per currency
+    PM-->>Holder: ERC-20 and ETH payments to the holder's own wallet
+    Router-->>PM: Callback complete, ClaimWithdrawn events
+    PM-->>Router: Unlock complete
+    Router-->>Holder: Withdrawal complete
 
     Admin->>Vault: collect(currency, recipient)
     Vault->>Hook: owner()

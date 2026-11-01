@@ -1,6 +1,6 @@
 # Router
 
-[Git Source](https://github.com/asyncswap/contracts/blob/81ba6b8081cd0a14a141591616a5f8409d55b349/src/Router.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/9fddf384806296d86e2066f735c36f956d6e9f73/src/Router.sol)
 
 **Inherits:** EIP712, Multicall
 
@@ -8,10 +8,11 @@
 
 **Author:** @msakiart
 
-Thin entrypoint for makers (`swap`), fillers (`fillOrder`), and makers cancelling orders
-(`cancelOrder`). All three actions go through `IPoolManager.unlock` so the hook can
-operate on PM debts. Native payouts/refunds are PoolManager claims (ID 0),
-redeemable through NativeClaims after approval; ERC20 payouts remain direct.
+Thin entrypoint for makers (`swap`, `cancelOrder`, `cancelAndWithdraw`, `withdrawClaims`), fillers
+(`fillOrder`) and keepers (`matchBook`, `fillFromPoolLiquidity`), batched with `multicall`. Each action
+goes through `IPoolManager.unlock` so the hook can operate on PM debts. Native payouts/refunds are
+PoolManager claims (ID 0), redeemable through NativeClaims or `withdrawClaims`; ERC20 payouts remain
+direct.
 
 Gasless variants (`swapWithSig`, `cancelWithSig`) take the maker's EIP-712 signature so a
 relayer can submit. Signed creates pull input through Permit2 with the order as witness,
@@ -21,6 +22,13 @@ so the wallet shows the full order (tokens, amounts, pool) in one readable messa
 cancel many orders and withdraw the claims). It is not payable, so native-value actions
 (`swap` with native input, `fillOrder` with native output) cannot reuse one `msg.value`.
 Each action keeps its own PoolManager unlock and sets the transient slots it reads.
+
+Order creation and fills (`swap`, `swapWithSig`, `fillOrder`, `fillFromPoolLiquidity`) pay an MEV tax
+("Priority Is All You Need", Robinson & White): `mevTax()`, the transaction's priority fee per gas times
+`MEV_TAX_GAS`, in ETH on top of any native deposit, credited to the FeeVault as native claims. On a chain
+that orders by priority fee, searchers racing for the same position bid it up, so most of what they race
+for goes to the protocol; a transaction with no priority pays nothing. Inside `multicall`, which is not
+payable, a taxed action needs a transaction with no priority.
 
 ## Constants
 
@@ -40,6 +48,15 @@ AsyncSwap immutable HOOK;
 
 ```solidity
 ISignatureTransfer public immutable PERMIT2;
+```
+
+### MEV_TAX_GAS
+
+Gas units the MEV tax charges per unit of priority fee: the tax on a transaction is its priority fee
+per gas times this. Fixed at deployment.
+
+```solidity
+uint256 public immutable MEV_TAX_GAS;
 ```
 
 ### ACTION_LOCATION
@@ -76,14 +93,22 @@ bytes32 constant ASYNC_FILLER_LOCATION = 0xd972a937b59dc5cb8c692dd9f211e85afa8de
 bytes32 constant MAX_PRICE_LOCATION = 0x6b4f8e2c9d5a0b7e1f3c2a8d4e9f0b6c5a1d8e7f2b3c4d5e6a7f8b9c0d1e2f30;
 ```
 
+### MEV_TAX_LOCATION
+
+keccak256("Router.MevTax") - 1
+
+```solidity
+bytes32 constant MEV_TAX_LOCATION = 0xe6251c15e22bdb44d13d4efeec6855e57f2b38fe36310ce3c709991726ed21da;
+```
+
 ## Functions
 
-<a id="constructor-ipoolmanager-asyncswap-isignaturetransfer" />
+<a id="constructor-ipoolmanager-asyncswap-isignaturetransfer-uint256" />
 
 ### constructor
 
 ```solidity
-constructor(IPoolManager _poolManager, AsyncSwap _hook, ISignatureTransfer _permit2)
+constructor(IPoolManager _poolManager, AsyncSwap _hook, ISignatureTransfer _permit2, uint256 _mevTaxGas)
         EIP712("AsyncSwap Router", "1");
 ```
 
@@ -94,6 +119,43 @@ constructor(IPoolManager _poolManager, AsyncSwap _hook, ISignatureTransfer _perm
 | \_poolManager | `IPoolManager` |  |
 | \_hook | `AsyncSwap` |  |
 | \_permit2 | `ISignatureTransfer` |  |
+| \_mevTaxGas | `uint256` |  |
+
+<a id="mevtax" />
+
+### mevTax
+
+The MEV tax this transaction pays per taxed action, in wei: its priority fee per gas times
+`MEV_TAX_GAS`.
+
+```solidity
+function mevTax() public view returns (uint256);
+```
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint256` |  |
+
+<a id="_chargemevtax-uint256" />
+
+### \_chargeMevTax
+
+<i>
+  Requires `msg.value` to be `deposit` plus the MEV tax, and records the tax for the unlock callback,
+  which credits it to the FeeVault.
+</i>
+
+```solidity
+function _chargeMevTax(uint256 deposit) private;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| deposit | `uint256` |  |
 
 <a id="onlypoolmanager" />
 
@@ -121,7 +183,8 @@ supplies the salt fetched from the indexer or event log).
 Native input (currency0 = address(0) and zeroForOne = true, OR currency1 =
 address(0) and zeroForOne = false) requires `msg.value == order.amountIn` —
 the router holds the ETH and settles it to PM during unlock. For ERC20 input
-the maker must approve the router for `amountIn` of the input token.
+the maker must approve the router for `amountIn` of the input token. Either way `msg.value`
+also carries the MEV tax (`mevTax()`, zero without a priority fee).
 
 ```solidity
 function swap(AsyncOrder calldata order, bytes memory userData) external payable;
@@ -142,7 +205,8 @@ Filler completes an open order, paying exactly the maker's live minimum. The mak
 receives it less the 0.02% trade fee, and the filler the input less 0.02%.
 For ERC20 output, approve the router for that amount. For native output,
 `msg.value` must equal the live minimum;
-a stale or excessive deposit reverts rather than stranding the difference.
+a stale or excessive deposit reverts rather than stranding the difference. `msg.value`
+also carries the MEV tax (`mevTax()`, zero without a priority fee).
 Native output is currency1 for zeroForOne, otherwise currency0.
 
 `maxPrice` caps the output the filler pays —
@@ -172,10 +236,12 @@ Relayer submits a maker's signed order. The maker signs a Permit2
 and the `AsyncOrder` witness (see `OrderSignatures`), so one signature both approves
 the transfer and commits to the order. Input then lands in the hook escrow exactly as
 in `swap`. Requires a prior Permit2 approval of the input token; native input is not
-supported (use `swap`).
+supported (use `swap`). The relayer pays the MEV tax for its transaction's priority in `msg.value`.
 
 ```solidity
-function swapWithSig(AsyncOrder calldata order, PermitData calldata permit, ExecutorGrant calldata grant) external;
+function swapWithSig(AsyncOrder calldata order, PermitData calldata permit, ExecutorGrant calldata grant)
+        external
+        payable;
 ```
 
 **Parameters**
@@ -309,11 +375,12 @@ function matchBook(PoolKey calldata key, uint8 maxMatches) external;
 Retry a resting order against the pool's active Uniswap v4 LP positions.
 
 <i>
-  The order is left untouched when the pool cannot fully fill it at its minimum output.
+  The order is left untouched when the pool cannot fully fill it at its minimum output. `msg.value` is
+  the MEV tax.
 </i>
 
 ```solidity
-function fillFromPoolLiquidity(AsyncOrder calldata order) external;
+function fillFromPoolLiquidity(AsyncOrder calldata order) external payable;
 ```
 
 **Parameters**
@@ -344,6 +411,18 @@ function unlockCallback(bytes calldata data) external onlyPoolManager returns (b
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | \<none> | `bytes` |  |
+
+<a id="_paymevtax" />
+
+### \_payMevTax
+
+<i>
+  Credits a recorded MEV tax, held by the Router since the entry call, to the FeeVault as native claims.
+</i>
+
+```solidity
+function _payMevTax() private;
+```
 
 <a id="_withdrawclaim-address-currency-uint256" />
 
@@ -451,6 +530,21 @@ function _orderId(AsyncOrder memory order) private view returns (bytes32);
 
 ## Events
 
+### MevTaxPaid
+
+A taxed action paid `amount` wei of MEV tax, credited to the FeeVault as native claims.
+
+```solidity
+event MevTaxPaid(address indexed payer, uint256 amount);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| payer | `address` |  |
+| amount | `uint256` |  |
+
 ### ClaimWithdrawn
 
 ```solidity
@@ -522,7 +616,8 @@ struct PermitData {
 ### ExecutorGrant
 
 Optional signed `SetExecutor` grant, submitted to the hook ahead of the maker's first
-gasless order on a pool. Leave `signature` empty when the Router is already authorized.
+gasless order on a pool. A supplied grant is always applied and its nonce spent, so leave
+`signature` empty when the Router is already authorized.
 
 ```solidity
 struct ExecutorGrant {

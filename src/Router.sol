@@ -18,10 +18,11 @@ import {AsyncSwap} from "src/AsyncSwap.sol";
 
 /// @title Router
 /// @author @msakiart
-/// @notice Thin entrypoint for makers (`swap`), fillers (`fillOrder`), and makers cancelling orders
-///         (`cancelOrder`). All three actions go through `IPoolManager.unlock` so the hook can
-///         operate on PM debts. Native payouts/refunds are PoolManager claims (ID 0),
-///         redeemable through NativeClaims after approval; ERC20 payouts remain direct.
+/// @notice Thin entrypoint for makers (`swap`, `cancelOrder`, `cancelAndWithdraw`, `withdrawClaims`), fillers
+///         (`fillOrder`) and keepers (`matchBook`, `fillFromPoolLiquidity`), batched with `multicall`. Each action
+///         goes through `IPoolManager.unlock` so the hook can operate on PM debts. Native payouts/refunds are
+///         PoolManager claims (ID 0), redeemable through NativeClaims or `withdrawClaims`; ERC20 payouts remain
+///         direct.
 ///
 ///         Gasless variants (`swapWithSig`, `cancelWithSig`) take the maker's EIP-712 signature so a
 ///         relayer can submit. Signed creates pull input through Permit2 with the order as witness,
@@ -31,6 +32,13 @@ import {AsyncSwap} from "src/AsyncSwap.sol";
 ///         cancel many orders and withdraw the claims). It is not payable, so native-value actions
 ///         (`swap` with native input, `fillOrder` with native output) cannot reuse one `msg.value`.
 ///         Each action keeps its own PoolManager unlock and sets the transient slots it reads.
+///
+///         Order creation and fills (`swap`, `swapWithSig`, `fillOrder`, `fillFromPoolLiquidity`) pay an MEV tax
+///         ("Priority Is All You Need", Robinson & White): `mevTax()`, the transaction's priority fee per gas times
+///         `MEV_TAX_GAS`, in ETH on top of any native deposit, credited to the FeeVault as native claims. On a chain
+///         that orders by priority fee, searchers racing for the same position bid it up, so most of what they race
+///         for goes to the protocol; a transaction with no priority pays nothing. Inside `multicall`, which is not
+///         payable, a taxed action needs a transaction with no priority.
 contract Router is EIP712, Multicall {
     using CurrencySettler for Currency;
     using CurrencyLibrary for Currency;
@@ -41,6 +49,9 @@ contract Router is EIP712, Multicall {
     IPoolManager immutable POOLMANAGER;
     AsyncSwap immutable HOOK;
     ISignatureTransfer public immutable PERMIT2;
+    /// @notice Gas units the MEV tax charges per unit of priority fee: the tax on a transaction is its priority fee
+    ///         per gas times this. Fixed at deployment.
+    uint256 public immutable MEV_TAX_GAS;
 
     /// keccak256("Router.ActionType") - 1
     bytes32 constant ACTION_LOCATION = 0xf3b150ebf41dad0872df6788629edb438733cb4a5c9ea779b1b1f3614faffc69;
@@ -50,6 +61,8 @@ contract Router is EIP712, Multicall {
     bytes32 constant ASYNC_FILLER_LOCATION = 0xd972a937b59dc5cb8c692dd9f211e85afa8def4caee6e05b31db0f53e16d02e0;
     /// @dev keccak256("asyncswap.router.maxPrice") - 1
     bytes32 constant MAX_PRICE_LOCATION = 0x6b4f8e2c9d5a0b7e1f3c2a8d4e9f0b6c5a1d8e7f2b3c4d5e6a7f8b9c0d1e2f30;
+    /// keccak256("Router.MevTax") - 1
+    bytes32 constant MEV_TAX_LOCATION = 0xe6251c15e22bdb44d13d4efeec6855e57f2b38fe36310ce3c709991726ed21da;
 
     enum ActionType {
         Swap,
@@ -76,7 +89,8 @@ contract Router is EIP712, Multicall {
     }
 
     /// @notice Optional signed `SetExecutor` grant, submitted to the hook ahead of the maker's first
-    ///         gasless order on a pool. Leave `signature` empty when the Router is already authorized.
+    ///         gasless order on a pool. A supplied grant is always applied and its nonce spent, so leave
+    ///         `signature` empty when the Router is already authorized.
     struct ExecutorGrant {
         uint256 nonce;
         uint256 deadline;
@@ -86,12 +100,34 @@ contract Router is EIP712, Multicall {
     error SignatureExpired();
     error InvalidSignature();
 
-    constructor(IPoolManager _poolManager, AsyncSwap _hook, ISignatureTransfer _permit2)
+    /// @notice A taxed action paid `amount` wei of MEV tax, credited to the FeeVault as native claims.
+    event MevTaxPaid(address indexed payer, uint256 amount);
+
+    constructor(IPoolManager _poolManager, AsyncSwap _hook, ISignatureTransfer _permit2, uint256 _mevTaxGas)
         EIP712("AsyncSwap Router", "1")
     {
         POOLMANAGER = _poolManager;
         HOOK = _hook;
         PERMIT2 = _permit2;
+        MEV_TAX_GAS = _mevTaxGas;
+    }
+
+    /// @notice The MEV tax this transaction pays per taxed action, in wei: its priority fee per gas times
+    ///         `MEV_TAX_GAS`.
+    function mevTax() public view returns (uint256) {
+        return tx.gasprice > block.basefee ? (tx.gasprice - block.basefee) * MEV_TAX_GAS : 0;
+    }
+
+    /// @dev Requires `msg.value` to be `deposit` plus the MEV tax, and records the tax for the unlock callback,
+    ///      which credits it to the FeeVault.
+    function _chargeMevTax(uint256 deposit) private {
+        uint256 tax = mevTax();
+        require(msg.value == deposit + tax, "msg.value != deposit + mevTax");
+        if (tax == 0) return;
+        assembly ("memory-safe") {
+            tstore(MEV_TAX_LOCATION, tax)
+        }
+        emit MevTaxPaid(msg.sender, tax);
     }
 
     modifier onlyPoolManager() {
@@ -113,7 +149,8 @@ contract Router is EIP712, Multicall {
     ///         Native input (currency0 = address(0) and zeroForOne = true, OR currency1 =
     ///         address(0) and zeroForOne = false) requires `msg.value == order.amountIn` —
     ///         the router holds the ETH and settles it to PM during unlock. For ERC20 input
-    ///         the maker must approve the router for `amountIn` of the input token.
+    ///         the maker must approve the router for `amountIn` of the input token. Either way `msg.value`
+    ///         also carries the MEV tax (`mevTax()`, zero without a priority fee).
     function swap(AsyncOrder calldata order, bytes memory userData) external payable {
         require(order.owner == msg.sender, "Only owner can swap");
         address onBehalf = address(this);
@@ -123,14 +160,10 @@ contract Router is EIP712, Multicall {
         require(userParams.amountOutMin == order.amountOutMin, "amountOutMin mismatch");
         require(userParams.priorityFee == order.priorityFee, "priorityFee mismatch");
 
-        // msg.value invariant: native input requires the exact deposit; ERC20 input forbids any
-        // value, so no ETH accumulates in the router between calls.
+        // msg.value invariant: the exact native deposit (none for ERC20 input) plus the MEV tax, so no ETH
+        // accumulates in the router between calls.
         Currency input = order.zeroForOne ? order.key.currency0 : order.key.currency1;
-        if (input.isAddressZero()) {
-            require(msg.value == order.amountIn, "msg.value != order.amountIn");
-        } else {
-            require(msg.value == 0, "msg.value forbidden for ERC20 input");
-        }
+        _chargeMevTax(input.isAddressZero() ? order.amountIn : 0);
         assembly ("memory-safe") {
             tstore(USER_LOCATION, caller())
             tstore(ASYNC_FILLER_LOCATION, onBehalf)
@@ -142,7 +175,8 @@ contract Router is EIP712, Multicall {
     ///         receives it less the 0.02% trade fee, and the filler the input less 0.02%.
     ///         For ERC20 output, approve the router for that amount. For native output,
     ///         `msg.value` must equal the live minimum;
-    ///         a stale or excessive deposit reverts rather than stranding the difference.
+    ///         a stale or excessive deposit reverts rather than stranding the difference. `msg.value`
+    ///         also carries the MEV tax (`mevTax()`, zero without a priority fee).
     ///         Native output is currency1 for zeroForOne, otherwise currency0.
     ///
     ///         `maxPrice` caps the output the filler pays —
@@ -167,11 +201,11 @@ contract Router is EIP712, Multicall {
             // total amount settled: maker net output plus protocol fee.
             (, uint256 livePrice) = HOOK.asyncOrderInfo(order.key.toId(), _orderId(order));
             livePrice += HOOK.calculatePoolFee(order.key.fee, livePrice);
-            require(msg.value == livePrice, "msg.value != livePrice");
-            (bool ok,) = address(HOOK).call{value: msg.value}("");
+            _chargeMevTax(livePrice);
+            (bool ok,) = address(HOOK).call{value: livePrice}("");
             require(ok, "Native output transfer to hook failed");
         } else {
-            require(msg.value == 0, "msg.value forbidden for ERC20 output");
+            _chargeMevTax(0);
         }
         POOLMANAGER.unlock(abi.encode(SwapCallback({action: ActionType.FillOrder, order: order, maxMatches: 0})));
     }
@@ -181,11 +215,17 @@ contract Router is EIP712, Multicall {
     ///         and the `AsyncOrder` witness (see `OrderSignatures`), so one signature both approves
     ///         the transfer and commits to the order. Input then lands in the hook escrow exactly as
     ///         in `swap`. Requires a prior Permit2 approval of the input token; native input is not
-    ///         supported (use `swap`).
-    function swapWithSig(AsyncOrder calldata order, PermitData calldata permit, ExecutorGrant calldata grant) external {
+    ///         supported (use `swap`). The relayer pays the MEV tax for its transaction's priority in `msg.value`.
+    function swapWithSig(AsyncOrder calldata order, PermitData calldata permit, ExecutorGrant calldata grant)
+        external
+        payable
+    {
         Currency input = order.zeroForOne ? order.key.currency0 : order.key.currency1;
         require(!input.isAddressZero(), "Native input needs swap()");
-        if (grant.signature.length != 0 && !HOOK.isExecutor(order.key.toId(), order.owner, address(this))) {
+        _chargeMevTax(0);
+        // Always apply a supplied grant, which spends its nonce. A skipped grant would stay valid in public calldata,
+        // and anyone could replay it to re-authorize the Router after the maker revokes it.
+        if (grant.signature.length != 0) {
             HOOK.setExecutorWithSig(
                 order.key, order.owner, address(this), true, grant.nonce, grant.deadline, grant.signature
             );
@@ -269,8 +309,10 @@ contract Router is EIP712, Multicall {
     }
 
     /// @notice Retry a resting order against the pool's active Uniswap v4 LP positions.
-    /// @dev The order is left untouched when the pool cannot fully fill it at its minimum output.
-    function fillFromPoolLiquidity(AsyncOrder calldata order) external {
+    /// @dev The order is left untouched when the pool cannot fully fill it at its minimum output. `msg.value` is
+    ///      the MEV tax.
+    function fillFromPoolLiquidity(AsyncOrder calldata order) external payable {
+        _chargeMevTax(0);
         address onBehalf = address(this);
         assembly ("memory-safe") {
             tstore(USER_LOCATION, caller())
@@ -293,6 +335,7 @@ contract Router is EIP712, Multicall {
             user := tload(USER_LOCATION)
             asyncFiller := tload(ASYNC_FILLER_LOCATION)
         }
+        _payMevTax();
 
         if (action == uint8(ActionType.WithdrawClaims)) {
             (, address owner, Currency[] memory currencies, uint256[] memory amounts) =
@@ -377,6 +420,18 @@ contract Router is EIP712, Multicall {
         }
 
         return "";
+    }
+
+    /// @dev Credits a recorded MEV tax, held by the Router since the entry call, to the FeeVault as native claims.
+    function _payMevTax() private {
+        uint256 tax;
+        assembly ("memory-safe") {
+            tax := tload(MEV_TAX_LOCATION)
+            tstore(MEV_TAX_LOCATION, 0)
+        }
+        if (tax == 0) return;
+        POOLMANAGER.settle{value: tax}();
+        POOLMANAGER.mint(address(HOOK.feeVault()), 0, tax);
     }
 
     event ClaimWithdrawn(address indexed owner, Currency indexed currency, uint256 amount);

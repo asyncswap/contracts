@@ -61,7 +61,7 @@ contract AsyncSwapDeployer {
         }
         require(deployed != address(0), "hook deploy failed");
         hook = AsyncSwap(payable(deployed));
-        router = new Router(manager, hook, ISignatureTransfer(address(0)));
+        router = new Router(manager, hook, ISignatureTransfer(address(0)), 0);
         require(address(router) == predictedRouter, "router address mismatch");
     }
 

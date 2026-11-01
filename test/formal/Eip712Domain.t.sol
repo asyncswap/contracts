@@ -40,7 +40,7 @@ contract DomainHarness is AsyncSwap {
 
 /// @dev Router exposing the internal `_EIP712Name` / `_EIP712Version`.
 contract RouterDomainHarness is Router {
-    constructor(IPoolManager manager, AsyncSwap hook_, ISignatureTransfer permit2) Router(manager, hook_, permit2) {}
+    constructor(IPoolManager manager, AsyncSwap hook_, ISignatureTransfer permit2) Router(manager, hook_, permit2, 0) {}
 
     function eip712Name() external view returns (string memory) {
         return _EIP712Name();

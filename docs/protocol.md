@@ -19,7 +19,7 @@ flowchart LR
     end
 
     subgraph Periphery
-        Router["Router.sol<br/>swap · swapWithSig · fillOrder<br/>cancelOrder · cancelWithSig<br/>matchBook · fillFromPoolLiquidity"]
+        Router["Router.sol<br/>swap · swapWithSig · fillOrder<br/>cancelOrder · cancelWithSig · cancelAndWithdraw<br/>withdrawClaims · matchBook · fillFromPoolLiquidity<br/>multicall"]
         Permit2["Permit2<br/>permitWitnessTransferFrom"]
         NativeClaims["NativeClaims.sol<br/>redeem native claims (ID 0)"]
         TokenClaims["TokenClaims.sol<br/>redeem ERC-20 claims"]
@@ -29,13 +29,15 @@ flowchart LR
         PM["Uniswap v4 PoolManager<br/>unlock · swap<br/>ERC-6909 claims"]
         Hook["AsyncSwap.sol (hook)<br/>beforeInitialize · beforeSwap<br/>beforeAddLiquidity<br/>matchNewOrder · executeOrder<br/>updatePrice · cancelOrder<br/>setExecutor(WithSig)"]
         Matching["AsyncMatching.sol<br/>external library, delegatecall<br/>addOrder · match · fill · cancel<br/>updatePrice · fillFromPool"]
-        Filler_["AsyncFiller.sol<br/>State: orders, isExecutor<br/>Book: bids, asks, levels"]
+        DFO["DynamicFeeOrdering.sol<br/>linked library<br/>dynamic fee on pool fills"]
+        Filler_["AsyncFiller.sol<br/>State: orders, isExecutor<br/>Book: bids, asks, levels,<br/>minOrder, minAssetAmount"]
+        Tick["TickPrice.sol<br/>linked library<br/>limit price → v4 tick key"]
         Radix["RadixPriceTree.sol<br/>best bid / best ask<br/>priority tree per level"]
         Sigs["OrderSignatures.sol<br/>EIP-712 types · Permit2 witness"]
         Vault["FeeVault.sol<br/>owns protocol fee claims in PoolManager<br/>collect(currency, recipient)"]
     end
 
-    Maker -->|swap, cancelOrder| Router
+    Maker -->|swap, cancelOrder, withdrawClaims, multicall| Router
     Maker -->|setExecutor, updatePrice| Hook
     Relayer -->|swapWithSig, cancelWithSig| Router
     Filler -->|fillOrder maxPrice| Router
@@ -51,6 +53,8 @@ flowchart LR
     Router -->|matchNewOrder, executeOrder,<br/>cancelOrder, matchBook,<br/>tryFillOrderFromPoolLiquidity| Hook
     Hook -.->|delegatecall| Matching
     Matching --> Filler_
+    Matching --> DFO
+    Filler_ --> Tick
     Filler_ --> Radix
     Hook --> Sigs
     Router --> Sigs
@@ -64,11 +68,21 @@ flowchart LR
 ```
 
 Anyone may open a pool on the hook, as long as it contains the chain's USDC (`numeraire`) and uses the
-dynamic-fee flag (`beforeInitialize`). The minimum order applies to each order's USDC leg (a buy's input,
-a sell's minimum output), so no check reads the initial price the opener chose. Each order must also trade at
-least 0.0001 of a whole asset token on its asset side (a sell's input, a buy's minimum output). The hook
-derives that floor from the asset's decimals when the pool opens, using the precision fixed at deployment. `beforeAddLiquidity` is a pass-through: anyone may add ordinary v4 range
-positions, and they are the inventory for the LP-fill path. No swap ever reaches the AMM curve
+dynamic-fee flag (`beforeInitialize`). Every order must meet two floors, both fixed when the pool opens:
+
+- **Minimum order**, on the USDC leg (a buy's input, a sell's minimum output). The hook's constructor
+  takes it in whole dollars and scales it by the numeraire's `decimals()`. No check reads the pool
+  price, so the initial price an opener chooses cannot block orders.
+- **Asset floor**, on the asset leg (a sell's input, a buy's minimum output): at least 0.0001 of a whole
+  token, `10^(decimals - assetPrecision)` base units with the deployed precision of 4. The hook reads
+  the asset's `decimals()` once when the pool opens (native ETH counts as 18; a token without
+  `decimals()` gets a 1-unit floor). An asset address with no code is rejected, so nobody can open a
+  pool before its token exists and pin that floor at 1 unit. This blocks literal dust such as 1-wei sells; it limits quantity,
+  not value.
+
+Neither floor, nor the $0.10 priority-bid cap (`10^(decimals - 1)` of the numeraire), has a setter: the
+owner cannot change the rules under live orders. `beforeAddLiquidity` is a pass-through: anyone may add
+ordinary v4 range positions, and they are the inventory for the LP-fill path. No swap ever reaches the AMM curve
 directly, because `beforeSwap` consumes the whole input as an order; the only AMM swaps are the ones
 the hook itself performs when it fills a resting order from pool liquidity. The standalone
 `MatchingEngine.sol` is a benchmark harness and is not deployed.
@@ -81,7 +95,7 @@ FeeVault owns claims recorded in PoolManager. Crediting those claims does not ca
 flowchart TB
     subgraph PoolManager["PoolManager (custody)"]
         Escrow["ERC-6909 claims owned by the hook<br/>one balance per currency<br/>= Σ open orders' remaining input<br/>+ escrowed priority bids"]
-        Fees["ERC-6909 claims owned by FeeVault<br/>= 0.02% trade fees and 0.01% pool-fill fees (both currencies)<br/>+ half of each dynamic fee<br/>+ settled priority bids"]
+        Fees["ERC-6909 claims owned by FeeVault<br/>= 0.02% trade fees and 0.01% pool-fill fees (both currencies)<br/>+ half of each dynamic fee<br/>+ settled priority bids<br/>+ MEV tax (native claims)"]
         User["ERC-6909 claims owned by makers / fillers<br/>match proceeds and dust refunds (any currency),<br/>native fill proceeds (claim ID 0)"]
         Reserves["Pool reserves<br/>v4 LP positions"]
     end
@@ -96,7 +110,7 @@ flowchart TB
     Reserves -->|dynamic fee: half| Fees
     Reserves -->|dynamic fee: half, donated| Reserves
     Fees -->|collect| OwnerW["Owner-chosen recipient"]
-    User -->|TokenClaims.redeem /<br/>NativeClaims.redeem| MakerW
+    User -->|TokenClaims.redeem /<br/>NativeClaims.redeem /<br/>Router.withdrawClaims| MakerW
 ```
 
 Fees, by path. A book match and a filler fill (`Router.fillOrder`) take a 0.02% trade fee, rounded up,
@@ -105,7 +119,8 @@ asset less 0.02% and the seller the quote less 0.02%; in a filler fill the fille
 maker's live minimum, the maker receives that minimum less 0.02%, and the filler receives the input less
 0.02%. A maker's guarantee is therefore its minimum output minus 0.02%. Refunds and cancels are not
 charged. An LP fill sends 0.01% of the input to the FeeVault and swaps the rest at a 0.02% dynamic LP
-fee for the active v4 positions; it still pays the full minimum. `calculatePoolFee` (a surcharge on top
+fee for the active v4 positions; it still pays the full minimum. A pool fill that stops at the best book
+level (see section 4) pays the 0.01% only on the input it swapped and must meet the maker's minimum pro rata. `calculatePoolFee` (a surcharge on top
 of the minimum) and `calculateHookFee` are zero.
 
 Dynamic fee ordering (`DynamicFeeOrdering`). The first pool fill in a window of 2 blocks records the pool's
@@ -128,6 +143,7 @@ recompute fees from gross amounts:
 | 0.01% protocol fee, pool fill | `OrderFeeAccrued` | the filled order, in the input |
 | Dynamic fee, pool fill | `DynamicFeeCharged(poolId, orderId, currency, toLps, toFeeVault, refTick)` | the filled order, in the output |
 | 0.02% LP fee, pool fill | PoolManager's `Swap` event (`fee`) | the pool |
+| MEV tax | Router `MevTaxPaid(payer, amount)` | the transaction's sender, in native ETH |
 
 `AsyncOrdersMatched` and `AsyncOrderFilled` carry gross amounts; `AsyncOrderLiquidityFilled` carries the
 maker's output after the dynamic fee.
@@ -135,10 +151,22 @@ Optional priority bids are escrowed as hook claims by `addOrder` and settle to t
 as input fills, the rest when the order closes. A zero bid incurs no escrow or transfer. Bids never go to LPs, so liquidity added just before
 a settlement earns none of them.
 
+MEV tax ("Priority Is All You Need", Robinson & White). The Router charges every order creation and fill
+(`swap`, `swapWithSig`, `fillOrder`, `fillFromPoolLiquidity`) `mevTax()`: the transaction's priority fee per
+gas (`tx.gasprice - block.basefee`) times `MEV_TAX_GAS`, fixed at deployment (20,000,000 by default). It is
+paid in ETH in `msg.value`, on top of any native deposit, and credited to the FeeVault as native claims. On a
+chain that orders transactions by priority fee, searchers racing for the same position bid that fee up, and
+the tax turns most of the bid into protocol revenue instead of sequencer revenue: with `MEV_TAX_GAS` about 30
+times an order's gas, roughly 97% of it. A transaction with no priority fee pays nothing, so wallets should
+send orders with a zero priority fee. Cancels, claims and `matchBook` are not taxed, so a maker racing to
+protect an order pays only gas. The tax only captures value when searchers compete; it does not by itself
+protect the order they race against.
+
 An order-to-order match pays both sides, and returns any remainder left below the pool minimum, as
 PoolManager claims rather than token transfers, so a recipient a token refuses cannot block matching.
 Holders redeem ERC-20 claims through `TokenClaims` and native claims through `NativeClaims`, to any
-recipient, after approving the redeemer for that claim id. Filler fills and LP fills pay the maker's
+recipient, after approving the redeemer for that claim id, or to their own wallet through
+`Router.withdrawClaims` with exact per-claim allowances. Filler fills and LP fills pay the maker's
 ERC-20 output directly. Minting bid
 claims creates hook debt immediately; the PoolManager unlock must settle that debt, including for
 custom executors. The Router pays it with `settleFor(hook)`. All pools rank equal prices by remaining
@@ -169,6 +197,7 @@ sequenceDiagram
     PM->>H: beforeSwap(sender = Router, params, hookData)
     H->>PM: take(input, hook, amountIn, claims = true)
     H->>AM: addOrder(id, owner, amountIn, amountOutMin, isBuy, priorityFee)
+    Note over AM: checks the pool minimum (USDC leg), the asset floor<br/>(asset leg) and, for a nonzero bid, the bid floor
     AM->>PM: mint numeraire bid claims to hook, hook owes bid
     Note over AM: salt assigned by the hook, priceKey = v4 tick of the limit,<br/>order linked into the bid or ask level
     H-->>PM: BeforeSwapDelta consumes the whole input
@@ -177,6 +206,7 @@ sequenceDiagram
         R->>PM: settleFor(hook) with USDC bid
     end
     R->>H: matchNewOrder(order)
+    Note over H: the better venue goes first: the pool if it has active liquidity<br/>and its spot price beats the best opposing level, else the book
     H->>AM: match up to 8 crossing resting orders
     opt Incoming order still open
         H->>H: guarded self-call for LP fill
@@ -193,7 +223,8 @@ sequenceDiagram
 Signed orders follow the same path through `swapWithSig`. The maker signs one Permit2
 `PermitWitnessTransferFrom` whose witness is `OrderSignatures.hashOrder(order)`, so the signature
 both moves the input and commits to the order. A relayer can also attach a signed `SetExecutor` grant
-for the maker's first order on a pool.
+for the maker's first order on a pool. A supplied grant is always applied and its nonce spent, so it
+cannot be replayed to re-authorize the Router after the maker revokes it.
 
 ## 4. Everything after placement
 
@@ -208,9 +239,11 @@ are in [`order-lifecycle.md`](order-lifecycle.md). Three facts to keep in mind w
   pool fill (half to LPs, half to the FeeVault). Matching compares the signed limits, so the fee never changes which orders
   cross. `calculatePoolFee` and `calculateHookFee` are zero.
 - A new order goes to the better venue first. If the pool has active liquidity and its spot price is
-  strictly better than the best opposing book level, the hook tries the pool fill first and matches the
-  book only if that fails; otherwise it matches the book first and tries the pool for any remainder.
-  The comparison uses spot price, so it ignores the pool fill's fees and price impact.
+  strictly better than the best opposing book level, the pool goes first, limited at that level: it fills
+  the order up to the level and the book matches the rest (a fill that stops there pays out as claims, and
+  a remainder below the pool minimum that the book leaves is refunded). Otherwise the hook matches the book
+  first and the pool must take all of any remainder. The comparison uses spot price, so it ignores the pool
+  fill's fees and price impact; the limit keeps the pool from filling past a resting order.
 - `updatePrice` only re-ranks the order in the book. It needs no PoolManager unlock and triggers no
   matching; a later crossing order, `matchBook`, a filler or an LP retry has to execute it.
 - `matchNewOrder` is gated by a transient slot that `beforeSwap` writes for
@@ -226,14 +259,14 @@ struct, so a maker needs the event or an indexer to cancel or reprice.
 ```mermaid
 flowchart LR
     subgraph MakerRights["Maker (order.owner)"]
-        m1["swap / cancelOrder via Router<br/>(msg.sender must be owner)"]
+        m1["swap / cancelOrder / withdrawClaims via Router<br/>(msg.sender must be owner)<br/>Router.multicall batches them as the caller"]
         m2["updatePrice (msg.sender must be owner)"]
         m3["setExecutor / revoke"]
         m4["sign: Permit2 order witness,<br/>SetExecutor, UpdatePrice, CancelOrder (EIP-712)"]
     end
     subgraph ExecutorRights["Registered executor (the Router)"]
         e1["beforeSwap sender must equal hookData.executor<br/>and be authorised by the maker"]
-        e2["executeOrder, cancelOrder, tryFillOrderFromPoolLiquidity<br/>require isExecutor[maker][caller], inside the unlock"]
+        e2["executeOrder, cancelOrder, tryFillOrderFromPoolLiquidity<br/>require isExecutor[maker][caller], inside the unlock<br/>(cancelOrder also accepts the owner itself)"]
         e3["matchNewOrder: only the executor<br/>recorded by beforeSwap in the same tx (transient slot)"]
     end
     subgraph OwnerRights["Protocol owner (two-step transfer)"]
@@ -251,6 +284,16 @@ flowchart LR
     end
 ```
 
+`Router.multicall` runs several Router calls in one atomic transaction, each as the caller, so a maker
+can cancel many orders and withdraw claims at once without granting any other contract executor or
+operator rights. It is not payable: native-value actions (`swap` with native input, `fillOrder` with
+native output) must be sent on their own, so no two calls can count one `msg.value`. For the same reason a
+taxed action inside `multicall` needs a transaction with no priority fee.
+
+Revoking the Router with `setExecutor(poolId, router, false)` strands the maker's live orders on that
+pool: Router cancels and fills revert until the maker grants it again, while book matching can still
+consume them. A contract maker can cancel directly from its own unlock; an EOA has to re-grant first.
+
 Signed maker actions use unordered nonces: `AsyncSwap.nonceUsed` for `SetExecutor`,
 `UpdatePrice` and `CancelOrder` (the Router burns cancel nonces through `AsyncSwap.useNonce`, so
 `invalidateNonce` revokes any of them), and Permit2's own nonces for order witnesses. The Permit2 witness binds maker, both tokens, amounts, bid and pool; it leaves out
@@ -260,18 +303,20 @@ Signed maker actions use unordered nonces: `AsyncSwap.nonceUsed` for `SetExecuto
 
 ```mermaid
 flowchart LR
-    D["CREATE2 deployer<br/>0x4e59…956C"] -->|fixed salt| Lib["AsyncMatching library<br/>same address on every chain"]
-    D -->|mined salt: flags + 0x91 prefix| Hook["AsyncSwap hook<br/>constructor(PoolManager, USDC, owner)"]
+    D["CREATE2 deployer<br/>0x4e59…956C"] -->|fixed salts| Lib["TickPrice, DynamicFeeOrdering,<br/>AsyncMatching libraries<br/>same addresses on every chain"]
+    D -->|mined salt: flags + 0x91 prefix| Hook["AsyncSwap hook<br/>constructor(PoolManager, USDC, owner,<br/>Router, minOrderUsd, assetPrecision)"]
     Hook -->|constructor| Vault["FeeVault"]
-    Owner["Deployer / owner"] -->|CREATE| Router["Router(PoolManager, hook, Permit2)"]
+    Owner["Deployer / owner"] -->|CREATE, before the hook,<br/>at the address the hook is built with| Router["Router(PoolManager, hook, Permit2)"]
     Lib -.->|linked into bytecode| Hook
     Owner -->|CREATE, separate script| NC["NativeClaims(PoolManager)"]
     Owner -->|CREATE, separate script| TC["TokenClaims(PoolManager)"]
-    Hook -->|initialize| Pool["Pool: USDC × asset<br/>dynamic fee flag, hook address"]
+    Anyone["Anyone"] -->|PoolManager.initialize| Pool["Pool: USDC × asset<br/>dynamic fee flag, hook address"]
 ```
 
 `script/deploy.sh <chain-key> [dry-run|broadcast|verify]` runs this sequence against
-`script/config/chains.json`. On chains whose gas token has an ERC-20 twin (Arc: native USDC and
+`script/config/chains.json`. It passes `DEPLOY_MIN_ORDER_USD` (default 10) and an asset precision of 4;
+the constructor reads the numeraire's decimals (1 to 20) and derives the base-unit minimum and the
+$0.10 bid cap itself. On chains whose gas token has an ERC-20 twin (Arc: native USDC and
 `0x3600…0000` are one balance) never initialize a native-currency pool; pair the ERC-20 USDC with a
 normal ERC-20 asset.
 

@@ -47,6 +47,10 @@ contract DeployHookScript is FFIHelper {
         // Pools get a $10 minimum order (DEPLOY_MIN_ORDER_USD). The hook scales it, and its $0.10 priority-bid
         // cap, by the numeraire's decimals. Both are fixed at deployment.
         uint256 minOrderUsd = vm.envOr("DEPLOY_MIN_ORDER_USD", uint256(10));
+        // Order creation and fills pay an MEV tax of their priority fee per gas times this (DEPLOY_MEV_TAX_GAS),
+        // fixed at deployment. 20M gas is about 30x a typical order's gas, so a searcher racing for position
+        // pays roughly 97% of its bid to the FeeVault; a transaction with no priority fee pays nothing.
+        uint256 mevTaxGas = vm.envOr("DEPLOY_MEV_TAX_GAS", uint256(20_000_000));
         bytes memory creationCode = type(AsyncSwap).creationCode;
         bytes memory constructorArgs = abi.encode(
             address(manager),
@@ -73,7 +77,7 @@ contract DeployHookScript is FFIHelper {
         console.log("predicted hook address:", predicted);
 
         vm.startBroadcast(OWNER);
-        router = new Router(manager, AsyncSwap(payable(predicted)), ISignatureTransfer(PERMIT2));
+        router = new Router(manager, AsyncSwap(payable(predicted)), ISignatureTransfer(PERMIT2), mevTaxGas);
         require(address(router) == predictedRouter, "deployed router address mismatch");
         // Through the CREATE2 factory explicitly, as the library scripts do: on some chains Forge runs
         // `new AsyncSwap{salt: salt}` as a CREATE2 from the sender instead, missing the mined address.

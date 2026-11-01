@@ -93,6 +93,7 @@ contract AsyncSwap is BaseHook, EIP712 {
     error NotOwner();
     error ZeroAddress();
     error UnsupportedNumeraireDecimals();
+    error AssetHasNoCode();
     error SignatureExpired();
     error InvalidSignature();
     error NonceAlreadyUsed();
@@ -290,10 +291,12 @@ contract AsyncSwap is BaseHook, EIP712 {
     }
 
     /// @dev 10^(decimals - assetPrecision) base units of `asset`, at least 1. Native ETH has 18 decimals. A token
-    ///      without a readable `decimals()` gets the 1-unit floor, and reported decimals are capped at 36.
+    ///      without a readable `decimals()` gets the 1-unit floor, and reported decimals are capped at 36. An asset
+    ///      with no code reverts: a pool opened before its token is deployed would otherwise keep a 1-unit floor.
     function _minAssetAmount(Currency asset) private view returns (uint256) {
         uint256 decimals = 18;
         if (!asset.isAddressZero()) {
+            if (Currency.unwrap(asset).code.length == 0) revert AssetHasNoCode();
             (bool ok, bytes memory ret) = Currency.unwrap(asset).staticcall(abi.encodeWithSignature("decimals()"));
             if (!ok || ret.length < 32) return 1;
             decimals = abi.decode(ret, (uint256));
@@ -445,16 +448,19 @@ contract AsyncSwap is BaseHook, EIP712 {
         // insufficient active liquidity, or a price outside the maker's minimum reverts only the
         // external pool self-call; whatever neither venue takes rests on the book.
         // Going first, the pool may take the order only at prices better than the best resting level
-        // (FM-01): the swap is limited at that level, and a fill that would cross it reverts as partial,
-        // leaving the book to match. Going second, the pool keeps the maker's own minimum as its limit.
+        // (FM-01): the swap is limited at that level, fills up to it, and leaves the rest to the book (M-02).
+        // Going second, the pool keeps the maker's own minimum as its limit and must take the whole rest.
         (bool poolFirst, uint160 bookLimit) = _poolBeatsBook(order.key, state.orders[id].isBuy);
+        AsyncFiller.Book storage book = priceBooks[order.key.toId()];
         for (uint256 step; step < 2 && state.orders[id].amountIn != 0; ++step) {
             if ((step == 0) == poolFirst) {
                 try this.fillOrderFromPoolLiquidity(order, id, bookLimit) {} catch {}
             } else {
-                matched = AsyncMatching.matchIncoming(state, priceBooks[order.key.toId()], order.key, id, address(this));
+                matched = AsyncMatching.matchIncoming(state, book, order.key, id, address(this));
             }
         }
+        // A pool part can leave less than the minimum, which the book may not have taken.
+        if (poolFirst) AsyncMatching.closeBelowMinimum(state, book, order.key, id);
     }
 
     /// @dev True when the pool has active liquidity and its current price is strictly better for an
@@ -488,28 +494,13 @@ contract AsyncSwap is BaseHook, EIP712 {
     /// @dev The self-call boundary makes a failed AMM attempt atomic while preserving the resting
     ///      order. PoolManager skips hook callbacks when the hook itself is the swap caller, so this
     ///      swap does not create an order.
-    ///      `sqrtPriceLimitX96` is a price the swap may not cross (0 for none): the whole order fills
-    ///      before it, or the call reverts.
+    ///      `sqrtPriceLimitX96` is a price the swap may not cross (0 for none). Without one the whole order
+    ///      fills or the call reverts; with one the pool may fill part and leave the rest on the book.
     function fillOrderFromPoolLiquidity(AsyncOrder calldata order, bytes32 id, uint160 sqrtPriceLimitX96) external {
         if (msg.sender != address(this)) revert NotSelf();
         PoolId poolId = order.key.toId();
-        AsyncFiller.State storage state = asyncOrders[poolId];
-        // The protocol's 0.01% of the maker's input, rounded up; the library swaps the rest.
-        uint256 protocolFee = (state.orders[id].amountIn + 9_999) / 10_000;
-        if (protocolFee != 0) {
-            Currency input = order.zeroForOne ? order.key.currency0 : order.key.currency1;
-            poolManager.transfer(address(feeVault), input.toId(), protocolFee);
-            emit AsyncFiller.OrderFeeAccrued(poolId, id, input, protocolFee);
-        }
         AsyncMatching.fillFromPoolLiquidity(
-            state,
-            priceBooks[poolId],
-            order.key,
-            id,
-            state.orders[id].owner,
-            address(this),
-            protocolFee,
-            sqrtPriceLimitX96
+            asyncOrders[poolId], priceBooks[poolId], order.key, id, address(this), sqrtPriceLimitX96
         );
     }
 

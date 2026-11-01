@@ -190,7 +190,7 @@ contract MatchingInvariantTest is StdInvariant, Test {
             Hooks.BEFORE_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG
                 | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
         );
-        Router router = new Router(manager, AsyncSwap(payable(address(flags))), ISignatureTransfer(address(0)));
+        Router router = new Router(manager, AsyncSwap(payable(address(flags))), ISignatureTransfer(address(0)), 0);
         deployCodeTo(
             "AsyncSwap.sol",
             abi.encode(

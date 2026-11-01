@@ -7,7 +7,7 @@ Recovered October 16, 2026.
 
 These diagrams are copied verbatim from the chat. They are historical designs, not the current protocol specification. Updated diagrams matching the current source are in the [order lifecycle documentation](order-lifecycle.md).
 
-The current [README](../README.md) describes non-refundable priority bids: remaining bids are donated when an order is canceled or terminates, and amounts go to FeeVault when no active liquidity exists. A zero bid is now valid; a nonzero bid must meet the configured minimum. The refund path below therefore does not describe current behavior. The first diagram also contains an original cancellation-arrow placement that should be reviewed before reuse.
+Current priority bids are non-refundable and always settle to the protocol FeeVault, never to LPs, whether an order matches, fills, terminates or is cancelled. A zero bid is valid; a nonzero bid must meet the minimum. There is no FIFO mode. The refund and donation paths below therefore do not describe current behavior. The first diagram also contains an original cancellation-arrow placement that should be reviewed before reuse.
 
 ## Initial lifecycle blueprint
 

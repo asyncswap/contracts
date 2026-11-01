@@ -2,9 +2,9 @@
 
 # Async Swap
 
-Async Swap is an on-chain order book and matching engine built as a Uniswap v4 hook. Traders set a limit price for assets paired with USDC. Orders can match with other traders or available pool liquidity. Anyone can permissionlessly fill orders.
+Async Swap is an on-chain order book and matching engine built as a Uniswap v4 hook. Traders set a limit price for assets paired with USDC. Orders can match with other traders or available pool liquidity. Anyone can permissionlessly fill orders, and anyone can open a USDC pool on the hook. The minimum order, the $0.10 priority-bid cap and the 0.0001-token asset floor are fixed when the hook is deployed, so the owner cannot change pool rules under live orders.
 
-Book matching prioritizes price, with higher escrowed USDC bids breaking same-price ties and earlier submissions breaking equal-bid ties. Each side of a book match or filler fill receives its proceeds less a 0.02% protocol fee, so a maker receives at least its minimum output minus 0.02%; fills against pool liquidity pay active LPs 0.02% and the protocol 0.01%, and a fill that moves the pool back within two blocks of a pool fill pays a dynamic fee of half the price gap it closes, split between LPs and the protocol (dynamic fee ordering). Unfilled amounts remain open for later execution, repricing, or cancellation; fills depend on available liquidity and counterparties.
+Book matching prioritizes price, with higher escrowed USDC bids breaking same-price ties and earlier submissions breaking equal-bid ties. Each side of a book match or filler fill receives its proceeds less a 0.02% protocol fee, so a maker receives at least its minimum output minus 0.02%; fills against pool liquidity pay active LPs 0.02% and the protocol 0.01%, and a fill that moves the pool back within two blocks of a pool fill pays a dynamic fee of half the price gap it closes, split between LPs and the protocol (dynamic fee ordering). Order creation and fills also pay an MEV tax on the transaction's priority fee, credited to the protocol, so a transaction sent with no priority fee pays nothing and searchers racing for position pay most of their bids to the protocol. Unfilled amounts remain open for later execution, repricing, or cancellation; fills depend on available liquidity and counterparties.
 
 ## Documentation
 

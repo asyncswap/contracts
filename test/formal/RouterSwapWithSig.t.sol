@@ -67,8 +67,9 @@ contract RouterSwapWithSigFormalTest is FormalProbesA {
         _assertTransient(o.owner, address(router));
     }
 
-    /// @notice formal/Refinement/Swarm/RouterSwapWithSig.lean:64 — if the hook already lists the Router as
-    ///         the owner's executor, a non-empty grant is ignored (no `setExecutorWithSig`).
+    /// @notice formal/Refinement/Swarm/RouterSwapWithSig.lean:64, changed by the M-01 fix (Lean statement needs
+    ///         updating): even when the hook already lists the Router as the owner's executor, a non-empty grant
+    ///         is applied, so its nonce is spent and it cannot be replayed after a revocation.
     function testFuzz_swapWithSig_alreadyExecutor(
         address caller,
         AsyncOrder memory o,
@@ -77,33 +78,36 @@ contract RouterSwapWithSigFormalTest is FormalProbesA {
     ) public oneTx {
         vm.assume(_input(o) != address(0) && g.signature.length != 0);
         vm.mockCall(address(hook), _isExecCall(o), abi.encode(true));
+        vm.mockCall(address(hook), _grantCall(o, g), "");
         _mockUnlockOk();
-        vm.expectCall(address(hook), abi.encodeWithSelector(AsyncSwap.setExecutorWithSig.selector), 0);
+        vm.expectCall(address(hook), 0, _grantCall(o, g), 1);
         vm.expectCall(address(manager), 0, abi.encodeCall(IPoolManager.unlock, (_data(o, p))), 1);
         vm.prank(caller);
         router.swapWithSig(o, p, g);
         _assertTransient(o.owner, address(router));
     }
 
-    /// @notice formal/Refinement/Swarm/RouterSwapWithSig.lean:75 — a revert of `HOOK.isExecutor` is the
-    ///         call's revert.
-    function testFuzz_swapWithSig_isExecutor_revert(
+    /// @notice formal/Refinement/Swarm/RouterSwapWithSig.lean:75, changed by the M-01 fix (Lean statement needs
+    ///         updating): the Router no longer reads `HOOK.isExecutor`, so a revert there cannot affect the call.
+    function testFuzz_swapWithSig_neverReadsIsExecutor(
         address caller,
         AsyncOrder memory o,
         Router.PermitData memory p,
         Router.ExecutorGrant memory g,
         bytes memory err
-    ) public {
+    ) public oneTx {
         vm.assume(_input(o) != address(0) && g.signature.length != 0);
         vm.mockCallRevert(address(hook), _isExecCall(o), err);
+        vm.mockCall(address(hook), _grantCall(o, g), "");
         _mockUnlockOk();
+        vm.expectCall(address(hook), abi.encodeWithSelector(AsyncSwap.isExecutor.selector), 0);
         vm.prank(caller);
-        vm.expectRevert(err);
         router.swapWithSig(o, p, g);
+        _assertTransient(o.owner, address(router));
     }
 
-    /// @notice formal/Refinement/Swarm/RouterSwapWithSig.lean:88 — Router not yet an executor and a non-empty
-    ///         grant: it calls `HOOK.setExecutorWithSig(key, owner, router, true, nonce, deadline, sig)`; a
+    /// @notice formal/Refinement/Swarm/RouterSwapWithSig.lean:88 — a non-empty grant, whether or not the Router
+    ///         is already an executor: it calls `HOOK.setExecutorWithSig(key, owner, router, true, nonce, deadline, sig)`; a
     ///         revert there is the call's revert, else it continues with `unlock(swapWithSigData)`.
     function testFuzz_swapWithSig_grant(
         address caller,

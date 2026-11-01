@@ -28,6 +28,8 @@ contract SetupHook is Test {
     ///      cap is 100_000 base units.
     uint8 numeraireDecimals = 6;
     uint8 hookAssetPrecision = type(uint8).max; // no asset floor beyond 1 unit
+    /// @dev The Router's MEV tax gas, as deployed. Foundry's default transaction has no priority fee, so no tax.
+    uint256 routerMevTaxGas = 20_000_000;
     IPoolManager manager;
     AsyncSwap hook;
     Router router;
@@ -113,7 +115,9 @@ contract SetupHook is Test {
 
     /// @dev The Router, built with the hook's address before the hook is deployed there (as the deploy script does).
     function _deployRouter() internal {
-        router = new Router(manager, AsyncSwap(payable(_hookAddress())), ISignatureTransfer(Permit2Bytecode.PERMIT2));
+        router = new Router(
+            manager, AsyncSwap(payable(_hookAddress())), ISignatureTransfer(Permit2Bytecode.PERMIT2), routerMevTaxGas
+        );
     }
 
     function _createKey() internal {

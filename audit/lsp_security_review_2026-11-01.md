@@ -59,6 +59,10 @@ can undo it.
 
 `Router.swapWithSig` · Line 188 · Confidence: 75 · Severity: Medium
 
+> **Status: fixed.** `swapWithSig` now always applies a supplied grant, so its nonce is spent. The POC below is the
+> exploit against `81ba6b8`; [`GrantReplay.t.sol`](../test/security/poc/GrantReplay.t.sol) now holds the regression
+> tests `test_grantSpentEvenWhenRouterAlreadyExecutor` and `test_grantSpentWhenRouterNotYetExecutor`.
+
 **Description**
 `swapWithSig` applies a grant, and spends its nonce, only when the Router is not yet an executor. Otherwise the
 grant is skipped and stays valid until its deadline. After the maker revokes the Router, anyone can replay the
@@ -141,6 +145,16 @@ Logs:
 ### M-02: A front-run ask can force a new order onto the book at a worse price than the pool
 
 `AsyncSwap.matchNewOrder` → `AsyncMatching._swapAgainstPool` · Line 450 · Confidence: 60 · Severity: Medium
+
+> **Status: fixed.** Going first, the pool now fills the order up to the best book level and leaves the rest for
+> the book with the maker's own limit, instead of reverting and sending the whole order to the book. The attacker's
+> ask then only takes what the pool would have filled at worse prices. The POC below is the original exploit
+> against `81ba6b8`; [`PoolFirstFrontRun.t.sol`](../test/security/poc/PoolFirstFrontRun.t.sol) is now a regression
+> test (`test_frontRunAskNoLongerForcesWorseBookMatch`): the maker receives 998.7241 token0, more than the 998.7016
+> of the pool alone, and the attacker's round trip loses 0.0821 token0. The fix is covered by
+> [`PoolFirstPartialFill.t.sol`](../test/security/PoolFirstPartialFill.t.sol). The Router also now charges an MEV
+> tax on the transaction's priority fee (`Router.mevTax`), so searchers competing for such positions pay most of
+> their bids to the FeeVault.
 
 **Description**
 When the pool beats the book, the hook tries to fill the new order from the pool, capped at the best book price,
@@ -309,6 +323,11 @@ These have passing POCs, but the judging gates demote them for impact, so they c
 ### L-02: Pool squatting disables the asset floor
 
 `AsyncSwap._minAssetAmount` · Severity: Low
+
+> **Status: fixed.** An asset with no code now reverts `AssetHasNoCode`, so a pool can only be opened once its token
+> exists. The POC below is the exploit against `81ba6b8`;
+> [`PoolSquatAssetFloor.t.sol`](../test/security/poc/PoolSquatAssetFloor.t.sol) now holds the regression test
+> `test_cannotSquatPoolBeforeTokenIsDeployed`.
 
 Calling `decimals()` on an address with no code succeeds and returns nothing, which gives a 1-unit floor. A pool
 initialized at a token's predicted address before the token is deployed keeps that floor forever and accepts

@@ -1,6 +1,6 @@
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/2047394fa89cda4ed8f617b9d3c53de5e873ac09/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/81ba6b8081cd0a14a141591616a5f8409d55b349/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -41,6 +41,32 @@ transient pending-match id set for the rest of the transaction, and `matchBook` 
 
 ```solidity
 address public immutable router;
+```
+
+### minOrder
+
+Minimum order in numeraire base units (0: none), fixed at deployment for every pool so the
+owner cannot change the rules under live orders.
+
+```solidity
+uint256 public immutable minOrder;
+```
+
+### priorityFeeCap
+
+$0.10 in numeraire base units, `10^(decimals - 1)`: the most a priority-bid floor can require.
+
+```solidity
+uint64 public immutable priorityFeeCap;
+```
+
+### assetPrecision
+
+Decimal places of a whole asset token an order may trade, fixed at deployment: with 4, every order
+trades at least 0.0001 token on its asset side. 36 or more leaves only a 1-unit floor.
+
+```solidity
+uint8 public immutable assetPrecision;
 ```
 
 ### PENDING_NATIVE_DEPOSIT_SLOT
@@ -114,22 +140,6 @@ Unordered nonces consumed by signed maker actions (`setExecutorWithSig`, `update
 mapping(address maker => mapping(uint256 nonce => bool)) public nonceUsed;
 ```
 
-### defaultMinOrder
-
-Minimum order, in numeraire base units, that pools initialized from now on start with.
-
-```solidity
-uint256 public defaultMinOrder;
-```
-
-### defaultPriorityFeeCap
-
-$0.10 priority-bid cap in numeraire base units for pools initialized from now on.
-
-```solidity
-uint64 public defaultPriorityFeeCap = 100_000;
-```
-
 ## Functions
 
 <a id="onlyowner" />
@@ -142,14 +152,19 @@ Restricts a call to the protocol owner.
 modifier onlyOwner();
 ```
 
-<a id="constructor-ipoolmanager-currency-address-address" />
+<a id="constructor-ipoolmanager-currency-address-address-uint256-uint8" />
 
 ### constructor
 
 ```solidity
-constructor(IPoolManager _poolManager, Currency _numeraire, address _owner, address _router)
-        BaseHook(_poolManager)
-        EIP712("AsyncSwap", "1");
+constructor(
+        IPoolManager _poolManager,
+        Currency _numeraire,
+        address _owner,
+        address _router,
+        uint256 _minOrderUsd,
+        uint8 _assetPrecision
+    ) BaseHook(_poolManager) EIP712("AsyncSwap", "1");
 ```
 
 **Parameters**
@@ -160,6 +175,8 @@ constructor(IPoolManager _poolManager, Currency _numeraire, address _owner, addr
 | \_numeraire | `Currency` |  |
 | \_owner | `address` | Explicit protocol owner. Not `msg.sender`: CREATE2 deployments run the<br />constructor from the deterministic deployer, which could never act as owner. |
 | \_router | `address` | The Router, deployed after the hook (it takes the hook in its constructor): pass its<br />predicted address. |
+| \_minOrderUsd | `uint256` | Minimum order in whole numeraire units, e.g. dollars (0: none). The constructor scales it<br />and the $0.10 bid cap by the numeraire's own `decimals()`, so neither can be mis-scaled. |
+| \_assetPrecision | `uint8` | Decimal places of a whole asset token an order may trade (4: at least 0.0001 token). |
 
 <a id="transferownership-address" />
 
@@ -218,23 +235,19 @@ function sweep(Currency currency, address to) external onlyOwner;
 ### \_beforeInitialize
 
 <i>
-  Only the owner opens pools: the initial price feeds the sell-side minimum check, so an
-  extreme price set by anyone else could block every sell on the pool.
+  Anyone may open a pool that pairs the numeraire with a dynamic fee. No order check reads the
+  pool price, so the initializer's choice of price cannot block orders.
 </i>
 
 ```solidity
-function _beforeInitialize(address sender, PoolKey calldata key, uint160)
-        internal
-        virtual
-        override
-        returns (bytes4);
+function _beforeInitialize(address, PoolKey calldata key, uint160) internal virtual override returns (bytes4);
 ```
 
 **Parameters**
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| sender | `address` |  |
+| \_ | `address` |  |
 | key | `PoolKey` |  |
 | \_ | `uint160` |  |
 
@@ -290,6 +303,31 @@ function _beforeAddLiquidity(address, PoolKey calldata, ModifyLiquidityParams ca
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | \<none> | `bytes4` |  |
+
+<a id="_minassetamount-currency" />
+
+### \_minAssetAmount
+
+<i>
+  10^(decimals - assetPrecision) base units of `asset`, at least 1. Native ETH has 18 decimals. A token
+  without a readable `decimals()` gets the 1-unit floor, and reported decimals are capped at 36.
+</i>
+
+```solidity
+function _minAssetAmount(Currency asset) private view returns (uint256);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| asset | `Currency` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint256` |  |
 
 <a id="asyncorder-poolid-bytes32" />
 
@@ -364,71 +402,27 @@ function asyncOrderPriorityFee(PoolId poolId, bytes32 orderId) external view ret
 | ---- | ---- | ----------- |
 | \<none> | `uint256` |  |
 
-<a id="setminorder-poolkey-uint256" />
+<a id="minassetamount-poolid" />
 
-### setMinOrder
+### minAssetAmount
 
-Set a pool's minimum order, in numeraire base units (0: none).
+The least asset amount an order on this pool may trade (0 if not initialized).
 
 ```solidity
-function setMinOrder(PoolKey calldata key, uint256 minimum) external onlyOwner;
+function minAssetAmount(PoolId poolId) external view returns (uint256);
 ```
 
 **Parameters**
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| key | `PoolKey` |  |
-| minimum | `uint256` |  |
+| poolId | `PoolId` |  |
 
-<a id="setdefaultminorder-uint256" />
-
-### setDefaultMinOrder
-
-Set the minimum order new pools start with.
-
-```solidity
-function setDefaultMinOrder(uint256 minimum) external onlyOwner;
-```
-
-**Parameters**
+**Returns**
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| minimum | `uint256` |  |
-
-<a id="setdefaultpriorityfeecap-uint64" />
-
-### setDefaultPriorityFeeCap
-
-Set the $0.10 priority-bid cap for new pools in numeraire base units.
-
-```solidity
-function setDefaultPriorityFeeCap(uint64 cap) external onlyOwner;
-```
-
-**Parameters**
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| cap | `uint64` |  |
-
-<a id="setpriorityfeecap-poolkey-uint64" />
-
-### setPriorityFeeCap
-
-Correct an initialized pool's cap when its numeraire has a different decimal scale.
-
-```solidity
-function setPriorityFeeCap(PoolKey calldata key, uint64 cap) external onlyOwner;
-```
-
-**Parameters**
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| key | `PoolKey` |  |
-| cap | `uint64` |  |
+| \<none> | `uint256` |  |
 
 <a id="bestorder-poolid-bool" />
 
@@ -863,6 +857,12 @@ function _createOrder(PoolId poolId, bool zeroForOne, uint256 amountIn, UserPara
 
 ### setExecutor
 
+TODO Revoking the Router strands the maker's live orders on this pool: Router.cancelOrder and
+cancelWithSig revert (AsyncFiller.cancel needs the executor), and so do fillOrder and
+fillFromPoolLiquidity. An EOA can't call cancelOrder from its own unlock, so its input is
+stuck until it re-grants. Matching still consumes those orders. Either block revocation
+while orders are live or let the Router cancel on the owner's behalf regardless.
+
 Maker explicitly authorises an executor (typically the Router) to submit
 and fill orders on their behalf. Without this grant, `_createOrder` reverts
 on the maker's first swap. Pass `allow = false` to revoke an executor.
@@ -1279,10 +1279,10 @@ error NotOwner();
 error ZeroAddress();
 ```
 
-### InvalidPriorityFeeCap
+### UnsupportedNumeraireDecimals
 
 ```solidity
-error InvalidPriorityFeeCap();
+error UnsupportedNumeraireDecimals();
 ```
 
 ### SignatureExpired

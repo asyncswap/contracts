@@ -231,12 +231,9 @@ sequenceDiagram
     Operator->>PM: initialize(key, sqrtPriceX96)
     PM->>Hook: beforeInitialize(...)
     Hook->>Hook: Require configured USDC and dynamic-fee pool
+    Hook->>Hook: Copy the deployment minimum order and bid cap to the pool
     Hook-->>PM: beforeInitialize selector
     PM-->>Operator: Initialized tick, Initialize event
-    opt Configure minimum order size
-        Admin->>Hook: setMinOrder(key, minimum)
-        Hook-->>Admin: Minimum recorded
-    end
     LP->>LM: Add funded liquidity in a chosen tick range
     LM->>PM: unlock(liquidity operation)
     PM->>LM: unlockCallback(data)

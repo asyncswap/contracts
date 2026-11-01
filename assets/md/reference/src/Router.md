@@ -1,8 +1,8 @@
 # Router
 
-[Git Source](https://github.com/asyncswap/contracts/blob/2047394fa89cda4ed8f617b9d3c53de5e873ac09/src/Router.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/81ba6b8081cd0a14a141591616a5f8409d55b349/src/Router.sol)
 
-**Inherits:** EIP712
+**Inherits:** EIP712, Multicall
 
 **Title:** Router
 
@@ -16,6 +16,11 @@ redeemable through NativeClaims after approval; ERC20 payouts remain direct.
 Gasless variants (`swapWithSig`, `cancelWithSig`) take the maker's EIP-712 signature so a
 relayer can submit. Signed creates pull input through Permit2 with the order as witness,
 so the wallet shows the full order (tokens, amounts, pool) in one readable message.
+
+`multicall` runs several of these as one atomic transaction, each as the caller (for example,
+cancel many orders and withdraw the claims). It is not payable, so native-value actions
+(`swap` with native input, `fillOrder` with native output) cannot reuse one `msg.value`.
+Each action keeps its own PoolManager unlock and sets the transient slots it reads.
 
 ## Constants
 

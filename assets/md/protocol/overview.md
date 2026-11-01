@@ -15,7 +15,7 @@ flowchart LR
         Relayer["Relayer<br/>(submits signed orders)"]
         Keeper["Anyone<br/>(matchBook, fillFromPoolLiquidity)"]
         LP["v4 LP<br/>(adds range liquidity)"]
-        Owner["Protocol owner<br/>(FeeVault.collect, sweep, minimum order size)"]
+        Owner["Protocol owner<br/>(FeeVault.collect, sweep)"]
     end
 
     subgraph Periphery
@@ -42,7 +42,7 @@ flowchart LR
     Keeper -->|matchBook, fillFromPoolLiquidity| Router
     LP -->|modifyLiquidity| PM
     Owner -->|collect| Vault
-    Owner -->|sweep, setMinOrder| Hook
+    Owner -->|sweep| Hook
 
     Router -->|unlock → unlockCallback| PM
     Router -->|signed input| Permit2
@@ -63,8 +63,11 @@ flowchart LR
     TokenClaims -->|burn claim, send ERC-20| PM
 ```
 
-Every pool that uses the hook must contain the chain's USDC (`numeraire`) and use the dynamic-fee flag
-(`beforeInitialize`). `beforeAddLiquidity` is a pass-through: anyone may add ordinary v4 range
+Anyone may open a pool on the hook, as long as it contains the chain's USDC (`numeraire`) and uses the
+dynamic-fee flag (`beforeInitialize`). The minimum order applies to each order's USDC leg (a buy's input,
+a sell's minimum output), so no check reads the initial price the opener chose. Each order must also trade at
+least 0.0001 of a whole asset token on its asset side (a sell's input, a buy's minimum output). The hook
+derives that floor from the asset's decimals when the pool opens, using the precision fixed at deployment. `beforeAddLiquidity` is a pass-through: anyone may add ordinary v4 range
 positions, and they are the inventory for the LP-fill path. No swap ever reaches the AMM curve
 directly, because `beforeSwap` consumes the whole input as an order; the only AMM swaps are the ones
 the hook itself performs when it fills a resting order from pool liquidity. The standalone
@@ -236,10 +239,11 @@ flowchart LR
     subgraph OwnerRights["Protocol owner (two-step transfer)"]
         o1["FeeVault.collect(currency, recipient)"]
         o2["sweep(currency, to) — hook's raw balance only"]
-        o3["setMinOrder(key, minimum), setDefaultMinOrder(minimum)"]
+        o3["minimum order and bid cap: fixed at deployment, no setter"]
         o4["no pause, no upgrade, no access to escrow"]
     end
     subgraph Public["Anyone"]
+        p0["initialize a USDC, dynamic-fee pool"]
         p1["matchBook(key, 1..8)"]
         p2["fillFromPoolLiquidity(order)"]
         p3["fillOrder(order, maxPrice) — pays the maker"]

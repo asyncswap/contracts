@@ -1,6 +1,6 @@
 # AsyncFiller
 
-[Git Source](https://github.com/asyncswap/contracts/blob/2047394fa89cda4ed8f617b9d3c53de5e873ac09/src/libraries/AsyncFiller.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/81ba6b8081cd0a14a141591616a5f8409d55b349/src/libraries/AsyncFiller.sol)
 
 **Title:** AsyncFiller
 
@@ -155,53 +155,26 @@ function minPriorityFee(uint256 notional, uint64 cap) internal pure returns (uin
 | ---- | ---- | ----------- |
 | \<none> | `uint256` |  |
 
-<a id="checkminimum-state-book-poolid-bool-bool-uint256-uint256" />
+<a id="checkminimum-book-bool-uint256-uint256" />
 
 ### checkMinimum
 
-Reverts unless the order is worth at least the pool's minimum in the numeraire: a buy's
-input; a sell's minimum output and its input at the pool's current price. The price
-check keeps out sells that ask for the minimum but offer almost nothing.
+Reverts unless the order's numeraire leg is at least the pool's minimum (a buy's input, a
+sell's minimum output) and its asset leg at least the pool's asset floor (a sell's input, a buy's minimum
+output). Neither reads the pool price, which whoever initializes the pool sets.
 
 ```solidity
-function checkMinimum(
-        State storage self,
-        Book storage book,
-        PoolId poolId,
-        bool isBuy,
-        bool zeroForOne,
-        uint256 amountIn,
-        uint256 amountOutMin
-    ) internal view;
+function checkMinimum(Book storage book, bool isBuy, uint256 amountIn, uint256 amountOutMin) internal view;
 ```
 
 **Parameters**
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| self | `State` |  |
 | book | `Book` |  |
-| poolId | `PoolId` |  |
 | isBuy | `bool` |  |
-| zeroForOne | `bool` |  |
 | amountIn | `uint256` |  |
 | amountOutMin | `uint256` |  |
-
-<a id="setminorder-book-poolid-uint256" />
-
-### setMinOrder
-
-```solidity
-function setMinOrder(Book storage book, PoolId poolId, uint256 minimum) internal;
-```
-
-**Parameters**
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| book | `Book` |  |
-| poolId | `PoolId` |  |
-| minimum | `uint256` |  |
 
 <a id="settlepriorityfee-state-poolkey-bytes32-address-uint256-address" />
 
@@ -781,19 +754,6 @@ event PriorityFeeForfeited(PoolId indexed poolId, bytes32 indexed orderId, addre
 | maker | `address` |  |
 | amount | `uint256` |  |
 
-### MinOrderSet
-
-```solidity
-event MinOrderSet(PoolId indexed poolId, uint256 minOrder);
-```
-
-**Parameters**
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| poolId | `PoolId` |  |
-| minOrder | `uint256` |  |
-
 ## Errors
 
 ### OrderAlreadyExists
@@ -842,6 +802,12 @@ error PriorityFeeTooSmall();
 
 ```solidity
 error BelowMinimumOrder();
+```
+
+### BelowMinimumAssetAmount
+
+```solidity
+error BelowMinimumAssetAmount();
 ```
 
 ## Structs
@@ -992,6 +958,8 @@ struct Book {
         mapping(uint128 price => PriceLevel) askLevels;
         /// @dev Least order size in numeraire base units (0: none); see `checkMinimum`.
         uint256 minOrder;
+        /// @dev Least asset amount an order may trade, from the asset's decimals and the hook's precision.
+        uint256 minAssetAmount;
     }
 ```
 
@@ -1007,3 +975,4 @@ struct Book {
 | bidLevels | `mapping(uint128 price => PriceLevel)` |  |
 | askLevels | `mapping(uint128 price => PriceLevel)` |  |
 | minOrder | `uint256` |  |
+| minAssetAmount | `uint256` |  |

@@ -122,8 +122,8 @@ contract AsyncSwapBeforeInitializeFormalTest is FormalBase {
         hook.beforeInitialize(sender, k, sp);
     }
 
-    /// @notice Only the hook owner may open a pool: from the PoolManager, any other sender reverts `NotOwner`.
-    function testFuzz_beforeInitialize_notOwner(
+    /// @notice Pool creation is permissionless: from the PoolManager, any sender opens a valid key.
+    function testFuzz_beforeInitialize_anySender(
         address sender,
         address other,
         bool numIs0,
@@ -133,12 +133,11 @@ contract AsyncSwapBeforeInitializeFormalTest is FormalBase {
     ) public {
         vm.assume(sender != hook.owner());
         PoolKey memory k = _key(numIs0 ? _num() : other, numIs0 ? other : _num(), DYN, ts, hooks);
-        vm.expectRevert(AsyncSwap.NotOwner.selector);
-        vm.prank(address(manager));
-        hook.beforeInitialize(sender, k, sp);
+        (bool ok,) = _call(address(manager), sender, k, sp);
+        assertTrue(ok, "a non-owner opens the pool");
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeInitialize.lean:58 — from the PoolManager, a key with no numeraire leg reverts `NumeraireRequired`. (semantics changed by the owner-only pool initialization; Lean statement needs updating)
+    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeInitialize.lean:58 — from the PoolManager, a key with no numeraire leg reverts `NumeraireRequired`.
     function testFuzz_beforeInitialize_numeraireRequired(
         address sender,
         address c0,
@@ -150,13 +149,12 @@ contract AsyncSwapBeforeInitializeFormalTest is FormalBase {
     ) public {
         vm.assume(c0 != _num() && c1 != _num());
         PoolKey memory k = _key(c0, c1, fee, ts, hooks);
-        address owner = hook.owner();
         vm.expectRevert(AsyncSwap.NumeraireRequired.selector);
         vm.prank(address(manager));
-        hook.beforeInitialize(owner, k, sp);
+        hook.beforeInitialize(sender, k, sp);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeInitialize.lean:67 — from the PoolManager, with a numeraire leg but a static fee, reverts `DynamicFeeRequired`. (semantics changed by the owner-only pool initialization; Lean statement needs updating)
+    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeInitialize.lean:67 — from the PoolManager, with a numeraire leg but a static fee, reverts `DynamicFeeRequired`.
     function testFuzz_beforeInitialize_dynamicFeeRequired(
         address sender,
         address other,
@@ -171,13 +169,12 @@ contract AsyncSwapBeforeInitializeFormalTest is FormalBase {
         address c0 = numIs0 || bothNum ? _num() : other;
         address c1 = !numIs0 || bothNum ? _num() : other;
         PoolKey memory k = _key(c0, c1, fee, ts, hooks);
-        address owner = hook.owner();
         vm.expectRevert(AsyncSwap.DynamicFeeRequired.selector);
         vm.prank(address(manager));
-        hook.beforeInitialize(owner, k, sp);
+        hook.beforeInitialize(sender, k, sp);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeInitialize.lean:78 — under the guards, returns exactly `0xdc98354e` and the world is the three writes of `asyncOrders[key.toId()]`. (semantics changed by the owner-only pool initialization; Lean statement needs updating)
+    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeInitialize.lean:78 — under the guards, returns exactly `0xdc98354e` and the world is the three writes of `asyncOrders[key.toId()]`.
     function testFuzz_beforeInitialize_run_ok(
         address sender,
         address other,
@@ -188,13 +185,13 @@ contract AsyncSwapBeforeInitializeFormalTest is FormalBase {
     ) public {
         PoolKey memory k = _key(numIs0 ? _num() : other, numIs0 ? other : _num(), DYN, ts, hooks);
         vm.record();
-        (bool ok, bytes memory ret) = _call(address(manager), hook.owner(), k, sp);
+        (bool ok, bytes memory ret) = _call(address(manager), sender, k, sp);
         assertTrue(ok, "guards hold but call reverted");
         assertEq(abi.decode(ret, (bytes4)), SEL);
         _assertWrites(k);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeInitialize.lean:97 — under the guards, returns the selector and the hook's storage becomes `beforeInit_state`. (semantics changed by the owner-only pool initialization; Lean statement needs updating)
+    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeInitialize.lean:97 — under the guards, returns the selector and the hook's storage becomes `beforeInit_state`.
     function testFuzz_beforeInitialize_ok(
         address sender,
         address other,
@@ -207,34 +204,34 @@ contract AsyncSwapBeforeInitializeFormalTest is FormalBase {
         if (withOrder) _placeOrder(alice, true, 1 ether, 1 ether);
         PoolKey memory k = _key(numIs0 ? _num() : other, numIs0 ? other : _num(), DYN, ts, hooks);
         vm.record();
-        (bool ok, bytes memory ret) = _call(address(manager), hook.owner(), k, sp);
+        (bool ok, bytes memory ret) = _call(address(manager), sender, k, sp);
         assertTrue(ok);
         assertEq(abi.decode(ret, (bytes4)), SEL);
         _assertWrites(k);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeInitialize.lean:105 — every success satisfies the guards, returns the selector and writes `beforeInit_state`. (semantics changed by the owner-only pool initialization; Lean statement needs updating)
+    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeInitialize.lean:105 — every success satisfies the guards, returns the selector and writes `beforeInit_state`.
     function testFuzz_beforeInitialize_ok_inv(In memory x) public {
         address caller = x.fromManager ? address(manager) : x.caller;
         PoolKey memory k = _steeredKey(x.c0, x.c1, x.num0, x.num1, x.fee, x.dyn, x.ts, x.hooks);
         vm.record();
         (bool ok, bytes memory ret) = _call(caller, x.sender, k, x.sp);
         if (ok) {
-            assertTrue(_guards(caller, k) && x.sender == hook.owner(), "success without guards");
+            assertTrue(_guards(caller, k), "success without guards");
             assertEq(abi.decode(ret, (bytes4)), SEL);
             _assertWrites(k);
         }
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeInitialize.lean:124 — succeeds iff sender is the PoolManager, a leg is the numeraire, and fee is the dynamic flag. (semantics changed by the owner-only pool initialization; Lean statement needs updating)
+    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeInitialize.lean:124 — succeeds iff sender is the PoolManager, a leg is the numeraire, and fee is the dynamic flag.
     function testFuzz_beforeInitialize_succeeds_iff(In memory x) public {
         address caller = x.fromManager ? address(manager) : x.caller;
         PoolKey memory k = _steeredKey(x.c0, x.c1, x.num0, x.num1, x.fee, x.dyn, x.ts, x.hooks);
         (bool ok,) = _call(caller, x.sender, k, x.sp);
-        assertEq(ok, _guards(caller, k) && x.sender == hook.owner());
+        assertEq(ok, _guards(caller, k));
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeInitialize.lean:145 — footprint: a success changes only `asyncOrders[key.toId()].{poolManager,numeraire,feeVault}`; every other pool and state variable is unchanged. (semantics changed by the owner-only pool initialization; Lean statement needs updating)
+    /// @notice formal/Refinement/Swarm/AsyncSwapBeforeInitialize.lean:145 — footprint: a success changes only `asyncOrders[key.toId()].{poolManager,numeraire,feeVault}`; every other pool and state variable is unchanged.
     function testFuzz_beforeInitialize_frame(
         address sender,
         address other,
@@ -256,7 +253,7 @@ contract AsyncSwapBeforeInitializeFormalTest is FormalBase {
             _loadHook(bytes32(PENDING_OWNER_SLOT))
         ];
         vm.record();
-        (bool ok,) = _call(address(manager), hook.owner(), k, sp);
+        (bool ok,) = _call(address(manager), sender, k, sp);
         assertTrue(ok);
         _assertWrites(k);
         assertEq(_loadHook(bytes32(OWNER_SLOT)), before[3]);

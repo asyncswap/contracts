@@ -95,7 +95,7 @@ library AsyncMatching {
     function addOrder(AsyncFiller.State storage self, AsyncFiller.Book storage book, AsyncFiller.NewOrder memory order)
         public
     {
-        self.checkMinimum(book, order.poolId, order.isBuy, order.zeroForOne, order.amountIn, order.amountOutMin);
+        AsyncFiller.checkMinimum(book, order.isBuy, order.amountIn, order.amountOutMin);
         self.addOrder(
             book,
             order.id,

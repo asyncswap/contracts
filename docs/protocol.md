@@ -63,8 +63,9 @@ flowchart LR
     TokenClaims -->|burn claim, send ERC-20| PM
 ```
 
-Every pool that uses the hook must contain the chain's USDC (`numeraire`) and use the dynamic-fee flag
-(`beforeInitialize`). `beforeAddLiquidity` is a pass-through: anyone may add ordinary v4 range
+Anyone may open a pool on the hook, as long as it contains the chain's USDC (`numeraire`) and uses the
+dynamic-fee flag (`beforeInitialize`). The minimum order applies to each order's USDC leg (a buy's input,
+a sell's minimum output), so no check reads the initial price the opener chose. `beforeAddLiquidity` is a pass-through: anyone may add ordinary v4 range
 positions, and they are the inventory for the LP-fill path. No swap ever reaches the AMM curve
 directly, because `beforeSwap` consumes the whole input as an order; the only AMM swaps are the ones
 the hook itself performs when it fills a resting order from pool liquidity. The standalone
@@ -240,6 +241,7 @@ flowchart LR
         o4["no pause, no upgrade, no access to escrow"]
     end
     subgraph Public["Anyone"]
+        p0["initialize a USDC, dynamic-fee pool"]
         p1["matchBook(key, 1..8)"]
         p2["fillFromPoolLiquidity(order)"]
         p3["fillOrder(order, maxPrice) — pays the maker"]

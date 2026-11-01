@@ -8,6 +8,7 @@ import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {MockERC20} from "../utils/MockERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {LPFeeLibrary} from "v4-core/libraries/LPFeeLibrary.sol";
+import {TickMath} from "v4-core/libraries/TickMath.sol";
 import {Currency} from "v4-core/types/Currency.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 
@@ -111,10 +112,12 @@ contract MinimumOrderTest is MinimumOrderBase {
     }
 
     /// A sell asking for plenty but offering almost nothing, at the pool's 1:1 price, is below the minimum.
-    function test_RevertWhen_SellInputWorthLessThanMinimum() public {
+    /// A sell is held to the minimum by its numeraire output alone: the pool price, which whoever opens the
+    ///         pool sets, is never read, so a tiny input asking for the minimum rests.
+    function test_sellJudgedByMinimumOutputNotInput() public {
         AsyncOrder memory ask = _order(alice, true, 1, 100 ether, 100_000);
-        vm.expectRevert();
-        this.submitExternal(ask);
+        _submit(ask);
+        assertEq(hook.asyncOrder(poolId, _id(ask)), 1, "the 1-wei ask rests");
     }
 
     function test_sellAtMinimum_rests() public {
@@ -192,20 +195,16 @@ contract MinimumOrderTest is MinimumOrderBase {
         vm.stopPrank();
     }
 
-    function submitSellExternal(PoolKey memory k, uint256 amountIn, uint256 amountOutMin) external {
-        _submitSell(k, amountIn, amountOutMin);
-    }
-
     function _submitSell(PoolKey memory k, uint256 amountIn, uint256 amountOutMin) internal {
         AsyncOrder memory order = AsyncOrder(k, alice, false, amountIn, amountOutMin, 100_000, 2 ** 96, 0);
         vm.prank(alice);
         router.swap(order, abi.encode(AsyncSwap.UserParams(alice, address(router), amountOutMin, 100_000)));
     }
 
-    function test_RevertWhen_SellInputWorthLessThanMinimum_numeraireIsCurrency0() public {
+    function test_sellJudgedByMinimumOutputNotInput_numeraireIsCurrency0() public {
         (PoolKey memory k,) = _numeraireFirstPool();
-        vm.expectRevert();
-        this.submitSellExternal(k, 1, 100 ether);
+        _submitSell(k, 1, 100 ether);
+        assertEq(manager.balanceOf(address(hook), k.currency1.toId()), 1, "the 1-wei sell rests");
     }
 
     function test_sellAtMinimum_rests_numeraireIsCurrency0() public {
@@ -235,6 +234,28 @@ contract MinimumOrderTest is MinimumOrderBase {
         bid.key = key2;
         vm.expectRevert();
         this.submitExternal(bid);
+    }
+
+    /// Anyone may open a pool, at any price: a stranger's extreme initial price neither blocks a sell at the
+    /// minimum nor lets one below it in.
+    function test_strangerOpensPoolAtExtremePrice_minimumStillHolds() public {
+        PoolKey memory key2 = PoolKey({
+            currency0: currency0, currency1: currency1, fee: LPFeeLibrary.DYNAMIC_FEE_FLAG, tickSpacing: 3, hooks: hook
+        });
+        vm.prank(makeAddr("stranger"));
+        manager.initialize(key2, TickMath.MIN_SQRT_PRICE + 1);
+        vm.prank(alice);
+        hook.setExecutor(key2.toId(), address(router), true);
+
+        AsyncOrder memory ask = _order(alice, true, MIN, MIN, 100_000);
+        ask.key = key2;
+        _submit(ask);
+        assertEq(manager.balanceOf(address(hook), currency0.toId()), MIN, "the sell at the minimum rests");
+
+        AsyncOrder memory small = _order(alice, true, MIN, MIN - 1, 100_000);
+        small.key = key2;
+        vm.expectRevert();
+        this.submitExternal(small);
     }
 }
 

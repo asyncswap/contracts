@@ -234,15 +234,9 @@ contract AsyncSwap is BaseHook, EIP712 {
     }
 
     /// @inheritdoc BaseHook
-    /// @dev Only the owner opens pools: the initial price feeds the sell-side minimum check, so an
-    ///      extreme price set by anyone else could block every sell on the pool.
-    function _beforeInitialize(address sender, PoolKey calldata key, uint160)
-        internal
-        virtual
-        override
-        returns (bytes4)
-    {
-        if (sender != owner) revert NotOwner();
+    /// @dev Anyone may open a pool that pairs the numeraire with a dynamic fee. No order check reads the
+    ///      pool price, so the initializer's choice of price cannot block orders.
+    function _beforeInitialize(address, PoolKey calldata key, uint160) internal virtual override returns (bytes4) {
         if (!(key.currency0 == numeraire || key.currency1 == numeraire)) revert NumeraireRequired();
         if (key.fee != LPFeeLibrary.DYNAMIC_FEE_FLAG) revert DynamicFeeRequired();
         asyncOrders[key.toId()].poolManager = poolManager;

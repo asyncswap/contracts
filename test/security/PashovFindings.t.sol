@@ -219,6 +219,33 @@ contract EmptyRangeTest is PashovBase {
     }
 }
 
+/// Finding 7 (acknowledged, see audit/README.md): `_reduceAfterMatch` rounds a remainder's minimum up, so a partly matched
+/// order's exact ratio ends slightly worse than the maker signed, and an equal newer order moves ahead of it. Rounding
+/// down instead lets a worse dust remainder jump ahead (`test_worsePriceCannotJumpAheadWithBidOrAge`), so the fix is to
+/// rank by the signed ratio. This test pins today's behaviour; flip the last assertion when that fix lands.
+contract RemainderRoundingKnownIssueTest is PashovBase {
+    function test_knownIssue_partlyMatchedOrderFallsBehindAnEqualOrder() public {
+        // A and B ask 3 token0 for 6_000_000_001 token1 base units; A is older and pays a bid.
+        (, bytes32 aId) = _order(alice, true, 3e18, 6_000_000_001, 100_000);
+        (, bytes32 bId) = _order(carol, true, 3e18, 6_000_000_001, 0);
+        (bool found,, bytes32 best,) = hook.bestOrder(poolId, false);
+        assertTrue(found);
+        assertEq(best, aId, "before the match, A is ahead: same price, higher bid");
+
+        // Bob buys 10_000_000 token1 worth: a partial match of A at A's price.
+        _order(bob, false, 10_000_000, 4e15, 0);
+        assertLt(hook.asyncOrder(poolId, aId), 3e18, "A was partly matched");
+        assertEq(hook.asyncOrder(poolId, bId), 3e18, "B is untouched");
+
+        (, uint256 aMin) = hook.asyncOrderInfo(poolId, aId);
+        uint256 aIn = hook.asyncOrder(poolId, aId);
+        assertGt(aMin * 3e18, 6_000_000_001 * aIn, "A's remainder now asks more per token than A signed");
+
+        (,, best,) = hook.bestOrder(poolId, false);
+        assertEq(best, bId, "known issue: B moves ahead of A");
+    }
+}
+
 /// Finding 10: a copied grant submitted before the relayer spent its nonce, so the relayer's swapWithSig reverted.
 contract GrantFrontRunTest is PocSignedBase {
     function test_frontRunGrantDoesNotRevertTheRelayedOrder() public {

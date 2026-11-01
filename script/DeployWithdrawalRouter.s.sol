@@ -25,7 +25,9 @@ contract DeployWithdrawalRouter is Script {
         );
         ISignatureTransfer permit2 = current.PERMIT2();
         vm.startBroadcast();
-        withdrawalRouter = new Router(manager, hook, permit2, current.MEV_TAX_GAS());
+        // The chain's MEV tax gas from script/config/chains.json (exported by deploy-withdrawal-router.sh); the
+        // current Router may predate the tax.
+        withdrawalRouter = new Router(manager, hook, permit2, vm.envUint("DEPLOY_MEV_TAX_GAS"));
         vm.stopBroadcast();
     }
 }

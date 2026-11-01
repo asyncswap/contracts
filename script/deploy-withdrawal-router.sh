@@ -8,12 +8,16 @@ mode="${2:-dry-run}"
 set -a
 source .env.deploy
 set +a
-read -r chain_id rpc_env < <(python3 - "$chain_key" <<'PY'
+read -r chain_id DEPLOY_MEV_TAX_GAS rpc_env < <(python3 - "$chain_key" <<'PY'
 import json,sys
 c=json.load(open('script/config/chains.json'))['chains'][sys.argv[1]]
-print(c['chainId'],c['rpcUrlEnv'])
+t=c['deployment'].get('mevTaxGas')
+if not isinstance(t,int) or isinstance(t,bool) or t<0:
+    raise SystemExit(f"{c['name']} has no deployment.mevTaxGas in script/config/chains.json")
+print(c['chainId'],t,c['rpcUrlEnv'])
 PY
 )
+export DEPLOY_MEV_TAX_GAS
 rpc_url="${!rpc_env}"
 # Sepolia charges more deployment gas than the local simulation estimates.
 gas_multiplier=150

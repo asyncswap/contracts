@@ -78,12 +78,20 @@ if not isinstance(usdc, str) or not re.fullmatch(addr_re, usdc):
 pool_manager = contracts.get("poolManager")
 if not isinstance(pool_manager, str) or not re.fullmatch(addr_re, pool_manager):
     raise SystemExit(f"{chain['name']} has no PoolManager address in {config_path}.")
-print(chain["chainId"], usdc, pool_manager, chain.get("rpcUrlEnv") or "", chain.get("explorerUrl") or "", chain["name"].replace(" ", "_"))
+# The Router MEV tax only captures searcher bids where blocks are ordered by priority fee; elsewhere
+# it would only tax ordinary tips. Require an explicit per-chain decision.
+deployment = chain.get("deployment", {})
+mev_tax_gas = deployment.get("mevTaxGas")
+if not isinstance(mev_tax_gas, int) or isinstance(mev_tax_gas, bool) or mev_tax_gas < 0:
+    raise SystemExit(f"{chain['name']} has no deployment.mevTaxGas in {config_path}; confirm how it orders transactions and set it.")
+if mev_tax_gas != 0 and deployment.get("ordering") != "priority":
+    raise SystemExit(f"{chain['name']} sets mevTaxGas {mev_tax_gas} but its ordering is {deployment.get('ordering')!r}, not 'priority'.")
+print(chain["chainId"], usdc, pool_manager, mev_tax_gas, chain.get("rpcUrlEnv") or "", chain.get("explorerUrl") or "", chain["name"].replace(" ", "_"))
 PY
 )"
-read -r expected_chain_id DEPLOY_NUMERAIRE_ADDRESS POOL_MANAGER_ADDRESS rpc_url_env explorer_url chain_name <<< "$chain_config_values"
+read -r expected_chain_id DEPLOY_NUMERAIRE_ADDRESS POOL_MANAGER_ADDRESS DEPLOY_MEV_TAX_GAS rpc_url_env explorer_url chain_name <<< "$chain_config_values"
 chain_name="${chain_name//_/ }"
-export DEPLOY_NUMERAIRE_ADDRESS
+export DEPLOY_NUMERAIRE_ADDRESS DEPLOY_MEV_TAX_GAS
 
 # The chain's own RPC variable (e.g. RPC_URL_ARC) wins over the generic RPC_URL.
 if [[ -n "$rpc_url_env" && -n "${!rpc_url_env:-}" ]]; then
@@ -155,8 +163,24 @@ PY
   for pair in "AsyncMatching:$lib_addr" "AsyncSwap:$hook_addr" "Router:$router_addr" "FeeVault:$vault_addr" "TickPrice:$tick_addr" "DynamicFeeOrdering:$ordering_addr"; do
     [[ "${pair#*:}" != "-" ]] || { echo "Registry is missing ${pair%%:*}." >&2; exit 1; }
   done
-  hook_args="$(cast abi-encode "constructor(address,address,address)" "$POOL_MANAGER_ADDRESS" "$DEPLOY_NUMERAIRE_ADDRESS" "$OWNER")"
-  router_args="$(cast abi-encode "constructor(address,address,address)" "$POOL_MANAGER_ADDRESS" "$hook_addr" 0x000000000022D473030F116dDEE9F6B43aC78BA3)"
+  # Constructor arguments are read from the deployment transactions themselves, so verification uses
+  # exactly what was deployed (minimum order, asset precision, MEV tax gas) rather than today's config.
+  # Both constructors take only static words, so the arguments are the tail of the creation input:
+  # 6 words for the hook (deployed through the CREATE2 factory), 4 for the Router (a plain CREATE).
+  read -r hook_tx router_tx <<< "$(python3 - "$registry" <<'PY'
+import json, sys
+c = json.load(open(sys.argv[1]))["contracts"]
+print(c["AsyncSwap"].get("txHash") or "-", c["Router"].get("txHash") or "-")
+PY
+)"
+  [[ "$hook_tx" != "-" && "$router_tx" != "-" ]] || { echo "Registry is missing the hook or Router deployment transaction." >&2; exit 1; }
+  ctor_tail() { local input; input="$(cast tx "$1" input --rpc-url "$RPC_URL")"; echo "0x${input: -$(( $2 * 64 ))}"; }
+  hook_args="$(ctor_tail "$hook_tx" 6)"
+  router_args="$(ctor_tail "$router_tx" 4)"
+  [[ "$(cast abi-decode --input "constructor(address,address,address,address,uint256,uint8)" "$hook_args" | sed -n 1p)" == "$(cast to-check-sum-address "$POOL_MANAGER_ADDRESS")" ]] \
+    || { echo "Hook deployment input does not end with the expected constructor arguments; was it deployed from older source?" >&2; exit 1; }
+  [[ "$(cast abi-decode --input "constructor(address,address,address,uint256)" "$router_args" | sed -n 2p)" == "$(cast to-check-sum-address "$hook_addr")" ]] \
+    || { echo "Router deployment input does not end with the expected constructor arguments; was it deployed from older source?" >&2; exit 1; }
   vault_args="$(cast abi-encode "constructor(address)" "$POOL_MANAGER_ADDRESS")"
   lib_flag="src/libraries/AsyncMatching.sol:AsyncMatching:$lib_addr"
   tick_flag="src/libraries/TickPrice.sol:TickPrice:$tick_addr"

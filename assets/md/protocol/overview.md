@@ -153,7 +153,7 @@ a settlement earns none of them.
 
 MEV tax ("Priority Is All You Need", Robinson & White). The Router charges every order creation and fill
 (`swap`, `swapWithSig`, `fillOrder`, `fillFromPoolLiquidity`) `mevTax()`: the transaction's priority fee per
-gas (`tx.gasprice - block.basefee`) times `MEV_TAX_GAS`, fixed at deployment (20,000,000 by default). It is
+gas (`tx.gasprice - block.basefee`) times `MEV_TAX_GAS`, fixed at deployment and set per chain (see section 6). It is
 paid in ETH in `msg.value`, on top of any native deposit, and credited to the FeeVault as native claims. On a
 chain that orders transactions by priority fee, searchers racing for the same position bid that fee up, and
 the tax turns most of the bid into protocol revenue instead of sequencer revenue: with `MEV_TAX_GAS` about 30
@@ -316,7 +316,12 @@ flowchart LR
 `script/deploy.sh <chain-key> [dry-run|broadcast|verify]` runs this sequence against
 `script/config/chains.json`. It passes `DEPLOY_MIN_ORDER_USD` (default 10) and an asset precision of 4;
 the constructor reads the numeraire's decimals (1 to 20) and derives the base-unit minimum and the
-$0.10 bid cap itself. On chains whose gas token has an ERC-20 twin (Arc: native USDC and
+$0.10 bid cap itself. The Router's `MEV_TAX_GAS` comes from the chain's `deployment.mevTaxGas`, next to
+`deployment.ordering`, how that chain orders transactions. It is 20,000,000 on Unichain, whose blocks are
+ordered by priority fee, and 0 on chains ordered by arrival (Robinhood Chain), by block builders (Ethereum,
+Sepolia) or not yet confirmed (Arc, MegaETH), where it would only tax ordinary tips. `deploy.sh` refuses a
+chain with no value and a nonzero value on a chain not ordered by priority fee. `verify` reads the
+constructor arguments back from the deployment transactions. On chains whose gas token has an ERC-20 twin (Arc: native USDC and
 `0x3600…0000` are one balance) never initialize a native-currency pool; pair the ERC-20 USDC with a
 normal ERC-20 asset.
 

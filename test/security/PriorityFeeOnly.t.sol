@@ -142,9 +142,7 @@ contract PriorityFeeOnlyTest is PriorityFeeOnlyBase {
         k = PoolKey(key.currency0, key.currency1, key.fee, key.tickSpacing, h);
         e = new BidSkippingExecutor(manager, h, k);
         deployCodeTo(
-            "AsyncSwap.sol",
-            abi.encode(manager, currency1, address(this), address(e), uint256(0), uint64(100_000), type(uint8).max),
-            at
+            "AsyncSwap.sol", abi.encode(manager, currency1, address(this), address(e), uint256(0), type(uint8).max), at
         );
         manager.initialize(k, 2 ** 96);
         topUp(address(e), 10 ether);
@@ -197,7 +195,7 @@ contract PriorityFeeOnlyTest is PriorityFeeOnlyBase {
 /// @notice A hook deployed for an 18-decimal numeraire scales its $0.10 bid cap to 0.1 ether.
 contract PriorityFeeCap18DecimalTest is PriorityFeeOnlyBase {
     function setUp() public override {
-        hookPriorityFeeCap = 0.1 ether;
+        numeraireDecimals = 18;
         super.setUp();
     }
 

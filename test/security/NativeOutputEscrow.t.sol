@@ -43,11 +43,11 @@ contract NativeOutputEscrowTest is Test {
                 | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
         );
         router = new Router(manager, AsyncSwap(payable(address(flags))), ISignatureTransfer(Permit2Bytecode.PERMIT2));
+        // The 18-decimal mock stands in for 6-decimal USDC: the hook derives its $0.10 bid cap from decimals.
+        vm.mockCall(Currency.unwrap(currency1), abi.encodeWithSignature("decimals()"), abi.encode(uint8(6)));
         deployCodeTo(
             "AsyncSwap.sol",
-            abi.encode(
-                manager, currency1, address(this), address(router), uint256(0), uint64(100_000), type(uint8).max
-            ),
+            abi.encode(manager, currency1, address(this), address(router), uint256(0), type(uint8).max),
             address(flags)
         );
         hook = AsyncSwap(payable(address(flags)));

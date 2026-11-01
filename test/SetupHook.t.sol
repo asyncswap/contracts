@@ -23,8 +23,10 @@ contract SetupHook is Test {
 
     address owner = makeAddr("deployer");
     /// @dev Constructor parameters for `_deployHook`: a suite sets them before `super.setUp()`.
-    uint256 hookMinOrder;
-    uint64 hookPriorityFeeCap = 100_000;
+    uint256 hookMinOrderUsd;
+    /// @dev Decimals the mock numeraire reports to the hook constructor: 6, like USDC, so the derived $0.10 bid
+    ///      cap is 100_000 base units.
+    uint8 numeraireDecimals = 6;
     uint8 hookAssetPrecision = type(uint8).max; // no asset floor beyond 1 unit
     IPoolManager manager;
     AsyncSwap hook;
@@ -68,6 +70,7 @@ contract SetupHook is Test {
         vm.stopPrank();
         vm.label(t0, "token0");
         vm.label(t1, "token1");
+        _mockNumeraireDecimals();
     }
 
     /// @dev The hook's address: its permission flags.
@@ -80,13 +83,18 @@ contract SetupHook is Test {
         );
     }
 
+    /// @dev The hook derives its bid cap and minimum from the numeraire's decimals. The 18-decimal mock tokens
+    ///      stand in for USDC, so currency1 reports `numeraireDecimals` (6 by default) to the constructor.
+    function _mockNumeraireDecimals() internal {
+        vm.mockCall(Currency.unwrap(currency1), abi.encodeWithSignature("decimals()"), abi.encode(numeraireDecimals));
+    }
+
     /// @dev Deploys the hook with `router` as its one trusted swap caller: `_deployRouter` runs first.
     function _deployHook() internal {
+        _mockNumeraireDecimals();
         deployCodeTo(
             "AsyncSwap.sol",
-            abi.encode(
-                manager, currency1, address(this), address(router), hookMinOrder, hookPriorityFeeCap, hookAssetPrecision
-            ),
+            abi.encode(manager, currency1, address(this), address(router), hookMinOrderUsd, hookAssetPrecision),
             _hookAddress()
         );
         hook = AsyncSwap(payable(_hookAddress()));

@@ -430,6 +430,10 @@ contract AsyncSwapCtorSpecFormalTest is SpecEip712Constants, FormalImmutablesC {
     function setUp() public {
         manager = new PoolManager(address(this));
         usdc = new MockERC20("USD Coin", "USDC", 6);
+        // The constructor reads the numeraire's decimals; the other code-bearing candidates report 6 like USDC,
+        // so these checks keep testing the code and owner guards (Numeraire.t.sol covers the decimals guard).
+        vm.mockCall(address(manager), abi.encodeWithSignature("decimals()"), abi.encode(uint8(6)));
+        vm.mockCall(address(this), abi.encodeWithSignature("decimals()"), abi.encode(uint8(6)));
     }
 
     function _withCode(uint8 which) internal view returns (address) {

@@ -87,7 +87,7 @@ abstract contract MinimumOrderBase is SetupHook {
 /// @notice A hook deployed with a minimum of 10 (in numeraire units) holds every pool to it.
 contract MinimumOrderTest is MinimumOrderBase {
     function setUp() public override {
-        hookMinOrder = MIN;
+        hookMinOrderUsd = MIN / 1e6; // the 6-decimal mock numeraire scales it back to MIN
         super.setUp();
     }
 
@@ -328,7 +328,7 @@ contract MinimumOrderTieredBidTest is MinimumOrderBase {
 /// @notice A $10 minimum does not stop the sell bid floor from applying on a reprice.
 contract MinimumOrderBidFloorTest is MinimumOrderBase {
     function setUp() public override {
-        hookMinOrder = 10e6;
+        hookMinOrderUsd = 10;
         super.setUp();
     }
 

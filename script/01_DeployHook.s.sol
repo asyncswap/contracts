@@ -6,7 +6,6 @@ import {UniswapAddresses} from "./config/UniswapAddresses.sol";
 import {FFIHelper} from "./FFIHelper.sol";
 import {AsyncSwap} from "@async-swap/AsyncSwap.sol";
 import {Router} from "@async-swap/Router.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {console} from "forge-std/Script.sol";
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {Currency} from "v4-core/types/Currency.sol";
@@ -45,19 +44,16 @@ contract DeployHookScript is FFIHelper {
         // The hook trusts only the Router as swap caller, and the Router takes the hook in its constructor: the
         // Router goes first, as OWNER's next CREATE, pointing at the hook's mined address.
         address predictedRouter = vm.computeCreateAddress(OWNER, vm.getNonce(OWNER));
-        // Pools get a $10 minimum order (DEPLOY_MIN_ORDER_USD) and a $0.10 priority-bid cap, in the
-        // numeraire's base units. Both are fixed at deployment.
+        // Pools get a $10 minimum order (DEPLOY_MIN_ORDER_USD). The hook scales it, and its $0.10 priority-bid
+        // cap, by the numeraire's decimals. Both are fixed at deployment.
         uint256 minOrderUsd = vm.envOr("DEPLOY_MIN_ORDER_USD", uint256(10));
-        uint8 decimals = IERC20Metadata(Currency.unwrap(numeraire)).decimals();
-        require(decimals >= 1 && decimals <= 20, "Unsupported numeraire decimals");
         bytes memory creationCode = type(AsyncSwap).creationCode;
         bytes memory constructorArgs = abi.encode(
             address(manager),
             numeraire,
             OWNER,
             predictedRouter,
-            minOrderUsd * 10 ** decimals,
-            uint64(10 ** decimals / 10),
+            minOrderUsd,
             uint8(4) // orders trade at least 0.0001 of a whole asset token
         );
         bytes32 initCodeHash = keccak256(abi.encodePacked(creationCode, constructorArgs));

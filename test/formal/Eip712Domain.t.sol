@@ -24,7 +24,7 @@ interface IEip712Probe {
 /// @dev AsyncSwap with hook-address mining bypassed, exposing the internal `_EIP712Name` / `_EIP712Version`.
 contract DomainHarness is AsyncSwap {
     constructor(IPoolManager manager, Currency quote, address owner_, address router_)
-        AsyncSwap(manager, quote, owner_, router_, 0, 100_000, type(uint8).max)
+        AsyncSwap(manager, quote, owner_, router_, 0, type(uint8).max)
     {}
 
     function validateHookAddress(BaseHook) internal pure override {}

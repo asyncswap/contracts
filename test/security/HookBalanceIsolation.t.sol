@@ -73,17 +73,13 @@ contract HookBalanceIsolationTest is Test {
             PoolKey(Currency.wrap(address(t0)), Currency.wrap(address(t1)), LPFeeLibrary.DYNAMIC_FEE_FLAG, 1, hook);
         // The worst case: the self-executing maker is the hook's one trusted swap caller.
         SelfExecutingMaker d = new SelfExecutingMaker(manager, hook, key);
+        // The 18-decimal mock stands in for 6-decimal USDC: the hook derives its $0.10 bid cap from decimals.
+        vm.mockCall(
+            Currency.unwrap(Currency.wrap(address(t1))), abi.encodeWithSignature("decimals()"), abi.encode(uint8(6))
+        );
         deployCodeTo(
             "AsyncSwap.sol",
-            abi.encode(
-                manager,
-                Currency.wrap(address(t1)),
-                address(this),
-                address(d),
-                uint256(0),
-                uint64(100_000),
-                type(uint8).max
-            ),
+            abi.encode(manager, Currency.wrap(address(t1)), address(this), address(d), uint256(0), type(uint8).max),
             address(flags)
         );
         manager.initialize(key, 2 ** 96);

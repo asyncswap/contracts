@@ -8,6 +8,7 @@ import {RadixPriceTree} from "@async-swap/libraries/RadixPriceTree.sol";
 import {TickPrice} from "@async-swap/libraries/TickPrice.sol";
 import {AsyncOrder, AsyncOrderLibrary} from "@async-swap/types/AsyncOrder.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import {CurrencySettler} from "@async-swap/libraries/CurrencySettler.sol";
 import {IPoolManager, ModifyLiquidityParams, SwapParams} from "v4-core/interfaces/IPoolManager.sol";
@@ -69,7 +70,7 @@ contract AsyncSwap is BaseHook, EIP712 {
     ///         owner cannot change the rules under live orders.
     uint256 public immutable minOrder;
 
-    /// @notice $0.10 priority-bid cap in numeraire base units, fixed at deployment for every pool.
+    /// @notice $0.10 in numeraire base units, `10^(decimals - 1)`: the most a priority-bid floor can require.
     uint64 public immutable priorityFeeCap;
 
     /// @notice Decimal places of a whole asset token an order may trade, fixed at deployment: with 4, every order
@@ -91,7 +92,7 @@ contract AsyncSwap is BaseHook, EIP712 {
     error UnaccountedNativeOutput();
     error NotOwner();
     error ZeroAddress();
-    error InvalidPriorityFeeCap();
+    error UnsupportedNumeraireDecimals();
     error SignatureExpired();
     error InvalidSignature();
     error NonceAlreadyUsed();
@@ -186,25 +187,26 @@ contract AsyncSwap is BaseHook, EIP712 {
     ///               constructor from the deterministic deployer, which could never act as owner.
     /// @param _router The Router, deployed after the hook (it takes the hook in its constructor): pass its
     ///                predicted address.
-    /// @param _minOrder Minimum order in numeraire base units (0: none).
-    /// @param _priorityFeeCap $0.10 in numeraire base units: the most a priority-bid floor can require.
+    /// @param _minOrderUsd Minimum order in whole numeraire units, e.g. dollars (0: none). The constructor scales it
+    ///                     and the $0.10 bid cap by the numeraire's own `decimals()`, so neither can be mis-scaled.
     /// @param _assetPrecision Decimal places of a whole asset token an order may trade (4: at least 0.0001 token).
     constructor(
         IPoolManager _poolManager,
         Currency _numeraire,
         address _owner,
         address _router,
-        uint256 _minOrder,
-        uint64 _priorityFeeCap,
+        uint256 _minOrderUsd,
         uint8 _assetPrecision
     ) BaseHook(_poolManager) EIP712("AsyncSwap", "1") {
         if (Currency.unwrap(_numeraire).code.length == 0) revert InvalidNumeraire();
         if (_owner == address(0) || _router == address(0)) revert ZeroAddress();
-        if (_priorityFeeCap == 0) revert InvalidPriorityFeeCap();
+        uint8 decimals = IERC20Metadata(Currency.unwrap(_numeraire)).decimals();
+        // 10^19 is the largest power of ten a uint64 cap holds.
+        if (decimals == 0 || decimals > 20) revert UnsupportedNumeraireDecimals();
         numeraire = _numeraire;
         router = _router;
-        minOrder = _minOrder;
-        priorityFeeCap = _priorityFeeCap;
+        minOrder = _minOrderUsd * 10 ** decimals;
+        priorityFeeCap = uint64(10 ** (decimals - 1));
         assetPrecision = _assetPrecision;
         owner = _owner;
         feeVault = new FeeVault(_poolManager);

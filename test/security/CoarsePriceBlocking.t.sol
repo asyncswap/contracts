@@ -28,7 +28,7 @@ contract CoarsePriceBlockingTest is SetupHook {
         currency0 = Currency.wrap(address(token0));
         currency1 = Currency.wrap(address(token1));
         _deployRouter();
-        hookMinOrder = 1_000_000;
+        hookMinOrderUsd = 1;
         _deployHook();
         _createKey();
         // 1,000 USDC per 18-decimal asset: raw token1/token0 ratio = 1e-9.

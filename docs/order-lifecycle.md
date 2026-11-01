@@ -10,11 +10,11 @@ These diagrams describe the current source, not a deployment or mainnet-readines
 flowchart TD
     A["Submit order: input amount, minimum output, optional USDC bid"] --> D["Require pool minimum (USDC leg) and 0.0001-token asset floor; validate bid minimum only for nonzero bid"]
     D --> E["Validate executor; escrow input and any nonzero bid at creation"]
-    E --> R{"Pool spot price strictly better than the best opposing level?"}
-    R -- "No" --> F["Match best opposing prices first; up to 8 pairs"]
-    R -- "Yes" --> P["Try the order against pool liquidity first"]
-    P -- "Filled" --> Z
-    P -- "Attempt reverts" --> F
+    E --> V{"Pool spot price strictly better than the best opposing level?"}
+    V -- "No" --> F["Match best opposing prices first; up to 8 pairs"]
+    V -- "Yes" --> PF["Try the order against pool liquidity first"]
+    PF -- "Filled" --> Z
+    PF -- "Attempt reverts" --> F
     F --> G["Same-price ties: highest remaining bid, then earliest sequence"]
     G --> H["Settle executable crossing pairs; reduce orders and settle bid shares"]
     H --> I{"Incoming order still open?"}
@@ -29,15 +29,15 @@ flowchart TD
     N -- "Input exhausted or remainder below pool minimum" --> Z
     M -- "Router.fillFromPoolLiquidity" --> J
     M -- "Private filler chooses order" --> O["Check live minimum against filler maxPrice"]
-    O --> P["Filler pays the minimum; maker gets it less 0.02%, filler the input less 0.02%; settle bid; close order"]
-    P --> Z
+    O --> FF["Filler pays exactly the minimum; maker gets it less 0.02%, filler the input less 0.02%; settle bid; close order"]
+    FF --> Z
     M -- "Maker reprices" --> Q["Update minimum; re-enter book with fresh time priority"]
     Q --> M
-    M -- "Authorized cancellation" --> R["Return remaining input; settle remaining bid; close order"]
-    R --> Z
+    M -- "Owner or authorized cancellation" --> C["Return remaining input; settle remaining bid; close order"]
+    C --> Z
 ```
 
-If no executable crossing pair exists, the initial matching pass leaves the order unchanged before the LP attempt. `Router.matchBook` accepts a bound of 1–8 pairs and does not itself retry LP liquidity. An LP retry does not require the order to be first in the book. Private fills require a maker-authorized executor (normally the Router); the filler supplies the live minimum plus the protocol fee in the same transaction. That protocol fee is separate from the LP fee on pool-liquidity fills. Book-match proceeds, and input returned below the pool minimum, are credited as PoolManager claims in every currency, redeemable through `TokenClaims` (ERC-20) or `NativeClaims` (ETH); native fill proceeds and refunds are claims too. Filler and LP fills pay ERC-20 output directly.
+If no executable crossing pair exists, the initial matching pass leaves the order unchanged before the LP attempt. `Router.matchBook` accepts a bound of 1–8 pairs and does not itself retry LP liquidity. An LP retry does not require the order to be first in the book. Private fills require a maker-authorized executor (normally the Router); the filler pays exactly the live minimum in the same transaction, and the 0.02% trade fee comes out of each side's proceeds. That trade fee is separate from the LP fee on pool-liquidity fills. Book-match proceeds, and input returned below the pool minimum, are credited as PoolManager claims in every currency, redeemable through `TokenClaims` (ERC-20), `NativeClaims` (ETH) or `Router.withdrawClaims`; native fill proceeds and refunds are claims too. Filler and LP fills pay ERC-20 output directly.
 
 Sources: [Router](../src/Router.sol), [AsyncSwap](../src/AsyncSwap.sol), [AsyncMatching](../src/libraries/AsyncMatching.sol), and [AsyncFiller](../src/libraries/AsyncFiller.sol).
 

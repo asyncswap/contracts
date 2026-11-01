@@ -29,7 +29,9 @@ flowchart LR
         PM["Uniswap v4 PoolManager<br/>unlock · swap<br/>ERC-6909 claims"]
         Hook["AsyncSwap.sol (hook)<br/>beforeInitialize · beforeSwap<br/>beforeAddLiquidity<br/>matchNewOrder · executeOrder<br/>updatePrice · cancelOrder<br/>setExecutor(WithSig)"]
         Matching["AsyncMatching.sol<br/>external library, delegatecall<br/>addOrder · match · fill · cancel<br/>updatePrice · fillFromPool"]
-        Filler_["AsyncFiller.sol<br/>State: orders, isExecutor<br/>Book: bids, asks, levels"]
+        DFO["DynamicFeeOrdering.sol<br/>linked library<br/>dynamic fee on pool fills"]
+        Filler_["AsyncFiller.sol<br/>State: orders, isExecutor<br/>Book: bids, asks, levels,<br/>minOrder, minAssetAmount"]
+        Tick["TickPrice.sol<br/>linked library<br/>limit price → v4 tick key"]
         Radix["RadixPriceTree.sol<br/>best bid / best ask<br/>priority tree per level"]
         Sigs["OrderSignatures.sol<br/>EIP-712 types · Permit2 witness"]
         Vault["FeeVault.sol<br/>owns protocol fee claims in PoolManager<br/>collect(currency, recipient)"]
@@ -51,6 +53,8 @@ flowchart LR
     Router -->|matchNewOrder, executeOrder,<br/>cancelOrder, matchBook,<br/>tryFillOrderFromPoolLiquidity| Hook
     Hook -.->|delegatecall| Matching
     Matching --> Filler_
+    Matching --> DFO
+    Filler_ --> Tick
     Filler_ --> Radix
     Hook --> Sigs
     Router --> Sigs
@@ -179,6 +183,7 @@ sequenceDiagram
     PM->>H: beforeSwap(sender = Router, params, hookData)
     H->>PM: take(input, hook, amountIn, claims = true)
     H->>AM: addOrder(id, owner, amountIn, amountOutMin, isBuy, priorityFee)
+    Note over AM: checks the pool minimum (USDC leg), the asset floor<br/>(asset leg) and, for a nonzero bid, the bid floor
     AM->>PM: mint numeraire bid claims to hook, hook owes bid
     Note over AM: salt assigned by the hook, priceKey = v4 tick of the limit,<br/>order linked into the bid or ask level
     H-->>PM: BeforeSwapDelta consumes the whole input
@@ -187,6 +192,7 @@ sequenceDiagram
         R->>PM: settleFor(hook) with USDC bid
     end
     R->>H: matchNewOrder(order)
+    Note over H: the better venue goes first: the pool if it has active liquidity<br/>and its spot price beats the best opposing level, else the book
     H->>AM: match up to 8 crossing resting orders
     opt Incoming order still open
         H->>H: guarded self-call for LP fill
@@ -243,7 +249,7 @@ flowchart LR
     end
     subgraph ExecutorRights["Registered executor (the Router)"]
         e1["beforeSwap sender must equal hookData.executor<br/>and be authorised by the maker"]
-        e2["executeOrder, cancelOrder, tryFillOrderFromPoolLiquidity<br/>require isExecutor[maker][caller], inside the unlock"]
+        e2["executeOrder, cancelOrder, tryFillOrderFromPoolLiquidity<br/>require isExecutor[maker][caller], inside the unlock<br/>(cancelOrder also accepts the owner itself)"]
         e3["matchNewOrder: only the executor<br/>recorded by beforeSwap in the same tx (transient slot)"]
     end
     subgraph OwnerRights["Protocol owner (two-step transfer)"]
@@ -279,10 +285,10 @@ Signed maker actions use unordered nonces: `AsyncSwap.nonceUsed` for `SetExecuto
 
 ```mermaid
 flowchart LR
-    D["CREATE2 deployer<br/>0x4e59…956C"] -->|fixed salt| Lib["AsyncMatching library<br/>same address on every chain"]
+    D["CREATE2 deployer<br/>0x4e59…956C"] -->|fixed salts| Lib["TickPrice, DynamicFeeOrdering,<br/>AsyncMatching libraries<br/>same addresses on every chain"]
     D -->|mined salt: flags + 0x91 prefix| Hook["AsyncSwap hook<br/>constructor(PoolManager, USDC, owner,<br/>Router, minOrderUsd, assetPrecision)"]
     Hook -->|constructor| Vault["FeeVault"]
-    Owner["Deployer / owner"] -->|CREATE| Router["Router(PoolManager, hook, Permit2)"]
+    Owner["Deployer / owner"] -->|CREATE, before the hook,<br/>at the address the hook is built with| Router["Router(PoolManager, hook, Permit2)"]
     Lib -.->|linked into bytecode| Hook
     Owner -->|CREATE, separate script| NC["NativeClaims(PoolManager)"]
     Owner -->|CREATE, separate script| TC["TokenClaims(PoolManager)"]

@@ -95,7 +95,7 @@ FeeVault owns claims recorded in PoolManager. Crediting those claims does not ca
 flowchart TB
     subgraph PoolManager["PoolManager (custody)"]
         Escrow["ERC-6909 claims owned by the hook<br/>one balance per currency<br/>= Σ open orders' remaining input<br/>+ escrowed priority bids"]
-        Fees["ERC-6909 claims owned by FeeVault<br/>= 0.02% trade fees and 0.01% pool-fill fees (both currencies)<br/>+ half of each dynamic fee<br/>+ settled priority bids"]
+        Fees["ERC-6909 claims owned by FeeVault<br/>= 0.02% trade fees and 0.01% pool-fill fees (both currencies)<br/>+ half of each dynamic fee<br/>+ settled priority bids<br/>+ MEV tax (native claims)"]
         User["ERC-6909 claims owned by makers / fillers<br/>match proceeds and dust refunds (any currency),<br/>native fill proceeds (claim ID 0)"]
         Reserves["Pool reserves<br/>v4 LP positions"]
     end
@@ -119,7 +119,8 @@ asset less 0.02% and the seller the quote less 0.02%; in a filler fill the fille
 maker's live minimum, the maker receives that minimum less 0.02%, and the filler receives the input less
 0.02%. A maker's guarantee is therefore its minimum output minus 0.02%. Refunds and cancels are not
 charged. An LP fill sends 0.01% of the input to the FeeVault and swaps the rest at a 0.02% dynamic LP
-fee for the active v4 positions; it still pays the full minimum. `calculatePoolFee` (a surcharge on top
+fee for the active v4 positions; it still pays the full minimum. A pool fill that stops at the best book
+level (see section 4) pays the 0.01% only on the input it swapped and must meet the maker's minimum pro rata. `calculatePoolFee` (a surcharge on top
 of the minimum) and `calculateHookFee` are zero.
 
 Dynamic fee ordering (`DynamicFeeOrdering`). The first pool fill in a window of 2 blocks records the pool's
@@ -142,12 +143,24 @@ recompute fees from gross amounts:
 | 0.01% protocol fee, pool fill | `OrderFeeAccrued` | the filled order, in the input |
 | Dynamic fee, pool fill | `DynamicFeeCharged(poolId, orderId, currency, toLps, toFeeVault, refTick)` | the filled order, in the output |
 | 0.02% LP fee, pool fill | PoolManager's `Swap` event (`fee`) | the pool |
+| MEV tax | Router `MevTaxPaid(payer, amount)` | the transaction's sender, in native ETH |
 
 `AsyncOrdersMatched` and `AsyncOrderFilled` carry gross amounts; `AsyncOrderLiquidityFilled` carries the
 maker's output after the dynamic fee.
 Optional priority bids are escrowed as hook claims by `addOrder` and settle to the FeeVault: the filled share
 as input fills, the rest when the order closes. A zero bid incurs no escrow or transfer. Bids never go to LPs, so liquidity added just before
 a settlement earns none of them.
+
+MEV tax ("Priority Is All You Need", Robinson & White). The Router charges every order creation and fill
+(`swap`, `swapWithSig`, `fillOrder`, `fillFromPoolLiquidity`) `mevTax()`: the transaction's priority fee per
+gas (`tx.gasprice - block.basefee`) times `MEV_TAX_GAS`, fixed at deployment (20,000,000 by default). It is
+paid in ETH in `msg.value`, on top of any native deposit, and credited to the FeeVault as native claims. On a
+chain that orders transactions by priority fee, searchers racing for the same position bid that fee up, and
+the tax turns most of the bid into protocol revenue instead of sequencer revenue: with `MEV_TAX_GAS` about 30
+times an order's gas, roughly 97% of it. A transaction with no priority fee pays nothing, so wallets should
+send orders with a zero priority fee. Cancels, claims and `matchBook` are not taxed, so a maker racing to
+protect an order pays only gas. The tax only captures value when searchers compete; it does not by itself
+protect the order they race against.
 
 An order-to-order match pays both sides, and returns any remainder left below the pool minimum, as
 PoolManager claims rather than token transfers, so a recipient a token refuses cannot block matching.
@@ -226,9 +239,11 @@ are in [`order-lifecycle.md`](order-lifecycle.md). Three facts to keep in mind w
   pool fill (half to LPs, half to the FeeVault). Matching compares the signed limits, so the fee never changes which orders
   cross. `calculatePoolFee` and `calculateHookFee` are zero.
 - A new order goes to the better venue first. If the pool has active liquidity and its spot price is
-  strictly better than the best opposing book level, the hook tries the pool fill first and matches the
-  book only if that fails; otherwise it matches the book first and tries the pool for any remainder.
-  The comparison uses spot price, so it ignores the pool fill's fees and price impact.
+  strictly better than the best opposing book level, the pool goes first, limited at that level: it fills
+  the order up to the level and the book matches the rest (a fill that stops there pays out as claims, and
+  a remainder below the pool minimum that the book leaves is refunded). Otherwise the hook matches the book
+  first and the pool must take all of any remainder. The comparison uses spot price, so it ignores the pool
+  fill's fees and price impact; the limit keeps the pool from filling past a resting order.
 - `updatePrice` only re-ranks the order in the book. It needs no PoolManager unlock and triggers no
   matching; a later crossing order, `matchBook`, a filler or an LP retry has to execute it.
 - `matchNewOrder` is gated by a transient slot that `beforeSwap` writes for
@@ -272,7 +287,8 @@ flowchart LR
 `Router.multicall` runs several Router calls in one atomic transaction, each as the caller, so a maker
 can cancel many orders and withdraw claims at once without granting any other contract executor or
 operator rights. It is not payable: native-value actions (`swap` with native input, `fillOrder` with
-native output) must be sent on their own, so no two calls can count one `msg.value`.
+native output) must be sent on their own, so no two calls can count one `msg.value`. For the same reason a
+taxed action inside `multicall` needs a transaction with no priority fee.
 
 Revoking the Router with `setExecutor(poolId, router, false)` strands the maker's live orders on that
 pool: Router cancels and fills revert until the maker grants it again, while book matching can still

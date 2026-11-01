@@ -68,10 +68,10 @@ script. The local demo deploys a new mock-USDC market; it is not a mainnet liqui
   Source: <https://developers.uniswap.org/docs/protocols/v4/deployments>
 - USDC: `0x078D782b760474a361dDA0AF3839290b0EF57AD6`. Revalidate issuer address and decimals in the final
   rehearsal.
-- Runtime sizes (`forge build --sizes`, `optimizer_runs = 10_000`, 2026-11-01, after the M-01 and L-02 fixes):
-  AsyncSwap 23,355 bytes, AsyncMatching 22,626, Router 21,631, FeeVault 2,320, TokenClaims 2,110,
-  NativeClaims 1,964. All under the 24,576-byte EIP-170 limit, but the margins are thin: the hook has
-  1,221 bytes left (down from 5,339 on 2026-10-23), AsyncMatching 1,950 and Router 2,945. Budget audit
+- Runtime sizes (`forge build --sizes`, `optimizer_runs = 10_000`, 2026-11-01, after the M-01, L-02 and M-02
+  fixes): AsyncSwap 22,988 bytes, AsyncMatching 23,866, Router 22,130, FeeVault 2,320, TokenClaims 2,110,
+  NativeClaims 1,964. All under the 24,576-byte EIP-170 limit, but the margins are thin: AsyncMatching has
+  only 710 bytes left, the hook 1,588 and the Router 2,446. Budget audit
   fixes against those margins, prefer moving logic into linked libraries over growing the hook, and
   recheck after every change.
 - The deployment wrapper checks library code presence, not exact runtime identity. Pin and verify the
@@ -85,6 +85,10 @@ script. The local demo deploys a new mock-USDC market; it is not a mainnet liqui
 - Pool parameters are constructor arguments with no setter: `DEPLOY_MIN_ORDER_USD` (default $10) and an
   asset precision of 4 (0.0001 token). The constructor derives the $0.10 bid cap and the base-unit
   minimum from USDC's decimals. Confirm both values before broadcast; changing them means a new hook.
+- The Router's MEV tax gas is a constructor argument with no setter: `DEPLOY_MEV_TAX_GAS` (default 20,000,000).
+  The tax is the transaction's priority fee per gas times it, so it only works as intended on a chain that
+  orders by priority fee. Confirm Unichain's ordering and typical wallet priority fees before broadcast, and
+  have the frontend send orders with a zero priority fee.
 
 ## Before the audit starts
 

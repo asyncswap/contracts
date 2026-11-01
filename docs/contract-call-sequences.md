@@ -70,7 +70,7 @@ sequenceDiagram
         Router->>PM: settleFor(hook)
     end
     Router->>Hook: matchNewOrder(order)
-    Note over Hook,PM: If the pool has active liquidity and its spot tick beats the best opposing level,<br/>the pool fill below runs first and the book takes only what it leaves.
+    Note over Hook,PM: If the pool has active liquidity and its spot tick beats the best opposing level,<br/>the pool fill below runs first, limited at that level, and the book takes what it leaves.<br/>A remainder below the pool minimum that the book leaves is then refunded as claims.
     Hook->>Match: matchIncoming(...)
     loop Up to 8 executable crossing pairs
         Match->>Match: Best bid and best ask across the whole book (price, then bid, then time)
@@ -84,13 +84,14 @@ sequenceDiagram
     Match-->>Hook: Matched pair count
     opt Incoming order still has a remainder
         Hook->>Hook: External self-call fillOrderFromPoolLiquidity(order, id)
-        Hook->>PM: transfer 0.01% of the input claims to FeeVault (protocol fee)
         Hook->>Match: fillFromPoolLiquidity(...)
-        Match->>PM: Burn the rest of the input claims, temporarily set 0.02% LP fee
+        Match->>PM: Burn the input claims less 0.01%, temporarily set 0.02% LP fee
         Match->>PM: swap(remaining exact input)
         Note over Hook,PM: Hook-originated swap skips this hook's callbacks, it does not create another order.
         PM-->>Match: Actual input and output deltas
         Match->>PM: Restore previous LP fee
+        Match->>PM: Mint back any input the swap left unused (only a swap limited at the book level stops short)
+        Match->>PM: transfer 0.01% of the input swapped to FeeVault (protocol fee)
         Match->>Fee: charge(state, key, output, tickBefore, amountOut)
         Note over Fee,PM: First pool fill in a 2-block window: record the tick before it as the reference, no fee.<br/>Later fill in the window that moves the price back toward it: half the price gap it closes.
         opt Dynamic fee is due
@@ -102,7 +103,11 @@ sequenceDiagram
             Match->>PM: Pay output less the dynamic fee, settle remaining bid to FeeVault
             PM-->>Wallet: ERC-20 proceeds or native claims
             Match-->>Hook: Order removed, liquidity fill event
-        else Insufficient liquidity, partial execution, or limit not met
+        else Pool first, stopped at the book level, pro-rata minimum met
+            Match->>Match: Reduce the order, keeping the maker's limit; settle the filled bid share
+            Match->>PM: Credit output less the dynamic fee as claims
+            Match-->>Hook: Order stays open for the book, liquidity fill event
+        else Insufficient liquidity, partial execution without a limit, or limit not met
             Match-->>Hook: Self-call reverts, caught by matchNewOrder
             Note over Hook,PM: Only LP attempt rolls back, prior book fills and open remainder survive.
         end

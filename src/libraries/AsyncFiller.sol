@@ -44,6 +44,8 @@ library AsyncFiller {
         bool isBuy;
         bool zeroForOne;
         uint64 sequence;
+        /// @dev Maker reprices so far; signed reprices commit to it (`OrderSignatures.hashUpdatePrice`).
+        uint32 reprices;
         /// @dev The bid, escrowed as hook claims since the order was created.
         uint64 priorityFee;
         uint128 priorityKey;
@@ -168,6 +170,7 @@ library AsyncFiller {
             isBuy: isBuy,
             zeroForOne: zeroForOne,
             sequence: sequence,
+            reprices: 0,
             priorityFee: uint64(priorityFee),
             priorityKey: _priorityKey(uint64(priorityFee), sequence),
             createdSequence: sequence
@@ -272,6 +275,7 @@ library AsyncFiller {
         info.price = _priceKey(info.isBuy, info.zeroForOne, info.amountIn, newAmountOutMin);
         // A maker price update re-enters the queue with fresh time priority.
         info.sequence = ++book.nextSequence;
+        ++info.reprices;
         _append(self, book, id);
         emit AsyncOrderPriceUpdated(order.key.toId(), id, old, newAmountOutMin);
     }

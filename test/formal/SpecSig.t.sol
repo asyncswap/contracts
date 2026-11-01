@@ -528,21 +528,12 @@ contract SpecSigFormalTest is FormalProbesA {
         o.key = key;
     }
 
-    function _routerCancelDigest(AsyncOrder memory o, uint256 amountIn, uint256 nonce, uint256 deadline)
-        internal
-        view
-        returns (bytes32)
-    {
+    function _routerCancelDigest(AsyncOrder memory o, uint256 nonce, uint256 deadline) internal view returns (bytes32) {
         return keccak256(
             _leanPreimage(
                 _leanDomainSep("AsyncSwap Router", address(router)),
                 OrderSignatures.hashCancel(
-                    o,
-                    _routerOrderId(o),
-                    amountIn,
-                    hook.orderCreatedSequence(o.key.toId(), _routerOrderId(o)),
-                    nonce,
-                    deadline
+                    o, _routerOrderId(o), hook.orderCreatedSequence(o.key.toId(), _routerOrderId(o)), nonce, deadline
                 )
             )
         );
@@ -578,7 +569,7 @@ contract SpecSigFormalTest is FormalProbesA {
         bytes memory r = _script(fail, ret, magic, extra, bytes32(0), tryWrite);
         _mockInfo(o, amountIn);
         _mockUnlockOk();
-        vm.expectCall(address(wallet), _leanCalldata(_routerCancelDigest(o, amountIn, nonce, deadline), sig), 1);
+        vm.expectCall(address(wallet), _leanCalldata(_routerCancelDigest(o, nonce, deadline), sig), 1);
         vm.record();
         (bool ok, bytes memory err) =
             address(router).call(abi.encodeCall(Router.cancelWithSig, (o, nonce, deadline, sig)));
@@ -603,9 +594,7 @@ contract SpecSigFormalTest is FormalProbesA {
         uint256 deadline = block.timestamp;
         _mockInfo(o, amountIn);
         _mockUnlockOk();
-        _script(
-            false, "", true, 0, keccak256(_leanCalldata(_routerCancelDigest(o, amountIn, nonce, deadline), sig)), false
-        );
+        _script(false, "", true, 0, keccak256(_leanCalldata(_routerCancelDigest(o, nonce, deadline), sig)), false);
         router.cancelWithSig(o, nonce, deadline, sig);
         assertEq(vm.load(address(hook), _cancelNonceSlot(o.owner, nonce)), bytes32(uint256(1)));
     }
@@ -623,7 +612,7 @@ contract SpecSigFormalTest is FormalProbesA {
         o.key = key;
         _mockInfo(o, amountIn);
         _mockUnlockOk();
-        bytes32 digest = _routerCancelDigest(o, amountIn, nonce, block.timestamp);
+        bytes32 digest = _routerCancelDigest(o, nonce, block.timestamp);
         vm.assume(!SignatureChecker.isValidSignatureNow(o.owner, digest, sig));
         vm.expectRevert(Router.InvalidSignature.selector);
         router.cancelWithSig(o, nonce, block.timestamp, sig);
@@ -638,7 +627,7 @@ contract SpecSigFormalTest is FormalProbesA {
         o.owner = vm.addr(pk);
         o.key = key;
         _mockInfo(o, amountIn);
-        bytes32 d = _routerCancelDigest(o, amountIn, nonce, block.timestamp);
+        bytes32 d = _routerCancelDigest(o, nonce, block.timestamp);
         bytes memory sig = _signSig(pk, d);
         vm.expectCall(o.owner, _leanCalldata(d, sig), 0);
         router.cancelWithSig(o, nonce, block.timestamp, sig);
@@ -650,7 +639,7 @@ contract SpecSigFormalTest is FormalProbesA {
     {
         _walletOrder(o);
         _mockInfo(o, amountIn);
-        bytes memory sig = _signSig(pk, _routerCancelDigest(o, amountIn, nonce, block.timestamp));
+        bytes memory sig = _signSig(pk, _routerCancelDigest(o, nonce, block.timestamp));
         (ok,) = address(router).call(abi.encodeCall(Router.cancelWithSig, (o, nonce, block.timestamp, sig)));
     }
 

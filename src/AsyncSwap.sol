@@ -374,6 +374,11 @@ contract AsyncSwap is BaseHook, EIP712 {
         return asyncOrders[poolId].orders[id].createdSequence;
     }
 
+    /// @notice How many times the order has been repriced: a signed `UpdatePrice` commits to it.
+    function orderReprices(PoolId poolId, bytes32 id) external view returns (uint32) {
+        return asyncOrders[poolId].orders[id].reprices;
+    }
+
     function isExecutor(PoolId poolId, address maker, address executor) external view returns (bool) {
         return asyncOrders[poolId].isExecutor[maker][executor];
     }
@@ -530,12 +535,16 @@ contract AsyncSwap is BaseHook, EIP712 {
 
     /// @notice Maker cancels an unfilled order. Must be called via an authorized executor inside
     ///         an `IPoolManager.unlock` context. The executor must have asserted maker identity.
+    /// @dev The trusted Router needs no grant: it cancels only for `order.owner` or with the owner's signature,
+    ///      and a cancel only returns input to the owner, so revoking the Router never traps a maker's orders.
     function cancelOrder(AsyncOrder calldata order) external {
         bytes32 id = order.orderId();
         AsyncMatching.cancel(
             asyncOrders[order.key.toId()],
             priceBooks[order.key.toId()],
-            AsyncMatching.CancelParams({order: order, id: id, hook: address(this), executor: msg.sender})
+            AsyncMatching.CancelParams({
+                order: order, id: id, hook: address(this), executor: msg.sender == router ? order.owner : msg.sender
+            })
         );
     }
 
@@ -664,8 +673,11 @@ contract AsyncSwap is BaseHook, EIP712 {
     }
 
     /// @notice Signed `updatePrice`: anyone may submit the maker's EIP-712 `UpdatePrice` message.
+    /// @param amountIn The order's input the maker signed against. If matches have since shrunk the order, the
+    ///        signed price applies to the remainder: its minimum is `newAmountOutMin` scaled down, rounded up.
     function updatePriceWithSig(
         AsyncOrder calldata order,
+        uint256 amountIn,
         uint256 newAmountOutMin,
         uint256 nonce,
         uint256 deadline,
@@ -673,21 +685,39 @@ contract AsyncSwap is BaseHook, EIP712 {
     ) external {
         PoolId poolId = order.key.toId();
         bytes32 id = order.orderId();
-        uint256 amountIn = asyncOrders[poolId].orders[id].amountIn;
-        _verify(
-            order.owner,
-            OrderSignatures.hashUpdatePrice(
-                order, id, amountIn, newAmountOutMin, asyncOrders[poolId].orders[id].sequence, nonce, deadline
-            ),
-            nonce,
-            deadline,
-            signature
-        );
+        newAmountOutMin = _verifyReprice(order, id, amountIn, newAmountOutMin, nonce, deadline, signature);
         AsyncMatching.updatePrice(
             asyncOrders[poolId],
             priceBooks[poolId],
             AsyncMatching.UpdateParams({order: order, id: id, newAmountOutMin: newAmountOutMin, caller: order.owner})
         );
+    }
+
+    /// @dev Verifies a signed `UpdatePrice` against the order's creation sequence and reprice count, and returns
+    ///      its minimum for the order's live input: orders only shrink, so a live input above the signed one means
+    ///      the signature was for another order, and a smaller one gets the signed price, rounded up.
+    function _verifyReprice(
+        AsyncOrder calldata order,
+        bytes32 id,
+        uint256 amountIn,
+        uint256 newAmountOutMin,
+        uint256 nonce,
+        uint256 deadline,
+        bytes calldata signature
+    ) private returns (uint256) {
+        AsyncFiller.OrderInfo storage info = asyncOrders[order.key.toId()].orders[id];
+        _verify(
+            order.owner,
+            OrderSignatures.hashUpdatePrice(
+                order, id, amountIn, newAmountOutMin, info.createdSequence, info.reprices, nonce, deadline
+            ),
+            nonce,
+            deadline,
+            signature
+        );
+        uint256 liveIn = info.amountIn;
+        if (liveIn > amountIn) revert InvalidSignature();
+        return liveIn == amountIn ? newAmountOutMin : (newAmountOutMin * liveIn + amountIn - 1) / amountIn;
     }
 
     /// @notice Revoke a signed action before a relayer submits it.
@@ -699,10 +729,9 @@ contract AsyncSwap is BaseHook, EIP712 {
     ///         Every maker signature shares this one nonce space, so `invalidateNonce` revokes those
     ///         signatures too, and only the trusted Router may burn one: any other executor could
     ///         void the maker's signed actions on every pool.
-    function useNonce(PoolId poolId, address maker, uint256 nonce) external {
-        if (msg.sender != router || !asyncOrders[poolId].isExecutor[maker][msg.sender]) {
-            revert AsyncFiller.NotAuthorizedExecutor();
-        }
+    ///         The Router needs no grant here, so a maker who revoked it can still cancel by signature.
+    function useNonce(address maker, uint256 nonce) external {
+        if (msg.sender != router) revert AsyncFiller.NotAuthorizedExecutor();
         _useNonce(maker, nonce);
     }
 

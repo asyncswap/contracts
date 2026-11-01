@@ -6,8 +6,8 @@ import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 import {PoolId} from "v4-core/types/PoolId.sol";
 
 /// @notice `useNonce` burns a maker's nonce in the one space every signed action shares. Only the
-///         Router, which verifies the maker's cancel signature first, may burn it. An executor the
-///         maker approved anywhere else, even on an unrelated pool id, must not.
+///         Router, which verifies the maker's cancel signature, may burn it, with or without a grant. An
+///         executor the maker approved, on any pool, must not.
 contract UseNonceScopeTest is SetupHook {
     address alice = makeAddr("alice");
     address evil = makeAddr("evil-executor");
@@ -19,7 +19,7 @@ contract UseNonceScopeTest is SetupHook {
 
         vm.prank(evil);
         vm.expectRevert(AsyncFiller.NotAuthorizedExecutor.selector);
-        hook.useNonce(otherPool, alice, 7);
+        hook.useNonce(alice, 7);
         assertFalse(hook.nonceUsed(alice, 7), "the maker's signed actions stay valid");
     }
 
@@ -29,7 +29,7 @@ contract UseNonceScopeTest is SetupHook {
 
         vm.prank(evil);
         vm.expectRevert(AsyncFiller.NotAuthorizedExecutor.selector);
-        hook.useNonce(poolId, alice, 7);
+        hook.useNonce(alice, 7);
         assertFalse(hook.nonceUsed(alice, 7));
     }
 }

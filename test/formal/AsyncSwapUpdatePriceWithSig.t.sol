@@ -31,21 +31,34 @@ contract AsyncSwapUpdatePriceWithSigFormalTest is HookUnlockBase {
         uint256 deadline;
     }
 
-    function _sig(AsyncOrder memory o, uint256 storedIn, U memory u, uint256 pk) internal view returns (bytes memory) {
-        (,,,,, uint64 sequence,) = hook.orderBookOrder(poolId, _idOf(o));
-        bytes32 sh = OrderSignatures.hashUpdatePrice(o, _idOf(o), storedIn, u.n, sequence, u.nonce, u.deadline);
+    /// @dev The input the last signature was made against: `_submit` passes it, read before any `expectRevert`.
+    uint256 signedIn;
+
+    function _sig(AsyncOrder memory o, uint256 storedIn, U memory u, uint256 pk) internal returns (bytes memory) {
+        signedIn = storedIn;
+        bytes32 id = _idOf(o);
+        bytes32 sh = OrderSignatures.hashUpdatePrice(
+            o,
+            id,
+            storedIn,
+            u.n,
+            hook.orderCreatedSequence(poolId, id),
+            hook.orderReprices(poolId, id),
+            u.nonce,
+            u.deadline
+        );
         (uint8 v, bytes32 r, bytes32 s) =
             vm.sign(pk, keccak256(abi.encodePacked("\x19\x01", hook.DOMAIN_SEPARATOR(), sh)));
         return abi.encodePacked(r, s, v);
     }
 
-    function _validSig(AsyncOrder memory o, U memory u) internal view returns (bytes memory) {
+    function _validSig(AsyncOrder memory o, U memory u) internal returns (bytes memory) {
         return _sig(o, hook.asyncOrder(poolId, _idOf(o)), u, MAKER_PK);
     }
 
     function _submit(address caller, AsyncOrder memory o, U memory u, bytes memory sig) internal {
         vm.prank(caller);
-        hook.updatePriceWithSig(o, u.n, u.nonce, u.deadline, sig);
+        hook.updatePriceWithSig(o, signedIn, u.n, u.nonce, u.deadline, sig);
     }
 
     function _order() internal returns (AsyncOrder memory o) {
@@ -78,7 +91,7 @@ contract AsyncSwapUpdatePriceWithSigFormalTest is HookUnlockBase {
         }
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapUpdatePriceWithSig.lean:79 — _verify over hashUpdatePrice(order, id, stored amountIn, n, nonce, deadline), then ZeroAmount, then OrderNotFound, then the reprice; no NotOrderOwner guard. (semantics changed: the hash binds the order's current sequence, not createdSequence; Lean statement needs updating)
+    /// @notice formal/Refinement/Swarm/AsyncSwapUpdatePriceWithSig.lean:79 — _verify over hashUpdatePrice(order, id, stored amountIn, n, nonce, deadline), then ZeroAmount, then OrderNotFound, then the reprice; no NotOrderOwner guard. (semantics changed by L-01: the hash binds createdSequence and the reprice count, and a smaller live input scales the signed minimum; Lean statement needs updating)
     function testFuzz_updatePriceWithSig_run(bool zero, bool exists, uint256 n, uint256 nonce, uint256 d) public {
         AsyncOrder memory o = _order();
         if (!exists) o.salt = bytes32(uint256(o.salt) ^ 4);
@@ -107,7 +120,7 @@ contract AsyncSwapUpdatePriceWithSigFormalTest is HookUnlockBase {
     ) public {
         d = bound(d, 0, block.timestamp - 1);
         vm.expectRevert(AsyncSwap.SignatureExpired.selector);
-        hook.updatePriceWithSig(o, n, nonce, d, sig);
+        hook.updatePriceWithSig(o, o.amountIn, n, nonce, d, sig);
     }
 
     /// @notice formal/Refinement/Swarm/AsyncSwapUpdatePriceWithSig.lean:114 — deadline ok and (owner, nonce) used reverts NonceAlreadyUsed (even with a valid signature).
@@ -129,7 +142,7 @@ contract AsyncSwapUpdatePriceWithSigFormalTest is HookUnlockBase {
         U memory u = U(bound(n, 1, 1e30), nonce, _future(d));
         bytes memory sig;
         if (how % 3 == 0) sig = _sig(o, 1 ether, u, 0xBAD);
-        else if (how % 3 == 1) sig = _sig(o, 2 ether, u, MAKER_PK); // signed a different stored amountIn
+        else if (how % 3 == 1) sig = _sig(o, 0.5 ether, u, MAKER_PK); // signed for a smaller order than the live one
         else sig = junk;
         vm.expectRevert(AsyncSwap.InvalidSignature.selector);
         _submit(relayer, o, u, sig);
@@ -166,7 +179,7 @@ contract AsyncSwapUpdatePriceWithSigFormalTest is HookUnlockBase {
         bytes memory sig = valid ? _validSig(o, u) : _sig(o, 1 ether, u, 0xBAD);
         vm.prank(caller);
         (bool ok, bytes memory ret) =
-            address(hook).call(abi.encodeCall(hook.updatePriceWithSig, (o, u.n, u.nonce, u.deadline, sig)));
+            address(hook).call(abi.encodeCall(hook.updatePriceWithSig, (o, signedIn, u.n, u.nonce, u.deadline, sig)));
         if (!ok) assertTrue(bytes4(ret) != AsyncFiller.NotOrderOwner.selector, "NotOrderOwner never fires");
         if (valid && u.n != 0 && u.deadline >= block.timestamp) assertTrue(ok, "relayer success");
     }

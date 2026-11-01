@@ -247,13 +247,10 @@ contract Router is EIP712, Multicall {
         external
     {
         if (block.timestamp > deadline) revert SignatureExpired();
-        HOOK.useNonce(order.key.toId(), order.owner, nonce);
+        HOOK.useNonce(order.owner, nonce);
         bytes32 id = _orderId(order);
-        (uint256 amountIn,) = HOOK.asyncOrderInfo(order.key.toId(), id);
         bytes32 digest = _hashTypedDataV4(
-            OrderSignatures.hashCancel(
-                order, id, amountIn, HOOK.orderCreatedSequence(order.key.toId(), id), nonce, deadline
-            )
+            OrderSignatures.hashCancel(order, id, HOOK.orderCreatedSequence(order.key.toId(), id), nonce, deadline)
         );
         if (!SignatureChecker.isValidSignatureNow(order.owner, digest, signature)) revert InvalidSignature();
         POOLMANAGER.unlock(abi.encode(SwapCallback({action: ActionType.Cancel, order: order, maxMatches: 0})));

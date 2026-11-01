@@ -230,6 +230,15 @@ Logs:
 
 `Router.cancelWithSig` / `AsyncSwap.updatePriceWithSig` · Lines 206 / 676 · Confidence: 65 · Severity: Low
 
+> **Status: fixed.** `CancelOrder` no longer commits to the order's size, so a cancel covers whatever remains.
+> `UpdatePrice` commits to the size when signed, the order's `createdSequence` and a new `reprices` count, which
+> only reprices move. A reprice that lands after partial matches applies its signed price to the remainder. The
+> POC below is the original exploit against `81ba6b8`;
+> [`SignedCancelGrief.t.sol`](../test/security/poc/SignedCancelGrief.t.sol) now holds the regression tests
+> (`test_dustMatchNoLongerBreaksRelayedCancel`, `test_dustMatchNoLongerBreaksRelayedReprice`,
+> `test_staleRepriceCannotUndoALaterOne`). The same change lets the Router cancel without an executor grant, so
+> revoking the Router no longer traps a maker's orders (`test/security/ExecutorRevocation.t.sol`).
+
 **Description**
 Signed cancels and reprices commit to the order's live `amountIn`. One small crossing match before the relayer
 submits makes the signature invalid, so the order stays live at its old price until the maker signs again. In

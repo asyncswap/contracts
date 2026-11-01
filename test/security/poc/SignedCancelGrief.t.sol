@@ -4,12 +4,13 @@ pragma solidity ^0.8.26;
 import {PocSignedBase} from "./PocSignedBase.sol";
 import {AsyncSwap} from "@async-swap/AsyncSwap.sol";
 import {Router} from "@async-swap/Router.sol";
-import {OrderSignatures} from "@async-swap/libraries/OrderSignatures.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-/// @notice Candidate 2: signed cancel / reprice bind the order's live amountIn (and sequence). A dust crossing
-///         counter-order placed before relay changes amountIn, so the relayed signature reverts InvalidSignature
-///         and the remainder stays live at the stale price.
+/// @notice Regression for L-01 (audit/lsp_security_review_2026-11-01.md). Signed cancels and reprices used to commit to
+///         the order's live `amountIn` (and reprices to its queue sequence), so one small crossing match before the
+///         relayer submitted voided the signature and left the remainder live at its old price. A cancel now covers
+///         whatever remains, and a reprice applies its signed price to the remainder.
 contract SignedCancelGriefPoc is PocSignedBase {
     uint256 constant CANCEL_NONCE = 1;
     // Attacker's dust bid: buys 0.01 token0 at exactly the maker's limit (0.95).
@@ -24,65 +25,75 @@ contract SignedCancelGriefPoc is PocSignedBase {
         order.salt = _expectedSalt(maker, AMOUNT_IN, AMOUNT_OUT_MIN);
     }
 
-    function _dustMatch() internal returns (uint256 attackerQuotePaid, uint256 attackerAssetGot) {
-        uint256 a0 = token0.balanceOf(attacker);
-        uint256 a1 = token1.balanceOf(attacker);
+    function _dustMatch() internal {
         _submit(_plainOrder(attacker, false, DUST_QUOTE, DUST_ASSET, 0));
-        attackerQuotePaid = a1 - token1.balanceOf(attacker);
-        // Proceeds arrive as ERC-6909 claims for book matches.
-        attackerAssetGot = token0.balanceOf(attacker) - a0 + manager.balanceOf(attacker, currency0.toId());
-    }
-
-    function test_poc_dustMatchBreaksRelayedCancel() public {
-        AsyncOrder memory order = _createSigned();
-        uint256 deadline = block.timestamp + 1 hours;
-        bytes memory sig = _cancelSig(order, AMOUNT_IN, CANCEL_NONCE, deadline);
-
-        (uint256 paid, uint256 got) = _dustMatch();
-        (uint256 liveIn, uint256 liveMin) = hook.asyncOrderInfo(poolId, _id(order));
-        emit log_named_uint("attacker quote paid (token1)", paid);
-        emit log_named_uint("attacker asset received (token0, net of fee)", got);
-        emit log_named_uint("attacker cost vs fair value at maker price", paid - got * AMOUNT_OUT_MIN / AMOUNT_IN);
-        emit log_named_uint("maker order remaining amountIn", liveIn);
-        emit log_named_uint("maker order remaining min out", liveMin);
+        (uint256 liveIn,) = hook.asyncOrderInfo(poolId, _id(_signedOrderWithSalt()));
         assertEq(liveIn, AMOUNT_IN - DUST_ASSET, "dust partially matched");
-
-        vm.prank(relayer);
-        vm.expectRevert(Router.InvalidSignature.selector);
-        router.cancelWithSig(order, CANCEL_NONCE, deadline, sig);
-        assertFalse(hook.nonceUsed(maker, CANCEL_NONCE), "nonce not burnt; tx reverted");
-
-        // Remainder stays exposed at the stale price; e.g. a filler takes it all.
-        order.amountIn = liveIn;
-        uint256 b0 = token0.balanceOf(bob);
-        vm.prank(bob);
-        router.fillOrder(order, type(uint256).max, "");
-        emit log_named_uint("remainder taken by filler after failed cancel (token0)", token0.balanceOf(bob) - b0);
-        // Exposure: >= 99% of the order the maker tried to cancel remained fillable; attacker spent <1%.
-        assertGe(liveIn, AMOUNT_IN * 99 / 100);
-        assertLt(paid, AMOUNT_IN * 1 / 100);
     }
 
-    function test_poc_dustMatchBreaksRelayedReprice() public {
+    function _signedOrderWithSalt() internal view returns (AsyncOrder memory order) {
+        order = _signedOrder(AMOUNT_OUT_MIN);
+        order.salt = _expectedSalt(maker, AMOUNT_IN, AMOUNT_OUT_MIN);
+    }
+
+    function test_dustMatchNoLongerBreaksRelayedCancel() public {
         AsyncOrder memory order = _createSigned();
         uint256 deadline = block.timestamp + 1 hours;
-        (,,,,, uint64 seq,) = hook.orderBookOrder(poolId, _id(order));
-        bytes32 structHash = OrderSignatures.hashUpdatePrice(order, _id(order), AMOUNT_IN, 1.2 ether, seq, 9, deadline);
-        bytes memory sig = _sign(_digest(hook.DOMAIN_SEPARATOR(), structHash));
+        bytes memory sig = _cancelSig(order, CANCEL_NONCE, deadline);
         _dustMatch();
+
+        uint256 before = token0.balanceOf(maker);
         vm.prank(relayer);
+        router.cancelWithSig(order, CANCEL_NONCE, deadline, sig);
+        assertTrue(hook.nonceUsed(maker, CANCEL_NONCE), "nonce spent");
+        assertEq(hook.asyncOrder(poolId, _id(order)), 0, "the remainder is cancelled");
+        assertEq(token0.balanceOf(maker) - before, AMOUNT_IN - DUST_ASSET, "the remainder is refunded");
+    }
+
+    /// A lower price: a partly filled sell has spent the matched share of its bid, below the floor for a higher one.
+    function test_dustMatchNoLongerBreaksRelayedReprice() public {
+        AsyncOrder memory order = _createSigned();
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes memory sig = _repriceSig(order, AMOUNT_IN, 0.9 ether, 9, deadline);
+        _dustMatch();
+
+        vm.prank(relayer);
+        hook.updatePriceWithSig(order, AMOUNT_IN, 0.9 ether, 9, deadline, sig);
+        (uint256 liveIn, uint256 liveMin) = hook.asyncOrderInfo(poolId, _id(order));
+        assertEq(
+            liveMin, Math.mulDiv(0.9 ether, liveIn, AMOUNT_IN, Math.Rounding.Ceil), "signed price on the remainder"
+        );
+    }
+
+    /// The reprice count, not the queue sequence, versions the price: a reprice signed earlier cannot undo a later one.
+    function test_staleRepriceCannotUndoALaterOne() public {
+        AsyncOrder memory order = _createSigned();
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes memory first = _repriceSig(order, AMOUNT_IN, 1.2 ether, 9, deadline);
+        bytes memory second = _repriceSig(order, AMOUNT_IN, 1.3 ether, 10, deadline);
+
+        hook.updatePriceWithSig(order, AMOUNT_IN, 1.3 ether, 10, deadline, second);
+        assertEq(hook.orderReprices(poolId, _id(order)), 1);
         vm.expectRevert(AsyncSwap.InvalidSignature.selector);
-        hook.updatePriceWithSig(order, 1.2 ether, 9, deadline, sig);
+        hook.updatePriceWithSig(order, AMOUNT_IN, 1.2 ether, 9, deadline, first);
         (, uint256 liveMin) = hook.asyncOrderInfo(poolId, _id(order));
-        emit log_named_uint("min out after failed reprice", liveMin);
-        assertLt(liveMin, 1.2 ether * 80 / 100, "remainder stays at stale price");
+        assertEq(liveMin, 1.3 ether, "the later reprice stands");
+    }
+
+    /// A reprice cannot be applied to a larger order than the one signed.
+    function test_repriceRejectsSignedSizeBelowTheOrder() public {
+        AsyncOrder memory order = _createSigned();
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes memory sig = _repriceSig(order, AMOUNT_IN / 2, 0.6 ether, 9, deadline);
+        vm.expectRevert(AsyncSwap.InvalidSignature.selector);
+        hook.updatePriceWithSig(order, AMOUNT_IN / 2, 0.6 ether, 9, deadline, sig);
     }
 
     /// Control: no interference, the relayed cancel returns the full input.
     function test_control_cancelSucceedsWithoutInterference() public {
         AsyncOrder memory order = _createSigned();
         uint256 deadline = block.timestamp + 1 hours;
-        bytes memory sig = _cancelSig(order, AMOUNT_IN, CANCEL_NONCE, deadline);
+        bytes memory sig = _cancelSig(order, CANCEL_NONCE, deadline);
         uint256 before = token0.balanceOf(maker);
         vm.prank(relayer);
         router.cancelWithSig(order, CANCEL_NONCE, deadline, sig);

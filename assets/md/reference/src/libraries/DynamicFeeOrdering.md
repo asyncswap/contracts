@@ -1,6 +1,6 @@
 # DynamicFeeOrdering
 
-[Git Source](https://github.com/asyncswap/contracts/blob/7d09cfaccb98252068945596ea6058dffa186a9a/src/libraries/DynamicFeeOrdering.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/c13cd5a3947c45e1887698ad62cbb0175b5bf594/src/libraries/DynamicFeeOrdering.sol)
 
 **Title:** Dynamic fee ordering on pool-liquidity fills
 
@@ -29,7 +29,9 @@ uint256 internal constant ORDERING_WINDOW = 2;
   `ORDERING_WINDOW` blocks records its starting tick as the reference. A later fill in the
   window that moves the price back toward the reference pays half the price gap it closes:
   `amountOut * avgGap / 2`, with the gap averaged over the fill's start and end ticks (one
-  tick is about 0.01%), so splitting a backrun does not lower its total. Half of the fee
+  tick is about 0.01%), so splitting a backrun does not lower its total. A fill that crosses
+  the reference pays only on the share of its output from the side before the reference,
+  in proportion to the ticks on each side. Half of the fee
   is donated to in-range LPs and half credited to the FeeVault as claims.
 </i>
 

@@ -1,6 +1,6 @@
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/7d09cfaccb98252068945596ea6058dffa186a9a/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/c13cd5a3947c45e1887698ad62cbb0175b5bf594/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -692,8 +692,9 @@ function matchNewOrder(AsyncOrder calldata order) external returns (uint8 matche
   True when the pool has active liquidity and its current price is strictly better for an
   incoming order than the best resting order on the other side: below the best ask for a
   buy, above the best bid for a sell (`TickPrice.poolBeatsLevel`). An empty opposite side or an equal level leaves the book first.
-  The spot price excludes the pool fill's fees and price impact, so this is a heuristic.
-  With it, the best level as a sqrt price: the limit a pool-first swap may not cross.
+  The spot price excludes the pool fill's fixed fees and price impact, so this is a heuristic; inside the
+  dynamic-fee window it counts the fee a fill back toward the reference pays. With it, the limit a pool-first
+  swap may not cross.
 </i>
 
 ```solidity

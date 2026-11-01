@@ -1,6 +1,6 @@
 # TickPrice
 
-[Git Source](https://github.com/asyncswap/contracts/blob/7d09cfaccb98252068945596ea6058dffa186a9a/src/libraries/TickPrice.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/c13cd5a3947c45e1887698ad62cbb0175b5bf594/src/libraries/TickPrice.sol)
 
 Book levels on Uniswap v4 ticks: an order sits at the floor tick (spacing 1, 0.01% steps)
 of its exact currency1/currency0 limit. Levels are a fixed relative width at any price and
@@ -35,21 +35,33 @@ function key(bool isBuy, bool zeroForOne, uint256 amountIn, uint256 amountOut) p
 | ---- | ---- | ----------- |
 | \<none> | `uint128` |  |
 
-<a id="poolbeatslevel-ipoolmanager-poolid-bool-bool-uint128" />
+<a id="poolbeatslevel-ipoolmanager-poolid-bool-bool-uint128-int24-uint64" />
 
 ### poolBeatsLevel
 
 Whether the pool has active liquidity and its current price is strictly better for an
 incoming order than the best opposite level `levelKey` (below the best ask for a buy,
-above the best bid for a sell), compared as keys; if so, also that level's sqrt price,
-the limit a pool-first swap may not cross. `quote1`: the numeraire is currency1, so the
-tick's price is already numeraire per asset; otherwise it is flipped.
+above the best bid for a sell), compared as keys; if so, also the limit a pool-first swap
+may not cross. `quote1`: the numeraire is currency1, so the tick's price is already
+numeraire per asset; otherwise it is flipped.
+
+<i>
+  Inside the dynamic-fee window (`refTick`, `refBlock`; see `DynamicFeeOrdering`) a fill back toward the
+  reference pays about half the price gap it closes, so the pool's price counts that much worse: half the
+  gap, in ticks. The limit is the level's tick, one tick higher for a swap that lowers the tick (the key is
+  a floor tick, so the floor would trade past the level's exact price), kept inside the range v4 accepts.
+</i>
 
 ```solidity
-function poolBeatsLevel(IPoolManager manager, PoolId poolId, bool quote1, bool isBuy, uint128 levelKey)
-        public
-        view
-        returns (bool, uint160);
+function poolBeatsLevel(
+        IPoolManager manager,
+        PoolId poolId,
+        bool quote1,
+        bool isBuy,
+        uint128 levelKey,
+        int24 refTick,
+        uint64 refBlock
+    ) public view returns (bool, uint160);
 ```
 
 **Parameters**
@@ -61,6 +73,8 @@ function poolBeatsLevel(IPoolManager manager, PoolId poolId, bool quote1, bool i
 | quote1 | `bool` |  |
 | isBuy | `bool` |  |
 | levelKey | `uint128` |  |
+| refTick | `int24` |  |
+| refBlock | `uint64` |  |
 
 **Returns**
 

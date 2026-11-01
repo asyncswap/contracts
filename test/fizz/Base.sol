@@ -17,9 +17,6 @@ import {Router} from "src/Router.sol";
 import {FeeVault} from "src/FeeVault.sol";
 import {NativeClaims} from "src/NativeClaims.sol";
 import {TokenClaims} from "src/TokenClaims.sol";
-import {BatchClaims} from "src/BatchClaims.sol";
-import {BatchCancels} from "src/BatchCancels.sol";
-import {BatchActions} from "src/BatchActions.sol";
 import {AsyncOrder} from "src/types/AsyncOrder.sol";
 import {ISignatureTransfer} from "src/interfaces/ISignatureTransfer.sol";
 
@@ -132,9 +129,6 @@ abstract contract Base is StringUtils, Clamp, Deployer, Math {
     FeeVault internal feeVault;
     NativeClaims internal nativeClaims;
     TokenClaims internal tokenClaims;
-    BatchClaims internal batchClaims;
-    BatchCancels internal batchCancels;
-    BatchActions internal batchActions;
     PoolModifyLiquidityTest internal lpRouter;
 
     PoolKey internal key;
@@ -164,9 +158,6 @@ abstract contract Base is StringUtils, Clamp, Deployer, Math {
 
         nativeClaims = new NativeClaims(manager);
         tokenClaims = new TokenClaims(manager);
-        batchClaims = new BatchClaims(manager);
-        batchCancels = new BatchCancels(manager, hook);
-        batchActions = new BatchActions(manager, hook);
 
         key = PoolKey(Currency.wrap(address(0)), Currency.wrap(address(usdc)), LPFeeLibrary.DYNAMIC_FEE_FLAG, 1, hook);
         poolId = key.toId();
@@ -202,12 +193,8 @@ abstract contract Base is StringUtils, Clamp, Deployer, Math {
             vm.startPrank(_actor);
             usdc.approve(address(router), type(uint256).max);
             hook.setExecutor(poolId, address(router), true);
-            hook.setExecutor(poolId, address(batchCancels), true);
-            hook.setExecutor(poolId, address(batchActions), true);
             manager.setOperator(address(nativeClaims), true);
             manager.setOperator(address(tokenClaims), true);
-            manager.setOperator(address(batchClaims), true);
-            manager.setOperator(address(batchActions), true);
             vm.stopPrank();
         }
         actor = actors[0];

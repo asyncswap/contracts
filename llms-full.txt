@@ -1442,7 +1442,7 @@ match the code on `main`. Each page links to its source file.
 
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/c13cd5a3947c45e1887698ad62cbb0175b5bf594/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/23bf8f6698ec0944ced9853bd31e6c767d6e61d6/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -2883,7 +2883,7 @@ struct UserParams {
 
 # FeeVault
 
-[Git Source](https://github.com/asyncswap/contracts/blob/c13cd5a3947c45e1887698ad62cbb0175b5bf594/src/FeeVault.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/23bf8f6698ec0944ced9853bd31e6c767d6e61d6/src/FeeVault.sol)
 
 Holds and redeems protocol fee claims, never maker escrow.
 
@@ -2990,7 +2990,7 @@ error ZeroAddress();
 
 # ImmutableState
 
-[Git Source](https://github.com/asyncswap/contracts/blob/c13cd5a3947c45e1887698ad62cbb0175b5bf594/src/ImmutableState.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/23bf8f6698ec0944ced9853bd31e6c767d6e61d6/src/ImmutableState.sol)
 
 **Title:** Immutable State
 
@@ -3042,7 +3042,7 @@ error NotPoolManager();
 
 # MatchingEngine
 
-[Git Source](https://github.com/asyncswap/contracts/blob/c13cd5a3947c45e1887698ad62cbb0175b5bf594/src/MatchingEngine.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/23bf8f6698ec0944ced9853bd31e6c767d6e61d6/src/MatchingEngine.sol)
 
 **Title:** MatchingEngine
 
@@ -3515,7 +3515,7 @@ struct Book {
 
 # NativeClaims
 
-[Git Source](https://github.com/asyncswap/contracts/blob/c13cd5a3947c45e1887698ad62cbb0175b5bf594/src/NativeClaims.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/23bf8f6698ec0944ced9853bd31e6c767d6e61d6/src/NativeClaims.sol)
 
 Redeems the caller's PoolManager native ETH claims to a chosen recipient.
 
@@ -3637,7 +3637,7 @@ error ReentrantRedemption();
 
 # Router
 
-[Git Source](https://github.com/asyncswap/contracts/blob/c13cd5a3947c45e1887698ad62cbb0175b5bf594/src/Router.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/23bf8f6698ec0944ced9853bd31e6c767d6e61d6/src/Router.sol)
 
 **Inherits:** EIP712, Multicall
 
@@ -4304,7 +4304,7 @@ enum ActionType {
 
 # TokenClaims
 
-[Git Source](https://github.com/asyncswap/contracts/blob/c13cd5a3947c45e1887698ad62cbb0175b5bf594/src/TokenClaims.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/23bf8f6698ec0944ced9853bd31e6c767d6e61d6/src/TokenClaims.sol)
 
 Redeems the caller's PoolManager currency claims to a chosen recipient.
 
@@ -4428,7 +4428,7 @@ error ReentrantRedemption();
 
 # BaseHook
 
-[Git Source](https://github.com/asyncswap/contracts/blob/c13cd5a3947c45e1887698ad62cbb0175b5bf594/src/BaseHook.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/23bf8f6698ec0944ced9853bd31e6c767d6e61d6/src/BaseHook.sol)
 
 **Inherits:** IHooks, [ImmutableState](/reference/src/ImmutableState)
 
@@ -5088,7 +5088,7 @@ error HookNotImplemented();
 
 # IFeeOwner
 
-[Git Source](https://github.com/asyncswap/contracts/blob/c13cd5a3947c45e1887698ad62cbb0175b5bf594/src/FeeVault.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/23bf8f6698ec0944ced9853bd31e6c767d6e61d6/src/FeeVault.sol)
 
 ## Functions
 
@@ -5108,7 +5108,7 @@ function owner() external view returns (address);
 
 # ISignatureTransfer
 
-[Git Source](https://github.com/asyncswap/contracts/blob/c13cd5a3947c45e1887698ad62cbb0175b5bf594/src/interfaces/ISignatureTransfer.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/23bf8f6698ec0944ced9853bd31e6c767d6e61d6/src/interfaces/ISignatureTransfer.sol)
 
 **Title:** ISignatureTransfer
 
@@ -5201,7 +5201,7 @@ struct SignatureTransferDetails {
 
 # AsyncFiller
 
-[Git Source](https://github.com/asyncswap/contracts/blob/c13cd5a3947c45e1887698ad62cbb0175b5bf594/src/libraries/AsyncFiller.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/23bf8f6698ec0944ced9853bd31e6c767d6e61d6/src/libraries/AsyncFiller.sol)
 
 **Title:** AsyncFiller
 
@@ -6183,7 +6183,7 @@ struct Book {
 
 # AsyncMatching
 
-[Git Source](https://github.com/asyncswap/contracts/blob/c13cd5a3947c45e1887698ad62cbb0175b5bf594/src/libraries/AsyncMatching.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/23bf8f6698ec0944ced9853bd31e6c767d6e61d6/src/libraries/AsyncMatching.sol)
 
 Linked matching module operating on the hook's order and radix-book storage.
 
@@ -7077,7 +7077,7 @@ struct UpdateParams {
 
 # ClaimTransfers
 
-[Git Source](https://github.com/asyncswap/contracts/blob/c13cd5a3947c45e1887698ad62cbb0175b5bf594/src/libraries/ClaimTransfers.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/23bf8f6698ec0944ced9853bd31e6c767d6e61d6/src/libraries/ClaimTransfers.sol)
 
 <i>
   At most 16 makers and the FeeVault can each receive two currencies in eight matches.
@@ -7157,7 +7157,7 @@ struct Batch {
 
 # CurrencySettler
 
-[Git Source](https://github.com/asyncswap/contracts/blob/c13cd5a3947c45e1887698ad62cbb0175b5bf594/src/libraries/CurrencySettler.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/23bf8f6698ec0944ced9853bd31e6c767d6e61d6/src/libraries/CurrencySettler.sol)
 
 **Title:** CurrencySettler
 
@@ -7208,7 +7208,7 @@ function take(Currency currency, IPoolManager manager, address recipient, uint25
 
 # DynamicFeeOrdering
 
-[Git Source](https://github.com/asyncswap/contracts/blob/c13cd5a3947c45e1887698ad62cbb0175b5bf594/src/libraries/DynamicFeeOrdering.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/23bf8f6698ec0944ced9853bd31e6c767d6e61d6/src/libraries/DynamicFeeOrdering.sol)
 
 **Title:** Dynamic fee ordering on pool-liquidity fills
 
@@ -7356,7 +7356,7 @@ event PoolPriceObserved(
 
 # EligiblePrice
 
-[Git Source](https://github.com/asyncswap/contracts/blob/c13cd5a3947c45e1887698ad62cbb0175b5bf594/src/libraries/EligiblePrice.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/23bf8f6698ec0944ced9853bd31e6c767d6e61d6/src/libraries/EligiblePrice.sol)
 
 Exact-price summaries on a priority-key radix tree.
 
@@ -7535,7 +7535,7 @@ struct Ratio {
 
 # OrderSignatures
 
-[Git Source](https://github.com/asyncswap/contracts/blob/c13cd5a3947c45e1887698ad62cbb0175b5bf594/src/libraries/OrderSignatures.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/23bf8f6698ec0944ced9853bd31e6c767d6e61d6/src/libraries/OrderSignatures.sol)
 
 **Title:** OrderSignatures
 
@@ -7790,7 +7790,7 @@ function hashCancel(
 
 # RadixPriceTree
 
-[Git Source](https://github.com/asyncswap/contracts/blob/c13cd5a3947c45e1887698ad62cbb0175b5bf594/src/libraries/RadixPriceTree.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/23bf8f6698ec0944ced9853bd31e6c767d6e61d6/src/libraries/RadixPriceTree.sol)
 
 Patricia radix index for uint128 price levels. Inserts and removals
 traverse at most 128 branch bits; each distinct price creates one
@@ -8006,7 +8006,7 @@ struct Tree {
 
 # TickPrice
 
-[Git Source](https://github.com/asyncswap/contracts/blob/c13cd5a3947c45e1887698ad62cbb0175b5bf594/src/libraries/TickPrice.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/23bf8f6698ec0944ced9853bd31e6c767d6e61d6/src/libraries/TickPrice.sol)
 
 Book levels on Uniswap v4 ticks: an order sits at the floor tick (spacing 1, 0.01% steps)
 of its exact currency1/currency0 limit. Levels are a fixed relative width at any price and
@@ -8115,7 +8115,7 @@ function floorTick(uint256 num, uint256 den) internal pure returns (int24);
 
 # AsyncOrderLibrary
 
-[Git Source](https://github.com/asyncswap/contracts/blob/c13cd5a3947c45e1887698ad62cbb0175b5bf594/src/types/AsyncOrder.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/23bf8f6698ec0944ced9853bd31e6c767d6e61d6/src/types/AsyncOrder.sol)
 
 **Title:** AsyncOrderLibrary
 
@@ -8157,7 +8157,7 @@ function orderId(AsyncOrder calldata order) internal view returns (bytes32);
 
 # AsyncOrder
 
-[Git Source](https://github.com/asyncswap/contracts/blob/c13cd5a3947c45e1887698ad62cbb0175b5bf594/src/types/AsyncOrder.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/23bf8f6698ec0944ced9853bd31e6c767d6e61d6/src/types/AsyncOrder.sol)
 
 Represents an async order for a swap in the Uniswap V4 pool.
 

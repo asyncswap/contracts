@@ -52,7 +52,7 @@ skill ([`call-analysis`](https://github.com/asyncswap/skills/tree/2e9aca64980e7c
 | 4 | 85 | A maker that sets itself as executor fills from the pool with no MEV tax | Acknowledged | No user loses funds; the tax covers Router creation and fills only |
 | 5 | 85 | A direct `updatePrice` makes an old order cross with no MEV tax | Acknowledged | As 4 |
 | 6 | 85 | Reprice plus `matchBook` pays no MEV tax | Acknowledged | As 4 |
-| 7 | 75 | Ceil rounding on a partial match makes the remainder's limit worse | Open | Pinned by `test_knownIssue_partlyMatchedOrderFallsBehindAnEqualOrder`. Rounding down lets a worse dust remainder jump ahead (`test_worsePriceCannotJumpAheadWithBidOrAge`); a real fix stores the signed ratio |
+| 7 | 75 | Ceil rounding on a partial match makes the remainder's limit worse | Acknowledged | No funds at risk: a partly matched order can lose its place to an equal-priced order, and its bid (at most $0.10) then buys no priority. Pinned by `test_knownIssue_partlyMatchedOrderFallsBehindAnEqualOrder`. Rounding down lets a worse dust remainder jump ahead (`test_worsePriceCannotJumpAheadWithBidOrAge`); a fix stores the signed ratio or ranks by tick level, then bid, then time. Revisit the priority rule before the audit freeze |
 | 8 | 75 | A pool-first fill parks the price in an empty range and freezes pool fills | ✅ Fixed | A pool fill that would leave no active liquidity reverts |
 | 9 | 75 | Any caller runs the hook's `matchBook` with no unlock and no Router | Acknowledged | As 4; matching moves only claims and respects every limit |
 | 10 | 75 | A copied executor grant submitted first reverts the relayer's `swapWithSig` | ✅ Fixed | A grant whose nonce is spent is skipped |

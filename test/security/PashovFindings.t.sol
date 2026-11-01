@@ -219,7 +219,7 @@ contract EmptyRangeTest is PashovBase {
     }
 }
 
-/// Finding 7 (open, see audit/README.md): `_reduceAfterMatch` rounds a remainder's minimum up, so a partly matched
+/// Finding 7 (acknowledged, see audit/README.md): `_reduceAfterMatch` rounds a remainder's minimum up, so a partly matched
 /// order's exact ratio ends slightly worse than the maker signed, and an equal newer order moves ahead of it. Rounding
 /// down instead lets a worse dust remainder jump ahead (`test_worsePriceCannotJumpAheadWithBidOrAge`), so the fix is to
 /// rank by the signed ratio. This test pins today's behaviour; flip the last assertion when that fix lands.

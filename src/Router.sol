@@ -223,9 +223,10 @@ contract Router is EIP712, Multicall {
         Currency input = order.zeroForOne ? order.key.currency0 : order.key.currency1;
         require(!input.isAddressZero(), "Native input needs swap()");
         _chargeMevTax(0);
-        // Always apply a supplied grant, which spends its nonce. A skipped grant would stay valid in public calldata,
-        // and anyone could replay it to re-authorize the Router after the maker revokes it.
-        if (grant.signature.length != 0) {
+        // Apply a supplied grant, which spends its nonce: a skipped unspent grant would stay valid in public calldata,
+        // and anyone could replay it after the maker revokes the Router. A grant someone already submitted has a
+        // spent nonce and cannot be replayed, so it is skipped rather than reverting the order.
+        if (grant.signature.length != 0 && !HOOK.nonceUsed(order.owner, grant.nonce)) {
             HOOK.setExecutorWithSig(
                 order.key, order.owner, address(this), true, grant.nonce, grant.deadline, grant.signature
             );

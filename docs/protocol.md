@@ -130,8 +130,9 @@ gapAfter) / 4` in units of 0.01% (one tick), capped at half the output. The gap 
 fill's start and end ticks, so splitting a backrun into several orders costs about the same. Half of
 the dynamic fee is donated to in-range LPs and half is credited to the FeeVault as claims (all of it to
 the FeeVault if no liquidity is in range). The dynamic fee is taken in the fill's output currency; the
-maker's minimum must still be met after it. Fills that move the price further from the reference, and
-fills after the window, pay none. See [`dynamic-fee-ordering.md`](dynamic-fee-ordering.md).
+maker's minimum must still be met after it. A fill that crosses the reference pays only on the share of
+its output from before the reference. Fills that move the price further from the reference, and fills
+after the window, pay none. See [`dynamic-fee-ordering.md`](dynamic-fee-ordering.md).
 
 Fee events. Every fee the hook moves is logged by the hook, with its pool, so indexers never have to
 recompute fees from gross amounts:
@@ -161,6 +162,12 @@ times an order's gas, roughly 97% of it. A transaction with no priority fee pays
 send orders with a zero priority fee. Cancels, claims and `matchBook` are not taxed, so a maker racing to
 protect an order pays only gas. The tax only captures value when searchers compete; it does not by itself
 protect the order they race against.
+
+The tax covers order creation and fills through the Router only. A searcher can still race untaxed: it
+reprices one of its own resting orders with `updatePrice` and settles it with `matchBook`, or pool-fills it
+through `tryFillOrderFromPoolLiquidity` with its own contract as executor. No user loses funds this way, since
+every fill still respects the resting order's limit; the protocol only collects less. This is acknowledged
+(the 2026-11-01 Pashov review, findings 4, 5, 6 and 9).
 
 An order-to-order match pays both sides, and returns any remainder left below the pool minimum, as
 PoolManager claims rather than token transfers, so a recipient a token refuses cannot block matching.
@@ -243,7 +250,12 @@ are in [`order-lifecycle.md`](order-lifecycle.md). Three facts to keep in mind w
   the order up to the level and the book matches the rest (a fill that stops there pays out as claims, and
   a remainder below the pool minimum that the book leaves is refunded). Otherwise the hook matches the book
   first and the pool must take all of any remainder. The comparison uses spot price, so it ignores the pool
-  fill's fees and price impact; the limit keeps the pool from filling past a resting order.
+  fill's fixed fees and price impact, but inside the dynamic-fee window it counts a fill back toward the
+  reference as half its gap (in ticks) worse, the fee it would pay. The limit is the level's tick, one tick
+  higher for a swap that lowers the tick, so the pool never fills past a resting order's exact price, and it
+  stays inside the range v4 accepts, so an order at an extreme price cannot turn pool fills off. A pool fill
+  that would leave the pool with no active liquidity reverts, so the order uses the book and the pool is
+  never left where no liquidity is active.
 - `updatePrice` only re-ranks the order in the book. It needs no PoolManager unlock and triggers no
   matching; a later crossing order, `matchBook`, a filler or an LP retry has to execute it.
 - `matchNewOrder` is gated by a transient slot that `beforeSwap` writes for

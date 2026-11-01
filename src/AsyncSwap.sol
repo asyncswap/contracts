@@ -471,14 +471,18 @@ contract AsyncSwap is BaseHook, EIP712 {
     /// @dev True when the pool has active liquidity and its current price is strictly better for an
     ///      incoming order than the best resting order on the other side: below the best ask for a
     ///      buy, above the best bid for a sell (`TickPrice.poolBeatsLevel`). An empty opposite side or an equal level leaves the book first.
-    ///      The spot price excludes the pool fill's fees and price impact, so this is a heuristic.
-    ///      With it, the best level as a sqrt price: the limit a pool-first swap may not cross.
+    ///      The spot price excludes the pool fill's fixed fees and price impact, so this is a heuristic; inside the
+    ///      dynamic-fee window it counts the fee a fill back toward the reference pays. With it, the limit a pool-first
+    ///      swap may not cross.
     function _poolBeatsBook(PoolKey calldata key, bool isBuy) private view returns (bool, uint160) {
         PoolId poolId = key.toId();
         AsyncFiller.Book storage book = priceBooks[poolId];
         (bool found, uint128 bookKey) = (isBuy ? book.asks : book.bids).best(!isBuy);
         if (!found) return (false, 0);
-        return TickPrice.poolBeatsLevel(poolManager, poolId, key.currency1 == numeraire, isBuy, bookKey);
+        AsyncFiller.State storage state = asyncOrders[poolId];
+        return TickPrice.poolBeatsLevel(
+            poolManager, poolId, key.currency1 == numeraire, isBuy, bookKey, state.refTick, state.refBlock
+        );
     }
 
     /// @notice Permissionless executor entry for retrying a resting order against current pool LPs.

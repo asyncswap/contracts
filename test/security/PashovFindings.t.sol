@@ -262,3 +262,33 @@ contract GrantFrontRunTest is PocSignedBase {
         assertEq(hook.asyncOrder(poolId, _id(order)), AMOUNT_IN, "the order is placed");
     }
 }
+
+/// A 1-wei dynamic fee rounds the LP half to zero, so all of it goes to the FeeVault and nothing is donated. The pool
+/// is thin, so a few wei move the price by whole ticks.
+contract DustDynamicFeeTest is PashovBase {
+    function setUp() public override {
+        super.setUp();
+        _liquidity(-887220, 887220, 1e6);
+    }
+
+    function test_oneWeiFeeGoesWhollyToTheVault() public {
+        _order(carol, false, 30_500, 1, 0); // first fill in the window: reference tick 0, pool up about 600 ticks
+        uint256 gap = uint256(int256(_tick()));
+        assertGt(gap, 500, "carol moved the pool up");
+        // A sell back toward the reference pays about out * gap / 20_000: about 1.5 wei here, whose LP half rounds to 0.
+        vm.recordLogs();
+        (, bytes32 sellId) = _order(bob, true, 30_000 / gap, 1, 0);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertEq(hook.asyncOrder(poolId, sellId), 0, "the dust sell filled from the pool");
+        bool seen;
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].topics[0] == DYNAMIC_FEE_TOPIC) {
+                (uint256 toLps, uint256 toVault,) = abi.decode(logs[i].data, (uint256, uint256, int24));
+                assertEq(toLps, 0, "nothing donated");
+                assertEq(toVault, 1, "the whole 1-wei fee to the vault");
+                seen = true;
+            }
+        }
+        assertTrue(seen, "the dust sell paid a dynamic fee");
+    }
+}

@@ -1,7 +1,8 @@
 # Audit
 
-- [AUDIT_SCOPE_10_23_26.md](AUDIT_SCOPE_10_23_26.md): scope for the next audit of this repository, frozen at
-  `830cd9e`.
+- [AUDIT_SCOPE_11_01_26.md](AUDIT_SCOPE_11_01_26.md): scope for the next audit of this repository, frozen at
+  `fdfdf65` (code identical to the testnet deployment, `c13cd5a`).
+- [AUDIT_SCOPE_10_23_26.md](AUDIT_SCOPE_10_23_26.md): earlier scope, frozen at `830cd9e`; superseded.
 - [AUDIT_SCOPE_10_19_26.md](AUDIT_SCOPE_10_19_26.md): earlier scope, frozen at `dc8042d`; superseded.
 - [FM-01-routing-pool-impact.md](FM-01-routing-pool-impact.md): Formal Mind swarm finding (Medium, fixed):
   best-price routing sent the whole order through the pool past better book liquidity.

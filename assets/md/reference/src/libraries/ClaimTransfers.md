@@ -1,6 +1,6 @@
 # ClaimTransfers
 
-[Git Source](https://github.com/asyncswap/contracts/blob/2bbb7d0a129a3419408dd3151a91cb5ff19adf49/src/libraries/ClaimTransfers.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/bae26ef1448faa2347a1fb13d45436a67057695f/src/libraries/ClaimTransfers.sol)
 
 <i>
   At most 16 makers and the FeeVault can each receive two currencies in eight matches.

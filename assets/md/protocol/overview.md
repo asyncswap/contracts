@@ -328,7 +328,7 @@ flowchart LR
 ```
 
 `script/deploy.sh <chain-key> [dry-run|broadcast|verify]` runs this sequence against
-`script/config/chains.json`. It passes `DEPLOY_MIN_ORDER_USD` (default 10) and an asset precision of 4;
+`script/config/chains.json`. It passes `DEPLOY_MIN_ORDER_USD` (default 0, no dollar minimum) and an asset precision of 4;
 the constructor reads the numeraire's decimals (1 to 20) and derives the base-unit minimum and the
 $0.10 bid cap itself. The Router's `MEV_TAX_GAS` comes from the chain's `deployment.mevTaxGas`, next to
 `deployment.ordering`, how that chain orders transactions. It is 20,000,000 on Unichain, whose blocks are

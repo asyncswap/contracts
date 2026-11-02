@@ -1,6 +1,6 @@
 # AsyncOrder
 
-[Git Source](https://github.com/asyncswap/contracts/blob/2bbb7d0a129a3419408dd3151a91cb5ff19adf49/src/types/AsyncOrder.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/bae26ef1448faa2347a1fb13d45436a67057695f/src/types/AsyncOrder.sol)
 
 Represents an async order for a swap in the Uniswap V4 pool.
 

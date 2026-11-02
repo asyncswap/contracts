@@ -27,19 +27,19 @@
         "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
       },
       "AsyncSwap": {
-        "address": "0x9134b42BEcacCF2b3A1CF6A290e3156C23892888",
-        "startBlock": 66719898,
-        "txHash": "0x6644169ad2c4689cf0a05c475fec0c0f34a86b1fa34e5469325242c8064ab8e0"
+        "address": "0x91B1e6C36Af74737FF82A654Fa7a1747fE186888",
+        "startBlock": 66737245,
+        "txHash": "0x524c0dafb4952f696967e1c33c7c2e3be566f6957f0342b9751e980252c84fb3"
       },
       "Router": {
-        "address": "0xF1B572ADE26987F44Bf01A9f962B460e6Eeb8f89",
-        "startBlock": 66719898,
-        "txHash": "0x46f63386877fc2846b4b28150535847e2c0b273da60970602a250cc1f1c0062c"
+        "address": "0x9FecF58D791d7167826EA18e2f653A8CDED79C1c",
+        "startBlock": 66737245,
+        "txHash": "0xe85185b6530a4b848194126591aeb3e625ace3e8de138304a203ea44079526e5"
       },
       "FeeVault": {
-        "address": "0x149f371CAfc6d2f218c6D6E9E42f646d650656f2",
-        "startBlock": 66719898,
-        "txHash": "0x6644169ad2c4689cf0a05c475fec0c0f34a86b1fa34e5469325242c8064ab8e0"
+        "address": "0xbB4FEEBf05D6F4f6eE76f951ce6964e48E5ce9A4",
+        "startBlock": 66737245,
+        "txHash": "0x524c0dafb4952f696967e1c33c7c2e3be566f6957f0342b9751e980252c84fb3"
       },
       "WithdrawalRouter": {
         "address": "0x023b3dc1d065887e492efd2e4474d91dd4be0341",
@@ -120,19 +120,19 @@
         "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
       },
       "AsyncSwap": {
-        "address": "0x919Ba43205fDaA298DC6Bfb87E2729Dae78c6888",
-        "startBlock": 146734407,
-        "txHash": "0x67e91702f7932e1145d3e3f48aaf44534eace4ccc6040026efb59c611e1cea38"
+        "address": "0x91E143120F9758b875713aA5E476E8e853C86888",
+        "startBlock": 146837556,
+        "txHash": "0xa04e9b8ff469c32d40b43aeceb6b8fee18ea2ebc64a7520be65bed10a24d11a3"
       },
       "Router": {
-        "address": "0xF378A88c2cf18D3E804Bd5248a1A0Cbee7dde682",
-        "startBlock": 146734391,
-        "txHash": "0x91015fa455034e8aef0aab70a6186071dbf00f34522c76166dcb0db188cc97ab"
+        "address": "0xF1B572ADE26987F44Bf01A9f962B460e6Eeb8f89",
+        "startBlock": 146837543,
+        "txHash": "0x59ee5d41fb832536a1eba4e166360fc36bf50210f15010ed99ce6276221822bf"
       },
       "FeeVault": {
-        "address": "0x73081b9629E4d186e45C833d05347e792C8EbfeC",
-        "startBlock": 146734407,
-        "txHash": "0x67e91702f7932e1145d3e3f48aaf44534eace4ccc6040026efb59c611e1cea38"
+        "address": "0x24FBfcf78f844CBbA196D85c2F3F48d99B73267c",
+        "startBlock": 146837556,
+        "txHash": "0xa04e9b8ff469c32d40b43aeceb6b8fee18ea2ebc64a7520be65bed10a24d11a3"
       },
       "WithdrawalRouter": {
         "address": "0x78d2178052c9d07fef1ffae1c70252119d2de987",
@@ -169,19 +169,19 @@
         "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
       },
       "AsyncSwap": {
-        "address": "0x915ECf5045aD055286824f4323476eDd44a8A888",
-        "startBlock": 70251035,
-        "txHash": "0x5aeae036f511338523c7f4f9f70f2ed5d88743935f1939166669558dd9561187"
+        "address": "0x915bb9927D0860519a804345b27204E2C94a2888",
+        "startBlock": 70285011,
+        "txHash": "0x49e7b76efc9637ba0a6261e195c7e66fc896ede6c64107d69b87bac76cb2e80c"
       },
       "Router": {
-        "address": "0x1b859f02062464C0638863409B2951D1819f5172",
-        "startBlock": 70251035,
-        "txHash": "0x0c0bdff10c5923fd0638f0aa2f3b94fa36de6f69a77b110b3615e0dc412221df"
+        "address": "0x8FbeA6a4C4DD44616fc2eDf9fcb9Fd36da6d886F",
+        "startBlock": 70285011,
+        "txHash": "0x233c78a473eadd193d3a0b95b0d7a5cd46f53ecc87e6409bb5573429dfb9e473"
       },
       "FeeVault": {
-        "address": "0x4E855330d8a705ADd85EBB4A7778d9B8Daea89a0",
-        "startBlock": 70251035,
-        "txHash": "0x5aeae036f511338523c7f4f9f70f2ed5d88743935f1939166669558dd9561187"
+        "address": "0xE612f4cfBAAC021030707cCfEC1d9BC49B49442B",
+        "startBlock": 70285011,
+        "txHash": "0x49e7b76efc9637ba0a6261e195c7e66fc896ede6c64107d69b87bac76cb2e80c"
       },
       "WithdrawalRouter": {
         "address": "0x78d2178052c9d07fef1ffae1c70252119d2de987",
@@ -218,19 +218,19 @@
         "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
       },
       "AsyncSwap": {
-        "address": "0x91286f39a948171d932B7078937D3ec456726888",
-        "startBlock": 12044018,
-        "txHash": "0x4d67f050086991979d598d41e8d52df646b4a6bcea909855c8e33c98d18e7b1a"
+        "address": "0x91EBC2516F3650Db2d1E48fC56162881E91F2888",
+        "startBlock": 12045463,
+        "txHash": "0x2681e7a4e0bfa1e379c0fc719053fdfb0f9bac99017bd16531fc9612b72ca337"
       },
       "Router": {
-        "address": "0x6796D4AB98F1ae7f5F1Db681acfFa96A687863bD",
-        "startBlock": 12044018,
-        "txHash": "0x38f5b51ce2dbd8e2688b4d6a70d9dd31ca0b86ea347e0c17f36ebe3b04c6e920"
+        "address": "0xd50700c99563972d031E7B7d0577971515b6577F",
+        "startBlock": 12045463,
+        "txHash": "0xa87df658fc3ba001d2c54440839dda7d5eb8c4ab1618f5b01504e15a4e8ba48a"
       },
       "FeeVault": {
-        "address": "0x844e294ea3A5ABEaC3B84C509a87b85832CCCbf5",
-        "startBlock": 12044018,
-        "txHash": "0x4d67f050086991979d598d41e8d52df646b4a6bcea909855c8e33c98d18e7b1a"
+        "address": "0x6aa317ec3E99e0893eF18c4ae62Bf08c2DDca0B3",
+        "startBlock": 12045463,
+        "txHash": "0x2681e7a4e0bfa1e379c0fc719053fdfb0f9bac99017bd16531fc9612b72ca337"
       },
       "WithdrawalRouter": {
         "address": "0x778fe1232a5f128ba792bc72831e34a0e3f546a2",

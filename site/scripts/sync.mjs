@@ -28,12 +28,12 @@ const routes = {
 
 // One-line summaries for the generated guides: vocs reads them from frontmatter into llms.txt.
 const descriptions = {
-  '/protocol/overview': 'Contracts, custody, fees and authorization of the Async Swap hook, in diagrams.',
-  '/protocol/order-lifecycle': 'How an order is placed, matched, filled, repriced and cancelled, and how priority bids are paid.',
-  '/protocol/contract-call-sequences': 'Step-by-step contract calls for placing, matching, filling and cancelling orders.',
+  '/protocol/overview': 'Contracts, custody, fees and authorization of the Async Swap hook, in diagrams: permissionless pools, minimum order and asset floor fixed at deployment, Router.multicall.',
+  '/protocol/order-lifecycle': 'How an order is placed, matched, filled, repriced and cancelled, how priority bids are paid, and how to cancel and withdraw claims in one Router.multicall.',
+  '/protocol/contract-call-sequences': 'Step-by-step contract calls for opening pools and placing, matching, filling, cancelling (alone or batched) and redeeming orders.',
   '/protocol/price-key-crossing': 'How limit prices map to price keys and when two orders cross.',
   '/protocol/dynamic-fee-ordering': 'How Async Swap captures backrun MEV with a dynamic fee on pool fills that move the price back, split between LPs and the protocol.',
-  '/deployments': 'Contract addresses on the five testnets (Unichain Sepolia, Sepolia, Robinhood Chain testnet, Arc testnet, MegaETH testnet); no mainnet yet. Also at /deployments.json.',
+  '/deployments': 'Contract addresses on the five testnets (Unichain Sepolia, Sepolia, Robinhood Chain testnet, Arc testnet, MegaETH testnet), which predate fixed pool parameters; no mainnet yet. Also at /deployments.json.',
   '/audit/status': 'Status of each finding from the first AuditAgent report.',
 }
 
@@ -84,7 +84,8 @@ function syncGuides() {
     if (route === '/') continue // the home page is written by hand
     const out = join(pages, `${route.slice(1)}.md`)
     mkdirSync(dirname(out), { recursive: true })
-    const front = descriptions[route] ? `---\ndescription: ${descriptions[route]}\n---\n\n` : ''
+    // Quoted as a JSON string, which is valid YAML, so a colon in a summary cannot break the frontmatter.
+    const front = descriptions[route] ? `---\ndescription: ${JSON.stringify(descriptions[route])}\n---\n\n` : ''
     writeFileSync(out, front + rewriteLinks(readFileSync(join(repo, file), 'utf8'), file))
   }
   writeFileSync(join(site, 'public/deployments.json'), JSON.stringify(deployments(), null, 2) + '\n')

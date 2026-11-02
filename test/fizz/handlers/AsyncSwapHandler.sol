@@ -42,11 +42,9 @@ abstract contract AsyncSwapHandler is Properties {
 
     /// @notice Low-frequency owner and maker configuration.
     function asyncSwap_secondary(uint8 selector, uint256 arg0, bool arg1) public {
-        selector = uint8(selector % 5);
+        selector = uint8(selector % 3);
         if (selector == 0) _asyncSwap_setExecutor(arg1);
-        else if (selector == 1) _asyncSwap_setMinOrder(clampLte(arg0, 100e6));
-        else if (selector == 2) _asyncSwap_setDefaultMinOrder(clampLte(arg0, 100e6));
-        else if (selector == 3) _asyncSwap_sweep(arg1);
+        else if (selector == 1) _asyncSwap_sweep(arg1);
         else _asyncSwap_invalidateNonce(arg0);
     }
 
@@ -59,14 +57,6 @@ abstract contract AsyncSwapHandler is Properties {
     /// @dev Toggling the Router off strands the actor's cancels and fills until it is re-enabled.
     function _asyncSwap_setExecutor(bool allow) internal asActor {
         hook.setExecutor(poolId, address(router), allow);
-    }
-
-    function _asyncSwap_setMinOrder(uint256 minimum) internal asAdmin {
-        hook.setMinOrder(key, minimum);
-    }
-
-    function _asyncSwap_setDefaultMinOrder(uint256 minimum) internal asAdmin {
-        hook.setDefaultMinOrder(minimum);
     }
 
     function _asyncSwap_sweep(bool native) internal asAdmin {

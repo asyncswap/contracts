@@ -22,8 +22,8 @@ import {PoolIdLibrary} from "v4-core/types/PoolId.sol";
 
 /// @dev Only bypasses permission-address mining for constructor rejection tests.
 contract NumeraireConstructorHarness is AsyncSwap {
-    constructor(IPoolManager manager, Currency quote, address owner_, address router_)
-        AsyncSwap(manager, quote, owner_, router_)
+    constructor(IPoolManager manager, Currency quote, address owner_, address router_, uint256 minOrderUsd)
+        AsyncSwap(manager, quote, owner_, router_, minOrderUsd, type(uint8).max)
     {}
 
     function validateHookAddress(BaseHook) internal pure override {}
@@ -48,10 +48,12 @@ contract NumeraireTest is Test {
             Hooks.BEFORE_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG
                 | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
         );
-        router = new Router(manager, AsyncSwap(payable(address(flags))), ISignatureTransfer(Permit2Bytecode.PERMIT2));
+        router = new Router(manager, AsyncSwap(payable(address(flags))), ISignatureTransfer(Permit2Bytecode.PERMIT2), 0);
         deployCodeTo(
             "AsyncSwap.sol",
-            abi.encode(manager, Currency.wrap(address(usdc)), address(this), address(router)),
+            abi.encode(
+                manager, Currency.wrap(address(usdc)), address(this), address(router), uint256(0), type(uint8).max
+            ),
             address(flags)
         );
         hook = AsyncSwap(payable(address(flags)));
@@ -80,12 +82,14 @@ contract NumeraireTest is Test {
 
     function test_rejectZeroNumeraire() public {
         vm.expectRevert(AsyncSwap.InvalidNumeraire.selector);
-        new NumeraireConstructorHarness(manager, Currency.wrap(address(0)), address(this), address(0xCAFE));
+        new NumeraireConstructorHarness(manager, Currency.wrap(address(0)), address(this), address(0xCAFE), 0);
     }
 
     function test_rejectNonContractNumeraire() public {
         vm.expectRevert(AsyncSwap.InvalidNumeraire.selector);
-        new NumeraireConstructorHarness(manager, Currency.wrap(makeAddr("not a token")), address(this), address(0xCAFE));
+        new NumeraireConstructorHarness(
+            manager, Currency.wrap(makeAddr("not a token")), address(this), address(0xCAFE), 0
+        );
     }
 
     /// @dev CREATE2 deployments run the constructor from the deterministic deployer, so the owner
@@ -93,19 +97,54 @@ contract NumeraireTest is Test {
     function test_ownerIsExplicitArgumentNotDeployer() public {
         address protocolOwner = makeAddr("protocol owner");
         AsyncSwap h =
-            new NumeraireConstructorHarness(manager, Currency.wrap(address(usdc)), protocolOwner, address(0xCAFE));
+            new NumeraireConstructorHarness(manager, Currency.wrap(address(usdc)), protocolOwner, address(0xCAFE), 0);
         assertEq(h.owner(), protocolOwner);
         assertTrue(h.owner() != address(this));
     }
 
     function test_rejectZeroOwner() public {
         vm.expectRevert(AsyncSwap.ZeroAddress.selector);
-        new NumeraireConstructorHarness(manager, Currency.wrap(address(usdc)), address(0), address(0xCAFE));
+        new NumeraireConstructorHarness(manager, Currency.wrap(address(usdc)), address(0), address(0xCAFE), 0);
+    }
+
+    /// The constructor scales the dollar minimum and the $0.10 bid cap by the numeraire's own decimals.
+    function test_minimumAndCapFollowNumeraireDecimals() public {
+        AsyncSwap six =
+            new NumeraireConstructorHarness(manager, Currency.wrap(address(usdc)), address(this), address(0xCAFE), 10);
+        assertEq(six.minOrder(), 10e6, "$10 of 6-decimal USDC");
+        assertEq(six.priorityFeeCap(), 0.1e6, "$0.10 of 6-decimal USDC");
+
+        MockERC20 usdm = new MockERC20("USDM", "USDM", 18);
+        AsyncSwap eighteen =
+            new NumeraireConstructorHarness(manager, Currency.wrap(address(usdm)), address(this), address(0xCAFE), 10);
+        assertEq(eighteen.minOrder(), 10 ether, "$10 of an 18-decimal stablecoin");
+        assertEq(eighteen.priorityFeeCap(), 0.1 ether, "$0.10 of an 18-decimal stablecoin");
+    }
+
+    function test_rejectNumeraireDecimalsOutOfRange() public {
+        MockERC20 none = new MockERC20("Zero", "ZERO", 0);
+        vm.expectRevert(AsyncSwap.UnsupportedNumeraireDecimals.selector);
+        new NumeraireConstructorHarness(manager, Currency.wrap(address(none)), address(this), address(0xCAFE), 0);
+
+        MockERC20 many = new MockERC20("Many", "MANY", 21);
+        vm.expectRevert(AsyncSwap.UnsupportedNumeraireDecimals.selector);
+        new NumeraireConstructorHarness(manager, Currency.wrap(address(many)), address(this), address(0xCAFE), 0);
+    }
+
+    /// The minimum order and bid cap are immutables: no owner call can change them for any pool.
+    function test_poolParametersFixedAtDeployment() public view {
+        assertEq(hook.minOrder(), 0);
+        assertEq(hook.priorityFeeCap(), 0.1e6);
     }
 
     function test_acceptNumeraireOnEitherSortedSide() public {
-        PoolKey memory low = _key(address(1), address(usdc));
-        PoolKey memory high = _key(address(usdc), address(type(uint160).max));
+        // Deployed assets at the extremes of the address range: the hook rejects an asset with no code.
+        address lowAsset = address(0x1000);
+        address highAsset = address(type(uint160).max - 0xff);
+        deployCodeTo("test/utils/MockERC20.sol:MockERC20", abi.encode("Low", "LOW", uint8(18)), lowAsset);
+        deployCodeTo("test/utils/MockERC20.sol:MockERC20", abi.encode("High", "HI", uint8(18)), highAsset);
+        PoolKey memory low = _key(lowAsset, address(usdc));
+        PoolKey memory high = _key(address(usdc), highAsset);
         assertEq(Currency.unwrap(low.currency1), address(usdc));
         assertEq(Currency.unwrap(high.currency0), address(usdc));
         manager.initialize(low, 2 ** 96);

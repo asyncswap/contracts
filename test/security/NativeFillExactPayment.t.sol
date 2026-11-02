@@ -44,8 +44,14 @@ contract NativeFillExactPaymentTest is Test {
             Hooks.BEFORE_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG
                 | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
         );
-        router = new Router(manager, AsyncSwap(payable(address(flags))), ISignatureTransfer(Permit2Bytecode.PERMIT2));
-        deployCodeTo("AsyncSwap.sol", abi.encode(manager, currency1, address(this), address(router)), address(flags));
+        router = new Router(manager, AsyncSwap(payable(address(flags))), ISignatureTransfer(Permit2Bytecode.PERMIT2), 0);
+        // The 18-decimal mock stands in for 6-decimal USDC: the hook derives its $0.10 bid cap from decimals.
+        vm.mockCall(Currency.unwrap(currency1), abi.encodeWithSignature("decimals()"), abi.encode(uint8(6)));
+        deployCodeTo(
+            "AsyncSwap.sol",
+            abi.encode(manager, currency1, address(this), address(router), uint256(0), type(uint8).max),
+            address(flags)
+        );
         hook = AsyncSwap(payable(address(flags)));
 
         key = PoolKey({
@@ -128,7 +134,7 @@ contract NativeFillExactPaymentTest is Test {
         bytes32 id = _orderIdFor(alice, false, order.salt);
         (uint256 inputBefore, uint256 priceBefore) = hook.asyncOrderInfo(poolId, id);
         vm.prank(bob);
-        vm.expectRevert("msg.value != livePrice");
+        vm.expectRevert("msg.value != deposit + mevTax");
         router.fillOrder{value: value}(order, type(uint256).max, "");
         assertEq(bob.balance, fillerBefore, "filler keeps deposit");
         assertEq(alice.balance, makerBefore, "maker receives nothing");

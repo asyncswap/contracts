@@ -6,7 +6,6 @@ import {UniswapAddresses} from "./config/UniswapAddresses.sol";
 import {FFIHelper} from "./FFIHelper.sol";
 import {AsyncSwap} from "@async-swap/AsyncSwap.sol";
 import {Router} from "@async-swap/Router.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {console} from "forge-std/Script.sol";
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {Currency} from "v4-core/types/Currency.sol";
@@ -45,8 +44,24 @@ contract DeployHookScript is FFIHelper {
         // The hook trusts only the Router as swap caller, and the Router takes the hook in its constructor: the
         // Router goes first, as OWNER's next CREATE, pointing at the hook's mined address.
         address predictedRouter = vm.computeCreateAddress(OWNER, vm.getNonce(OWNER));
+        // The asset floor (10^(decimals - 4) of each pool's asset) is the order minimum, so no dollar minimum by
+        // default (DEPLOY_MIN_ORDER_USD). The hook scales it, and its $0.10 priority-bid cap, by the numeraire's
+        // decimals. Both are fixed at deployment.
+        uint256 minOrderUsd = vm.envOr("DEPLOY_MIN_ORDER_USD", uint256(0));
+        // Order creation and fills pay an MEV tax of their priority fee per gas times this, fixed at deployment.
+        // It is per chain (deployment.mevTaxGas in script/config/chains.json, exported by deploy.sh) and has no
+        // default: only on a chain ordered by priority fee does it capture searcher bids (20M gas, about 30x an
+        // order's gas, takes roughly 97% of them); elsewhere it would only tax ordinary tips, so it is 0.
+        uint256 mevTaxGas = vm.envUint("DEPLOY_MEV_TAX_GAS");
         bytes memory creationCode = type(AsyncSwap).creationCode;
-        bytes memory constructorArgs = abi.encode(address(manager), numeraire, OWNER, predictedRouter);
+        bytes memory constructorArgs = abi.encode(
+            address(manager),
+            numeraire,
+            OWNER,
+            predictedRouter,
+            minOrderUsd,
+            uint8(4) // orders trade at least 0.0001 of a whole asset token
+        );
         bytes32 initCodeHash = keccak256(abi.encodePacked(creationCode, constructorArgs));
 
         bytes32 salt = _readSaltEnv();
@@ -64,7 +79,7 @@ contract DeployHookScript is FFIHelper {
         console.log("predicted hook address:", predicted);
 
         vm.startBroadcast(OWNER);
-        router = new Router(manager, AsyncSwap(payable(predicted)), ISignatureTransfer(PERMIT2));
+        router = new Router(manager, AsyncSwap(payable(predicted)), ISignatureTransfer(PERMIT2), mevTaxGas);
         require(address(router) == predictedRouter, "deployed router address mismatch");
         // Through the CREATE2 factory explicitly, as the library scripts do: on some chains Forge runs
         // `new AsyncSwap{salt: salt}` as a CREATE2 from the sender instead, missing the mined address.
@@ -73,12 +88,6 @@ contract DeployHookScript is FFIHelper {
         hook = AsyncSwap(payable(predicted));
         require(address(hook).code.length > 0, "deployed hook address mismatch");
         require(hook.owner() == OWNER, "hook owner mismatch");
-        // Pools start with a $10 minimum order (DEPLOY_MIN_ORDER_USD), in the numeraire's base units.
-        uint256 minOrderUsd = vm.envOr("DEPLOY_MIN_ORDER_USD", uint256(10));
-        uint8 decimals = IERC20Metadata(Currency.unwrap(numeraire)).decimals();
-        require(decimals >= 1 && decimals <= 20, "Unsupported numeraire decimals");
-        hook.setDefaultMinOrder(minOrderUsd * 10 ** decimals);
-        hook.setDefaultPriorityFeeCap(uint64(10 ** decimals / 10));
         vm.stopBroadcast();
 
         if (!vm.envOr("DEPLOY_DRY_RUN", false)) {

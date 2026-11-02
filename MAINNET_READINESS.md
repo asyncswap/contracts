@@ -5,10 +5,10 @@ deployment has been broadcast, and none will be until the audit is complete and 
 
 ## Audit
 
-- **Scope:** [`audit/AUDIT_SCOPE_10_23_26.md`](audit/AUDIT_SCOPE_10_23_26.md). It freezes the code at
-  `830cd9e` (2026-10-23): 3,156 nSLOC across `src/` and `script/`. It supersedes
-  [`audit/AUDIT_SCOPE_10_19_26.md`](audit/AUDIT_SCOPE_10_19_26.md) (`dc8042d`). If `src/` or `script/`
-  changes before the audit starts, re-freeze in a new dated scope file.
+- **Scope:** [`audit/AUDIT_SCOPE_11_01_26.md`](audit/AUDIT_SCOPE_11_01_26.md). It freezes the code at
+  `fdfdf65` (2026-11-01; `src/` and `script/` identical to the deployed `c13cd5a`): 3,815 nSLOC across `src/` and
+  `script/`. It supersedes [`audit/AUDIT_SCOPE_10_23_26.md`](audit/AUDIT_SCOPE_10_23_26.md) (`830cd9e`). If
+  `src/` or `script/` changes before the audit starts, re-freeze in a new dated scope file.
 - **Automated review:** every finding of the Nethermind AuditAgent report is fixed or acknowledged, each
   fix with a regression test that fails on the audited commit; see
   [`audit/auditagent_report_1_status.md`](audit/auditagent_report_1_status.md).
@@ -68,19 +68,33 @@ script. The local demo deploys a new mock-USDC market; it is not a mainnet liqui
   Source: <https://developers.uniswap.org/docs/protocols/v4/deployments>
 - USDC: `0x078D782b760474a361dDA0AF3839290b0EF57AD6`. Revalidate issuer address and decimals in the final
   rehearsal.
-- Runtime sizes (`forge build --sizes`, `optimizer_runs = 1_000`, 2026-10-23): AsyncSwap 19,237 bytes,
-  AsyncMatching 19,064, Router 17,580, FeeVault 1,952, TokenClaims 1,760, NativeClaims 1,666. All under the
-  24,576-byte EIP-170 limit; the hook has 5,339 bytes of margin. Recheck after any audit fix.
+- Runtime sizes (`forge build --sizes`, `optimizer_runs = 10_000`, 2026-11-01, after the M-01, L-02, M-02
+  and L-01 fixes): AsyncSwap 23,367 bytes, AsyncMatching 24,022, Router 21,925, FeeVault 2,320, TokenClaims
+  2,110, NativeClaims 1,964. All under the 24,576-byte EIP-170 limit, but the margins are thin: AsyncMatching
+  has only 554 bytes left, the hook 1,209 and the Router 2,651. Budget audit
+  fixes against those margins, prefer moving logic into linked libraries over growing the hook, and
+  recheck after every change.
 - The deployment wrapper checks library code presence, not exact runtime identity. Pin and verify the
   final library and hook runtime hashes.
 - `AsyncMatching` deploys through CREATE2 with the salt `keccak256("asyncswap.v2.AsyncMatching")`, which
   fixes its address across chains. Keep it unless a new address is intended.
 - Owner in the current script: `0xb1F0982E02f9F71E60512fd47471d76610CcB556`. Confirm the final owner,
-  operational permissions and funding before broadcast.
+  operational permissions and funding before broadcast. The owner can transfer ownership, `sweep` the
+  hook's stranded raw balance and collect FeeVault fees. It cannot open or close pools or change pool
+  parameters.
+- Pool parameters are constructor arguments with no setter: `DEPLOY_MIN_ORDER_USD` (default 0: the asset floor is the minimum) and an
+  asset precision of 4 (0.0001 token). The constructor derives the $0.10 bid cap and the base-unit
+  minimum from USDC's decimals. Confirm both values before broadcast; changing them means a new hook.
+- The Router's MEV tax gas is a constructor argument with no setter, set per chain in
+  `script/config/chains.json` (`deployment.mevTaxGas`, with `deployment.ordering`): 20,000,000 on Unichain,
+  whose blocks are ordered by priority fee, and 0 where ordering is by arrival, by builders or unconfirmed.
+  `deploy.sh` refuses a chain without a value, or with a nonzero value on a chain not ordered by priority fee.
+  Confirm Unichain's ordering and typical wallet priority fees before broadcast, and have the frontend send
+  orders with a zero priority fee.
 
 ## Before the audit starts
 
-- If `src/` or `script/` changes after `830cd9e`, add a new dated scope file frozen at the commit to be
+- If `src/` or `script/` changes after `fdfdf65`, add a new dated scope file frozen at the commit to be
   audited (see [Audit](#audit)).
 
 ## After the audit

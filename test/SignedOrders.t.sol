@@ -229,9 +229,16 @@ contract SignedOrdersTest is SetupHook {
         view
         returns (bytes memory)
     {
-        (,,,,, uint64 sequence,) = hook.orderBookOrder(poolId, _id(order));
-        bytes32 structHash =
-            OrderSignatures.hashUpdatePrice(order, _id(order), AMOUNT_IN, newOut, sequence, nonce, deadline);
+        bytes32 structHash = OrderSignatures.hashUpdatePrice(
+            order,
+            _id(order),
+            AMOUNT_IN,
+            newOut,
+            hook.orderCreatedSequence(poolId, _id(order)),
+            hook.orderReprices(poolId, _id(order)),
+            nonce,
+            deadline
+        );
         return _sign(_digest(hook.DOMAIN_SEPARATOR(), structHash));
     }
 
@@ -241,7 +248,7 @@ contract SignedOrdersTest is SetupHook {
         bytes memory sig = _updateSig(order, 0.99 ether, 7, deadline);
 
         vm.prank(relayer);
-        hook.updatePriceWithSig(order, 0.99 ether, 7, deadline, sig);
+        hook.updatePriceWithSig(order, AMOUNT_IN, 0.99 ether, 7, deadline, sig);
 
         (, uint256 storedOutMin) = hook.asyncOrderInfo(poolId, _id(order));
         assertEq(storedOutMin, 0.99 ether, "price updated");
@@ -249,7 +256,7 @@ contract SignedOrdersTest is SetupHook {
 
         vm.prank(relayer);
         vm.expectRevert(AsyncSwap.NonceAlreadyUsed.selector);
-        hook.updatePriceWithSig(order, 0.99 ether, 7, deadline, sig);
+        hook.updatePriceWithSig(order, AMOUNT_IN, 0.99 ether, 7, deadline, sig);
     }
 
     /// PoC: a reprice the maker signed but never relayed must not undo a later direct reprice. Here the
@@ -263,7 +270,7 @@ contract SignedOrdersTest is SetupHook {
 
         vm.prank(relayer);
         vm.expectRevert(AsyncSwap.InvalidSignature.selector);
-        hook.updatePriceWithSig(order, 0.9 ether, 41, deadline, stale);
+        hook.updatePriceWithSig(order, AMOUNT_IN, 0.9 ether, 41, deadline, stale);
         (, uint256 minimum) = hook.asyncOrderInfo(poolId, _id(order));
         assertEq(minimum, 1.1 ether, "the maker's direct reprice stands");
     }
@@ -283,13 +290,13 @@ contract SignedOrdersTest is SetupHook {
         assertEq(hook.asyncOrder(poolId, _id(order)), AMOUNT_IN, "same ID and input recreated");
         vm.prank(relayer);
         vm.expectRevert(AsyncSwap.InvalidSignature.selector);
-        hook.updatePriceWithSig(order, 0.99 ether, 29, deadline, oldSig);
+        hook.updatePriceWithSig(order, AMOUNT_IN, 0.99 ether, 29, deadline, oldSig);
         (, uint256 minimum) = hook.asyncOrderInfo(poolId, _id(order));
         assertEq(minimum, AMOUNT_OUT_MIN, "replacement price unchanged");
         assertFalse(hook.nonceUsed(maker, 29), "rejection preserves unused nonce");
         bytes memory freshSig = _updateSig(order, 0.99 ether, 29, deadline);
         vm.prank(relayer);
-        hook.updatePriceWithSig(order, 0.99 ether, 29, deadline, freshSig);
+        hook.updatePriceWithSig(order, AMOUNT_IN, 0.99 ether, 29, deadline, freshSig);
         (, minimum) = hook.asyncOrderInfo(poolId, _id(order));
         assertEq(minimum, 0.99 ether, "fresh signature updates replacement");
         assertTrue(hook.nonceUsed(maker, 29), "fresh signature consumes nonce");
@@ -299,13 +306,13 @@ contract SignedOrdersTest is SetupHook {
         AsyncOrder memory order = _createSigned();
         uint256 deadline = block.timestamp + 1 hours;
         bytes32 structHash = OrderSignatures.hashUpdatePrice(
-            order, _id(order), AMOUNT_IN, 1, hook.orderCreatedSequence(poolId, _id(order)), 1, deadline
+            order, _id(order), AMOUNT_IN, 1, hook.orderCreatedSequence(poolId, _id(order)), 0, 1, deadline
         );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(0xBAD, _digest(hook.DOMAIN_SEPARATOR(), structHash));
 
         vm.prank(relayer);
         vm.expectRevert(AsyncSwap.InvalidSignature.selector);
-        hook.updatePriceWithSig(order, 1, 1, deadline, abi.encodePacked(r, s, v));
+        hook.updatePriceWithSig(order, AMOUNT_IN, 1, 1, deadline, abi.encodePacked(r, s, v));
     }
 
     function test_updatePriceWithSig_rejectsTamperedPrice() public {
@@ -315,7 +322,7 @@ contract SignedOrdersTest is SetupHook {
 
         vm.prank(relayer);
         vm.expectRevert(AsyncSwap.InvalidSignature.selector);
-        hook.updatePriceWithSig(order, 1, 1, deadline, sig);
+        hook.updatePriceWithSig(order, AMOUNT_IN, 1, 1, deadline, sig);
     }
 
     function test_updatePriceWithSig_rejectsExpired() public {
@@ -326,7 +333,7 @@ contract SignedOrdersTest is SetupHook {
 
         vm.prank(relayer);
         vm.expectRevert(AsyncSwap.SignatureExpired.selector);
-        hook.updatePriceWithSig(order, 0.99 ether, 1, deadline, sig);
+        hook.updatePriceWithSig(order, AMOUNT_IN, 0.99 ether, 1, deadline, sig);
     }
 
     function test_invalidateNonce_revokesSignedUpdate() public {
@@ -339,7 +346,7 @@ contract SignedOrdersTest is SetupHook {
 
         vm.prank(relayer);
         vm.expectRevert(AsyncSwap.NonceAlreadyUsed.selector);
-        hook.updatePriceWithSig(order, 0.99 ether, 3, deadline, sig);
+        hook.updatePriceWithSig(order, AMOUNT_IN, 0.99 ether, 3, deadline, sig);
     }
 
     /* ---------------------------------- cancel --------------------------------- */
@@ -350,7 +357,7 @@ contract SignedOrdersTest is SetupHook {
         returns (bytes memory)
     {
         bytes32 structHash = OrderSignatures.hashCancel(
-            order, _id(order), AMOUNT_IN, hook.orderCreatedSequence(poolId, _id(order)), nonce, deadline
+            order, _id(order), hook.orderCreatedSequence(poolId, _id(order)), nonce, deadline
         );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, _digest(router.DOMAIN_SEPARATOR(), structHash));
         return abi.encodePacked(r, s, v);
@@ -459,7 +466,7 @@ contract SignedOrdersTest is SetupHook {
     function test_RevertWhen_useNonceByNonExecutor() public {
         vm.prank(relayer);
         vm.expectRevert(AsyncFiller.NotAuthorizedExecutor.selector);
-        hook.useNonce(poolId, maker, 9);
+        hook.useNonce(maker, 9);
     }
 
     /* ------------------------------ type strings ------------------------------- */
@@ -479,7 +486,13 @@ contract SignedOrdersTest is SetupHook {
         assertEq(
             OrderSignatures.CANCEL_ORDER_TYPEHASH,
             keccak256(
-                "CancelOrder(address maker,address tokenIn,address tokenOut,uint256 amountIn,bytes32 orderId,uint64 createdSequence,uint256 nonce,uint256 deadline)"
+                "CancelOrder(address maker,address tokenIn,address tokenOut,bytes32 orderId,uint64 createdSequence,uint256 nonce,uint256 deadline)"
+            )
+        );
+        assertEq(
+            OrderSignatures.UPDATE_PRICE_TYPEHASH,
+            keccak256(
+                "UpdatePrice(address maker,address tokenIn,address tokenOut,uint256 amountIn,uint256 newAmountOutMin,bytes32 orderId,uint64 createdSequence,uint32 reprices,uint256 nonce,uint256 deadline)"
             )
         );
     }

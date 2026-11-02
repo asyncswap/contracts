@@ -191,6 +191,7 @@ contract AsyncSwapAddOrderFormalTest is FormalSlotsB {
             isBuy: o.isBuy,
             zeroForOne: o.zeroForOne,
             sequence: seq,
+            reprices: 0,
             priorityFee: uint64(o.priorityFee % 2 ** 64),
             priorityKey: uint128((o.priorityFee << 64) | (2 ** 64 - 1 - uint256(seq))),
             createdSequence: seq

@@ -10,7 +10,7 @@ import {FormalImmutablesC} from "./FormalImmutablesC.sol";
 
 /// @dev The real Router, exposing the internal `_domainSeparatorV4`.
 contract RouterCtorHarness is Router {
-    constructor(IPoolManager manager, AsyncSwap hook_, ISignatureTransfer permit2) Router(manager, hook_, permit2) {}
+    constructor(IPoolManager manager, AsyncSwap hook_, ISignatureTransfer permit2) Router(manager, hook_, permit2, 0) {}
 
     function domainSeparatorV4() external view returns (bytes32) {
         return _domainSeparatorV4();

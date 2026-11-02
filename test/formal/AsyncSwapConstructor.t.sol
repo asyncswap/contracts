@@ -13,7 +13,7 @@ import {Currency} from "v4-core/types/Currency.sol";
 ///      exposes the internal `_domainSeparatorV4`.
 contract CtorHarness is AsyncSwap {
     constructor(IPoolManager manager, Currency quote, address owner_, address router_)
-        AsyncSwap(manager, quote, owner_, router_)
+        AsyncSwap(manager, quote, owner_, router_, 0, type(uint8).max)
     {}
 
     function validateHookAddress(BaseHook) internal pure override {}
@@ -32,7 +32,6 @@ contract AsyncSwapConstructorFormalTest is Test {
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
     uint256 constant OWNER_SLOT = 4;
     uint256 constant PENDING_OWNER_SLOT = 5;
-    uint256 constant DEFAULT_PRIORITY_CAP_SLOT = 8;
 
     IPoolManager manager;
     MockERC20 usdc;
@@ -40,6 +39,10 @@ contract AsyncSwapConstructorFormalTest is Test {
     function setUp() public {
         manager = new PoolManager(address(this));
         usdc = new MockERC20("USD Coin", "USDC", 6);
+        // The constructor reads the numeraire's decimals; the other code-bearing candidates report 6 like USDC,
+        // so these checks keep testing the code and owner guards (Numeraire.t.sol covers the decimals guard).
+        vm.mockCall(address(manager), abi.encodeWithSignature("decimals()"), abi.encode(uint8(6)));
+        vm.mockCall(address(this), abi.encodeWithSignature("decimals()"), abi.encode(uint8(6)));
     }
 
     function _built(address self) internal view returns (bytes32) {
@@ -52,6 +55,14 @@ contract AsyncSwapConstructorFormalTest is Test {
         if (which == 0) return address(usdc);
         if (which == 1) return address(manager);
         return address(this);
+    }
+
+    /// @dev The constructor's decimals guard: `decimals()` answers with a value from 1 to 20.
+    function _decimalsOk(address num) internal view returns (bool) {
+        (bool ok, bytes memory ret) = num.staticcall(abi.encodeWithSignature("decimals()"));
+        if (!ok || ret.length < 32) return false;
+        uint256 d = abi.decode(ret, (uint256));
+        return d >= 1 && d <= 20;
     }
 
     function _deploy(address pm, address num, address owner_) internal returns (bool ok, address a) {
@@ -82,7 +93,7 @@ contract AsyncSwapConstructorFormalTest is Test {
     }
 
     /// @notice formal/Refinement/Swarm/AsyncSwapConstructor.lean:88 — reverts iff the numeraire has no code or
-    ///         the owner is zero.
+    ///         the owner is zero, extended by the decimals guard: the numeraire must report 1 to 20 decimals.
     function testFuzz_ctor_reverts_iff(
         address pm,
         address num,
@@ -94,7 +105,7 @@ contract AsyncSwapConstructorFormalTest is Test {
         if (hasCode) num = _withCode(which);
         if (zeroOwner) owner_ = address(0);
         (bool ok,) = _deploy(pm, num, owner_);
-        assertEq(!ok, num.code.length == 0 || owner_ == address(0));
+        assertEq(!ok, num.code.length == 0 || owner_ == address(0) || !_decimalsOk(num));
     }
 
     /// @notice formal/Refinement/Swarm/AsyncSwapConstructor.lean:95 — succeeds iff both guards pass, and then
@@ -107,19 +118,15 @@ contract AsyncSwapConstructorFormalTest is Test {
         address predicted = vm.computeCreateAddress(address(this), vm.getNonce(address(this)));
         vm.record();
         (bool ok, address a) = _deploy(pm, num, owner_);
-        assertEq(ok, num.code.length != 0 && owner_ != address(0), "ok iff guards pass");
+        assertEq(ok, num.code.length != 0 && owner_ != address(0) && _decimalsOk(num), "ok iff guards pass");
         if (!ok) return;
         assertEq(a, predicted);
         (, bytes32[] memory writes) = vm.accesses(a);
         assertGt(writes.length, 0, "owner is written");
         for (uint256 i; i < writes.length; i++) {
-            assertTrue(
-                writes[i] == bytes32(OWNER_SLOT) || writes[i] == bytes32(DEFAULT_PRIORITY_CAP_SLOT),
-                "only owner and default priority cap are written"
-            );
+            assertEq(writes[i], bytes32(OWNER_SLOT), "only owner is written");
         }
         assertEq(vm.load(a, bytes32(OWNER_SLOT)), bytes32(uint256(uint160(owner_))), "owner := _owner");
-        assertEq(uint256(vm.load(a, bytes32(DEFAULT_PRIORITY_CAP_SLOT))), 100_000, "default priority cap");
     }
 
     /// @notice formal/Refinement/Swarm/AsyncSwapConstructor.lean:104 — from fresh storage, the deployed state is

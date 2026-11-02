@@ -48,6 +48,19 @@ abstract contract RouterHandler is Properties {
         router_cancelOrder(order);
     }
 
+    /// @notice Cancel up to `count` live orders of one maker in one `multicall`.
+    function router_multicallCancel_clamped(uint256 entropy, uint8 count) public {
+        (bool found, AsyncOrder memory first) = pickLiveOrder(entropy);
+        if (!found) return;
+        actor = first.owner;
+        AsyncOrder[] memory batch = _liveOrdersOf(actor, clampBetween(count, 1, 5));
+        bytes[] memory calls = new bytes[](batch.length);
+        for (uint256 i; i < batch.length; ++i) {
+            calls[i] = abi.encodeCall(router.cancelOrder, (batch[i]));
+        }
+        router_multicall(calls);
+    }
+
     function router_fillFromPoolLiquidity_clamped(uint256 entropy) public {
         (bool found, AsyncOrder memory order) = pickLiveOrder(entropy);
         if (!found) return;
@@ -59,6 +72,10 @@ abstract contract RouterHandler is Properties {
     }
 
     // ―――――――――――――――――――――――― Unclamped ―――――――――――――――――――――――――
+
+    function router_multicall(bytes[] memory calls) public asActor {
+        router.multicall(calls);
+    }
 
     function router_cancelOrder(AsyncOrder memory order) public asActor {
         router.cancelOrder(order);
@@ -96,6 +113,18 @@ abstract contract RouterHandler is Properties {
             order, abi.encode(AsyncSwap.UserParams(actor, address(router), amountOutMin, bid)), sell ? amountIn : 0
         );
         orders.push(order);
+    }
+
+    function _liveOrdersOf(address owner, uint256 max) internal view returns (AsyncOrder[] memory batch) {
+        AsyncOrder[] memory buffer = new AsyncOrder[](max);
+        uint256 n;
+        for (uint256 i; i < orders.length && n < max; ++i) {
+            if (orders[i].owner == owner && liveAmountIn(orders[i]) != 0) buffer[n++] = orders[i];
+        }
+        batch = new AsyncOrder[](n);
+        for (uint256 i; i < n; ++i) {
+            batch[i] = buffer[i];
+        }
     }
 
     /// @dev Mirrors `AsyncSwap._createOrder`: msg.sender inside `_beforeSwap` is the PoolManager,

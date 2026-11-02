@@ -28,8 +28,9 @@ that `AsyncMatching` calls after every pool fill.
    ```
 
    where `gapBefore` and `gapAfter` are the distances, in ticks, from the reference to the pool's tick
-   before and after the fill. If the fill crosses the reference, `gapAfter` is 0: the part past the
-   reference closes no gap. One tick is about 0.01%, so `(gapBefore + gapAfter) / 2` is the average
+   before and after the fill. If the fill crosses the reference, `gapAfter` is 0 and `amountOut` is only
+   the share of the output from the side before the reference, `amountOut × gapBefore / (gapBefore +
+   ticks past the reference)`: the part past the reference closes no gap and pays nothing. One tick is about 0.01%, so `(gapBefore + gapAfter) / 2` is the average
    price gap over the fill in basis points, and the fee is **half the price gap the fill closes**.
 4. **No dynamic fee** for a fill that moves the price further from the reference, or doesn't move it.
 5. **Split.** Half the dynamic fee is donated to in-range LPs (`PoolManager.donate`). The other half,

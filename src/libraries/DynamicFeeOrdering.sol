@@ -45,7 +45,9 @@ library DynamicFeeOrdering {
     ///      `ORDERING_WINDOW` blocks records its starting tick as the reference. A later fill in the
     ///      window that moves the price back toward the reference pays half the price gap it closes:
     ///      `amountOut * avgGap / 2`, with the gap averaged over the fill's start and end ticks (one
-    ///      tick is about 0.01%), so splitting a backrun does not lower its total. Half of the fee
+    ///      tick is about 0.01%), so splitting a backrun does not lower its total. A fill that crosses
+    ///      the reference pays only on the share of its output from the side before the reference,
+    ///      in proportion to the ticks on each side. Half of the fee
     ///      is donated to in-range LPs and half credited to the FeeVault as claims.
     function charge(
         AsyncFiller.State storage self,
@@ -62,12 +64,16 @@ library DynamicFeeOrdering {
         } else {
             int256 from = int256(tickBefore) - self.refTick;
             int256 to = int256(tickAfter) - self.refTick;
-            // Only a fill toward the reference pays; the part past it closes no gap.
+            // Only a fill toward the reference pays; the part past it closes no gap, and its output pays nothing.
+            uint256 feeBase = amountOut;
+            if (to * from < 0) {
+                feeBase = amountOut * SignedMath.abs(from) / (SignedMath.abs(from) + SignedMath.abs(to));
+            }
             if (to * from <= 0) to = 0;
             uint256 gapBefore = SignedMath.abs(from);
             uint256 gapAfter = SignedMath.abs(to);
             if (gapAfter < gapBefore) {
-                fee = Math.min(amountOut * (gapBefore + gapAfter) / 40_000, amountOut / 2);
+                fee = Math.min(feeBase * (gapBefore + gapAfter) / 40_000, amountOut / 2);
                 _pay(self, key, id, output, fee);
             }
         }

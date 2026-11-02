@@ -12,7 +12,7 @@ match the code on `main`. Each page links to its source file.
 | Contract | Role |
 | --- | --- |
 | [AsyncSwap](/reference/src/AsyncSwap) | The Uniswap v4 hook: turns swaps into orders, escrows input and bids, entry point for matching, fills and cancels. |
-| [Router](/reference/src/Router) | Entry point for makers, fillers and relayers: `swap`, `fillOrder`, `cancelOrder`, signed variants, `matchBook`, `fillFromPoolLiquidity`. |
+| [Router](/reference/src/Router) | Entry point for makers, fillers and relayers: `swap`, `fillOrder`, `cancelOrder`, `cancelAndWithdraw`, `withdrawClaims`, signed variants, `matchBook`, `fillFromPoolLiquidity`, and `multicall` to batch them. |
 | [AsyncMatching](/reference/src/libraries/AsyncMatching) | Linked library that matches the book, fills from pool liquidity and settles each pair. |
 | [AsyncFiller](/reference/src/libraries/AsyncFiller) | Order storage and the per-pool book: placement, fills, cancels, repricing, bid settlement. |
 | [FeeVault](/reference/src/FeeVault) | Holds protocol fee and bid claims; the owner collects them. |

@@ -82,7 +82,7 @@ script. The local demo deploys a new mock-USDC market; it is not a mainnet liqui
   operational permissions and funding before broadcast. The owner can transfer ownership, `sweep` the
   hook's stranded raw balance and collect FeeVault fees. It cannot open or close pools or change pool
   parameters.
-- Pool parameters are constructor arguments with no setter: `DEPLOY_MIN_ORDER_USD` (default $10) and an
+- Pool parameters are constructor arguments with no setter: `DEPLOY_MIN_ORDER_USD` (default 0: the asset floor is the minimum) and an
   asset precision of 4 (0.0001 token). The constructor derives the $0.10 bid cap and the base-unit
   minimum from USDC's decimals. Confirm both values before broadcast; changing them means a new hook.
 - The Router's MEV tax gas is a constructor argument with no setter, set per chain in

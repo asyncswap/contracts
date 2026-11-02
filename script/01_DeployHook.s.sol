@@ -44,9 +44,10 @@ contract DeployHookScript is FFIHelper {
         // The hook trusts only the Router as swap caller, and the Router takes the hook in its constructor: the
         // Router goes first, as OWNER's next CREATE, pointing at the hook's mined address.
         address predictedRouter = vm.computeCreateAddress(OWNER, vm.getNonce(OWNER));
-        // Pools get a $10 minimum order (DEPLOY_MIN_ORDER_USD). The hook scales it, and its $0.10 priority-bid
-        // cap, by the numeraire's decimals. Both are fixed at deployment.
-        uint256 minOrderUsd = vm.envOr("DEPLOY_MIN_ORDER_USD", uint256(10));
+        // The asset floor (10^(decimals - 4) of each pool's asset) is the order minimum, so no dollar minimum by
+        // default (DEPLOY_MIN_ORDER_USD). The hook scales it, and its $0.10 priority-bid cap, by the numeraire's
+        // decimals. Both are fixed at deployment.
+        uint256 minOrderUsd = vm.envOr("DEPLOY_MIN_ORDER_USD", uint256(0));
         // Order creation and fills pay an MEV tax of their priority fee per gas times this, fixed at deployment.
         // It is per chain (deployment.mevTaxGas in script/config/chains.json, exported by deploy.sh) and has no
         // default: only on a chain ordered by priority fee does it capture searcher bids (20M gas, about 30x an

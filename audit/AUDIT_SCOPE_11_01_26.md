@@ -204,9 +204,10 @@ Status of every finding: [`README.md`](README.md). Every fix has a regression te
 
 ## Testing
 
-At the freeze commit:
+At the freeze commit, with the tests added alongside this scope file (tests are out of scope, so the freeze of `src/`
+and `script/` is unchanged):
 
-- `forge test`: 971 passing, 0 failing, 0 skipped. The Unichain fork suite (`UnichainForkTest`, 3 tests) runs
+- `forge test`: 980 passing, 0 failing, 0 skipped. The Unichain fork suite (`UnichainForkTest`, 3 tests) runs
   against the `unichain` RPC alias at block 61,709,000 unless `UNICHAIN_FORK_RPC_URL` and `UNICHAIN_FORK_BLOCK` are set.
 - 14 invariant runs across `MatchingInvariantTest`, `PriorityMatchingInvariantTest`, `LpMatchingInvariantTest` and
   `ExactPriorityInvariantTest` (64 runs × depth 64, fail-on-revert): escrow equals outstanding obligations, asset
@@ -215,9 +216,13 @@ At the freeze commit:
 - Regression suites in `test/security/` and `test/nethermind_auditagent/`; Python reference vectors for exact
   eligibility and priority; single-call bytecode property checks in `test/formal/`. The Lean specifications in
   `formal/` predate several changes and have not been regenerated.
-- Coverage of `src/`: 99.82% lines, 98.94% statements, 96.63% branches, 100% functions. The lowest branch coverage is
-  `TickPrice` at 78.57% (the clamps at v4's price limits and the fee-window guard) and `DynamicFeeOrdering` at
-  91.67%.
+- Coverage of `src/`: 99.82% lines, 99.10% statements, 97.60% branches, 100% functions. `test/TickPricePoolBeatsLevel.t.sol`
+  covers `poolBeatsLevel` for both numeraire orientations, the fee window both ways and the limit on every key. Three
+  branches there are defensive and unreachable, so they stay uncovered: the clamp at v4's minimum price in
+  `TickPrice.poolBeatsLevel` (a swap that lowers the tick has its limit moved one tick up, so it never lands on
+  `MIN_TICK`), the zero floor of the fee-window subtraction (the pool's key always exceeds half its gap to the
+  reference), and the no-liquidity case of `DynamicFeeOrdering._pay` (a pool fill that leaves no active liquidity
+  now reverts first).
 - Runtime sizes (EIP-170 limit 24,576): AsyncSwap 23,428 bytes, AsyncMatching 24,135, Router 22,131, TickPrice
   5,204, FeeVault 2,320, TokenClaims 2,110, NativeClaims 1,964.
 

@@ -12,9 +12,10 @@ liquidity, and anyone can permissionlessly fill a resting order.
   price, a higher escrowed USDC priority bid goes first, and earlier orders break equal bids.
 * **Ordering MEV is auctioned, not extracted.** Priority bids are paid in USDC to the protocol's
   FeeVault, so jumping the queue at a price costs the bidder, not other traders.
-* **Backruns pay LPs.** A pool fill that moves the price back within two blocks of another pool
-  fill pays a dynamic fee of half the price gap it closes, split between LPs and the protocol. See
-  [dynamic fee ordering](/protocol/dynamic-fee-ordering).
+* **Backruns pay LPs.** Each pool's first fill in a 2-block window records the price before it. A
+  later fill in that window that moves the same pool's price back toward it pays a dynamic fee of
+  about half the backrun's profit, split between LPs and the protocol. Other pools are unaffected.
+  See [dynamic fee ordering](/protocol/dynamic-fee-ordering).
 * **Orders rest until they execute.** Unfilled amounts stay open for later matching, a pool fill,
   a filler, repricing or cancellation.
 * **No swap touches the curve directly.** Every swap becomes an order. The only AMM swaps are the

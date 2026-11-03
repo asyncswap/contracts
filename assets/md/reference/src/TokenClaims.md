@@ -1,6 +1,6 @@
 # TokenClaims
 
-[Git Source](https://github.com/asyncswap/contracts/blob/c62d1435112c6a779c0b1e20836af4fbff22d83a/src/TokenClaims.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/adf1131361f6614f47f6824c159ca46a8418e2e5/src/TokenClaims.sol)
 
 Redeems the caller's PoolManager currency claims to a chosen recipient.
 

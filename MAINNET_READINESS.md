@@ -5,13 +5,11 @@ deployment has been broadcast, and none will be until the audit is complete and 
 
 ## Audit
 
-- **Scope:** [`audit/AUDIT_SCOPE_11_01_26.md`](audit/AUDIT_SCOPE_11_01_26.md). It freezes the code at
-  `fdfdf65` (2026-11-01; `src/` and `script/` identical to the deployed `c13cd5a`): 3,815 nSLOC across `src/` and
-  `script/`. It supersedes [`audit/AUDIT_SCOPE_10_23_26.md`](audit/AUDIT_SCOPE_10_23_26.md) (`830cd9e`). If
-  `src/` or `script/` changes before the audit starts, re-freeze in a new dated scope file.
-- **Automated review:** every finding of the Nethermind AuditAgent report is fixed or acknowledged, each
-  fix with a regression test that fails on the audited commit; see
-  [`audit/auditagent_report_1_status.md`](audit/auditagent_report_1_status.md).
+- **Scope:** [`audit/AUDIT_SCOPE_11_03_26.md`](audit/AUDIT_SCOPE_11_03_26.md). It freezes the code at
+  `2739d6c` (2026-11-03): 3,819 nSLOC across `src/` and `script/`. It supersedes the 2026-11-01 scope (`fdfdf65`).
+  If `src/` or `script/` changes before the audit starts, re-freeze in a new dated scope file.
+- **Previous reviews:** every finding of the Nethermind AuditAgent, Formal Mind, LSP and Pashov reviews is fixed or
+  acknowledged, each fix with a regression test; the scope lists their status and links to the reports.
 - **Previous audits** (Lee, 33 Labs, the H-05 follow-up) covered the earlier
   [asyncswap/protocol](https://github.com/asyncswap/protocol) code; see [`audit/README.md`](audit/README.md).
 

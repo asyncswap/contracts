@@ -1,6 +1,6 @@
 // Assemble the site's generated pages from the repository before `vocs dev` / `vocs build`:
 //   - docs/*.md                          -> src/pages/protocol/
-//   - audit/auditagent_report_1_status.md -> src/pages/audit/status.md
+//   - audit/AUDIT_SCOPE_11_03_26.md       -> src/pages/audit/scope.md
 //   - `forge doc` (NatSpec in src/)       -> src/pages/reference/src/ + src/generated/reference-sidebar.ts
 // docs/ and audit/ stay the source of truth; everything written here is git-ignored.
 import { execFileSync } from 'node:child_process'
@@ -23,7 +23,7 @@ const routes = {
   'docs/price-key-crossing.md': '/protocol/price-key-crossing',
   'docs/dynamic-fee-ordering.md': '/protocol/dynamic-fee-ordering',
   'docs/deployments.md': '/deployments',
-  'audit/auditagent_report_1_status.md': '/audit/status',
+  'audit/AUDIT_SCOPE_11_03_26.md': '/audit/scope',
 }
 
 // One-line summaries for the generated guides: vocs reads them from frontmatter into llms.txt.
@@ -34,7 +34,7 @@ const descriptions = {
   '/protocol/price-key-crossing': 'How limit prices map to price keys and when two orders cross.',
   '/protocol/dynamic-fee-ordering': 'How Async Swap captures backrun MEV with a dynamic fee on pool fills that move the price back, split between LPs and the protocol.',
   '/deployments': 'Contract addresses on the two testnets (Unichain Sepolia, Robinhood Chain testnet); no mainnet yet. Also at /deployments.json.',
-  '/audit/status': 'Status of each finding from the first AuditAgent report.',
+  '/audit/scope': 'Audit scope: frozen commit, files in scope, trust assumptions, known issues and the status of every previous finding.',
 }
 
 function reset(dir) {

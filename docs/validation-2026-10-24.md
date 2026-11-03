@@ -1,6 +1,6 @@
 # Validation of the second audit fixes
 
-The resolved findings are described in [the audit status](../audit/auditagent_report_2_status.md).
+The resolved findings are described in [the audit status](https://github.com/asyncswap/contracts/blob/2739d6c/audit/auditagent_report_2_status.md).
 
 The final run passed **859 Solidity tests** (one RPC-dependent fork test skipped), **42 Python
 tests**, all **10 Python–Solidity differential suites**, and the focused Lean build. All five
@@ -52,7 +52,7 @@ used 500,583 / 636,940 / 955,580 / 1,652,381 gas for the same batch sizes at 43,
 selection and linked code have changed, so the measurements describe the complete revision rather
 than isolating one optimization. These samples establish neither a global minimum nor a worst-case
 transaction bound. The full event receipts and compiler settings are in
-`audit/validation/matching-receipts-2026-10-24.json`.
+[`audit/validation/matching-receipts-2026-10-24.json`](https://github.com/asyncswap/contracts/blob/2739d6c/audit/validation/matching-receipts-2026-10-24.json).
 
 ## Proof location and boundaries
 

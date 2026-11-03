@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Render audit/formal-mind.audit.json (Formal Mind's report, kept local) as audit/formal-mind.md.
+"""Render audit/formal-mind.audit.json (Formal Mind's report) as audit/formal-mind.md. Both are local only now; the
+last tracked audit/formal-mind.md is at 2739d6c.
 
 The JSON was produced against the Lean model generated on Oct 28 (c49689f). Its finding statuses and some properties
 have since changed in the code; FINDING_STATUS and OUTDATED below record that, and the rendered file says so.

@@ -44,7 +44,7 @@ export default defineConfig({
     { text: 'Deployments', link: '/deployments' },
     {
       text: 'Security',
-      items: [{ text: 'Audit status', link: '/audit/status' }],
+      items: [{ text: 'Audit scope', link: '/audit/scope' }],
     },
     {
       text: 'Contract reference',

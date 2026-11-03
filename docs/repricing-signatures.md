@@ -15,7 +15,7 @@ Every reprice, direct or signed, increments `reprices`, so a reprice signature t
 cannot undo a later reprice. Matches do not move it: if partial matches shrink the order before the reprice
 lands, the signed `amountIn` and `newAmountOutMin` are applied as a price to the remainder, with the minimum
 rounded up, instead of the signature failing (L-01 in
-[the 2026-11-01 review](../audit/lsp_security_review_2026-11-01.md)). A live input larger than the signed
+[the 2026-11-01 review](https://github.com/asyncswap/contracts/blob/2739d6c/audit/lsp_security_review_2026-11-01.md)). A live input larger than the signed
 one is rejected. Cancelling and recreating an identical order gives it a new `createdSequence`, so an unused
 signature for the cancelled order cannot change the replacement.
 
@@ -35,4 +35,4 @@ implementations. Historical Huff storage-specific fixtures remain excluded from 
 The regenerated Lean models build; the added refinement lemmas check the encoder and distinct
 creation-sequence preimages, without claiming unconditional hash or signature security.
 
-[Logs and source fingerprints](../audit/validation/reprice-incarnation-2026-10-24/results.json).
+[Logs and source fingerprints](https://github.com/asyncswap/contracts/blob/2739d6c/audit/validation/reprice-incarnation-2026-10-24/results.json).

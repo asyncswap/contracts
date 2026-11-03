@@ -35,3 +35,6 @@ node_modules/
 # Local dev stack (script/local/up.sh): anvil state and the app env it prints
 /.local/
 deployments/31337/
+
+# formalmind
+formal

@@ -332,8 +332,7 @@ flowchart LR
 the constructor reads the numeraire's decimals (1 to 20) and derives the base-unit minimum and the
 $0.10 bid cap itself. The Router's `MEV_TAX_GAS` comes from the chain's `deployment.mevTaxGas`, next to
 `deployment.ordering`, how that chain orders transactions. It is 20,000,000 on Unichain, whose blocks are
-ordered by priority fee, and 0 on chains ordered by arrival (Robinhood Chain) or not yet confirmed (Arc), where
-it would only tax ordinary tips. `deploy.sh` refuses a
+ordered by priority fee, and 0 on chains ordered by arrival (Robinhood Chain), by block builders (Ethereum) or not yet confirmed (Arc), where it would only tax ordinary tips. `deploy.sh` refuses a
 chain with no value and a nonzero value on a chain not ordered by priority fee. `verify` reads the
 constructor arguments back from the deployment transactions. On chains whose gas token has an ERC-20 twin (Arc: native USDC and
 `0x3600…0000` are one balance) never initialize a native-currency pool; pair the ERC-20 USDC with a

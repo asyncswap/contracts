@@ -33,7 +33,7 @@ const descriptions = {
   '/protocol/contract-call-sequences': 'Step-by-step contract calls for opening pools and placing, matching, filling, cancelling (alone or batched) and redeeming orders.',
   '/protocol/price-key-crossing': 'How limit prices map to price keys and when two orders cross.',
   '/protocol/dynamic-fee-ordering': 'How Async Swap captures backrun MEV with a dynamic fee on pool fills that move the price back, split between LPs and the protocol.',
-  '/deployments': 'Contract addresses on the three testnets (Unichain Sepolia, Robinhood Chain testnet, Arc testnet); no mainnet yet. Also at /deployments.json.',
+  '/deployments': 'Contract addresses on the two testnets (Unichain Sepolia, Robinhood Chain testnet); no mainnet yet. Also at /deployments.json.',
   '/audit/status': 'Status of each finding from the first AuditAgent report.',
 }
 

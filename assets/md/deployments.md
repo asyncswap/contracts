@@ -1,7 +1,7 @@
 # Deployments
 
-Async Swap is deployed on two testnets and has no mainnet deployment. The earlier deployments on
-Unichain and Arc mainnet were tests, had bugs, and are archived: do not send orders to them. The current testnet addresses and hook start blocks below match the per-chain deployment registries.
+Async Swap is deployed on two testnets. The earlier deployments on.
+The current testnet addresses and hook start blocks below match the per-chain deployment registries.
 
 ## Contracts
 

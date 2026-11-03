@@ -84,7 +84,7 @@ difference comes from averaging the gap linearly in ticks while the pool's price
 - **It's an estimate.** The gap is measured in ticks against the pool's own earlier price, not against
   an outside market price. A fill that moves the pool back after the outside market really moved
   still pays within the window.
-- **Not yet in the Lean proofs.** The Foundry tests and the uv4 Python model cover it.
+- **Not in formal proofs.** The Foundry tests and the uv4 Python model cover it.
 
 ## Deployment
 

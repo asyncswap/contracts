@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Rebuild test/formal/README.md's theorem → test map from formal/Proofs/ and test/formal/.
 
-Every theorem and lemma under formal/Proofs/ gets a row: the test in test/formal/ that checks it on the
+formal/ is local only (ignored by git), so this needs that checkout; README links point to the last tracked copy
+at SNAPSHOT. Every theorem and lemma under formal/Proofs/ gets a row: the test in test/formal/ that checks it on the
 bytecode (a test function named after it: `test…_<theorem>`), or the reason it has none. Reasons and
 Halmos notes already written in the README for a theorem are kept; a theorem with neither a test nor a
 reason is listed as not tested yet. The prose above `## Theorem → test map` is kept as written.
@@ -17,6 +18,7 @@ root = Path(__file__).resolve().parents[1]
 readme = root / "test/formal/README.md"
 proofs = root / "formal/Proofs"
 MAP = "## Theorem → test map"
+SNAPSHOT = "https://github.com/asyncswap/contracts/blob/5901aca/formal/"
 
 THEOREM = re.compile(r"^\s*(?:@\[[^\]]*\]\s*)?(?:private |protected )?(?:theorem|lemma)\s+(\S+)")
 TEST = re.compile(r"function\s+(test\w*)\s*\(")
@@ -67,7 +69,7 @@ def build(text):
         rows = [(m.group(1), i + 1) for i, l in enumerate(lean.read_text().splitlines()) if (m := THEOREM.match(l))]
         if not rows:
             continue
-        link = lambda line: f"[{lean.name}:{line}](../../formal/{rel}#L{line})"
+        link = lambda line: f"[{lean.name}:{line}]({SNAPSHOT}{rel}#L{line})"
         have, left, todo = [], [], []
         for name, line in rows:
             short = name.split(".")[-1]
@@ -121,6 +123,8 @@ def build(text):
 
 
 if __name__ == "__main__":
+    if not proofs.is_dir():
+        sys.exit("formal/Proofs/ not found: the Lean corpus is local only (see test/formal/README.md)")
     text = readme.read_text()
     new, counts = build(text)
     if "--check" in sys.argv:

@@ -45,7 +45,7 @@ jobs:
           forge build
           python3 script/check-contract-sizes.py
 
-      # The invariant suites run at the depth MAINNET_READINESS.md records (foundry.toml), failing on any
+      # The invariant suites run at the depth the audit scope records (foundry.toml), failing on any
       # unexpected revert.
       - name: Run Forge tests
         run: forge test -vvv

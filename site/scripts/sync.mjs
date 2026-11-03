@@ -33,7 +33,7 @@ const descriptions = {
   '/protocol/contract-call-sequences': 'Step-by-step contract calls for opening pools and placing, matching, filling, cancelling (alone or batched) and redeeming orders.',
   '/protocol/price-key-crossing': 'How limit prices map to price keys and when two orders cross.',
   '/protocol/dynamic-fee-ordering': 'How Async Swap captures backrun MEV with a dynamic fee on pool fills that move the price back, split between LPs and the protocol.',
-  '/deployments': 'Contract addresses on the four testnets (Unichain Sepolia, Sepolia, Robinhood Chain testnet, Arc testnet); no mainnet yet. Also at /deployments.json.',
+  '/deployments': 'Contract addresses on the three testnets (Unichain Sepolia, Robinhood Chain testnet, Arc testnet); no mainnet yet. Also at /deployments.json.',
   '/audit/status': 'Status of each finding from the first AuditAgent report.',
 }
 
@@ -55,16 +55,13 @@ function rewriteLinks(markdown, source) {
   })
 }
 
-/// Registries kept on disk but not published: MegaETH testnet.
-const UNPUBLISHED_CHAIN_IDS = new Set(['6343'])
-
 /// Every network's registry (deployments/<chainId>/<chainId>.json) with its chains.json entry, for agents and apps.
 function deployments() {
   const { chains } = JSON.parse(readFileSync(join(repo, 'script/config/chains.json'), 'utf8'))
   const byId = Object.fromEntries(Object.entries(chains).map(([key, chain]) => [chain.chainId, { key, ...chain }]))
   const dir = join(repo, 'deployments')
   return readdirSync(dir)
-    .filter((id) => /^\d+$/.test(id) && !UNPUBLISHED_CHAIN_IDS.has(id) && existsSync(join(dir, id, `${id}.json`)) && byId[id]?.network !== 'local')
+    .filter((id) => /^\d+$/.test(id) && existsSync(join(dir, id, `${id}.json`)) && byId[id]?.network !== 'local')
     .map((id) => {
       const record = JSON.parse(readFileSync(join(dir, id, `${id}.json`), 'utf8'))
       const chain = byId[id]

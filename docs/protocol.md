@@ -242,8 +242,8 @@ are in [`order-lifecycle.md`](order-lifecycle.md). Three facts to keep in mind w
 
 - Book matches and filler fills take 0.02% of what each side receives, credited to the FeeVault as
   ERC-6909 claims inside the PoolManager; the LP-fill path charges 0.02% to active v4 positions and
-  0.01% to the FeeVault, plus a dynamic fee on fills that move the price back within 2 blocks of a
-  pool fill (half to LPs, half to the FeeVault). Matching compares the signed limits, so the fee never changes which orders
+  0.01% to the FeeVault, plus a dynamic fee on fills that move the pool's price back toward the
+  reference set by its first fill of a 2-block window (half to LPs, half to the FeeVault). Matching compares the signed limits, so the fee never changes which orders
   cross. `calculatePoolFee` and `calculateHookFee` are zero.
 - A new order goes to the better venue first. If the pool has active liquidity and its spot price is
   strictly better than the best opposing book level, the pool goes first, limited at that level: it fills
@@ -332,8 +332,7 @@ flowchart LR
 the constructor reads the numeraire's decimals (1 to 20) and derives the base-unit minimum and the
 $0.10 bid cap itself. The Router's `MEV_TAX_GAS` comes from the chain's `deployment.mevTaxGas`, next to
 `deployment.ordering`, how that chain orders transactions. It is 20,000,000 on Unichain, whose blocks are
-ordered by priority fee, and 0 on chains ordered by arrival (Robinhood Chain), by block builders (Ethereum,
-Sepolia) or not yet confirmed (Arc, MegaETH), where it would only tax ordinary tips. `deploy.sh` refuses a
+ordered by priority fee, and 0 on chains ordered by arrival (Robinhood Chain), by block builders (Ethereum) or not yet confirmed (Arc), where it would only tax ordinary tips. `deploy.sh` refuses a
 chain with no value and a nonzero value on a chain not ordered by priority fee. `verify` reads the
 constructor arguments back from the deployment transactions. On chains whose gas token has an ERC-20 twin (Arc: native USDC and
 `0x3600…0000` are one balance) never initialize a native-currency pool; pair the ERC-20 USDC with a

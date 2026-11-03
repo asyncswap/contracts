@@ -640,15 +640,18 @@ contract AsyncSwap is BaseHook, EIP712 {
         emit AsyncFiller.AsyncOrderCreated(poolId, id, hookData.user, zeroForOne, amountIn, hookData.amountOutMin, salt);
     }
 
-    /// TODO Revoking the Router strands the maker's live orders on this pool: Router.cancelOrder and
-    ///      cancelWithSig revert (AsyncFiller.cancel needs the executor), and so do fillOrder and
-    ///      fillFromPoolLiquidity. An EOA can't call cancelOrder from its own unlock, so its input is
-    ///      stuck until it re-grants. Matching still consumes those orders. Either block revocation
-    ///      while orders are live or let the Router cancel on the owner's behalf regardless.
+    /// @dev Revoking the Router would strand the maker's live orders: Router.cancelOrder, cancelWithSig,
+    ///      fillOrder and fillFromPoolLiquidity all need the grant, and an EOA can't cancel from its own
+    ///      unlock. So the trusted Router can never be revoked; any other executor can.
+    error CannotRevokeTrustedRouter();
+
     /// @notice Maker explicitly authorises an executor (typically the Router) to submit
     ///         and fill orders on their behalf. Without this grant, `_createOrder` reverts
     ///         on the maker's first swap. Pass `allow = false` to revoke an executor.
     function setExecutor(PoolId poolId, address executor, bool allow) external {
+        // protect user from stalling the protocol;
+        bool isTrustedRouter = executor == router;
+        if (isTrustedRouter && !allow) revert CannotRevokeTrustedRouter();
         asyncOrders[poolId].isExecutor[msg.sender][executor] = allow;
         emit ExecutorSet(poolId, msg.sender, executor, allow);
     }
@@ -671,6 +674,7 @@ contract AsyncSwap is BaseHook, EIP712 {
             deadline,
             signature
         );
+        if (executor == router && !allow) revert CannotRevokeTrustedRouter();
         PoolId poolId = key.toId();
         asyncOrders[poolId].isExecutor[maker][executor] = allow;
         emit ExecutorSet(poolId, maker, executor, allow);

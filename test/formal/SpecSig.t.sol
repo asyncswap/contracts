@@ -407,6 +407,8 @@ contract SpecSigFormalTest is FormalProbesA {
         uint256 nonce,
         bytes memory sig
     ) public {
+        // The trusted Router cannot be revoked (CannotRevokeTrustedRouter).
+        vm.assume(allow || e != address(router));
         sig = _non65(sig);
         uint256 deadline = block.timestamp + 1;
         bytes memory r = _script(fail, ret, magic, extra, bytes32(0), tryWrite);
@@ -438,6 +440,8 @@ contract SpecSigFormalTest is FormalProbesA {
         uint256 nonce,
         uint256 deadline
     ) public {
+        // The trusted Router cannot be revoked (CannotRevokeTrustedRouter).
+        vm.assume(allow || e != address(router));
         uint256 pk = _pk(pkSeed);
         address maker = vm.addr(pk);
         deadline = bound(deadline, block.timestamp, type(uint256).max);
@@ -460,6 +464,8 @@ contract SpecSigFormalTest is FormalProbesA {
     function testFuzz_hashTypedDataV4_run(uint64 chainId, address e, bool allow, uint256 nonce, bytes memory sig)
         public
     {
+        // The trusted Router cannot be revoked (CannotRevokeTrustedRouter).
+        vm.assume(allow || e != address(router));
         sig = _non65(sig);
         if (chainId % 2 == 1) vm.chainId(chainId);
         uint256 deadline = block.timestamp;
@@ -507,6 +513,8 @@ contract SpecSigFormalTest is FormalProbesA {
         bool allow,
         uint256 nonce
     ) public {
+        // The trusted Router cannot be revoked (CannotRevokeTrustedRouter).
+        vm.assume(allow || e != address(router));
         uint256 pk = _pk(pkSeed);
         address maker = vm.addr(pk);
         bytes32 dEoa = _hookDigest(maker, e, allow, nonce);

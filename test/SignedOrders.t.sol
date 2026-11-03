@@ -136,6 +136,24 @@ contract SignedOrdersTest is SetupHook {
     }
 
     function test_setExecutorWithSig_emitsRevocationForMaker() public {
+        address executor = address(0xcafe);
+        vm.prank(maker);
+        hook.setExecutor(poolId, executor, true);
+        uint256 nonce = 7;
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes32 structHash = OrderSignatures.hashSetExecutor(key, maker, executor, false, nonce, deadline);
+        bytes memory signature = _sign(_digest(hook.DOMAIN_SEPARATOR(), structHash));
+
+        vm.expectEmit(true, true, true, true, address(hook));
+        emit AsyncSwap.ExecutorSet(poolId, maker, executor, false);
+        vm.prank(relayer);
+        hook.setExecutorWithSig(key, maker, executor, false, nonce, deadline, signature);
+
+        assertFalse(hook.isExecutor(poolId, maker, executor), "maker revoked executor");
+        assertTrue(hook.nonceUsed(maker, nonce), "nonce consumed");
+    }
+
+    function test_RevertWhen_setExecutorWithSig_revokesTrustedRouter() public {
         vm.prank(maker);
         hook.setExecutor(poolId, address(router), true);
         uint256 nonce = 7;
@@ -143,13 +161,12 @@ contract SignedOrdersTest is SetupHook {
         bytes32 structHash = OrderSignatures.hashSetExecutor(key, maker, address(router), false, nonce, deadline);
         bytes memory signature = _sign(_digest(hook.DOMAIN_SEPARATOR(), structHash));
 
-        vm.expectEmit(true, true, true, true, address(hook));
-        emit AsyncSwap.ExecutorSet(poolId, maker, address(router), false);
         vm.prank(relayer);
+        vm.expectRevert(AsyncSwap.CannotRevokeTrustedRouter.selector);
         hook.setExecutorWithSig(key, maker, address(router), false, nonce, deadline, signature);
 
-        assertFalse(hook.isExecutor(poolId, maker, address(router)), "maker revoked executor");
-        assertTrue(hook.nonceUsed(maker, nonce), "nonce consumed");
+        assertTrue(hook.isExecutor(poolId, maker, address(router)), "router still authorized");
+        assertFalse(hook.nonceUsed(maker, nonce), "nonce not consumed");
     }
 
     /* --------------------------------- create ---------------------------------- */

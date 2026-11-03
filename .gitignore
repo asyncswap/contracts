@@ -35,3 +35,25 @@ node_modules/
 # Local dev stack (script/local/up.sh): anvil state and the app env it prints
 /.local/
 deployments/31337/
+
+# formalmind
+/formal/
+/formalmind.toml
+audit/formal-mind.audit.json
+
+# Local tool output and leftovers
+/.claude/
+/.playwright-mcp/
+/fizz_data/
+/forge-results.json
+/.gas-snapshot
+/deployments2/
+/x-ray/
+
+# Old Vocs docs scaffold; the docs site lives in site/
+/docs/.gitignore
+/docs/bun.lock
+/docs/package.json
+/docs/src/
+/docs/vocs.config.ts
+/docs/vocs.sidebar.ts

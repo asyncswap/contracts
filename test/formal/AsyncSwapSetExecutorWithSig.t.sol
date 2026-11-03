@@ -97,6 +97,8 @@ contract AsyncSwapSetExecutorWithSigFormalTest is HookUnlockBase {
     function testFuzz_setExecutorWithSig_ok(address relayer, address e, bool allow, uint256 nonce, uint256 deadline)
         public
     {
+        // The trusted Router cannot be revoked (CannotRevokeTrustedRouter).
+        vm.assume(allow || e != address(router));
         deadline = bound(deadline, block.timestamp, type(uint256).max);
         bytes memory sig = _sig(key, maker, e, allow, nonce, deadline, MAKER_PK);
         vm.prank(relayer);
@@ -123,6 +125,8 @@ contract AsyncSwapSetExecutorWithSigFormalTest is HookUnlockBase {
         uint8 tamper,
         address other
     ) public {
+        // The trusted Router cannot be revoked (CannotRevokeTrustedRouter).
+        vm.assume(allow || e != address(router));
         deadline = bound(deadline, block.timestamp, type(uint256).max - 1);
         bytes memory sig = _sig(key, maker, e, allow, nonce, deadline, MAKER_PK);
         Args memory x = Args(key, maker, e, allow, nonce, deadline);
@@ -151,6 +155,8 @@ contract AsyncSwapSetExecutorWithSigFormalTest is HookUnlockBase {
 
     /// @notice formal/Refinement/Swarm/AsyncSwapSetExecutorWithSig.lean:187 — exact effect: nonceUsed[maker][nonce] was false and becomes true, then isExecutor[maker][executor] = allow.
     function testFuzz_setExecutorWithSig_ok_state(address e, bool allow, uint256 nonce, uint256 deadline) public {
+        // The trusted Router cannot be revoked (CannotRevokeTrustedRouter).
+        vm.assume(e != address(router));
         deadline = bound(deadline, block.timestamp, type(uint256).max);
         vm.prank(maker);
         hook.setExecutor(poolId, e, !allow); // start from the opposite value so the write is visible
@@ -170,6 +176,8 @@ contract AsyncSwapSetExecutorWithSigFormalTest is HookUnlockBase {
         address otherMaker,
         address otherExec
     ) public {
+        // The trusted Router cannot be revoked (CannotRevokeTrustedRouter).
+        vm.assume(e != address(router));
         uint256 otherNonce = nonce ^ 1;
         vm.assume(otherMaker != maker && otherExec != e);
         hook.transferOwnership(bob);
@@ -221,6 +229,8 @@ contract AsyncSwapSetExecutorWithSigFormalTest is HookUnlockBase {
         uint256 deadline2,
         uint8 flags
     ) public {
+        // The trusted Router cannot be revoked (CannotRevokeTrustedRouter).
+        vm.assume(allow || e != address(router));
         bool otherKey = flags & 1 != 0;
         bool freshSig = flags & 2 != 0;
         _submit(e, allow, nonce, block.timestamp);

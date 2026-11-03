@@ -1,1 +1,0 @@
--- Removed scratch file (plan item 225). Intentionally empty; safe to delete.

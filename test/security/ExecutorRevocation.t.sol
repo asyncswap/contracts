@@ -7,10 +7,9 @@ import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 import {MockERC20} from "../utils/MockERC20.sol";
 
-/// @notice Pins down what revoking the Router does to a maker's live orders, and that filling needs no
-///         grant from the filler. A maker that revokes the Router can still cancel through it (the Router
-///         cancels only for the owner or with the owner's signature), but its orders cannot be filled through
-///         it until it re-grants. The book still matches those orders.
+/// @notice Pins down that a maker can never revoke the trusted Router (so live orders always stay cancellable
+///         and fillable through it), that other executors stay revocable, and that filling needs no grant from
+///         the filler.
 contract ExecutorRevocationTest is SetupHook {
     address alice = makeAddr("alice");
     address bob = makeAddr("bob");
@@ -63,16 +62,21 @@ contract ExecutorRevocationTest is SetupHook {
         return _orderIdFor(order.owner, order.zeroForOne, order.salt);
     }
 
-    function _revoke(address maker) internal {
-        vm.prank(maker);
+    function test_RevertWhen_MakerRevokesTrustedRouter() public {
+        AsyncOrder memory ask = _order(alice, true, 1 ether, 1 ether);
+        _submit(ask);
+
+        vm.prank(alice);
+        vm.expectRevert(AsyncSwap.CannotRevokeTrustedRouter.selector);
         hook.setExecutor(poolId, address(router), false);
+        assertTrue(hook.isExecutor(poolId, alice, address(router)), "router still authorized");
     }
 
-    function test_eoaCancelsThroughRevokedRouter() public {
+    /// Since the Router can't be revoked, the maker can always cancel a live order through it.
+    function test_eoaCancelsThroughRouter() public {
         AsyncOrder memory ask = _order(alice, true, 1 ether, 1 ether);
         uint256 before = token0.balanceOf(alice);
         _submit(ask);
-        _revoke(alice);
 
         vm.prank(alice);
         router.cancelOrder(ask);
@@ -80,62 +84,29 @@ contract ExecutorRevocationTest is SetupHook {
         assertEq(token0.balanceOf(alice), before, "input refunded");
     }
 
-    /// The Router still checks ownership: revoking it does not let anyone else cancel.
-    function test_RevertWhen_NonOwnerCancelsThroughRevokedRouter() public {
+    /// The Router still checks ownership: nobody else can cancel through it.
+    function test_RevertWhen_NonOwnerCancelsThroughRouter() public {
         AsyncOrder memory ask = _order(alice, true, 1 ether, 1 ether);
         _submit(ask);
-        _revoke(alice);
 
         vm.prank(bob);
         vm.expectRevert(bytes("Only owner can cancel"));
         router.cancelOrder(ask);
     }
 
-    /// Another executor the maker revoked still cannot cancel: only the trusted Router needs no grant.
+    /// Other executors stay revocable, and a revoked one cannot cancel.
     function test_RevertWhen_RevokedOtherExecutorCancels() public {
         AsyncOrder memory ask = _order(alice, true, 1 ether, 1 ether);
         _submit(ask);
-        vm.prank(alice);
+        vm.startPrank(alice);
+        hook.setExecutor(poolId, bob, true);
         hook.setExecutor(poolId, bob, false);
+        vm.stopPrank();
+        assertFalse(hook.isExecutor(poolId, alice, bob), "bob revoked");
 
         vm.prank(bob);
         vm.expectRevert(AsyncFiller.NotAuthorizedExecutor.selector);
         hook.cancelOrder(ask);
-    }
-
-    function test_RevertWhen_FillingOrderOfMakerWhoRevokedRouter() public {
-        AsyncOrder memory ask = _order(alice, true, 1 ether, 1 ether);
-        _submit(ask);
-        _revoke(alice);
-
-        vm.prank(bob);
-        vm.expectRevert(); // NotAuthorizedExecutor, wrapped by the PoolManager
-        router.fillOrder(ask, type(uint256).max, "");
-        assertEq(hook.asyncOrder(poolId, _id(ask)), 1 ether, "order untouched");
-    }
-
-    /// Matching never checks the resting maker's grant, so a revoked maker's order still trades.
-    function test_matchingConsumesOrderOfMakerWhoRevokedRouter() public {
-        AsyncOrder memory ask = _order(alice, true, 1 ether, 1 ether);
-        _submit(ask);
-        _revoke(alice);
-
-        _submit(_order(bob, false, 1 ether, 1 ether));
-        assertEq(hook.asyncOrder(poolId, _id(ask)), 0, "ask matched despite the revoked grant");
-    }
-
-    function test_regrantRestoresCancel() public {
-        AsyncOrder memory ask = _order(alice, true, 1 ether, 1 ether);
-        uint256 aliceToken0Before = token0.balanceOf(alice);
-        _submit(ask);
-        _revoke(alice);
-
-        vm.startPrank(alice);
-        hook.setExecutor(poolId, address(router), true);
-        router.cancelOrder(ask);
-        vm.stopPrank();
-        assertEq(hook.asyncOrder(poolId, _id(ask)), 0, "order cancelled");
-        assertEq(token0.balanceOf(alice), aliceToken0Before, "input refunded");
     }
 
     /// Fillers need no grant of their own: the check is on the maker's grant to the Router.

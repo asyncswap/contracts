@@ -1,6 +1,6 @@
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/6be5a28e5e178ab5294d40074014a3a9369322ba/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/5901aca44694429d2b3016c91998205a45eda432/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -887,12 +887,6 @@ function _createOrder(PoolId poolId, bool zeroForOne, uint256 amountIn, UserPara
 
 ### setExecutor
 
-TODO Revoking the Router strands the maker's live orders on this pool: Router.cancelOrder and
-cancelWithSig revert (AsyncFiller.cancel needs the executor), and so do fillOrder and
-fillFromPoolLiquidity. An EOA can't call cancelOrder from its own unlock, so its input is
-stuck until it re-grants. Matching still consumes those orders. Either block revocation
-while orders are live or let the Router cancel on the owner's behalf regardless.
-
 Maker explicitly authorises an executor (typically the Router) to submit
 and fill orders on their behalf. Without this grant, `_createOrder` reverts
 on the maker's first swap. Pass `allow = false` to revoke an executor.
@@ -1409,6 +1403,18 @@ error NotSelf();
 
 ```solidity
 error NotTrustedRouter();
+```
+
+### CannotRevokeTrustedRouter
+
+<i>
+  Revoking the Router would strand the maker's live orders: Router.cancelOrder, cancelWithSig,
+  fillOrder and fillFromPoolLiquidity all need the grant, and an EOA can't cancel from its own
+  unlock. So the trusted Router can never be revoked; any other executor can.
+</i>
+
+```solidity
+error CannotRevokeTrustedRouter();
 ```
 
 ## Structs

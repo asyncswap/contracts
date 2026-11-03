@@ -11,7 +11,7 @@ Sitemap:
 - [Price keys and crossing](/protocol/price-key-crossing): How limit prices map to price keys and when two orders cross.
 - [Dynamic fee ordering](/protocol/dynamic-fee-ordering): How Async Swap captures backrun MEV with a dynamic fee on pool fills that move the price back, split between LPs and the protocol.
 - [Deployments](/deployments): Contract addresses on the two testnets (Unichain Sepolia, Robinhood Chain testnet); no mainnet yet. Also at /deployments.json.
-- [AuditAgent report 1: status](/audit/status): Status of each finding from the first AuditAgent report.
+- [Audit scope: Async Swap (2026-11-03)](/audit/scope): Audit scope: frozen commit, files in scope, trust assumptions, known issues and the status of every previous finding.
 - [Contract reference](/reference/): Contracts, libraries, interfaces and types, generated from the NatSpec in src/.
 - [AsyncSwap](/reference/src/AsyncSwap): Uniswap v4 hook that converts an exact-input swap into an open async order: the maker deposits their input via `_beforeSwap`. Crossing orders settle directly at the resting limit; fillers settle unmatched orders.
 - [FeeVault](/reference/src/FeeVault): Holds and redeems protocol fee claims, never maker escrow.
@@ -77,14 +77,14 @@ liquidity, and anyone can permissionlessly fill a resting order.
 | See every call, callback and withdrawal step | [Contract call sequences](/protocol/contract-call-sequences) |
 | See how backrun MEV is captured for LPs | [Dynamic fee ordering](/protocol/dynamic-fee-ordering) |
 | Check how prices are compared and rounded | [Price keys and crossing](/protocol/price-key-crossing) |
-| Review audit findings and their fixes | [Audit status](/audit/status) |
+| Review the audit scope, known issues and previous findings | [Audit scope](/audit/scope) |
 | Look up a contract, function or event | [Contract reference](/reference) |
 
 ## Status
 
 The contracts are on [`asyncswap/contracts`](https://github.com/asyncswap/contracts) `main`. Every
-finding of the Nethermind AuditAgent report is fixed or acknowledged; see the
-[audit status](/audit/status). These docs rebuild from that repository on every change to its
+finding of the previous reviews is fixed or acknowledged; see the
+[audit scope](/audit/scope). These docs rebuild from that repository on every change to its
 sources, guides or audit notes.
 
 # Async Swap protocol map
@@ -1147,254 +1147,286 @@ olive exec new-deployer -- script/deploy-robinhood-testnet.sh broadcast
 entry to Sourcify, then to the chain's Blockscout explorer when there is one, and writes standard
 JSON inputs to `deployments/<chainId>/verify/` for manual upload.
 
-# AuditAgent report 1: status
+# Audit scope: Async Swap (2026-11-03)
 
-Tracks [`auditagent_report_1_ae602e60-d592-45ec-92ef-891968f087f0.md`](https://github.com/asyncswap/contracts/blob/main/audit/auditagent_report_1_ae602e60-d592-45ec-92ef-891968f087f0.md)
-(Nethermind AuditAgent, scan `ae602e60`, commit `e04668ec`), plus two findings of the same kind found
-while fixing it.
+Supersedes the 2026-11-01 scope, which froze the code at `fdfdf65`. Earlier scopes and every previous report are kept
+at [`2739d6c/audit/`](https://github.com/asyncswap/contracts/tree/2739d6c/audit); this file carries over what an
+auditor needs from them: the known issues and the status of every finding.
 
-| Status | Meaning |
-| --- | --- |
-| **Fixed** | Code changed; a regression test fails on the old code and passes on the new. |
-| **Acknowledged** | Kept as is on purpose; the reason is recorded. |
-| **Not fixed** | Open; needs a design decision. A recommended option is given. |
+* **Repository:** [asyncswap/contracts](https://github.com/asyncswap/contracts)
+* **Code frozen at:** `2739d6cfd07154c275144a313cf1168b485c1327` on `main` (2026-11-03). Later commits change only
+  this scope, docs and tests.
+* **Compiler:** solc 0.8.26, optimizer on (`optimizer_runs = 10_000`); see `foundry.toml`.
+* **Chain:** Unichain (130) first; any EVM chain with Uniswap v4 later.
+* **Builds on:** Uniswap v4 `PoolManager` (hooks, ERC-6909 claims, dynamic LP fee), Permit2 for signed orders,
+  OpenZeppelin `SafeERC20`, `EIP712`, `SignatureChecker` and `Multicall`.
 
-## Summary
+## Changes since the last freeze (`fdfdf65`)
 
-| # | Severity | Finding | Status |
-| --- | --- | --- | --- |
-| 1 | High | `fill` pays out while the order is still live | **Fixed** |
-| 2 | High | `fillFromPoolLiquidity` pays before removing the order | **Fixed** |
-| 3 | Medium | Coarse `_priceKey` buckets: a non-crossing head blocks its level | **Fixed** |
-| 4 | Medium | Temporary LPs capture priority bids / divert `FeeVault` forfeits | **Fixed** |
-| 5 | Medium | Filler `maxPrice` caps payment, not the input received | **Fixed** |
-| 6 | Medium | Favorable partial fills weaken the remaining limit | **Fixed** |
-| 7 | Medium | Custom executors can skip the priority bid | **Fixed** |
-| 8 | Medium | New orders bypass a crossed backlog left by the 8-match cap | **Acknowledged** (harness) / **Fixed** (live) |
-| 9 | Medium | An unreceivable ERC-20 payout blocks matching | **Fixed** |
-| 10 | Medium | `updatePrice` resets `sequence`, flipping maker/taker of a crossed pair | **Fixed** |
-| 11 | Low | Deleting an emptied level costs gas in its historical peak | **Fixed** |
-| 12 | Low | One dust order blocks `setOrderingMode` | **Fixed** |
-| R-1 | — | Router fill checks the order, pulls ERC-20, then executes | **Fixed** |
-| R-2 | — | A new order is matchable before its input is settled | **Fixed** |
+* **The trusted Router can't be revoked** (`src/AsyncSwap.sol`, +4 nSLOC). `setExecutor` and `setExecutorWithSig`
+  revert `CannotRevokeTrustedRouter` when a maker sets `allow = false` for the hook's immutable `router`; in the
+  signed path the check runs after the deadline, nonce and signature checks. Revoking the Router used to strand a
+  maker's live orders: `Router.cancelOrder`, `cancelWithSig`, `fillOrder` and `fillFromPoolLiquidity` all need the
+  grant, and an EOA can't cancel from its own unlock. Any other executor can still be granted and revoked.
+* **No dollar minimum by default** (`script/01_DeployHook.s.sol`): `DEPLOY_MIN_ORDER_USD` defaults to 0, so the
+  asset floor (10^(decimals − 4) of each pool's asset) is the order minimum unless a deployment sets one.
+* **Fewer deployment targets:** the Sepolia, Arc testnet, MegaETH testnet and HyperEVM testnet wrappers, the
+  standalone testnet script and their `chains.json` entries were removed.
 
-Every finding is now fixed or acknowledged; none is open. Policy changes made alongside: a
-[minimum order and tiered priority bid](#minimum-order-and-tiered-bid), and
-[priority-fee-only pools](#priority-fee-only-pools) (closes 7 and 12).
+## What it is
 
-The fixes are on `main`; no deployment has been made. Storage layout and public ABI changed, so they
-ship as fresh contracts, not as an upgrade.
+Async Swap is a Uniswap v4 hook that turns swaps into limit orders. Makers escrow their input in the hook and set a
+minimum output. Every pool pairs an asset with USDC (the numeraire). Orders are filled by matching against each
+other, by permissionless fillers, or against the pool's own liquidity.
 
-## Fixed
+* **Pools.** Anyone can create a pool: the hook accepts one that pairs the configured USDC with an asset that has
+  code and uses the dynamic-fee flag. The owner cannot open, close or configure pools.
+* **Book.** Orders sit at price levels on v4 ticks (`TickPrice`: the floor tick of the exact limit, 0.01% apart).
+  Within a level they rank by exact limit, then escrowed priority bid, then arrival (`EligiblePrice`); exact
+  rational limits decide crossing. New orders and any crossed backlog share one book-wide selection, at most eight
+  pairs per call.
+* **Venue choice.** A new order goes to the better venue first (`TickPrice.poolBeatsLevel`). If the pool's price
+  beats the best opposite level (inside the dynamic-fee window, counting the fee a fill back toward the reference
+  would pay), the pool goes first, limited one tick short of that level and inside v4's price range, and the book
+  matches the rest. Otherwise the book goes first and the pool must take all of any remainder. A pool fill that
+  would leave no active liquidity reverts.
+* **Fees.** Book matches and filler fills take 0.02% from what each side receives. Pool fills pay active LPs 0.02%
+  and the protocol 0.01%, plus a dynamic fee (`DynamicFeeOrdering`) on a fill that moves the price back toward the
+  first pool fill's starting tick within 2 blocks: half the gap it closes, half to LPs and half to `FeeVault`.
+* **Settlement.** Book matches credit both sides, and any remainder left below the pool minimum, as PoolManager
+  ERC-6909 claims, batched per call (`ClaimTransfers`). Holders redeem them through `TokenClaims` (ERC-20),
+  `NativeClaims` (ETH) or `Router.withdrawClaims`. Filler fills and full pool fills pay ERC-20 output directly; native
+  output, and a pool fill that leaves part of the order on the book, are credited as claims.
+* **Priority bids.** Optional, paid in USDC and escrowed when the order is created. Each fill settles its
+  proportional share and the rest settles when the order closes. Every settled bid goes to `FeeVault`, never to LPs.
+* **Minimums.** Fixed at deployment, no setter: an optional minimum order in USDC (`minOrder`, from a dollar amount
+  and the numeraire's decimals; 0 by default) and an asset floor per pool (`minAssetAmount`, 10^(decimals − 4), so
+  0.0001 of a token). The $0.10 bid cap is derived from the numeraire's decimals too.
+* **Signed actions.** Permit2 order witnesses (`swapWithSig`), `SetExecutor`, `UpdatePrice` (binds the order's
+  `createdSequence` and its `reprices` count; a reprice that lands after partial matches applies its signed price
+  to the remainder) and `CancelOrder` (no order size: covers whatever remains). All use unordered nonces in one space.
+* **Router.** The single trusted entry for order creation, and an executor makers can't revoke. `multicall` batches
+  actions as the caller (not payable). Order creation and fills pay an MEV tax of the transaction's priority fee
+  times `MEV_TAX_GAS` (per chain, fixed at deployment: 20,000,000 on Unichain and Unichain Sepolia, which order by
+  priority fee), in `msg.value` on top of any native deposit, credited to `FeeVault` as native claims. The Router can
+  cancel for a maker without an executor grant.
 
-### 1, 2: order state is final before any payout
+## In scope: 3,819 nSLOC
 
-An ERC-20 payout runs the token's code while the PoolManager is still unlocked, and the hook's own
-entry points (`cancelOrder` by the owner, `matchBook`, `updatePrice`, `executeOrder` by an executor)
-are callable from there. The order must already be closed or reduced when that code runs.
+nSLOC counts non-blank lines outside comments (the same method reproduces every count in the previous scopes).
+"Since `fdfdf65`" is the diff against the previous freeze.
 
-* `AsyncFiller.fill`: the order is removed, deleted and its paid bid settled (`_closeOrder`) before
-  the maker's output, the fee and the filler's input are paid.
-* `AsyncMatching.fillFromPoolLiquidity`: the order is removed and deleted before the pool swap and the
-  maker's payout.
-* `AsyncMatching._matchPair`: recipients are read first (`_payouts`), both orders are reduced, then
-  the two escrow legs pay out (`_settleTransfers`). Since the fix for 9, those legs credit PoolManager
-  claims and run no token code at all.
+### Contracts (`src/`): 2,704 nSLOC, 19 files
 
-Tests: `test/nethermind_auditagent/NethermindAuditAgent.t.sol`
-`test_H1_fill_orderClosedBeforeMakerPayout`, `test_H2_poolLiquidityFill_orderClosedBeforeMakerPayout`
-(a token notifies the paid maker, which only reads the order's record) and
-`test_H1_match_orderReducedBeforeMakerPayout` (the match credits claims and the token's code never runs).
+| File | nSLOC | Since `fdfdf65` | Notes |
+|---|---:|---|---|
+| `src/AsyncSwap.sol` | 531 | **changed (+4)** | The hook: pool admission, order creation in `beforeSwap`, venue choice, fills, cancels, signed actions, executor grants, immutable minimums |
+| `src/libraries/AsyncMatching.sol` | 456 | unchanged | Book-wide pair selection, match amounts, reductions, claim payouts, pool fills (full and partial), dust closes |
+| `src/libraries/AsyncFiller.sol` | 357 | unchanged | Order storage, escrow, fills, cancels, priority levels, bid settlement, minimum and asset-floor checks |
+| `src/Router.sol` | 324 | unchanged | Entry points: swap, signed swap (Permit2), fill, cancel, signed cancel, multicall, claim withdrawal, MEV tax |
+| `src/MatchingEngine.sol` | 188 | unchanged | Standalone matching benchmark harness; holds no tokens and is not deployed |
+| `src/BaseHook.sol` | 171 | unchanged | Uniswap v4 hook base |
+| `src/libraries/RadixPriceTree.sol` | 136 | unchanged | Patricia index of price levels and priority keys, with node-id reuse |
+| `src/libraries/OrderSignatures.sol` | 110 | unchanged | EIP-712 types: order witness, cancel, executor, reprice |
+| `src/libraries/EligiblePrice.sol` | 81 | unchanged | Exact subtree price summaries over the priority tree; eligible-order search |
+| `src/libraries/DynamicFeeOrdering.sol` | 71 | unchanged | Backrun fee on pool fills inside a 2-block window |
+| `src/libraries/TickPrice.sol` | 59 | unchanged | Price keys on v4 ticks; pool-versus-book comparison and the pool-first limit |
+| `src/libraries/ClaimTransfers.sol` | 37 | unchanged | Batches claim credits for one matching call (34 entries) |
+| `src/FeeVault.sol` | 34 | unchanged | Holds protocol fees, bids and MEV tax as claims; owner collects |
+| `src/TokenClaims.sol` | 33 | unchanged | Redeems a holder's ERC-20 PoolManager claims to any recipient |
+| `src/NativeClaims.sol` | 32 | unchanged | Redeems a holder's native-ETH claims to any recipient |
+| `src/libraries/CurrencySettler.sol` | 26 | unchanged | Settle/take helpers |
+| `src/interfaces/ISignatureTransfer.sol` | 24 | unchanged | Permit2 interface |
+| `src/types/AsyncOrder.sol` | 21 | unchanged | Order struct and id |
+| `src/ImmutableState.sol` | 13 | unchanged | PoolManager reference |
 
-### 3: exact eligibility inside coarse price buckets
+`AsyncMatching`, `TickPrice` and `DynamicFeeOrdering` are linked libraries deployed by CREATE2 at the same address
+on every chain; library calls run in the hook's context.
 
-`EligiblePrice` augments each priority radix tree with exact subtree price extrema. A lookup
-returns the highest-fee, earliest-sequence order that crosses the counterparty in at most 128
-branches. Noncrossing heads remain open and no longer hide eligible lower-priority orders.
-For a resting equal-key book, selection maximizes buy priority first, then eligible sell priority.
-Append/remove and every live partial fill maintain the extrema, including unchanged-key/fee fills.
+### Scripts (`script/`): 1,115 nSLOC, 19 files
 
-The original approximately 2-USDC blocker no longer stalls 20,000 USDC of executable orders.
-`CoarsePriceBlockingTest` covers both incoming directions. `EligiblePythonVectors.t.sol` compares
-514 operations and 132 matches against an independent rational-price Python oracle, including
-both clamps, two-sided blockers, mutations, selected IDs, remainders, fees, and maker balances.
-`EligiblePriceTest` checks subtree invariants, randomized mutations, full depth, and node reuse.
+| File | nSLOC | Since `fdfdf65` | Notes |
+|---|---:|---|---|
+| `script/FFIHelper.sol` | 146 | unchanged | FFI helpers; minimum priority bid, approvals, reading an order's assigned salt |
+| `script/Trade.s.sol` | 122 | unchanged | End-to-end trading flows on a deployment |
+| `script/01_DeployHook.s.sol` | 116 | changed (default) | Router then hook (CREATE2 salt, owner, numeraire, minimums, per-chain MEV tax gas), post-deploy checks; `DEPLOY_MIN_ORDER_USD` now defaults to 0 |
+| `script/config/UniswapAddresses.sol` | 100 | unchanged | Per-chain PoolManager, Permit2 and USDC addresses |
+| `script/03_Swap.s.sol` | 84 | unchanged | Place an order through the Router |
+| `script/lib/Deployments.sol` | 70 | unchanged | Reading and writing deployment records |
+| `script/InitPool.s.sol` | 66 | unchanged | Pool initialization with real tokens (Unichain) |
+| `script/local/Smoke.s.sol` | 58 | unchanged | Local smoke flow on Anvil |
+| `script/local/LocalMarket.s.sol` | 53 | unchanged | Local market setup on Anvil |
+| `script/02_InitializePool.s.sol` | 46 | unchanged | Pool initialization with a mock asset |
+| `script/05_ExecuteOrder.s.sol` | 40 | unchanged | Fill an order at its live amounts |
+| `script/00_DeployDynamicFeeOrdering.s.sol` | 35 | unchanged | Deploy `DynamicFeeOrdering` (CREATE2) |
+| `script/00_DeployMatchingLibrary.s.sol` | 35 | unchanged | Deploy and link `AsyncMatching` |
+| `script/00_DeployPoolManager.s.sol` | 34 | unchanged | Local PoolManager for testing |
+| `script/00_DeployTickPrice.s.sol` | 34 | unchanged | Deploy `TickPrice` (CREATE2) |
+| `script/DeployWithdrawalRouter.s.sol` | 26 | unchanged | Testnet-only second Router for claims |
+| `script/04_CancelOrder.s.sol` | 22 | unchanged | Cancel an order |
+| `script/DeployNativeClaims.s.sol` | 14 | unchanged | Deploy `NativeClaims` |
+| `script/DeployTokenClaims.s.sol` | 14 | unchanged | Deploy `TokenClaims` |
 
-The index bound is independent of blocker count. Matching runs no token code (finding 9), so a
-blocker cannot make it revert or burn gas through a payout. See `docs/price-key-crossing.md` and the
-revised whitepaper for the argument.
+Supporting deployment tooling (not Solidity; review for correctness of what gets deployed, not counted in nSLOC):
+`script/deploy.sh` and its per-chain wrappers (`deploy-unichain.sh`, `deploy-unichain-sepolia.sh`,
+`deploy-robinhood-testnet.sh`, `deploy-arc.sh`), `script/deploy-withdrawal-router.sh`, `script/mine-hook-salt.ts`,
+`script/price.ts`, `script/sync-deployment-record.py`, `script/sync-poolmanager-receipt.py`,
+`script/check-contract-sizes.py`, `script/check-mainnet-readiness.sh`, `script/config/chains.json` (per-chain
+addresses, transaction ordering and `mevTaxGas`; `deploy.sh` refuses a chain with no `mevTaxGas`, or a nonzero one on
+a chain not ordered by priority fee).
 
-### 4: priority bids always go to the `FeeVault`
+For the scripts, the questions are: does the hook get deployed with the intended owner, numeraire, flags, minimums,
+Router and linked libraries; does the Router get the intended MEV tax gas for its chain; are the per-chain addresses
+right; can a deployment be front-run or left half-configured.
 
-`AsyncFiller.settlePriorityFee` no longer checks in-range liquidity: every settled bid (the filled
-share on a match, the rest on close, cancel, fill or pool fill) is burned from the hook's claims and
-minted to the `FeeVault`. Liquidity added for the moment of settlement receives none of it. (Active
-LPs still earn the 30 bps fill fee on a pool fill, as on any Uniswap swap; that fee is not a bid.)
+Out of scope: `test/`, `dependencies/`, `docs/`, `site/`, and the helper scripts `script/formal-index.py`,
+`script/formal-mind-report.py` and `script/stress-matching-engine.sh`.
 
-Tests: `test_M4_liquidityAddedBeforeFillGetsNoBid` (on the audited code the bid shows up as LP fee
-growth), `test_filledPriorityBidGoesToFeeVaultNotActiveLps`, `test_lpCollectsFillFeeOnWithdraw`.
+## Where to look hardest
 
-### 5: `order.amountIn` bounds what the filler receives
+* **Venue choice and pool-first fills** (`TickPrice.poolBeatsLevel`, `AsyncSwap.matchNewOrder`,
+  `AsyncMatching._poolFillNet` / `_swapAgainstPool` / `_reduceAfterPoolFill`, `closeBelowMinimum`): the pool-first
+  limit (one tick toward the incoming order for a swap that lowers the tick, clamped inside v4's range), the
+  fee-window adjustment, partial pool fills that leave the rest for the book (pro-rata limit, pro-rata 0.01%, input
+  minted back), and the post-swap liquidity check. This code was the source of most findings in the reviews below.
+* **Dynamic fee** (`DynamicFeeOrdering.charge`): reference and window handling, the fee base for a fill that crosses
+  the reference, the 50% cap, and who can choose when a resting order pays it.
+* **Exact eligibility** (`EligiblePrice.sol`, `AsyncMatching._bookPair`, `AsyncFiller` append/remove/refresh):
+  subtree summaries must stay exact through insertion, removal, repricing, node-id reuse and every partial fill.
+* **Escrow conservation**: every path (match, filler fill, full and partial pool fill, cancel, dust close, bid
+  settlement) must burn or move exactly what it pays; the hook's claims per currency equal open input plus open
+  bids. Claims are fungible across pools, so one pool must never pay out another pool's escrow.
+* **Minimums and the asset floor** (`checkMinimum`, `_minAssetAmount`, pool admission with arbitrary assets and their
+  `decimals()`): both legs at creation and reprice; remainders are closed by the USDC leg only. With `minOrder` 0 the
+  asset floor is the only minimum.
+* **Executor grants and signed actions**: the Router can't be revoked through either path, while other executors
+  can; reprice scaling to a remainder (`_verifyReprice`), the `reprices` counter, nonce burning, the Router's
+  grant-free cancel and Router-only `useNonce`, and `swapWithSig` skipping a grant whose nonce is spent.
+* **MEV tax** (`Router._chargeMevTax` / `_payMevTax`): the transient slot, exact `msg.value`, native settlement to
+  `FeeVault`, and interaction with native deposits in `swap` and `fillOrder`.
+* **Ordering of state changes and external calls** in `fill`, `fillFromPoolLiquidity`, the Router's fill path
+  (`_requireUnchanged` after the ERC-20 pull), and token callbacks during order creation.
 
-`Router.unlockCallback` (fill) reverts with `"Input below order.amountIn"` when the order's live input
-is below `order.amountIn`. A missing order (live input 0) still reaches the hook's `OrderNotFound`.
+## Trust assumptions
 
-Tests: `test_M5_RevertWhen_LiveInputBelowFillerExpectation`, `test_M5_fillSucceeds_WhenFillerAcceptsLiveInput`.
+* **Owner** (two-step `transferOwnership` / `acceptOwnership`): sweeps tokens sent to the hook by mistake (`sweep`;
+  escrow lives in PoolManager claims, not the hook's balance) and collects fees, bids and MEV tax from `FeeVault`.
+  It cannot open, close or configure pools or change minimums. Must not be able to take makers' escrow.
+* **Router**: the hook trusts its immutable `router` as the only order-creation path, as an executor no maker can
+  revoke, for grant-free cancels on a maker's behalf (the Router checks the owner or a signature), and for burning
+  cancel nonces.
+* **Executors**: a maker authorizes executors per pool (`setExecutor` or `setExecutorWithSig`) and can revoke any of
+  them except the Router. An executor can only act on that maker's orders.
+* **Fillers / matchers / keepers**: anyone; permissionless.
+* **Pool creators**: anyone, for any asset with code. A malicious asset must only be able to affect its own pool.
+* **Tokens**: USDC plus standard ERC-20s and native ETH. Fee-on-transfer and rebasing tokens are not supported.
 
-### 6: the remainder keeps the maker's own limit
+## Known issues (do not report)
 
-`AsyncMatching._reduceAfterMatch` sets the remaining minimum to
-`ceil(oldMinimum * remainingInput / oldInput)` instead of `oldMinimum - outputReceived`. A side
-closes only when its input is used up; the early close-and-refund branch is gone.
+Acknowledged in the reviews below:
 
-**Behavior change:** an order that fills at a better price than its limit now keeps its unspent
-input on the book at its own limit, where it used to be refunded. Three existing tests were updated:
-`test_crossingOrdersMatchAndTransferEscrowedTokens`, `test_priorityFeeBreaksEqualPriceTiesAfterPricePriority`
-(`test/AsyncSwap.t.sol`), `test_retryFillsPartiallyMatchedRemainder` (`test/PoolLiquidityFill.t.sol`).
+* **Ways to race without the MEV tax** (Pashov 4, 5, 6, 9): a searcher can reprice its own resting order with
+  `updatePrice` and settle it with `matchBook` (on the Router or directly on the hook, which needs no unlock), or
+  pool-fill its own order through `tryFillOrderFromPoolLiquidity` with its own contract as executor. No user loses
+  funds; the tax covers Router creation and fills only.
+* **A partly matched order can fall behind an equal-priced order** (Pashov 7): the remainder's minimum rounds up, so
+  its exact limit is one unit worse than the maker signed and its bid buys no priority. Pinned by
+  `test_knownIssue_partlyMatchedOrderFallsBehindAnEqualOrder`.
+* **Fees round to zero on dust orders** (LSP I-01): only with minimums off.
+* **The MEV tax needs an exact `msg.value`**: the deposit plus `priority fee × MEV_TAX_GAS`. Wallets should send taxed
+  calls with no priority fee; the app does.
 
-Tests: `test_M6_favorablePartialFill_keepsRemainderLimit`, `test_M6_favorablePartialFill_keepsBuyerRemainderLimit`,
-`test_M6_partialFillMeetingWholeMinimum_keepsRemainderResting`.
+By design:
 
-### 8 (live): one book-wide priority for arrivals and backlog
+* **Makers can't revoke the Router.** A maker who wants out cancels its orders (through the Router, by signature,
+  or directly from its own unlock); the Router acts for a maker only when that maker calls it or signs.
+* **Priority bids are non-refundable.** All of a bid goes to `FeeVault`, including on cancellation or a dust close.
+* **Tokens with recipient callbacks (e.g. ERC-777)** are not supported. Matching pays only claims and runs no
+  recipient code; filler fills and full pool fills transfer ERC-20 output after the order is closed.
+* **Proceeds are claims.** Recipients redeem through `TokenClaims`, `NativeClaims` or `Router.withdrawClaims`.
+* **`DeployWithdrawalRouter`** deploys a testnet-only second Router for claims; the hook trusts only its own Router,
+  so cancels through the second one fail.
+* `MatchingEngine.sol` is a benchmark harness, not deployed (AuditAgent finding 8, acknowledged).
+* Release items in `MAINNET_READINESS.md` (deployment rehearsal, bytecode pinning, throughput stress, deploying the
+  claim redeemers) are operational, not code findings.
 
-`AsyncMatching.matchIncoming` now runs `matchBook` on the whole book, within the same 8-match budget,
-instead of matching only the new order against the best opposing level. A crossed backlog left by
-the cap clears first, by price, then bid, then time; the new order takes its place in that queue.
+The 29 leads in the Pashov review and the leads in the LSP review are unconfirmed trails, not known issues:
+confirming or ruling out any of them is in scope.
 
-Test: `test_M8_crossedBacklogClearsBeforeNewerOrder` (on the audited code a newer, worse-priced ask
-fills while the older crossed ask stays on the book).
+## Previous reviews
 
-### 9: match payouts are claims
+Reports are linked at `2739d6c`, the last commit that tracks them. Every fix has a regression test, in
+`test/security/` (including `test/security/poc/` and `test/security/PashovFindings.t.sol`),
+`test/nethermind_auditagent/` or `test/formal/RoutingPoolImpact.t.sol`.
 
-`AsyncMatching._transferEscrow` credits ERC-6909 claims in every currency, for both escrow legs and
-for a remainder returned below the pool minimum. Holders redeem with the new `TokenClaims`
-(`redeem(currency, recipient, amount)`, after approving it on the PoolManager), to any recipient the
-token accepts. A recipient the token refuses therefore cannot revert a match.
+| Report | Scope | Result |
+|---|---|---|
+| Lee, 33 Labs (2026-05-08) | Earlier design, never launched (`asyncswap/protocol`) | C-01, H-01..H-04, L-02, L-03, I-01 fixed; L-01 works as intended |
+| H-05 follow-up (2026-08-08) | Earlier design | H-05 fixed; native reentrancy hardening |
+| AI-assisted review (2026-10-10) | Earlier design at `760699a` | M-01, M-02, L-01..L-03, I-01, I-03 fixed; I-02 acknowledged |
+| Pre-freeze review (2026-10-19) | Matching engine | Unpaid priority bid could freeze a pool: fixed in #9 |
+| [Nethermind AuditAgent 1](https://github.com/asyncswap/contracts/blob/2739d6c/audit/auditagent_report_1_ae602e60-d592-45ec-92ef-891968f087f0.md) (scan `ae602e60`) | `e04668e` | 12 findings and 2 related issues: all fixed except 8, acknowledged for the harness and fixed live; [status](https://github.com/asyncswap/contracts/blob/2739d6c/audit/auditagent_report_1_status.md) |
+| [Nethermind AuditAgent 2](https://github.com/asyncswap/contracts/blob/2739d6c/audit/auditagent_report_2_e73aa801-4ee2-4796-9bf6-5ee08d526d36.md) (scan `e73aa801`) | Exact pricing, repricing, cancels | 3 findings fixed; [status](https://github.com/asyncswap/contracts/blob/2739d6c/audit/auditagent_report_2_status.md) |
+| [Formal Mind swarm](https://github.com/asyncswap/contracts/blob/2739d6c/audit/formal-mind.md) | Routing | FM-01 (Medium): best-price routing bypassed better book liquidity; fixed in `550b463` ([report](https://github.com/asyncswap/contracts/blob/2739d6c/audit/FM-01-routing-pool-impact.md)) |
+| [LSP security review](https://github.com/asyncswap/contracts/blob/2739d6c/audit/lsp_security_review_2026-11-01.md) (2026-11-01) | `81ba6b8` | M-01, M-02, L-01, L-02 fixed; I-01 acknowledged |
+| [Pashov `solidity-auditor`](https://github.com/asyncswap/contracts/blob/2739d6c/audit/pashov_security_review_2026-11-01.md) (2026-11-01, 3 passes) | `7d09cfa` | 1, 2, 3, 8, 10, 11 fixed; 4, 5, 6, 7, 9 acknowledged |
 
-Fills by a filler and pool-liquidity fills still pay the maker in ERC-20. A refused maker can only
-fail its own order there: the pool fill runs behind a caught self-call and leaves the order resting,
-and a filler fill reverts for that one order.
+The findings of the last three reviews, in full:
 
-Tests: `test_M9_blockedRecipientDoesNotBlockMatch` (on the audited code the refused transfer reverts
-the whole match), `test/TokenClaims.t.sol` (redemption, approvals, a refused transfer restoring claims
-and allowance, re-entry).
+| Review | ID | Severity | Finding | Status |
+|---|---|---|---|---|
+| Formal Mind | FM-01 | Medium | Best-price routing compares only the pool spot tick, then swaps the whole order through the pool | Fixed |
+| LSP | M-01 | Medium | A leftover signed `SetExecutor` grant from `swapWithSig` can undo a maker's revocation | Fixed |
+| LSP | M-02 | Medium | A front-run ask can force a new order onto the book at a worse price than the pool | Fixed |
+| LSP | L-01 | Low | A small partial match voids a maker's relayed cancel or reprice | Fixed |
+| LSP | L-02 | Low | Pool squatting before a token is deployed disables its asset floor | Fixed |
+| LSP | I-01 | Info | Fee rounding on dust remainders (only with minimums off) | Acknowledged |
+| Pashov | 1 | 90 | The backrun fee charges the whole output of a fill that crosses the reference tick | Fixed |
+| Pashov | 2 | 90 | A dust order at the end key turns off pool fills for the other side | Fixed |
+| Pashov | 3 | 85 | The venue choice ignores the dynamic fee | Fixed |
+| Pashov | 4 | 85 | A maker that sets itself as executor fills from the pool with no MEV tax | Acknowledged |
+| Pashov | 5 | 85 | A direct `updatePrice` makes an old order cross with no MEV tax | Acknowledged |
+| Pashov | 6 | 85 | Reprice plus `matchBook` pays no MEV tax | Acknowledged |
+| Pashov | 7 | 75 | Ceil rounding on a partial match makes the remainder's limit worse | Acknowledged |
+| Pashov | 8 | 75 | A pool-first fill parks the price in an empty range and freezes pool fills | Fixed |
+| Pashov | 9 | 75 | Any caller runs the hook's `matchBook` with no unlock and no Router | Acknowledged |
+| Pashov | 10 | 75 | A copied executor grant submitted first reverts the relayer's `swapWithSig` | Fixed |
+| Pashov | 11 | 75 | The pool-first limit stops one tick past the best resting price | Fixed |
 
-### 10: the maker role survives a reprice
+Pashov's column is the reviewer's confidence, not a severity.
 
-Each order now records an immutable `createdSequence`. `_matchPair` makes the order with the smaller
-`createdSequence` the maker, whose limit sets the price. `updatePrice` still takes a fresh `sequence`,
-which only sets queue position among equal-price, equal-bid orders.
+## Testing
 
-Test: `test_M10_repriceKeepsMakerRole` (on the audited code the older buy's reprice flips the maker,
-and the seller receives 11 instead of 12).
+At the freeze commit:
 
-The regression tests for 4, 8, 9 and 10 were run against the audited commit `e04668e` with the current
-`SetupHook` and its pools switched to priority-fee mode: each fails there on its own assertion and
-passes on `main`.
-
-### 11: an emptied price level is left in place
-
-`AsyncFiller._remove` no longer deletes the `PriceLevel` when its last order leaves. Its FIFO links
-are already zero and its priority tree is empty (root 0); deleting it only cleared the tree's
-`nextNodeId` and `freeIds`, a cost that grew with the level's historical peak. Those ids are now
-reused by later orders at that price.
-
-Tests: no dedicated gas test.
-
-### R-1: the Router fills only the order it checked
-
-Found while fixing 1 and 2. The fill path read the order (live input, price, `maxPrice`), then pulled
-the filler's ERC-20 with `safeTransferFrom`, which runs the token's code, then executed against
-whatever storage held by then. A changed price already reverted (the hook's deltas no longer net to
-zero); a reduced input did not. `Router` now re-reads the order after the pull and reverts with
-`"Order changed during fill"` unless it is unchanged (`_requireUnchanged`).
-
-Test: `test/security/RouterOrderWindow.t.sol` `test_RevertWhen_OrderChangesDuringFillPayment`.
-
-### R-2: a new order is not matchable before its input is settled
-
-Found while fixing 1 and 2. `_beforeSwap` puts the order on the book before the Router pulls the
-maker's input and priority bid, and the Router's comment said it "only becomes matchable after this
-maker's input has been settled". The permissionless `matchBook` did not enforce that. It now returns 0
-while this pool holds the order pending in `PENDING_MATCH_ID_SLOT`, i.e. until `matchNewOrder` takes
-it. An early match also needed the PoolManager to hold the token from other escrow or LP reserves.
-
-Test: `test/security/RouterOrderWindow.t.sol` `test_pendingOrder_notMatchableBeforeInputSettled`.
-
-## Minimum order and tiered bid
-
-Async Swap targets institutional-size orders; small trades are better served by the AMM. Measured in
-numeraire (USDC) base units:
-
-* **Minimum order.** Fixed at deployment for every pool, with no setter: the hook's constructor takes it
-  in whole dollars (`DEPLOY_MIN_ORDER_USD`, $10 by default) and scales it by the numeraire's
-  `decimals()`. A buy's input must be at least the minimum, and so must a sell's minimum output.
-  `updatePrice` re-checks it. An earlier version also valued a sell's input at the pool's current
-  price; that check was dropped when pool creation became permissionless, because whoever opens a pool
-  chooses that price.
-* **Asset floor.** Each order must also trade at least 0.0001 of a whole asset token on its asset side
-  (a sell's input, a buy's minimum output), from the asset's `decimals()` read when the pool opens. It
-  blocks literal dust such as 1-wei sells; it limits quantity, not value.
-* **Remainders.** A partial match that leaves an order worth less than the minimum, by its own terms
-  (no pool price), closes it and returns the remaining input as claims after both orders are reduced.
-* **Tiered bid.** The least nonzero bid is `min($0.10, 0.1% of the order)`: $0.10 from $100 up, down
-  to $0.01 at the $10 minimum. The $0.10 cap is `10^(decimals - 1)` of the numeraire, derived by the
-  constructor.
-
-Tests: `test/security/MinimumOrder.t.sol`, including a sell and a buy remainder refunded below the
-minimum and a pool opened by a stranger at an extreme price, `test/security/AssetPrecision.t.sol` and
-`test/Numeraire.t.sol` (the minimum and cap at 6 and 18 numeraire decimals). Formal tests updated: the `addOrder` and `CreateOrderSpec`
-fee guards, and `beforeInitialize`'s write set (now also `priceBooks[id].minOrder`).
-
-Hook size: `updatePriceWithSig` called the internal `AsyncFiller.updatePrice`, inlining it into the
-hook; it now goes through the linked `AsyncMatching.updatePrice` like `updatePrice`. `AsyncSwap` went
-from 24,311 to about 20,200 bytes (EIP-170 limit 24,576).
-
-## Priority-fee-only pools
-
-Findings **7 and 12 are fixed** in the working tree. Every pool queues equal-price orders by
-escrowed bid, then sequence. FIFO mode, its links, `setOrderingMode`, `orderingMode`, and the separate
-`recordPriorityFee` call are removed. `orderBookOrder` now returns `sequence` and `priorityFee` in
-its final two fields instead of FIFO neighbors; clients must update their ABI.
-
-`addOrder` mints the bid's numeraire claims to the hook immediately. This creates a matching hook
-debt in PoolManager; the unlock cannot finish until it is settled. The Router pays it with
-`settleFor(hook)`. A custom executor cannot leave an order resting with an unpaid declared bid.
-The tiered minimum still rounds down in base units, so a tiny order can have a zero minimum when
-the pool minimum permits it. This change does not impose a universal $10 minimum.
-
-Tests: `test/security/PriorityFeeOnly.t.sol` checks minimum bids on unconfigured pools, bid ordering,
-rejection of an executor that skips payment, successful paid custom execution, equal-bid time ordering,
-and removal of the mode setter. Existing placement,
-settlement, cancellation and invariant fixtures now account for escrowed bids.
-
-This changes storage layout and public ABI; deploy fresh contracts and update consumers. It is not
-a migration of existing orders or deployed contracts.
-
-## Acknowledged
-
-### 8 (harness): `MatchingEngine`
-
-`src/MatchingEngine.sol` is a standalone matching harness and gas benchmark; it holds no tokens.
-
-## Running the tests
+* `forge test`: 987 passing, 0 failing, 0 skipped, in 177 suites. The Unichain fork suite (`UnichainForkTest`, 3 tests) runs against the `unichain`
+  RPC alias at block 61,709,000 unless `UNICHAIN_FORK_RPC_URL` and `UNICHAIN_FORK_BLOCK` are set.
+* 14 invariant runs across `MatchingInvariantTest`, `PriorityMatchingInvariantTest`, `LpMatchingInvariantTest` and
+  `ExactPriorityInvariantTest` (64 runs × depth 64, fail-on-revert): escrow equals outstanding obligations, asset
+  conservation, best prices against a linear scan, the best order is exact limit then bid then age, and the hook
+  holds no USDC beyond escrow.
+* Regression suites in `test/security/` and `test/nethermind_auditagent/`; Python reference vectors for exact
+  eligibility and priority; single-call bytecode property checks in `test/formal/`. The Lean models those checks were
+  written from are not maintained and are not part of this repository.
+* Coverage of `src/`: 99.82% lines, 99.10% statements, 97.61% branches, 100% functions. Three branches are defensive
+  and unreachable, so they stay uncovered: the clamp at v4's minimum price in `TickPrice.poolBeatsLevel` (a swap that
+  lowers the tick has its limit moved one tick up, so it never lands on `MIN_TICK`), the zero floor of the fee-window
+  subtraction (the pool's key always exceeds half its gap to the reference), and the no-liquidity case of
+  `DynamicFeeOrdering._pay` (a pool fill that leaves no active liquidity reverts first).
+* Runtime sizes (EIP-170 limit 24,576): AsyncSwap 23,669 bytes, AsyncMatching 24,135, Router 22,131, TickPrice
+  5,204, FeeVault 2,320, TokenClaims 2,110, NativeClaims 1,964.
 
 ```sh
-forge test --match-path "test/nethermind_auditagent/*"
-forge test --match-contract RouterOrderWindowTest
-forge test                                   # everything
+forge test
+forge coverage --skip 'test/formal/AsyncSwapBeforeSwap.t.sol' --report summary --no-match-coverage '(test|script|dependencies)/'
 ```
 
-## Validation
+## Deployments
 
-* `forge test`: **833 passed, 0 failed, 1 skipped** across 139 suites. The Unichain fork fixture skips
-  without `UNICHAIN_FORK_RPC_URL`; no fork validation is claimed.
-* `forge build --sizes`: runtime sizes are 19,237 bytes (`AsyncSwap`), 19,064 bytes (`AsyncMatching`)
-  and 17,580 bytes (`Router`), each below the 24,576-byte EIP-170 limit.
-* `forge coverage` of `src/`: 99.9% of lines, 99.4% of statements, 98.8% of branches, 100% of
-  functions. The uncovered branches are unreachable guards (a matched amount above the order's input,
-  `MatchingEngine`'s reentrancy check, a sell-only lookup).
-* No deployment was performed.
+The testnets run `bc95df4`: Unichain Sepolia (1301) and Robinhood Chain testnet (46630), with `minOrder` 0 and the
+asset floor; addresses are in `deployments/<chainId>/` and [`docs/deployments.md`](/deployments). Its
+`src/` is the same as `fdfdf65`, so it **does not** include the Router rule above: on those hooks a maker can still
+revoke the Router. No mainnet deployment exists; see [`../MAINNET_READINESS.md`](https://github.com/asyncswap/contracts/blob/main/MAINNET_READINESS.md).
 
 # Contract reference
 
@@ -1417,7 +1449,7 @@ match the code on `main`. Each page links to its source file.
 
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/2739d6cfd07154c275144a313cf1168b485c1327/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/abf374271c3378a4f461841fd7dac3867f3f5158/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -2864,7 +2896,7 @@ struct UserParams {
 
 # FeeVault
 
-[Git Source](https://github.com/asyncswap/contracts/blob/2739d6cfd07154c275144a313cf1168b485c1327/src/FeeVault.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/abf374271c3378a4f461841fd7dac3867f3f5158/src/FeeVault.sol)
 
 Holds and redeems protocol fee claims, never maker escrow.
 
@@ -2971,7 +3003,7 @@ error ZeroAddress();
 
 # ImmutableState
 
-[Git Source](https://github.com/asyncswap/contracts/blob/2739d6cfd07154c275144a313cf1168b485c1327/src/ImmutableState.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/abf374271c3378a4f461841fd7dac3867f3f5158/src/ImmutableState.sol)
 
 **Title:** Immutable State
 
@@ -3023,7 +3055,7 @@ error NotPoolManager();
 
 # MatchingEngine
 
-[Git Source](https://github.com/asyncswap/contracts/blob/2739d6cfd07154c275144a313cf1168b485c1327/src/MatchingEngine.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/abf374271c3378a4f461841fd7dac3867f3f5158/src/MatchingEngine.sol)
 
 **Title:** MatchingEngine
 
@@ -3496,7 +3528,7 @@ struct Book {
 
 # NativeClaims
 
-[Git Source](https://github.com/asyncswap/contracts/blob/2739d6cfd07154c275144a313cf1168b485c1327/src/NativeClaims.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/abf374271c3378a4f461841fd7dac3867f3f5158/src/NativeClaims.sol)
 
 Redeems the caller's PoolManager native ETH claims to a chosen recipient.
 
@@ -3618,7 +3650,7 @@ error ReentrantRedemption();
 
 # Router
 
-[Git Source](https://github.com/asyncswap/contracts/blob/2739d6cfd07154c275144a313cf1168b485c1327/src/Router.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/abf374271c3378a4f461841fd7dac3867f3f5158/src/Router.sol)
 
 **Inherits:** EIP712, Multicall
 
@@ -4285,7 +4317,7 @@ enum ActionType {
 
 # TokenClaims
 
-[Git Source](https://github.com/asyncswap/contracts/blob/2739d6cfd07154c275144a313cf1168b485c1327/src/TokenClaims.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/abf374271c3378a4f461841fd7dac3867f3f5158/src/TokenClaims.sol)
 
 Redeems the caller's PoolManager currency claims to a chosen recipient.
 
@@ -4409,7 +4441,7 @@ error ReentrantRedemption();
 
 # BaseHook
 
-[Git Source](https://github.com/asyncswap/contracts/blob/2739d6cfd07154c275144a313cf1168b485c1327/src/BaseHook.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/abf374271c3378a4f461841fd7dac3867f3f5158/src/BaseHook.sol)
 
 **Inherits:** IHooks, [ImmutableState](/reference/src/ImmutableState)
 
@@ -5069,7 +5101,7 @@ error HookNotImplemented();
 
 # IFeeOwner
 
-[Git Source](https://github.com/asyncswap/contracts/blob/2739d6cfd07154c275144a313cf1168b485c1327/src/FeeVault.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/abf374271c3378a4f461841fd7dac3867f3f5158/src/FeeVault.sol)
 
 ## Functions
 
@@ -5089,7 +5121,7 @@ function owner() external view returns (address);
 
 # ISignatureTransfer
 
-[Git Source](https://github.com/asyncswap/contracts/blob/2739d6cfd07154c275144a313cf1168b485c1327/src/interfaces/ISignatureTransfer.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/abf374271c3378a4f461841fd7dac3867f3f5158/src/interfaces/ISignatureTransfer.sol)
 
 **Title:** ISignatureTransfer
 
@@ -5182,7 +5214,7 @@ struct SignatureTransferDetails {
 
 # AsyncFiller
 
-[Git Source](https://github.com/asyncswap/contracts/blob/2739d6cfd07154c275144a313cf1168b485c1327/src/libraries/AsyncFiller.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/abf374271c3378a4f461841fd7dac3867f3f5158/src/libraries/AsyncFiller.sol)
 
 **Title:** AsyncFiller
 
@@ -6164,7 +6196,7 @@ struct Book {
 
 # AsyncMatching
 
-[Git Source](https://github.com/asyncswap/contracts/blob/2739d6cfd07154c275144a313cf1168b485c1327/src/libraries/AsyncMatching.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/abf374271c3378a4f461841fd7dac3867f3f5158/src/libraries/AsyncMatching.sol)
 
 Linked matching module operating on the hook's order and radix-book storage.
 
@@ -7058,7 +7090,7 @@ struct UpdateParams {
 
 # ClaimTransfers
 
-[Git Source](https://github.com/asyncswap/contracts/blob/2739d6cfd07154c275144a313cf1168b485c1327/src/libraries/ClaimTransfers.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/abf374271c3378a4f461841fd7dac3867f3f5158/src/libraries/ClaimTransfers.sol)
 
 <i>
   At most 16 makers and the FeeVault can each receive two currencies in eight matches.
@@ -7138,7 +7170,7 @@ struct Batch {
 
 # CurrencySettler
 
-[Git Source](https://github.com/asyncswap/contracts/blob/2739d6cfd07154c275144a313cf1168b485c1327/src/libraries/CurrencySettler.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/abf374271c3378a4f461841fd7dac3867f3f5158/src/libraries/CurrencySettler.sol)
 
 **Title:** CurrencySettler
 
@@ -7189,7 +7221,7 @@ function take(Currency currency, IPoolManager manager, address recipient, uint25
 
 # DynamicFeeOrdering
 
-[Git Source](https://github.com/asyncswap/contracts/blob/2739d6cfd07154c275144a313cf1168b485c1327/src/libraries/DynamicFeeOrdering.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/abf374271c3378a4f461841fd7dac3867f3f5158/src/libraries/DynamicFeeOrdering.sol)
 
 **Title:** Dynamic fee ordering on pool-liquidity fills
 
@@ -7337,7 +7369,7 @@ event PoolPriceObserved(
 
 # EligiblePrice
 
-[Git Source](https://github.com/asyncswap/contracts/blob/2739d6cfd07154c275144a313cf1168b485c1327/src/libraries/EligiblePrice.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/abf374271c3378a4f461841fd7dac3867f3f5158/src/libraries/EligiblePrice.sol)
 
 Exact-price summaries on a priority-key radix tree.
 
@@ -7516,7 +7548,7 @@ struct Ratio {
 
 # OrderSignatures
 
-[Git Source](https://github.com/asyncswap/contracts/blob/2739d6cfd07154c275144a313cf1168b485c1327/src/libraries/OrderSignatures.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/abf374271c3378a4f461841fd7dac3867f3f5158/src/libraries/OrderSignatures.sol)
 
 **Title:** OrderSignatures
 
@@ -7771,7 +7803,7 @@ function hashCancel(
 
 # RadixPriceTree
 
-[Git Source](https://github.com/asyncswap/contracts/blob/2739d6cfd07154c275144a313cf1168b485c1327/src/libraries/RadixPriceTree.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/abf374271c3378a4f461841fd7dac3867f3f5158/src/libraries/RadixPriceTree.sol)
 
 Patricia radix index for uint128 price levels. Inserts and removals
 traverse at most 128 branch bits; each distinct price creates one
@@ -7987,7 +8019,7 @@ struct Tree {
 
 # TickPrice
 
-[Git Source](https://github.com/asyncswap/contracts/blob/2739d6cfd07154c275144a313cf1168b485c1327/src/libraries/TickPrice.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/abf374271c3378a4f461841fd7dac3867f3f5158/src/libraries/TickPrice.sol)
 
 Book levels on Uniswap v4 ticks: an order sits at the floor tick (spacing 1, 0.01% steps)
 of its exact currency1/currency0 limit. Levels are a fixed relative width at any price and
@@ -8096,7 +8128,7 @@ function floorTick(uint256 num, uint256 den) internal pure returns (int24);
 
 # AsyncOrderLibrary
 
-[Git Source](https://github.com/asyncswap/contracts/blob/2739d6cfd07154c275144a313cf1168b485c1327/src/types/AsyncOrder.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/abf374271c3378a4f461841fd7dac3867f3f5158/src/types/AsyncOrder.sol)
 
 **Title:** AsyncOrderLibrary
 
@@ -8138,7 +8170,7 @@ function orderId(AsyncOrder calldata order) internal view returns (bytes32);
 
 # AsyncOrder
 
-[Git Source](https://github.com/asyncswap/contracts/blob/2739d6cfd07154c275144a313cf1168b485c1327/src/types/AsyncOrder.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/abf374271c3378a4f461841fd7dac3867f3f5158/src/types/AsyncOrder.sol)
 
 Represents an async order for a swap in the Uniswap V4 pool.
 

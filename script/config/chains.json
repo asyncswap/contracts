@@ -173,29 +173,6 @@
         ]
       }
     },
-    "hyperEvmTestnet": {
-      "name": "HyperEVM Testnet",
-      "chainId": 998,
-      "network": "testnet",
-      "rpcUrlEnv": "RPC_URL_HYPEREVM_TESTNET",
-      "explorerUrl": "https://testnet.purrsec.com",
-      "nativeCurrency": { "name": "HYPE", "symbol": "HYPE", "decimals": 18 },
-      "contracts": {
-        "poolManager": null,
-        "permit2": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
-        "usdc": "0x2B3370eE501B4a559b57D449569354196457D8Ab",
-        "asyncSwapHook": null,
-        "router": null
-      },
-      "deployment": {
-        "status": "config_only",
-        "ordering": "unknown",
-        "mevTaxGas": 0,
-        "script": "script/deploy-hyperevm-testnet.sh",
-        "numeraireNote": "Six-decimal testnet USDC. PoolManager must be deployed locally before the hook.",
-        "requires": ["HYPE-funded deployer", "self-deployed PoolManager", "pool initialization"]
-      }
-    },
     "ink": {
       "name": "Ink",
       "chainId": 57073,
@@ -276,29 +253,6 @@
           "verified USDC address",
           "deployment and pool configuration"
         ]
-      }
-    },
-    "megaEthTestnet": {
-      "name": "MegaETH Testnet",
-      "chainId": 6343,
-      "network": "testnet",
-      "rpcUrlEnv": "RPC_URL_MEGAETH_TESTNET",
-      "explorerUrl": "https://testnet-mega.etherscan.io",
-      "nativeCurrency": { "name": "Ether", "symbol": "ETH", "decimals": 18 },
-      "contracts": {
-        "poolManager": "0x67E44b69D10737dF41f5a98078072B817016B871",
-        "permit2": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
-        "usdc": "0x72d4db19E3AE6f8ed47B5337ab00D69685277cF4",
-        "asyncSwapHook": "0x91d8D6eDeB81CDCd0a15fF180444B7EeEd50E888",
-        "router": "0xd25159473B1ba2979E92454620dDB86Fa2Af46EB"
-      },
-      "deployment": {
-        "status": "prepared",
-        "ordering": "unknown",
-        "mevTaxGas": 0,
-        "script": "script/deploy-megaeth-testnet.sh",
-        "numeraireNote": "Official MegaETH testnet USDM (MegaUSD), 18 decimals. The usdc field is the deployment script's generic numeraire slot.",
-        "requires": ["ETH-funded deployer", "self-deployed PoolManager", "pool initialization"]
       }
     },
     "monad": {
@@ -675,67 +629,6 @@
           "funded deployment keystore",
           "verified test-token bytecode",
           "test pool configuration"
-        ]
-      }
-    },
-    "sepolia": {
-      "name": "Ethereum Sepolia",
-      "chainId": 11155111,
-      "network": "testnet",
-      "rpcUrlEnv": "RPC_URL_SEPOLIA",
-      "explorerUrl": "https://sepolia.etherscan.io",
-      "nativeCurrency": {
-        "name": "Sepolia Ether",
-        "symbol": "ETH",
-        "decimals": 18
-      },
-      "contracts": {
-        "poolManager": "0xE03A1074c86CFeDd5C142C4F04F1a1536e203543",
-        "permit2": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
-        "usdc": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
-        "asyncSwapHook": null,
-        "router": null
-      },
-      "deployment": {
-        "status": "prepared",
-        "ordering": "builder",
-        "mevTaxGas": 0,
-        "script": "script/deploy-sepolia.sh",
-        "requires": [
-          "RPC_URL_SEPOLIA in .env.deploy",
-          "ETH-funded deployer keystore",
-          "test USDC from https://faucet.circle.com for pool liquidity"
-        ]
-      }
-    },
-    "arcTestnet": {
-      "name": "Arc Testnet",
-      "chainId": 5042002,
-      "network": "testnet",
-      "rpcUrlEnv": "RPC_URL_ARC_TESTNET",
-      "explorerUrl": "https://explorer.testnet.arc.io",
-      "nativeCurrency": {
-        "name": "USDC",
-        "symbol": "USDC",
-        "decimals": 18
-      },
-      "contracts": {
-        "poolManager": "0x8366a39CC670B4001A1121B8F6A443A643e40951",
-        "permit2": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
-        "usdc": "0x3600000000000000000000000000000000000000",
-        "asyncSwapHook": null,
-        "router": null
-      },
-      "deployment": {
-        "status": "prepared",
-        "ordering": "unknown",
-        "mevTaxGas": 0,
-        "script": "script/deploy-arc-testnet.sh",
-        "poolManagerNote": "Not in Uniswap's deployment feed; runtime bytecode matches the Arc mainnet PoolManager at the same address.",
-        "requires": [
-          "RPC_URL_ARC_TESTNET in .env.deploy",
-          "USDC-funded deployer keystore (https://faucet.circle.com)",
-          "never initialize a native-currency pool: native and ERC-20 USDC are the same balance"
         ]
       }
     },

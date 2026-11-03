@@ -184,12 +184,16 @@ contract AsyncSwapTest is SetupHook {
 
     function test_setExecutor_emitsRevocation() public {
         // topUp authorizes the Router for alice during setup.
-        vm.expectEmit(true, true, true, true, address(hook));
-        emit AsyncSwap.ExecutorSet(poolId, alice, address(router), false);
+        address executor = address(0xcafe);
         vm.prank(alice);
-        hook.setExecutor(poolId, address(router), false);
+        hook.setExecutor(poolId, executor, true);
 
-        assertFalse(hook.isExecutor(poolId, alice, address(router)), "executor revoked");
+        vm.expectEmit(true, true, true, true, address(hook));
+        emit AsyncSwap.ExecutorSet(poolId, alice, executor, false);
+        vm.prank(alice);
+        hook.setExecutor(poolId, executor, false);
+
+        assertFalse(hook.isExecutor(poolId, alice, executor), "executor revoked");
     }
 
     /* --------------------------------- create --------------------------------- */

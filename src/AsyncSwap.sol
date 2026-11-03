@@ -652,7 +652,7 @@ contract AsyncSwap is BaseHook, EIP712 {
     ///         on the maker's first swap. Pass `allow = false` to revoke an executor.
     function setExecutor(PoolId poolId, address executor, bool allow) external {
         // protect user from stalling the protocol;
-        bool isTrustedRouter = asyncOrders[poolId].isExecutor[msg.sender][router];
+        bool isTrustedRouter = executor == router;
         if (isTrustedRouter && !allow) revert CannotRevokeTrustedRouter();
         asyncOrders[poolId].isExecutor[msg.sender][executor] = allow;
         emit ExecutorSet(poolId, msg.sender, executor, allow);

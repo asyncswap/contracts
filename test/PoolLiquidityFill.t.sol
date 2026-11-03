@@ -376,15 +376,13 @@ contract PoolLiquidityFillTest is SetupHook {
         hook.fillOrderFromPoolLiquidity(order, _id(order), 0);
     }
 
-    function test_retryRequiresMakerAuthorizedExecutor() public {
+    /// The maker cannot revoke the trusted Router, so a resting order always stays retryable through it.
+    function test_retryAlwaysAuthorizedSinceRouterCannotBeRevoked() public {
         AsyncOrder memory order = _submit(_order(alice, true, 1 ether, 1.5 ether));
-        _addPoolLiquidity(1e24);
         vm.prank(alice);
+        vm.expectRevert(AsyncSwap.CannotRevokeTrustedRouter.selector);
         hook.setExecutor(poolId, address(router), false);
-
-        vm.prank(bob);
-        vm.expectRevert(AsyncFiller.NotAuthorizedExecutor.selector);
-        router.fillFromPoolLiquidity(order);
+        assertTrue(hook.isExecutor(poolId, alice, address(router)), "router still authorized");
         assertEq(hook.asyncOrder(poolId, _id(order)), 1 ether, "order untouched");
     }
 

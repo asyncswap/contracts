@@ -10,10 +10,9 @@ import {IUnlockCallback} from "v4-core/interfaces/callback/IUnlockCallback.sol";
 import {PoolId} from "v4-core/types/PoolId.sol";
 import {MockERC20} from "../utils/MockERC20.sol";
 
-/// @notice A smart-contract maker that creates an order through the Router, can
-///         later revoke the Router's executor grant, and still cancel its own
-///         order by calling `hook.cancelOrder` directly from inside its own
-///         PoolManager unlock — `msg.sender == order.owner` bypasses setExecutor.
+/// @notice A smart-contract maker that creates an order through the Router and
+///         cancels its own order by calling `hook.cancelOrder` directly from inside
+///         its own PoolManager unlock — `msg.sender == order.owner` bypasses setExecutor.
 contract SmartMaker is IUnlockCallback {
     IPoolManager public immutable manager;
     AsyncSwap public immutable hook;
@@ -58,7 +57,7 @@ contract SmartMaker is IUnlockCallback {
 }
 
 contract OwnerDirectCancelTest is SetupHook {
-    function test_owner_can_cancel_directly_after_revoking_executor() public {
+    function test_owner_can_cancel_directly() public {
         SmartMaker maker = new SmartMaker(manager, hook, router);
         topUp(address(maker), 100 ether);
 
@@ -83,12 +82,13 @@ contract OwnerDirectCancelTest is SetupHook {
         // Patch salt so the direct-cancel resolves the same orderId the hook stored under.
         order.salt = _expectedSalt(address(maker), 1 ether, 0.9 ether);
 
-        // Maker revokes Router as executor — open order remains.
+        // The maker cannot revoke the trusted Router.
+        vm.expectRevert(AsyncSwap.CannotRevokeTrustedRouter.selector);
         maker.authorizeRouter(poolId, false);
-        assertFalse(hook.isExecutor(poolId, address(maker), address(router)), "router revoked");
+        assertTrue(hook.isExecutor(poolId, address(maker), address(router)), "router still authorized");
 
         // Direct cancel through the maker's own unlock: msg.sender to the hook is the maker
-        // contract, so the executor == owner branch applies and no grant is needed.
+        // contract, so the executor == owner branch applies and no Router grant is involved.
         maker.cancelDirectly(order);
         assertEq(token0.balanceOf(address(maker)), makerToken0Before, "input refunded");
         (uint256 amountIn,) = hook.asyncOrderInfo(poolId, _orderIdFor(address(maker), true, order.salt));

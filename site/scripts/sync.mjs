@@ -19,6 +19,7 @@ const routes = {
   'README.md': '/',
   'docs/protocol.md': '/protocol/overview',
   'docs/order-lifecycle.md': '/protocol/order-lifecycle',
+  'docs/priority-fee-top-ups.md': '/protocol/priority-fee-top-ups',
   'docs/contract-call-sequences.md': '/protocol/contract-call-sequences',
   'docs/price-key-crossing.md': '/protocol/price-key-crossing',
   'docs/dynamic-fee-ordering.md': '/protocol/dynamic-fee-ordering',

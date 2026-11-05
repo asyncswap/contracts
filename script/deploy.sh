@@ -151,16 +151,16 @@ registry="$ROOT_DIR/deployments/$chain_id/$chain_id.json"
 # ---- verify mode ----------------------------------------------------------------------------
 if [[ "$mode" == "verify" ]]; then
   [[ -f "$registry" ]] || { echo "No registry at $registry; broadcast first." >&2; exit 1; }
-  read -r lib_addr hook_addr router_addr vault_addr tick_addr ordering_addr bitmap_addr eligible_addr <<< "$(python3 - "$registry" <<'PY'
+  read -r lib_addr hook_addr router_addr vault_addr tick_addr ordering_addr bitmap_addr eligible_addr topup_addr <<< "$(python3 - "$registry" <<'PY'
 import json, sys
 c = json.load(open(sys.argv[1]))["contracts"]
 def a(n):
     e = c.get(n)
     return e["address"] if e else "-"
-print(a("AsyncMatching"), a("AsyncSwap"), a("Router"), a("FeeVault"), a("TickPrice"), a("DynamicFeeOrdering"), a("TickBitmap"), a("EligiblePrice"))
+print(a("AsyncMatching"), a("AsyncSwap"), a("Router"), a("FeeVault"), a("TickPrice"), a("DynamicFeeOrdering"), a("TickBitmap"), a("EligiblePrice"), a("PriorityFeeUpdates"))
 PY
 )"
-  for pair in "AsyncMatching:$lib_addr" "AsyncSwap:$hook_addr" "Router:$router_addr" "FeeVault:$vault_addr" "TickPrice:$tick_addr" "DynamicFeeOrdering:$ordering_addr" "TickBitmap:$bitmap_addr" "EligiblePrice:$eligible_addr"; do
+  for pair in "AsyncMatching:$lib_addr" "AsyncSwap:$hook_addr" "Router:$router_addr" "FeeVault:$vault_addr" "TickPrice:$tick_addr" "DynamicFeeOrdering:$ordering_addr" "TickBitmap:$bitmap_addr" "EligiblePrice:$eligible_addr" "PriorityFeeUpdates:$topup_addr"; do
     [[ "${pair#*:}" != "-" ]] || { echo "Registry is missing ${pair%%:*}." >&2; exit 1; }
   done
   # Constructor arguments are read from the deployment transactions themselves, so verification uses
@@ -187,6 +187,7 @@ PY
   ordering_flag="src/libraries/DynamicFeeOrdering.sol:DynamicFeeOrdering:$ordering_addr"
   bitmap_flag="src/libraries/TickBitmap.sol:TickBitmap:$bitmap_addr"
   eligible_flag="src/libraries/EligiblePrice.sol:EligiblePrice:$eligible_addr"
+  topup_flag="src/libraries/PriorityFeeUpdates.sol:PriorityFeeUpdates:$topup_addr"
   out_dir="$ROOT_DIR/deployments/$chain_id/verify"
   mkdir -p "$out_dir"
 
@@ -194,8 +195,9 @@ PY
     local name="$1" addr="$2" target="$3" args="$4"
     local extra=()
     [[ -n "$args" ]] && extra+=(--constructor-args "$args")
-    [[ "$name" == "AsyncSwap" ]] && extra+=(--libraries "$lib_flag" --libraries "$tick_flag" --libraries "$ordering_flag" --libraries "$bitmap_flag" --libraries "$eligible_flag")
+    [[ "$name" == "AsyncSwap" ]] && extra+=(--libraries "$topup_flag" --libraries "$lib_flag" --libraries "$tick_flag" --libraries "$ordering_flag" --libraries "$bitmap_flag" --libraries "$eligible_flag")
     [[ "$name" == "AsyncMatching" ]] && extra+=(--libraries "$tick_flag" --libraries "$ordering_flag" --libraries "$bitmap_flag" --libraries "$eligible_flag")
+    [[ "$name" == "PriorityFeeUpdates" ]] && extra+=(--libraries "$eligible_flag")
     echo "== $name @ $addr"
     forge verify-contract --chain "$chain_id" --verifier sourcify --watch ${extra[@]+"${extra[@]}"} "$addr" "$target" \
       || echo "   Sourcify verification failed for $name (see above)." >&2
@@ -209,6 +211,7 @@ PY
   verify_one DynamicFeeOrdering "$ordering_addr" src/libraries/DynamicFeeOrdering.sol:DynamicFeeOrdering ""
   verify_one TickBitmap "$bitmap_addr" src/libraries/TickBitmap.sol:TickBitmap ""
   verify_one EligiblePrice "$eligible_addr" src/libraries/EligiblePrice.sol:EligiblePrice ""
+  verify_one PriorityFeeUpdates "$topup_addr" src/libraries/PriorityFeeUpdates.sol:PriorityFeeUpdates ""
   verify_one AsyncMatching "$lib_addr" src/libraries/AsyncMatching.sol:AsyncMatching ""
   verify_one AsyncSwap "$hook_addr" src/AsyncSwap.sol:AsyncSwap "$hook_args"
   verify_one Router "$router_addr" src/Router.sol:Router "$router_args"
@@ -273,6 +276,22 @@ for index_library in TickBitmap EligiblePrice; do
   fi
 done
 
+# ---- Priority fee amendments (linked to EligiblePrice) --------------------------------------
+topup_init_code="$(forge inspect src/libraries/PriorityFeeUpdates.sol:PriorityFeeUpdates bytecode --libraries "$eligible_flag")"
+topup_salt="$(cast keccak "asyncswap.v2.PriorityFeeUpdates")"
+topup_addr="$(cast create2 --deployer "$CREATE2_DEPLOYER" --salt "$topup_salt" --init-code-hash "$(cast keccak "$topup_init_code")" | awk '/Address:/ {print $2} /^0x/ {print $1}' | tail -1)"
+topup_flag="src/libraries/PriorityFeeUpdates.sol:PriorityFeeUpdates:$topup_addr"
+if ! has_code "$topup_addr"; then
+  if [[ "$mode" == "broadcast" ]]; then
+    : "${DEPLOYER_ACCOUNT:?Set DEPLOYER_ACCOUNT to a Foundry keystore in .env.deploy}"
+    DEPLOY_DRY_RUN=false forge script "$ROOT_DIR/script/00_DeployPriorityFeeUpdates.s.sol" --libraries "$eligible_flag" \
+      --rpc-url "$RPC_URL" --sender "$OWNER" --broadcast --account "$DEPLOYER_ACCOUNT" ${gas_flags[@]+"${gas_flags[@]}"}
+    wait_for_code "$topup_addr" || { echo "PriorityFeeUpdates deployment missing" >&2; exit 1; }
+  else
+    DEPLOY_DRY_RUN=true forge script "$ROOT_DIR/script/00_DeployPriorityFeeUpdates.s.sol" --libraries "$eligible_flag" --rpc-url "$RPC_URL" --sender "$OWNER"
+  fi
+fi
+
 # ---- AsyncMatching library ------------------------------------------------------------------
 # Deterministic address: CREATE2 via the shared deployer with the salt in 00_DeployMatchingLibrary.
 lib_init_code="$(forge inspect src/libraries/AsyncMatching.sol:AsyncMatching bytecode --libraries "$tick_flag" --libraries "$ordering_flag" --libraries "$bitmap_flag" --libraries "$eligible_flag")"
@@ -312,6 +331,7 @@ forge_args=(
   --libraries "$ordering_flag"
   --libraries "$bitmap_flag"
   --libraries "$eligible_flag"
+  --libraries "$topup_flag"
 )
 if [[ "$mode" == "broadcast" ]]; then
   : "${DEPLOYER_ACCOUNT:?Set DEPLOYER_ACCOUNT to a Foundry keystore in .env.deploy}"

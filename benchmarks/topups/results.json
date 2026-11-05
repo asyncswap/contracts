@@ -1,0 +1,65 @@
+{
+  "chain_id": 31337,
+  "hardfork": "cancun",
+  "block_gas_limit": 30000000,
+  "compiler": "solc 0.8.26",
+  "optimizer_runs": 10000,
+  "forge_version": "forge Version: 1.9.0",
+  "added_fee_usdc_units": 100000,
+  "intrinsic_gas_included": true,
+  "refunds_applied": true,
+  "setup_and_approvals_excluded": true,
+  "source_sha256": {
+    "src/AsyncSwap.sol": "5f77723d105024bfa95a1eb70edfad3e7ae80988436042c976795b2fe3619c22",
+    "src/BaseHook.sol": "e910e8e809f50335b1bd0da2109e417ae87213b517c0d1d8720e3bf0a1259ab9",
+    "src/FeeVault.sol": "7f8ccecc58e131b4b0712ec0721ae7042400ed7073af4017cfad08f2aa9e4bda",
+    "src/ImmutableState.sol": "81780a696bbff93efda8c21052c04b2b98cc97fb0af5ca7c23d30a37adcbfb8e",
+    "src/MatchingEngine.sol": "e6e63450d77a1af80c075eb34d113604734e35d75985b94ab177d58f6d603ddd",
+    "src/NativeClaims.sol": "b02920e5ddb1d06c862a16cf1b4f740e37d23d14159f960e7a5196833e976d7d",
+    "src/Router.sol": "40f9ace55e00be6e9b79082466ee075e56435ffeef79db1676b0bec624cc8730",
+    "src/TokenClaims.sol": "7d087a18c541658df2ebfa2af9469dbc00c1e70b8c7d9c82e58a090a8b2a59fa",
+    "src/interfaces/ISignatureTransfer.sol": "fdd4edd4221ad8df5968da0d0f8aed1127e9bfe56bcb1c8cb77ea7e66875f54b",
+    "src/libraries/AsyncFiller.sol": "9015299b187cf70ece0840490aba0c9bef9109ebef72630b9864b33c31e1cf0a",
+    "src/libraries/AsyncMatching.sol": "17b77d2b6c36740b567df49a746ed31898e0e1493fc17eb7013685aaeb4e74a2",
+    "src/libraries/ClaimTransfers.sol": "7e6ed08d2c629a25890dfa1f9b86a41b62d142d3d0272864c374b356ef862bdc",
+    "src/libraries/CurrencySettler.sol": "35fa91cd314c39fa825192ab2ceae2561ce14ff6b57a9be09fe4b1c3d652340d",
+    "src/libraries/DynamicFeeOrdering.sol": "14ef4bbb9831bb4ee02f9e18af58a2f712b137380d477c8c01c81ec8286edaa7",
+    "src/libraries/EligiblePrice.sol": "30b2a388afefc5a68d24afec6d2262c7f4aa7ffd570faf13460971d0dc3cd5ca",
+    "src/libraries/OrderSignatures.sol": "61c1e4ddbe0243123b1ef29636fc88d80dda9e8a941704c4e4bb8d5f2fdd0a2d",
+    "src/libraries/PriorityFeeUpdates.sol": "5d421e14f8dc28b40eab5c71172ff887808650531a9f5030dbc49b6a23b37987",
+    "src/libraries/RadixPriceTree.sol": "b2a672b6629caf28aa30df3a727b9026ddf3271ca422623a284f459db525dc53",
+    "src/libraries/TickBitmap.sol": "81e69010c0177a50b2496488727e98febd58884461716301fd28142549e8fe29",
+    "src/libraries/TickPrice.sol": "b4ec58fa775a17534379abf2480938531997069fa4da397ece40c1e8d2f7d220",
+    "src/types/AsyncOrder.sol": "1e18d34e727f7acb42131b56e65d4d56ff58c80d814fb60da37aad45493fe2bd"
+  },
+  "measurements": [
+    {
+      "workload": "distinct_prices_256",
+      "gas_used": 186710,
+      "logs_sha256": "09f4c0009e4c2943f3df5d3e352444769f4a1d685cdca998a6e6baf2bcc75e58",
+      "transaction_hash": "0xc71894cc703d84f06125bc2ecdb84e663741f7cdfd2a8ba94099e009990d0c46",
+      "status": 1
+    },
+    {
+      "workload": "same_price_32",
+      "gas_used": 235267,
+      "logs_sha256": "686159ed1c15645cc621c0465b407bdefecd0cf77415fcca530e6857a999d23f",
+      "transaction_hash": "0x7f11a38348d0052ddce196ff15bfc8ecce4ed059082f7294e44d0720b408bf18",
+      "status": 1
+    },
+    {
+      "workload": "single_paid",
+      "gas_used": 186883,
+      "logs_sha256": "7712cf6a7c6d8f823875967c99629e5faf633b0942ba326ad8ab71e7cd305601",
+      "transaction_hash": "0xba354a5a475fee9b6dbcb281857e56651ef5cbe8898fd9aca8b5d69e48efd24f",
+      "status": 1
+    },
+    {
+      "workload": "single_zero",
+      "gas_used": 215567,
+      "logs_sha256": "e2eb445895e6c71799ea227f8f0a9c0e52cf24bb5917c2eef261800f9bcca658",
+      "transaction_hash": "0x4a0cdf1d16b8c5b74af591d94aa5523fb8cd3d194a95db05db22d9ca8439dad1",
+      "status": 1
+    }
+  ]
+}

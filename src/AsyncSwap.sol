@@ -3,6 +3,7 @@ pragma solidity 0.8.26;
 
 import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 import {AsyncMatching} from "@async-swap/libraries/AsyncMatching.sol";
+import {PriorityFeeUpdates} from "@async-swap/libraries/PriorityFeeUpdates.sol";
 import {OrderSignatures} from "@async-swap/libraries/OrderSignatures.sol";
 import {TickBitmap} from "@async-swap/libraries/TickBitmap.sol";
 import {TickPrice} from "@async-swap/libraries/TickPrice.sol";
@@ -535,6 +536,18 @@ contract AsyncSwap is BaseHook, EIP712 {
             priceBooks[order.key.toId()],
             AsyncMatching.UpdateParams({order: order, id: id, newAmountOutMin: newAmountOutMin, caller: msg.sender})
         );
+    }
+
+    event AsyncOrderPriorityFeeUpdated(
+        PoolId indexed poolId, bytes32 indexed orderId, uint256 addedFee, uint256 newPriorityFee
+    );
+
+    /// @notice Increase an existing bid through the maker-authenticating Router inside an unlock.
+    /// @dev The Router must settle the additional numeraire debt before the unlock ends.
+    function topUpPriorityFee(AsyncOrder calldata order, uint256 addedFee) external {
+        if (msg.sender != router) revert NotTrustedRouter();
+        PoolId poolId = order.key.toId();
+        PriorityFeeUpdates.topUp(asyncOrders[poolId], priceBooks[poolId], poolId, order.orderId(), addedFee);
     }
 
     /// @notice Maker cancels an unfilled order. Must be called via an authorized executor inside

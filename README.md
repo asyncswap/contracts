@@ -20,7 +20,7 @@ every push to `main` that touches them; preview it locally with `cd site && bun 
 
 ## Build and deployment
 
-`AsyncMatching` is an external Solidity library linked into the hook. The deployment wrapper deploys and links `TickPrice`, `DynamicFeeOrdering`, `TickBitmap`, and `EligiblePrice` first. `script/deploy.sh <chain-key> [dry-run|broadcast|verify]` deploys the libraries through the shared CREATE2 deployer, links the hook bytecode, mines the hook salt, deploys the hook and Router, and records the addresses under `deployments/<chainId>/`. `verify` publishes sources through Sourcify, tries Blockscout, and writes standard JSON inputs for manual upload. An `ASYNC_MATCHING_LIBRARY_ADDRESS` override must match this build's predicted address. Foundry links the libraries automatically in tests.
+`AsyncMatching` is an external Solidity library linked into the hook. The deployment wrapper deploys and links `TickPrice`, `DynamicFeeOrdering`, `TickBitmap`, `EligiblePrice`, and `PriorityFeeUpdates` first. The fee-amendment library links to `EligiblePrice`. `script/deploy.sh <chain-key> [dry-run|broadcast|verify]` deploys the libraries through the shared CREATE2 deployer, links the hook bytecode, mines the hook salt, deploys the hook and Router, and records the addresses under `deployments/<chainId>/`. `verify` publishes sources through Sourcify, tries Blockscout, and writes standard JSON inputs for manual upload. An `ASYNC_MATCHING_LIBRARY_ADDRESS` override must match this build's predicted address. Foundry links the libraries automatically in tests.
 
 The bitmap changes the order-book storage layout and requires a new hook deployment. Existing radix state cannot be reused as bitmap state. The default compiler remains solc 0.8.26.
 
@@ -33,7 +33,7 @@ FOUNDRY_INVARIANT_RUNS=64 FOUNDRY_INVARIANT_DEPTH=64 forge test
 
 ## Benchmarks
 
-Measured on 2026-11-05 through the actual Router/hook settlement path, comparing the radix baseline with the bitmap implementation. The fixture has 256 distinct resting ask levels and distinct owners, with no LP liquidity. Each operation starts from the same committed state on local Anvil using Cancun rules and a 30M gas block limit.
+Measured on 2026-11-05 through the actual Router/hook settlement path, comparing the radix baseline with the bitmap implementation at `1389863`, before the fee top-up endpoint. The fixture has 256 distinct resting ask levels and distinct owners, with no LP liquidity. Each operation starts from the same committed state on local Anvil using Cancun rules and a 30M gas block limit.
 
 | Operation | Radix baseline gas | Bitmap gas | Reduction |
 | --- | ---: | ---: | ---: |
@@ -52,10 +52,14 @@ python3 benchmarks/orderbook/run.py --output /tmp/async-swap-book-benchmark
 
 See [methodology and validation](benchmarks/orderbook/README.md), [receipt data](benchmarks/orderbook/results/receipts.json), and [all workload results](benchmarks/orderbook/results/coverage.csv). The earlier standalone matching-harness block-packing numbers are not used to describe the Router/hook's performance.
 
+Fee top-ups measured separately use **186,710–235,267 gas** across four local fixtures, including an initially zero-bid order and a crowded price level. See [the top-up receipt benchmark](benchmarks/topups/README.md) for per-case results and reproduction instructions.
+
 ## Priority fees and future matching work
 
 An order's USDC priority bid breaks ties between equal exact limit prices. This is separate from the transaction's gas priority fee. Zero bids are allowed; for a nonzero bid, the required minimum is 0.1% of the order's USDC notional, rounded down and capped at $0.10 with the default six-decimal numeraire configuration. Users may bid more than that minimum.
 
-**Fee top-ups are proposed, not implemented.** A maker-authorized top-up could escrow additional USDC and update the order's priority entry without changing its input budget or limit price. It would improve queue position among equal-price orders; it would not create liquidity or guarantee execution. Existing priority bids are spent proportionally on fills, with the remainder forfeited on cancellation or dust closure to the FeeVault. They are not a direct keeper reward, so a top-up alone would not solve backlog-clearing incentives. Funding, amendment authorization and tie-priority rules need their own implementation and tests.
+Makers can call `Router.topUpPriorityFee(order, addedFee)` to escrow additional USDC on an open order. The Router requires the maker's approval and caller identity; the amount is added to the **remaining** bid without changing the order's input budget or limit price. The resulting bid must meet the minimum for the remaining order. A top-up resets time priority within its new fee tier and preserves the original maker age used for settlement pricing. It does not trigger matching; an agent can combine it with `matchBook(key, maxMatches)` through `Router.multicall` in one atomic transaction. See [the top-up API and agent example](docs/priority-fee-top-ups.md).
+
+Priority bids, including top-ups, are non-refundable: they are spent proportionally on fills, with the remainder transferred to the FeeVault on cancellation or dust closure. They improve priority among equal exact-price orders without creating liquidity or guaranteeing execution. They are not direct keeper rewards. This feature is implemented in source and requires a new hook and Router deployment; existing deployments do not acquire it automatically.
 
 The current matcher already processes up to eight pairs per call and combines claim transfers. A uniform-price batch auction would additionally change when orders clear and which price they receive. It remains a separate research direction; no batch-auction gas or execution-quality improvement has been demonstrated for these contracts. See [the research notes](benchmarks/orderbook/research.md).

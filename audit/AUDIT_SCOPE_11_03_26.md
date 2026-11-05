@@ -62,7 +62,7 @@ other, by permissionless fillers, or against the pool's own liquidity.
   priority fee), in `msg.value` on top of any native deposit, credited to `FeeVault` as native claims. The Router can
   cancel for a maker without an executor grant.
 
-## In scope: 3,819 nSLOC
+## In scope: protocol contracts, 2,704 nSLOC
 
 nSLOC counts non-blank lines outside comments (the same method reproduces every count in the previous scopes).
 "Since `fdfdf65`" is the diff against the previous freeze.
@@ -94,69 +94,8 @@ nSLOC counts non-blank lines outside comments (the same method reproduces every 
 `AsyncMatching`, `TickPrice` and `DynamicFeeOrdering` are linked libraries deployed by CREATE2 at the same address
 on every chain; library calls run in the hook's context.
 
-### Scripts (`script/`): 1,115 nSLOC, 19 files
-
-| File | nSLOC | Since `fdfdf65` | Notes |
-|---|---:|---|---|
-| `script/FFIHelper.sol` | 146 | unchanged | FFI helpers; minimum priority bid, approvals, reading an order's assigned salt |
-| `script/Trade.s.sol` | 122 | unchanged | End-to-end trading flows on a deployment |
-| `script/01_DeployHook.s.sol` | 116 | changed (default) | Router then hook (CREATE2 salt, owner, numeraire, minimums, per-chain MEV tax gas), post-deploy checks; `DEPLOY_MIN_ORDER_USD` now defaults to 0 |
-| `script/config/UniswapAddresses.sol` | 100 | unchanged | Per-chain PoolManager, Permit2 and USDC addresses |
-| `script/03_Swap.s.sol` | 84 | unchanged | Place an order through the Router |
-| `script/lib/Deployments.sol` | 70 | unchanged | Reading and writing deployment records |
-| `script/InitPool.s.sol` | 66 | unchanged | Pool initialization with real tokens (Unichain) |
-| `script/local/Smoke.s.sol` | 58 | unchanged | Local smoke flow on Anvil |
-| `script/local/LocalMarket.s.sol` | 53 | unchanged | Local market setup on Anvil |
-| `script/02_InitializePool.s.sol` | 46 | unchanged | Pool initialization with a mock asset |
-| `script/05_ExecuteOrder.s.sol` | 40 | unchanged | Fill an order at its live amounts |
-| `script/00_DeployDynamicFeeOrdering.s.sol` | 35 | unchanged | Deploy `DynamicFeeOrdering` (CREATE2) |
-| `script/00_DeployMatchingLibrary.s.sol` | 35 | unchanged | Deploy and link `AsyncMatching` |
-| `script/00_DeployPoolManager.s.sol` | 34 | unchanged | Local PoolManager for testing |
-| `script/00_DeployTickPrice.s.sol` | 34 | unchanged | Deploy `TickPrice` (CREATE2) |
-| `script/DeployWithdrawalRouter.s.sol` | 26 | unchanged | Testnet-only second Router for claims |
-| `script/04_CancelOrder.s.sol` | 22 | unchanged | Cancel an order |
-| `script/DeployNativeClaims.s.sol` | 14 | unchanged | Deploy `NativeClaims` |
-| `script/DeployTokenClaims.s.sol` | 14 | unchanged | Deploy `TokenClaims` |
-
-Supporting deployment tooling (not Solidity; review for correctness of what gets deployed, not counted in nSLOC):
-`script/deploy.sh` and its per-chain wrappers (`deploy-unichain.sh`, `deploy-unichain-sepolia.sh`,
-`deploy-robinhood-testnet.sh`, `deploy-arc.sh`), `script/deploy-withdrawal-router.sh`, `script/mine-hook-salt.ts`,
-`script/price.ts`, `script/sync-deployment-record.py`, `script/sync-poolmanager-receipt.py`,
-`script/check-contract-sizes.py`, `script/check-mainnet-readiness.sh`, `script/config/chains.json` (per-chain
-addresses, transaction ordering and `mevTaxGas`; `deploy.sh` refuses a chain with no `mevTaxGas`, or a nonzero one on
-a chain not ordered by priority fee).
-
-For the scripts, the questions are: does the hook get deployed with the intended owner, numeraire, flags, minimums,
-Router and linked libraries; does the Router get the intended MEV tax gas for its chain; are the per-chain addresses
-right; can a deployment be front-run or left half-configured.
-
-Out of scope: `test/`, `dependencies/`, `docs/`, `site/`, and the helper scripts `script/formal-index.py`,
-`script/formal-mind-report.py` and `script/stress-matching-engine.sh`.
-
-## Where to look hardest
-
-- **Venue choice and pool-first fills** (`TickPrice.poolBeatsLevel`, `AsyncSwap.matchNewOrder`,
-  `AsyncMatching._poolFillNet` / `_swapAgainstPool` / `_reduceAfterPoolFill`, `closeBelowMinimum`): the pool-first
-  limit (one tick toward the incoming order for a swap that lowers the tick, clamped inside v4's range), the
-  fee-window adjustment, partial pool fills that leave the rest for the book (pro-rata limit, pro-rata 0.01%, input
-  minted back), and the post-swap liquidity check. This code was the source of most findings in the reviews below.
-- **Dynamic fee** (`DynamicFeeOrdering.charge`): reference and window handling, the fee base for a fill that crosses
-  the reference, the 50% cap, and who can choose when a resting order pays it.
-- **Exact eligibility** (`EligiblePrice.sol`, `AsyncMatching._bookPair`, `AsyncFiller` append/remove/refresh):
-  subtree summaries must stay exact through insertion, removal, repricing, node-id reuse and every partial fill.
-- **Escrow conservation**: every path (match, filler fill, full and partial pool fill, cancel, dust close, bid
-  settlement) must burn or move exactly what it pays; the hook's claims per currency equal open input plus open
-  bids. Claims are fungible across pools, so one pool must never pay out another pool's escrow.
-- **Minimums and the asset floor** (`checkMinimum`, `_minAssetAmount`, pool admission with arbitrary assets and their
-  `decimals()`): both legs at creation and reprice; remainders are closed by the USDC leg only. With `minOrder` 0 the
-  asset floor is the only minimum.
-- **Executor grants and signed actions**: the Router can't be revoked through either path, while other executors
-  can; reprice scaling to a remainder (`_verifyReprice`), the `reprices` counter, nonce burning, the Router's
-  grant-free cancel and Router-only `useNonce`, and `swapWithSig` skipping a grant whose nonce is spent.
-- **MEV tax** (`Router._chargeMevTax` / `_payMevTax`): the transient slot, exact `msg.value`, native settlement to
-  `FeeVault`, and interaction with native deposits in `swap` and `fillOrder`.
-- **Ordering of state changes and external calls** in `fill`, `fillFromPoolLiquidity`, the Router's fill path
-  (`_requireUnchanged` after the ERC-20 pull), and token callbacks during order creation.
+Scripts and deployment tooling are out of scope for the protocol security review. Deployment addresses and constructor
+arguments should be checked separately against the intended release configuration before deploying.
 
 ## Trust assumptions
 
@@ -274,7 +213,7 @@ forge coverage --skip 'test/formal/AsyncSwapBeforeSwap.t.sol' --report summary -
 
 ## Deployments
 
-The testnets run `bc95df4`: Unichain Sepolia (1301) and Robinhood Chain testnet (46630), with `minOrder` 0 and the
-asset floor; addresses are in `deployments/<chainId>/` and [`docs/deployments.md`](../docs/deployments.md). Its
-`src/` is the same as `fdfdf65`, so it **does not** include the Router rule above: on those hooks a maker can still
-revoke the Router. No mainnet deployment exists; see [`../MAINNET_READINESS.md`](../MAINNET_READINESS.md).
+The existing testnet deployments run `bc95df4`: Unichain Sepolia (1301) and Robinhood Chain testnet (46630), with
+`minOrder` 0 and the asset floor. Treat them as prior deployments; their addresses are not targets for the next
+deployment. Their `src/` is the same as `fdfdf65`, so those hooks **do not** include the Router rule above: a maker
+can still revoke the Router. No mainnet deployment exists; see [`../MAINNET_READINESS.md`](../MAINNET_READINESS.md).

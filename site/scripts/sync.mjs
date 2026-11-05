@@ -1,6 +1,6 @@
 // Assemble the site's generated pages from the repository before `vocs dev` / `vocs build`:
 //   - docs/*.md                          -> src/pages/protocol/
-//   - audit/AUDIT_SCOPE_11_03_26.md       -> src/pages/audit/scope.md
+//   - audit/AUDIT_SCOPE_11_05_26.md       -> src/pages/audit/scope.md
 //   - `forge doc` (NatSpec in src/)       -> src/pages/reference/src/ + src/generated/reference-sidebar.ts
 // docs/ and audit/ stay the source of truth; everything written here is git-ignored.
 import { execFileSync } from 'node:child_process'
@@ -24,7 +24,7 @@ const routes = {
   'docs/price-key-crossing.md': '/protocol/price-key-crossing',
   'docs/dynamic-fee-ordering.md': '/protocol/dynamic-fee-ordering',
   'docs/deployments.md': '/deployments',
-  'audit/AUDIT_SCOPE_11_03_26.md': '/audit/scope',
+  'audit/AUDIT_SCOPE_11_05_26.md': '/audit/scope',
 }
 
 // One-line summaries for the generated guides: vocs reads them from frontmatter into llms.txt.
@@ -72,6 +72,9 @@ function deployments() {
         network: chain?.network ?? null,
         explorerUrl: chain?.explorerUrl ?? null,
         numeraire: chain?.contracts?.usdc ?? null,
+        release: record.release ?? null,
+        sourceCommit: record.sourceCommit ?? null,
+        features: record.features ?? {},
         contracts: record.contracts,
       }
     })

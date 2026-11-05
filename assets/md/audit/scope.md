@@ -1,28 +1,39 @@
-# Audit scope: Async Swap (2026-11-03)
+# Audit scope: Async Swap (2026-11-05)
 
-Supersedes the 2026-11-01 scope, which froze the code at `fdfdf65`. Earlier scopes and every previous report are kept
-at [`2739d6c/audit/`](https://github.com/asyncswap/contracts/tree/2739d6c/audit); this file carries over what an
-auditor needs from them: the known issues and the status of every finding.
+Supersedes the [2026-11-03 scope](https://github.com/asyncswap/contracts/blob/c9372ff/audit/AUDIT_SCOPE_11_03_26.md),
+which froze protocol code at `2739d6c`. The prior findings and their dispositions are carried forward below;
+passing tests are validation evidence, not a new security audit.
 
 * **Repository:** [asyncswap/contracts](https://github.com/asyncswap/contracts)
-* **Code frozen at:** `2739d6cfd07154c275144a313cf1168b485c1327` on `main` (2026-11-03). Later commits change only
-  this scope, docs and tests.
+* **Protocol and production deployment code frozen at:** `c9372ff9577ba3950fa321090a7bfb559fc964a4` on `main`.
+  This includes the bitmap optimization (#77) and funded fee top-ups (#78). Check out this exact commit for
+  the protocol review. Later release evidence and integration work do not change this frozen source.
 * **Compiler:** solc 0.8.26, optimizer on (`optimizer_runs = 10_000`); see `foundry.toml`.
 * **Chain:** Unichain (130) first; any EVM chain with Uniswap v4 later.
 * **Builds on:** Uniswap v4 `PoolManager` (hooks, ERC-6909 claims, dynamic LP fee), Permit2 for signed orders,
   OpenZeppelin `SafeERC20`, `EIP712`, `SignatureChecker` and `Multicall`.
 
-## Changes since the last freeze (`fdfdf65`)
+## Changes since the last freeze (`2739d6c`)
 
-* **The trusted Router can't be revoked** (`src/AsyncSwap.sol`, +4 nSLOC). `setExecutor` and `setExecutorWithSig`
-  revert `CannotRevokeTrustedRouter` when a maker sets `allow = false` for the hook's immutable `router`; in the
-  signed path the check runs after the deadline, nonce and signature checks. Revoking the Router used to strand a
-  maker's live orders: `Router.cancelOrder`, `cancelWithSig`, `fillOrder` and `fillFromPoolLiquidity` all need the
-  grant, and an EOA can't cancel from its own unlock. Any other executor can still be granted and revoked.
-* **No dollar minimum by default** (`script/01_DeployHook.s.sol`): `DEPLOY_MIN_ORDER_USD` defaults to 0, so the
-  asset floor (10^(decimals − 4) of each pool's asset) is the order minimum unless a deployment sets one.
-* **Fewer deployment targets:** the Sepolia, Arc testnet, MegaETH testnet and HyperEVM testnet wrappers, the
-  standalone testnet script and their `chains.json` entries were removed.
+* **Bounded outer tick bitmap.** `TickBitmap` replaces the outer radix price index in `AsyncFiller.Book`;
+  the inner Patricia priority tree remains. Check tick boundaries, empty levels, best-price selection and
+  count consistency. This changes storage layout and requires a new deployment; no in-place migration exists.
+* **Linked exact-price updates.** `EligiblePrice.refresh/remove` are now public linked-library calls to
+  keep matching bytecode deployable. Verify caller storage layout, link addresses and summary repair.
+* **Funded fee top-ups.** `Router.topUpPriorityFee(order, addedFee)` authenticates the maker, transfers the
+  delta in the numeraire and credits the hook before `PriorityFeeUpdates` rekeys the inner queue and mints
+  claims. The resulting remaining bid must meet the current minimum and fit uint64. Only the trusted Router
+  can enter the hook endpoint. Price, input budget, original maker age and signed-reprice version stay intact;
+  fee-tier FIFO age resets. Top-ups are non-refundable, untaxed by the Router's native MEV tax and do not
+  invoke matching. Makers can batch a bounded matching call with multicall.
+* **Payment callbacks and signatures.** The amendment reads live state after payment. A partial fill during
+  payment changes the remainder to which the delta is added; closure reverts the entire transaction.
+  Existing signed reprices and cancellations remain valid unless their own validity conditions change.
+* **Deployment links.** Production and local deployment wrappers now link `TickBitmap`, `EligiblePrice`,
+  and `PriorityFeeUpdates`, in dependency order. A supplied matcher override must match this build's
+  predicted address; having code alone is insufficient.
+* **Validation.** Independent linear-scan matching-model tests, bitmap boundary/property tests, funding
+  and callback regressions, mixed top-up invariants, and public-Router gas measurements accompany the changes.
 
 ## What it is
 
@@ -33,7 +44,7 @@ other, by permissionless fillers, or against the pool's own liquidity.
 * **Pools.** Anyone can create a pool: the hook accepts one that pairs the configured USDC with an asset that has
   code and uses the dynamic-fee flag. The owner cannot open, close or configure pools.
 * **Book.** Orders sit at price levels on v4 ticks (`TickPrice`: the floor tick of the exact limit, 0.01% apart).
-  Within a level they rank by exact limit, then escrowed priority bid, then arrival (`EligiblePrice`); exact
+  The outer index is a bounded bitmap. Within a level they rank by exact limit, then escrowed priority bid, then arrival (`EligiblePrice`); exact
   rational limits decide crossing. New orders and any crossed backlog share one book-wide selection, at most eight
   pairs per call.
 * **Venue choice.** A new order goes to the better venue first (`TickPrice.poolBeatsLevel`). If the pool's price
@@ -49,7 +60,7 @@ other, by permissionless fillers, or against the pool's own liquidity.
   `NativeClaims` (ETH) or `Router.withdrawClaims`. Filler fills and full pool fills pay ERC-20 output directly; native
   output, and a pool fill that leaves part of the order on the book, are credited as claims.
 * **Priority bids.** Optional, paid in USDC and escrowed when the order is created. Each fill settles its
-  proportional share and the rest settles when the order closes. Every settled bid goes to `FeeVault`, never to LPs.
+  proportional share and the rest settles when the order closes. Every settled bid goes to `FeeVault`, never to LPs. Makers may add funded USDC to the remaining bid through the Router; this changes fee priority without changing their limit price.
 * **Minimums.** Fixed at deployment, no setter: an optional minimum order in USDC (`minOrder`, from a dollar amount
   and the numeraire's decimals; 0 by default) and an asset floor per pool (`minAssetAmount`, 10^(decimals − 4), so
   0.0001 of a token). The $0.10 bid cap is derived from the numeraire's decimals too.
@@ -62,40 +73,50 @@ other, by permissionless fillers, or against the pool's own liquidity.
   priority fee), in `msg.value` on top of any native deposit, credited to `FeeVault` as native claims. The Router can
   cancel for a maker without an executor grant.
 
-## In scope: protocol contracts, 2,704 nSLOC
+## In scope: protocol contracts, 2,824 nSLOC
 
-nSLOC counts non-blank lines outside comments (the same method reproduces every count in the previous scopes).
-"Since `fdfdf65`" is the diff against the previous freeze.
+Non-blank lines outside comments, using the same count that reproduces the prior 2,704 nSLOC.
+There are 21 Solidity source files. Changes are relative to `2739d6c`; a zero line-count delta can still
+contain a security-relevant change.
 
-### Contracts (`src/`): 2,704 nSLOC, 19 files
-
-| File | nSLOC | Since `fdfdf65` | Notes |
+| File | nSLOC | Since `2739d6c` | Notes |
 |---|---:|---|---|
-| `src/AsyncSwap.sol` | 531 | **changed (+4)** | The hook: pool admission, order creation in `beforeSwap`, venue choice, fills, cancels, signed actions, executor grants, immutable minimums |
-| `src/libraries/AsyncMatching.sol` | 456 | unchanged | Book-wide pair selection, match amounts, reductions, claim payouts, pool fills (full and partial), dust closes |
-| `src/libraries/AsyncFiller.sol` | 357 | unchanged | Order storage, escrow, fills, cancels, priority levels, bid settlement, minimum and asset-floor checks |
-| `src/Router.sol` | 324 | unchanged | Entry points: swap, signed swap (Permit2), fill, cancel, signed cancel, multicall, claim withdrawal, MEV tax |
-| `src/MatchingEngine.sol` | 188 | unchanged | Standalone matching benchmark harness; holds no tokens and is not deployed |
+| `src/AsyncSwap.sol` | 540 | changed (+9) | The hook: pool admission, order creation in `beforeSwap`, venue choice, fills, cancels, signed actions, executor grants, immutable minimums |
 | `src/BaseHook.sol` | 171 | unchanged | Uniswap v4 hook base |
-| `src/libraries/RadixPriceTree.sol` | 136 | unchanged | Patricia index of price levels and priority keys, with node-id reuse |
-| `src/libraries/OrderSignatures.sol` | 110 | unchanged | EIP-712 types: order witness, cancel, executor, reprice |
-| `src/libraries/EligiblePrice.sol` | 81 | unchanged | Exact subtree price summaries over the priority tree; eligible-order search |
-| `src/libraries/DynamicFeeOrdering.sol` | 71 | unchanged | Backrun fee on pool fills inside a 2-block window |
-| `src/libraries/TickPrice.sol` | 59 | unchanged | Price keys on v4 ticks; pool-versus-book comparison and the pool-first limit |
-| `src/libraries/ClaimTransfers.sol` | 37 | unchanged | Batches claim credits for one matching call (34 entries) |
 | `src/FeeVault.sol` | 34 | unchanged | Holds protocol fees, bids and MEV tax as claims; owner collects |
-| `src/TokenClaims.sol` | 33 | unchanged | Redeems a holder's ERC-20 PoolManager claims to any recipient |
-| `src/NativeClaims.sol` | 32 | unchanged | Redeems a holder's native-ETH claims to any recipient |
-| `src/libraries/CurrencySettler.sol` | 26 | unchanged | Settle/take helpers |
-| `src/interfaces/ISignatureTransfer.sol` | 24 | unchanged | Permit2 interface |
-| `src/types/AsyncOrder.sol` | 21 | unchanged | Order struct and id |
 | `src/ImmutableState.sol` | 13 | unchanged | PoolManager reference |
+| `src/MatchingEngine.sol` | 188 | unchanged | Standalone matching benchmark harness; holds no tokens and is not deployed |
+| `src/NativeClaims.sol` | 32 | unchanged | Redeems a holder's native-ETH claims to any recipient |
+| `src/Router.sol` | 337 | changed (+13) | Maker entry points, top-up funding, signatures, multicall, claims and MEV tax |
+| `src/TokenClaims.sol` | 33 | unchanged | Redeems a holder's ERC-20 PoolManager claims to any recipient |
+| `src/interfaces/ISignatureTransfer.sol` | 24 | unchanged | Permit2 interface |
+| `src/libraries/AsyncFiller.sol` | 359 | changed (+2) | Order storage, escrow, fills, cancels, priority levels, bid settlement, minimum and asset-floor checks |
+| `src/libraries/AsyncMatching.sol` | 458 | changed (+2) | Book-wide pair selection, match amounts, reductions, claim payouts, pool fills (full and partial), dust closes |
+| `src/libraries/ClaimTransfers.sol` | 37 | unchanged | Batches claim credits for one matching call (34 entries) |
+| `src/libraries/CurrencySettler.sol` | 26 | unchanged | Settle/take helpers |
+| `src/libraries/DynamicFeeOrdering.sol` | 71 | unchanged | Backrun fee on pool fills inside a 2-block window |
+| `src/libraries/EligiblePrice.sol` | 81 | changed (+0) | Linked exact subtree summaries, removal/repair and eligible-order search |
+| `src/libraries/OrderSignatures.sol` | 110 | unchanged | EIP-712 types: order witness, cancel, executor, reprice |
+| `src/libraries/PriorityFeeUpdates.sol` | 42 | new | Funded bid amendments, fee-tier rekeying and escrow claim minting |
+| `src/libraries/RadixPriceTree.sol` | 136 | unchanged | Patricia index of inner priority keys, with node-id reuse |
+| `src/libraries/TickBitmap.sol` | 52 | new | Bounded bitmap of occupied v4 tick levels; first/last occupied-bit search |
+| `src/libraries/TickPrice.sol` | 59 | unchanged | Price keys on v4 ticks; pool-versus-book comparison and the pool-first limit |
+| `src/types/AsyncOrder.sol` | 21 | unchanged | Order struct and id |
 
-`AsyncMatching`, `TickPrice` and `DynamicFeeOrdering` are linked libraries deployed by CREATE2 at the same address
-on every chain; library calls run in the hook's context.
+The linked libraries are `AsyncMatching`, `TickPrice`, `DynamicFeeOrdering`, `TickBitmap`, `EligiblePrice`
+and `PriorityFeeUpdates`. Calls execute against hook storage. CREATE2 addresses depend on bytecode and
+all linked dependencies, not merely the library name or salt.
 
-Scripts and deployment tooling are out of scope for the protocol security review. Deployment addresses and constructor
-arguments should be checked separately against the intended release configuration before deploying.
+### Supporting deployment review
+
+Review these frozen files for the release, alongside the protocol security review: `script/deploy.sh`,
+`script/local/up.sh`, `script/01_DeployHook.s.sol`, the six `00_Deploy*` library scripts,
+`script/DeployTokenClaims.s.sol`, `script/DeployNativeClaims.s.sol`, `script/check-contract-sizes.py`,
+`script/config/chains.json`, `script/config/UniswapAddresses.sol` and `script/FFIHelper.sol`.
+Check dependency order and exact linked addresses, hook permission flags, constructor values, Router/hook
+pairing, claim-redeemer PoolManager identity, registry start blocks and bytecode verification. These
+supporting files are not included in the protocol nSLOC total. Operational rehearsals remain separate
+from proof that the protocol is secure.
 
 ## Trust assumptions
 
@@ -104,7 +125,7 @@ arguments should be checked separately against the intended release configuratio
   It cannot open, close or configure pools or change minimums. Must not be able to take makers' escrow.
 * **Router**: the hook trusts its immutable `router` as the only order-creation path, as an executor no maker can
   revoke, for grant-free cancels on a maker's behalf (the Router checks the owner or a signature), and for burning
-  cancel nonces.
+  cancel nonces, and for maker-authorized, funded priority-fee amendments. A generic executor grant does not authorize spending a maker's USDC for top-ups.
 * **Executors**: a maker authorizes executors per pool (`setExecutor` or `setExecutorWithSig`) and can revoke any of
   them except the Router. An executor can only act on that maker's orders.
 * **Fillers / matchers / keepers**: anyone; permissionless.
@@ -128,15 +149,25 @@ Acknowledged in the reviews below:
 
 By design:
 
+* **A top-up is an additive action.** Repeating it in a new transaction spends the delta again. It resets fee-tier
+  age, not maker age, and does not invalidate a previously signed cancellation or reprice. A multicall can
+  commit a top-up even when matching succeeds with zero fills. These are explicit semantics, not fill guarantees.
+
 * **Makers can't revoke the Router.** A maker who wants out cancels its orders (through the Router, by signature,
   or directly from its own unlock); the Router acts for a maker only when that maker calls it or signs.
-* **Priority bids are non-refundable.** All of a bid goes to `FeeVault`, including on cancellation or a dust close.
+
+* **Priority bids and top-ups are non-refundable.** All of a bid goes to `FeeVault`, including on cancellation or a dust close.
+
 * **Tokens with recipient callbacks (e.g. ERC-777)** are not supported. Matching pays only claims and runs no
   recipient code; filler fills and full pool fills transfer ERC-20 output after the order is closed.
+
 * **Proceeds are claims.** Recipients redeem through `TokenClaims`, `NativeClaims` or `Router.withdrawClaims`.
+
 * **`DeployWithdrawalRouter`** deploys a testnet-only second Router for claims; the hook trusts only its own Router,
   so cancels through the second one fail.
+
 * `MatchingEngine.sol` is a benchmark harness, not deployed (AuditAgent finding 8, acknowledged).
+
 * Release items in `MAINNET_READINESS.md` (deployment rehearsal, bytecode pinning, throughput stress, deploying the
   claim redeemers) are operational, not code findings.
 
@@ -187,33 +218,40 @@ Pashov's column is the reviewer's confidence, not a severity.
 
 ## Testing
 
-At the freeze commit:
+At the freeze commit (PR #78 validation):
 
-* `forge test`: 987 passing, 0 failing, 0 skipped, in 177 suites. The Unichain fork suite (`UnichainForkTest`, 3 tests) runs against the `unichain`
-  RPC alias at block 61,709,000 unless `UNICHAIN_FORK_RPC_URL` and `UNICHAIN_FORK_BLOCK` are set.
-* 14 invariant runs across `MatchingInvariantTest`, `PriorityMatchingInvariantTest`, `LpMatchingInvariantTest` and
-  `ExactPriorityInvariantTest` (64 runs × depth 64, fail-on-revert): escrow equals outstanding obligations, asset
-  conservation, best prices against a linear scan, the best order is exact limit then bid then age, and the hook
-  holds no USDC beyond escrow.
-* Regression suites in `test/security/` and `test/nethermind_auditagent/`; Python reference vectors for exact
-  eligibility and priority; single-call bytecode property checks in `test/formal/`. The Lean models those checks were
-  written from are not maintained and are not part of this repository.
-* Coverage of `src/`: 99.82% lines, 99.10% statements, 97.61% branches, 100% functions. Three branches are defensive
-  and unreachable, so they stay uncovered: the clamp at v4's minimum price in `TickPrice.poolBeatsLevel` (a swap that
-  lowers the tick has its limit moved one tick up, so it never lands on `MIN_TICK`), the zero floor of the fee-window
-  subtraction (the pool's key always exceeds half its gap to the reference), and the no-liquidity case of
-  `DynamicFeeOrdering._pay` (a pool fill that leaves no active liquidity reverts first).
-* Runtime sizes (EIP-170 limit 24,576): AsyncSwap 23,669 bytes, AsyncMatching 24,135, Router 22,131, TickPrice
-  5,204, FeeVault 2,320, TokenClaims 2,110, NativeClaims 1,964.
+* `forge test`: **1,024 passing, 0 failing, 0 skipped, 184 suites**, including the three pinned Unichain fork
+  tests at block 61,709,000. Default solc 0.8.26; optimizer 10,000 runs. PR CI also passed with pinned Foundry 1.8.6.
+* Invariants retain 64 runs × depth 64 with fail-on-revert. Handlers now interleave fee top-ups with submission,
+  cancellation, repricing, matching, claim redemption and LP fills. They check escrow obligations, conservation
+  and best exact-price/fee/age selection.
+* `MatchingReference.t.sol` independently scans orders and calculates settlement. Fuzz campaigns use 256 runs
+  of 64 mixed operations, plus deterministic backlog, maker-age and dust-closure cases. The model shares
+  `TickPrice` only for the documented age reset when rounding moves an order to another tick.
+* `PriorityFeeTopUp.t.sol` covers ownership, funding failure/short payment, zero/max bids, minimum admission,
+  partial fills, both numeraire positions, configured decimals, multicall rollback and payment callbacks.
+  `SignedOrders.t.sol` checks pending signed reprices and cancellations after top-ups.
+* The **old freeze's coverage percentages have not been rerun for this source** and are not current coverage
+  claims. The formal fixtures are executable bytecode checks; legacy Lean models are not maintained proofs
+  of this release.
+* Runtime sizes (limit 24,576 bytes): hook 24,159; matcher 24,225; Router 23,061; fee-amendment library 5,537;
+  bitmap 696; exact-price library 1,966. Hook/matcher headroom is 417/351 bytes.
+* [Bitmap measurements](https://github.com/asyncswap/contracts/blob/main/benchmarks/orderbook/README.md) compare the prior radix book with the optimized
+  book before top-ups. [Top-up measurements](https://github.com/asyncswap/contracts/blob/main/benchmarks/topups/README.md) use actual Router receipts:
+  186,710–235,267 gas over four fixtures, including intrinsic gas and refunds, excluding approvals/setup.
+  Neither is a production-throughput guarantee.
 
 ```sh
+git checkout c9372ff9577ba3950fa321090a7bfb559fc964a4
+forge build
+python3 script/check-contract-sizes.py
 forge test
-forge coverage --skip 'test/formal/AsyncSwapBeforeSwap.t.sol' --report summary --no-match-coverage '(test|script|dependencies)/'
 ```
 
 ## Deployments
 
-The existing testnet deployments run `bc95df4`: Unichain Sepolia (1301) and Robinhood Chain testnet (46630), with
-`minOrder` 0 and the asset floor. Treat them as prior deployments; their addresses are not targets for the next
-deployment. Their `src/` is the same as `fdfdf65`, so those hooks **do not** include the Router rule above: a maker
-can still revoke the Router. No mainnet deployment exists; see [`../MAINNET_READINESS.md`](https://github.com/asyncswap/contracts/blob/main/MAINNET_READINESS.md).
+The v1.3.0 testnet registries record new hooks, Routers and linked libraries for this frozen source.
+Previous deployment records remain available for existing orders. No in-place storage migration exists.
+Unichain Sepolia uses test USDC; Robinhood testnet uses test USDG. See [deployments](/deployments)
+for addresses, receipt blocks and release evidence. Testnet deployment does not clear the mainnet audit gate.
+See [mainnet readiness](https://github.com/asyncswap/contracts/blob/main/MAINNET_READINESS.md) for the remaining audit and operational gates.

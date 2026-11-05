@@ -5,21 +5,27 @@
     "network": "testnet",
     "explorerUrl": "https://sepolia.uniscan.xyz",
     "numeraire": "0x31d0220469e10c4e71834a79b1f276d740d3768f",
+    "release": "v1.3.0",
+    "sourceCommit": "c9372ff9577ba3950fa321090a7bfb559fc964a4",
+    "features": {
+      "priorityFeeTopUps": true,
+      "tickBitmap": true
+    },
     "contracts": {
       "TickPrice": {
-        "address": "0x4FFE1e1C663A8f4D09ddBD52902fcd1ba9F4ff5F",
-        "startBlock": 66719759,
-        "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+        "address": "0xDd2b08533dB75ED63AEe52D9b3e2c8DaA1C63b61",
+        "startBlock": 67049821,
+        "txHash": "0x00232f55d05b2799bcdc87b203ef1b1ae0183ea61beea062fd23422095a17ba7"
       },
       "DynamicFeeOrdering": {
-        "address": "0xCfEe50D16C2Aea951Bc2302De14d875Cb51a938c",
-        "startBlock": 66719772,
-        "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+        "address": "0x4c5901d2d168106C2fC274eF9445e085e9164Ae3",
+        "startBlock": 67049830,
+        "txHash": "0xa95c30a57ada8cd4a15e3d3ee3603c45b4e4603cf42c1a3e9f1d158a8e9f867c"
       },
       "AsyncMatching": {
-        "address": "0xac90214FF07101Ec1cB4D52503A3bbb0c7F544b7",
-        "startBlock": 66719783,
-        "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+        "address": "0x25d47EC632B406D307e5d3803b13015452156521",
+        "startBlock": 67049873,
+        "txHash": "0xaa3629987ceefe4cdcf45dd4277c51c7303be64fd541c8d80c112ba66e45132e"
       },
       "PoolManager": {
         "address": "0x00B036B58a818B1BC34d502D3fE730Db729e62AC",
@@ -27,24 +33,39 @@
         "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
       },
       "AsyncSwap": {
-        "address": "0x91B1e6C36Af74737FF82A654Fa7a1747fE186888",
-        "startBlock": 66737245,
-        "txHash": "0x524c0dafb4952f696967e1c33c7c2e3be566f6957f0342b9751e980252c84fb3"
+        "address": "0x914B6D0B00f0897a1FdaE43329556F477cf86888",
+        "startBlock": 67049925,
+        "txHash": "0xe4c95eaadd2f93f1a2738be85b5f06638e1c6d5259a8a23d011068a96dc31cf4"
       },
       "Router": {
-        "address": "0x9FecF58D791d7167826EA18e2f653A8CDED79C1c",
-        "startBlock": 66737245,
-        "txHash": "0xe85185b6530a4b848194126591aeb3e625ace3e8de138304a203ea44079526e5"
+        "address": "0xd31b1B308090e461c9944510fECdA447f849Ca52",
+        "startBlock": 67049925,
+        "txHash": "0xcc351c1ccac61d441e4d4178e94e16d16912695d12d15729ac889d1d85086c66"
       },
       "FeeVault": {
-        "address": "0xbB4FEEBf05D6F4f6eE76f951ce6964e48E5ce9A4",
-        "startBlock": 66737245,
-        "txHash": "0x524c0dafb4952f696967e1c33c7c2e3be566f6957f0342b9751e980252c84fb3"
+        "address": "0x8FD7A76C8E440B3807216fe59fC7d653607Cb19a",
+        "startBlock": 67049925,
+        "txHash": "0xe4c95eaadd2f93f1a2738be85b5f06638e1c6d5259a8a23d011068a96dc31cf4"
       },
       "WithdrawalRouter": {
         "address": "0x023b3dc1d065887e492efd2e4474d91dd4be0341",
         "startBlock": 66582590,
         "txHash": "0x2c249e8361b6abcc9b7bea71bf4447601d8868dd79854cbdd45c6f914c084148"
+      },
+      "TickBitmap": {
+        "address": "0x977Aee08690CB39A5dab41937eCdbD70e1Bf4a21",
+        "startBlock": 67049839,
+        "txHash": "0x35fb3199c141e01e45d015ea41da3a22c3f6fac10379e0a5795d49aafd4d07b6"
+      },
+      "EligiblePrice": {
+        "address": "0x5C51B17E1b1D842C168aeDcF001014Fe55b60f8e",
+        "startBlock": 67049851,
+        "txHash": "0x5819bb9fc607974249e310f0412f9ace21b61c3d2283f53cd872cb7b8252f264"
+      },
+      "PriorityFeeUpdates": {
+        "address": "0xB4852dD48089D4ec47e8f622111FE305F70dDB6C",
+        "startBlock": 67049862,
+        "txHash": "0xd8cc46a4b69e3ca5bcc814377966ae32789b7505af890c8ed7d5946f848e88ac"
       }
     }
   },
@@ -54,21 +75,27 @@
     "network": "testnet",
     "explorerUrl": "https://explorer.testnet.chain.robinhood.com",
     "numeraire": "0x7E955252E15c84f5768B83c41a71F9eba181802F",
+    "release": "v1.3.0",
+    "sourceCommit": "c9372ff9577ba3950fa321090a7bfb559fc964a4",
+    "features": {
+      "priorityFeeTopUps": true,
+      "tickBitmap": true
+    },
     "contracts": {
       "TickPrice": {
-        "address": "0x4FFE1e1C663A8f4D09ddBD52902fcd1ba9F4ff5F",
-        "startBlock": 12044038,
-        "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+        "address": "0xDd2b08533dB75ED63AEe52D9b3e2c8DaA1C63b61",
+        "startBlock": 149102238,
+        "txHash": "0x50f2ac9da6cae4ecdff9f216d6fe8b1cad1a77b4a43a9b2f4fd98cde5b25f483"
       },
       "DynamicFeeOrdering": {
-        "address": "0xCfEe50D16C2Aea951Bc2302De14d875Cb51a938c",
-        "startBlock": 12044039,
-        "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+        "address": "0x4c5901d2d168106C2fC274eF9445e085e9164Ae3",
+        "startBlock": 149102294,
+        "txHash": "0x079eae948efb0f5382d26a6884c954d9ad6696a85e4e92354c2e0296c88563b7"
       },
       "AsyncMatching": {
-        "address": "0xac90214FF07101Ec1cB4D52503A3bbb0c7F544b7",
-        "startBlock": 12044039,
-        "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+        "address": "0x25d47EC632B406D307e5d3803b13015452156521",
+        "startBlock": 149102507,
+        "txHash": "0x595ac0aa3a9ec5aa7dae2e9fd089b7646773c685768e743a9e9a55763266e1fe"
       },
       "PoolManager": {
         "address": "0x8366a39CC670B4001A1121B8F6A443A643e40951",
@@ -76,24 +103,39 @@
         "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
       },
       "AsyncSwap": {
-        "address": "0x91E143120F9758b875713aA5E476E8e853C86888",
-        "startBlock": 146837556,
-        "txHash": "0xa04e9b8ff469c32d40b43aeceb6b8fee18ea2ebc64a7520be65bed10a24d11a3"
+        "address": "0x917943DEE316842D941FE188bE7f149Dc3D32888",
+        "startBlock": 149102588,
+        "txHash": "0xfde83e4f80b79efc93967514c286039d7a890ddd3fb021ab3a1fac41afdd2f24"
       },
       "Router": {
-        "address": "0xF1B572ADE26987F44Bf01A9f962B460e6Eeb8f89",
-        "startBlock": 146837543,
-        "txHash": "0x59ee5d41fb832536a1eba4e166360fc36bf50210f15010ed99ce6276221822bf"
+        "address": "0xA93F36580aBA92a85A8C75B0c6f52C213c0226A5",
+        "startBlock": 149102573,
+        "txHash": "0x31746e8e2a547eb33c89bee973e4050e8f158120e1f7dae36fa89c32396cc4db"
       },
       "FeeVault": {
-        "address": "0x24FBfcf78f844CBbA196D85c2F3F48d99B73267c",
-        "startBlock": 146837556,
-        "txHash": "0xa04e9b8ff469c32d40b43aeceb6b8fee18ea2ebc64a7520be65bed10a24d11a3"
+        "address": "0xbB3570634FB375c483046534b42e77B0599DF8f2",
+        "startBlock": 149102588,
+        "txHash": "0xfde83e4f80b79efc93967514c286039d7a890ddd3fb021ab3a1fac41afdd2f24"
       },
       "WithdrawalRouter": {
         "address": "0x78d2178052c9d07fef1ffae1c70252119d2de987",
         "startBlock": 145836237,
         "txHash": "0x9d36a714a5586b7e1d37ef858caabd2b68591fb5d86d58da066ffd23710f8c9c"
+      },
+      "TickBitmap": {
+        "address": "0x977Aee08690CB39A5dab41937eCdbD70e1Bf4a21",
+        "startBlock": 149102341,
+        "txHash": "0xb2dde014211ab6e085564cd9878abdeee39be56c0f557f378621fa158f002a53"
+      },
+      "EligiblePrice": {
+        "address": "0x5C51B17E1b1D842C168aeDcF001014Fe55b60f8e",
+        "startBlock": 149102394,
+        "txHash": "0x179a90a27aba9daf45696ffa2266d6671145351a47688fb36185cad6238324b3"
+      },
+      "PriorityFeeUpdates": {
+        "address": "0xB4852dD48089D4ec47e8f622111FE305F70dDB6C",
+        "startBlock": 149102449,
+        "txHash": "0x5b7afc9f6b5a6f1d6a712cf3250d2ca9e67484daa121a66d34215f8598cce14e"
       }
     }
   }

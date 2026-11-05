@@ -9,6 +9,7 @@ import {PoolId} from "v4-core/types/PoolId.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {RadixPriceTree} from "@async-swap/libraries/RadixPriceTree.sol";
+import {TickBitmap} from "@async-swap/libraries/TickBitmap.sol";
 import {EligiblePrice} from "@async-swap/libraries/EligiblePrice.sol";
 import {TickPrice} from "@async-swap/libraries/TickPrice.sol";
 
@@ -25,6 +26,7 @@ library AsyncFiller {
     using CurrencySettler for Currency;
     using PoolIdLibrary for PoolKey;
     using RadixPriceTree for RadixPriceTree.Tree;
+    using TickBitmap for TickBitmap.Tree;
 
     uint64 internal constant MAX_PRIORITY_FEE = type(uint64).max;
     /// @dev Default $0.10 cap for six-decimal numeraires. A pool may override this for other decimals.
@@ -93,8 +95,8 @@ library AsyncFiller {
         uint64 openOrderCount;
         /// @dev $0.10 in this pool's numeraire base units. Zero uses the six-decimal default.
         uint64 priorityFeeCap;
-        RadixPriceTree.Tree bids;
-        RadixPriceTree.Tree asks;
+        TickBitmap.Tree bids;
+        TickBitmap.Tree asks;
         mapping(uint128 price => PriceLevel) bidLevels;
         mapping(uint128 price => PriceLevel) askLevels;
         /// @dev Least order size in numeraire base units (0: none); see `checkMinimum`.

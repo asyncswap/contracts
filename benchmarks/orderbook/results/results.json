@@ -1,0 +1,539 @@
+{
+  "baseline_commit": "abf374271c3378a4f461841fd7dac3867f3f5158",
+  "candidate_source_hashes": {
+    "src/AsyncSwap.sol": "c5badb94044a241a77569ac2e59e17fb59a54acad005921be304dae9d7f53217",
+    "src/BaseHook.sol": "e910e8e809f50335b1bd0da2109e417ae87213b517c0d1d8720e3bf0a1259ab9",
+    "src/FeeVault.sol": "7f8ccecc58e131b4b0712ec0721ae7042400ed7073af4017cfad08f2aa9e4bda",
+    "src/ImmutableState.sol": "81780a696bbff93efda8c21052c04b2b98cc97fb0af5ca7c23d30a37adcbfb8e",
+    "src/MatchingEngine.sol": "e6e63450d77a1af80c075eb34d113604734e35d75985b94ab177d58f6d603ddd",
+    "src/NativeClaims.sol": "b02920e5ddb1d06c862a16cf1b4f740e37d23d14159f960e7a5196833e976d7d",
+    "src/Router.sol": "b9545395bbb8c13fed1fb95f904242689d02bfa6dbfd5f85b4e3a07c3acf7fce",
+    "src/TokenClaims.sol": "7d087a18c541658df2ebfa2af9469dbc00c1e70b8c7d9c82e58a090a8b2a59fa",
+    "src/interfaces/ISignatureTransfer.sol": "fdd4edd4221ad8df5968da0d0f8aed1127e9bfe56bcb1c8cb77ea7e66875f54b",
+    "src/libraries/AsyncFiller.sol": "9015299b187cf70ece0840490aba0c9bef9109ebef72630b9864b33c31e1cf0a",
+    "src/libraries/AsyncMatching.sol": "17b77d2b6c36740b567df49a746ed31898e0e1493fc17eb7013685aaeb4e74a2",
+    "src/libraries/ClaimTransfers.sol": "7e6ed08d2c629a25890dfa1f9b86a41b62d142d3d0272864c374b356ef862bdc",
+    "src/libraries/CurrencySettler.sol": "35fa91cd314c39fa825192ab2ceae2561ce14ff6b57a9be09fe4b1c3d652340d",
+    "src/libraries/DynamicFeeOrdering.sol": "14ef4bbb9831bb4ee02f9e18af58a2f712b137380d477c8c01c81ec8286edaa7",
+    "src/libraries/EligiblePrice.sol": "30b2a388afefc5a68d24afec6d2262c7f4aa7ffd570faf13460971d0dc3cd5ca",
+    "src/libraries/OrderSignatures.sol": "61c1e4ddbe0243123b1ef29636fc88d80dda9e8a941704c4e4bb8d5f2fdd0a2d",
+    "src/libraries/RadixPriceTree.sol": "b2a672b6629caf28aa30df3a727b9026ddf3271ca422623a284f459db525dc53",
+    "src/libraries/TickBitmap.sol": "81e69010c0177a50b2496488727e98febd58884461716301fd28142549e8fe29",
+    "src/libraries/TickPrice.sol": "b4ec58fa775a17534379abf2480938531997069fa4da397ece40c1e8d2f7d220",
+    "src/types/AsyncOrder.sol": "1e18d34e727f7acb42131b56e65d4d56ff58c80d814fb60da37aad45493fe2bd"
+  },
+  "checks": [
+    {
+      "variant": "baseline",
+      "label": "oracle",
+      "passed": 7,
+      "command": [
+        "forge",
+        "test",
+        "--fuzz-runs",
+        "128",
+        "--fuzz-seed",
+        "0x5eed",
+        "--gas-limit",
+        "10000000000",
+        "--match-contract",
+        "MatchingReferenceTest",
+        "-vv"
+      ]
+    },
+    {
+      "variant": "baseline",
+      "label": "coverage",
+      "passed": 11,
+      "command": [
+        "forge",
+        "test",
+        "--fuzz-runs",
+        "128",
+        "--fuzz-seed",
+        "0x5eed",
+        "--gas-limit",
+        "10000000000",
+        "--match-contract",
+        "ResearchCoverageTest",
+        "-vv"
+      ]
+    },
+    {
+      "variant": "baseline",
+      "label": "export",
+      "passed": 1,
+      "command": [
+        "forge",
+        "test",
+        "--fuzz-runs",
+        "128",
+        "--fuzz-seed",
+        "0x5eed",
+        "--gas-limit",
+        "10000000000",
+        "--match-contract",
+        "ResearchLiveTest",
+        "--match-test",
+        "test_distinct256",
+        "-vv"
+      ]
+    },
+    {
+      "variant": "bitmap",
+      "label": "oracle",
+      "passed": 7,
+      "command": [
+        "forge",
+        "test",
+        "--fuzz-runs",
+        "128",
+        "--fuzz-seed",
+        "0x5eed",
+        "--gas-limit",
+        "10000000000",
+        "--match-contract",
+        "MatchingReferenceTest",
+        "-vv"
+      ]
+    },
+    {
+      "variant": "bitmap",
+      "label": "coverage",
+      "passed": 11,
+      "command": [
+        "forge",
+        "test",
+        "--fuzz-runs",
+        "128",
+        "--fuzz-seed",
+        "0x5eed",
+        "--gas-limit",
+        "10000000000",
+        "--match-contract",
+        "ResearchCoverageTest",
+        "-vv"
+      ]
+    },
+    {
+      "variant": "bitmap",
+      "label": "export",
+      "passed": 1,
+      "command": [
+        "forge",
+        "test",
+        "--fuzz-runs",
+        "128",
+        "--fuzz-seed",
+        "0x5eed",
+        "--gas-limit",
+        "10000000000",
+        "--match-contract",
+        "ResearchLiveTest",
+        "--match-test",
+        "test_distinct256",
+        "-vv"
+      ]
+    }
+  ],
+  "matched_public_api_states": 38,
+  "forge": "forge Version: 1.9.0\nCommit SHA: 6056c5845d34205a83cf7108042adb137325c9df\nBuild Timestamp: 2026-11-02T20:16:54.701302000Z (1793650614)\nBuild Profile: dist",
+  "anvil": "anvil Version: 1.9.0\nCommit SHA: 6056c5845d34205a83cf7108042adb137325c9df\nBuild Timestamp: 2026-11-02T20:16:54.701302000Z (1793650614)\nBuild Profile: dist",
+  "runtime_bytes": {
+    "baseline": {
+      "FeeVault": 2320,
+      "Router": 22131,
+      "AsyncSwap": 23669,
+      "TickPrice": 5204,
+      "AsyncMatching": 24135,
+      "DynamicFeeOrdering": 2896
+    },
+    "bitmap": {
+      "FeeVault": 2320,
+      "Router": 22131,
+      "AsyncSwap": 23849,
+      "TickPrice": 5204,
+      "TickBitmap": 696,
+      "AsyncMatching": 24225,
+      "EligiblePrice": 1966,
+      "DynamicFeeOrdering": 2896
+    }
+  },
+  "coverage": [
+    {
+      "workload": "bids/cancel",
+      "orders": 32,
+      "baseline_gross_gas": 287881,
+      "candidate_gross_gas": 228680,
+      "saving_percent": 20.564,
+      "state_digest": "0x96882b5871c274ae76d914f8032655f021b925dc4e204b6cf9ed5488dee89625"
+    },
+    {
+      "workload": "bids/cancel",
+      "orders": 256,
+      "baseline_gross_gas": 289099,
+      "candidate_gross_gas": 229896,
+      "saving_percent": 20.478,
+      "state_digest": "0x75370041c892e8607caaabde3eb7fc164ca3d6495a120941dc39325b47cc8c00"
+    },
+    {
+      "workload": "bids/incoming_8",
+      "orders": 32,
+      "baseline_gross_gas": 3627190,
+      "candidate_gross_gas": 3397410,
+      "saving_percent": 6.335,
+      "state_digest": "0x1f1b6993aab294d882ef0be34524e7c6dad6c7bf59c4e9221173da338fcd5fd2"
+    },
+    {
+      "workload": "bids/incoming_8",
+      "orders": 256,
+      "baseline_gross_gas": 3642522,
+      "candidate_gross_gas": 3400577,
+      "saving_percent": 6.642,
+      "state_digest": "0xcfb478616df32474965203ccd138298ea8c0e6a4d38d5fa4d8ca72a82f83da74"
+    },
+    {
+      "workload": "bids/place",
+      "orders": 32,
+      "baseline_gross_gas": 554201,
+      "candidate_gross_gas": 467866,
+      "saving_percent": 15.578,
+      "state_digest": "0xd56ffbdb9126e97d00d253b006f854c2e83cb82af573cdbb9c4d6322230a37cb"
+    },
+    {
+      "workload": "bids/place",
+      "orders": 256,
+      "baseline_gross_gas": 563174,
+      "candidate_gross_gas": 469058,
+      "saving_percent": 16.712,
+      "state_digest": "0x775879273614645e4032504d77413967fe0884ea7daf02fe5e197f286c4dd3b7"
+    },
+    {
+      "workload": "bids/reprice",
+      "orders": 32,
+      "baseline_gross_gas": 434962,
+      "candidate_gross_gas": 348556,
+      "saving_percent": 19.865,
+      "state_digest": "0xddcbf7b9f21f1240e3dd3541b891f93642ded2020460e5c7b9a31872c07058df"
+    },
+    {
+      "workload": "bids/reprice",
+      "orders": 256,
+      "baseline_gross_gas": 449759,
+      "candidate_gross_gas": 350284,
+      "saving_percent": 22.117,
+      "state_digest": "0xdbab3ed866719291d61f6391dfc1e898b1b610ecfc72b6676d69e0f6b9626de0"
+    },
+    {
+      "workload": "distinct/cancel",
+      "orders": 32,
+      "baseline_gross_gas": 292687,
+      "candidate_gross_gas": 233486,
+      "saving_percent": 20.227,
+      "state_digest": "0x26d410625ef38b9187494aff419b8ef2bb1bf5bfc00db5df3ceb0539ab57a045"
+    },
+    {
+      "workload": "distinct/cancel",
+      "orders": 256,
+      "baseline_gross_gas": 293883,
+      "candidate_gross_gas": 234692,
+      "saving_percent": 20.141,
+      "state_digest": "0x626ce34fed37373ef855a183a4a96db0ecea14cfd5e29c1b7ca0c5f4b340cd5a"
+    },
+    {
+      "workload": "distinct/cancel",
+      "orders": 1024,
+      "baseline_gross_gas": 298024,
+      "candidate_gross_gas": 238821,
+      "saving_percent": 19.865,
+      "state_digest": "0xc055f28870d706df0a57cc33e35c4fe8cfab9bd5306c2d4b7b8376b795cac9de"
+    },
+    {
+      "workload": "distinct/incoming_8",
+      "orders": 32,
+      "baseline_gross_gas": 3688624,
+      "candidate_gross_gas": 3495476,
+      "saving_percent": 5.236,
+      "state_digest": "0x99c650a99cc78f87e7c5657cfe39c7092a71dd5215f95368dd7c41cd8b67b4dc"
+    },
+    {
+      "workload": "distinct/incoming_8",
+      "orders": 256,
+      "baseline_gross_gas": 3710318,
+      "candidate_gross_gas": 3498661,
+      "saving_percent": 5.705,
+      "state_digest": "0x510c22026fccc109ad7440f236b416775fb913691cd16ba46997fbe08e1b0208"
+    },
+    {
+      "workload": "distinct/incoming_8",
+      "orders": 1024,
+      "baseline_gross_gas": 3727383,
+      "candidate_gross_gas": 3509550,
+      "saving_percent": 5.844,
+      "state_digest": "0x2b0526dd14560cd42affe2478037318718967b888ceb7748f25d6172a1d469e7"
+    },
+    {
+      "workload": "distinct/place",
+      "orders": 32,
+      "baseline_gross_gas": 575340,
+      "candidate_gross_gas": 489863,
+      "saving_percent": 14.857,
+      "state_digest": "0x4a57ee711710a539f7ab0a1fb9ac2d00d8a21dbe12eca578ab138ace354406e2"
+    },
+    {
+      "workload": "distinct/place",
+      "orders": 256,
+      "baseline_gross_gas": 589252,
+      "candidate_gross_gas": 491056,
+      "saving_percent": 16.665,
+      "state_digest": "0xf41340fd0e3100e2a66e90948b20d215ed26cccdf726a1c6e772bffd8a59c7a6"
+    },
+    {
+      "workload": "distinct/place",
+      "orders": 1024,
+      "baseline_gross_gas": 604931,
+      "candidate_gross_gas": 495134,
+      "saving_percent": 18.15,
+      "state_digest": "0x2713104765d63677391e1e2be608e60284b3607ebde31fb59b6f30faff26756a"
+    },
+    {
+      "workload": "distinct/reprice",
+      "orders": 32,
+      "baseline_gross_gas": 435001,
+      "candidate_gross_gas": 326969,
+      "saving_percent": 24.835,
+      "state_digest": "0xa36ba536a251cf342e5455354f5599cbfa5d2d56b5a0e69d0edf143ebba189f7"
+    },
+    {
+      "workload": "distinct/reprice",
+      "orders": 256,
+      "baseline_gross_gas": 442009,
+      "candidate_gross_gas": 328769,
+      "saving_percent": 25.619,
+      "state_digest": "0xeaa6f96f9e0020be8a1c26f211290f842d5307a2a54650252538a023b91d8edf"
+    },
+    {
+      "workload": "distinct/reprice",
+      "orders": 1024,
+      "baseline_gross_gas": 457342,
+      "candidate_gross_gas": 334942,
+      "saving_percent": 26.763,
+      "state_digest": "0x9e4f7eb277709460de86e86209bcdeffff7aab11d4c591efb971129c96d59dbb"
+    },
+    {
+      "workload": "lp/buy",
+      "orders": 32,
+      "baseline_gross_gas": 769337,
+      "candidate_gross_gas": 732832,
+      "saving_percent": 4.745,
+      "state_digest": "0x445ef6d4b84d86335c494f10727612965873d01cddb145d9bccad57a2c353fce"
+    },
+    {
+      "workload": "lp/sell",
+      "orders": 32,
+      "baseline_gross_gas": 823260,
+      "candidate_gross_gas": 786838,
+      "saving_percent": 4.424,
+      "state_digest": "0x20a895935daac10db6b27ff1bd2a595b1a1090465421b03780668b4333d5f1f0"
+    },
+    {
+      "workload": "mixed_tick/append_existing",
+      "orders": 32,
+      "baseline_gross_gas": 535481,
+      "candidate_gross_gas": 546678,
+      "saving_percent": -2.091,
+      "state_digest": "0x8043169b7c96a807e36d01864e0839033c9480a48e39af408fd0e05abcabcee7"
+    },
+    {
+      "workload": "mixed_tick/cancel",
+      "orders": 32,
+      "baseline_gross_gas": 247142,
+      "candidate_gross_gas": 250277,
+      "saving_percent": -1.269,
+      "state_digest": "0xca8e5b8a8726072e969703cffdb38597457a9cacb67271b85fa11006ab02a8c1"
+    },
+    {
+      "workload": "mixed_tick/incoming_8",
+      "orders": 32,
+      "baseline_gross_gas": 3360864,
+      "candidate_gross_gas": 3377876,
+      "saving_percent": -0.506,
+      "state_digest": "0x98d7ef4e1c4c1d7ac5a04a1381da250f67d9dac01249038d3b95adc9a47b8178"
+    },
+    {
+      "workload": "mixed_tick/reprice_inside",
+      "orders": 32,
+      "baseline_gross_gas": 273881,
+      "candidate_gross_gas": 278072,
+      "saving_percent": -1.53,
+      "state_digest": "0xe6100869d89a7cf37829c71e72557393600da680e9089f6fc5727c44794501f0"
+    },
+    {
+      "workload": "same_price/cancel",
+      "orders": 32,
+      "baseline_gross_gas": 247120,
+      "candidate_gross_gas": 250249,
+      "saving_percent": -1.266,
+      "state_digest": "0x42be6d6ffd4950c6ed182c3f9ee68d7ef9d94d8c73514fa196aa1c593b0ed66d"
+    },
+    {
+      "workload": "same_price/cancel",
+      "orders": 256,
+      "baseline_gross_gas": 248324,
+      "candidate_gross_gas": 251454,
+      "saving_percent": -1.26,
+      "state_digest": "0x7bfebeed99ce3e4c74d65d0a1bdc71d8aa3cc8fdbecb8e733eb1ecdafe0562f4"
+    },
+    {
+      "workload": "same_price/cancel",
+      "orders": 1024,
+      "baseline_gross_gas": 252441,
+      "candidate_gross_gas": 255571,
+      "saving_percent": -1.24,
+      "state_digest": "0xfeb20c95c2ade5fb8785fabe05e4fd31456faf7930c2b0ae9375638a97353cdd"
+    },
+    {
+      "workload": "same_price/incoming_8",
+      "orders": 32,
+      "baseline_gross_gas": 3290052,
+      "candidate_gross_gas": 3307344,
+      "saving_percent": -0.526,
+      "state_digest": "0x975faf85b98fa87af21d43e7b12fa12872fc159b2c16427665714ddaff227ea7"
+    },
+    {
+      "workload": "same_price/incoming_8",
+      "orders": 256,
+      "baseline_gross_gas": 3340949,
+      "candidate_gross_gas": 3358232,
+      "saving_percent": -0.517,
+      "state_digest": "0xe337230fb10e7b1911635ae37d56e300fa5b0635fc8aac9bffa9752d53e13bc2"
+    },
+    {
+      "workload": "same_price/incoming_8",
+      "orders": 1024,
+      "baseline_gross_gas": 3383724,
+      "candidate_gross_gas": 3401001,
+      "saving_percent": -0.511,
+      "state_digest": "0x1eefff8cbc7cefb5490090e8f814a7111f04eef340600e0cbf10369f8d9d70a6"
+    },
+    {
+      "workload": "same_price/place",
+      "orders": 32,
+      "baseline_gross_gas": 555716,
+      "candidate_gross_gas": 487887,
+      "saving_percent": 12.206,
+      "state_digest": "0x6d475cfd8e1b74be7c6d8121f265910ab321f1aac4032bba54cacf2192102ccd"
+    },
+    {
+      "workload": "same_price/place",
+      "orders": 256,
+      "baseline_gross_gas": 556907,
+      "candidate_gross_gas": 489079,
+      "saving_percent": 12.179,
+      "state_digest": "0x92a084df322bc67d8c470eac3577525f82a5b8e0c4578a7a21238cea0dc2146f"
+    },
+    {
+      "workload": "same_price/place",
+      "orders": 1024,
+      "baseline_gross_gas": 560994,
+      "candidate_gross_gas": 493166,
+      "saving_percent": 12.091,
+      "state_digest": "0x3331e0c3fdcc48a64ae8fe0d37e56dfd491c4c9e3f35324dc28ef9111ee15073"
+    },
+    {
+      "workload": "same_price/reprice",
+      "orders": 32,
+      "baseline_gross_gas": 420148,
+      "candidate_gross_gas": 343775,
+      "saving_percent": 18.178,
+      "state_digest": "0x7d532d5a3b1bfe61bda9de0b2c762c1d3b6cd22d114ec4119fc3515896aa8964"
+    },
+    {
+      "workload": "same_price/reprice",
+      "orders": 256,
+      "baseline_gross_gas": 421934,
+      "candidate_gross_gas": 345562,
+      "saving_percent": 18.1,
+      "state_digest": "0xf3f5c22698184326c3a9d790874489eb5faef68b46f030f4d07fae9e8a69b897"
+    },
+    {
+      "workload": "same_price/reprice",
+      "orders": 1024,
+      "baseline_gross_gas": 428047,
+      "candidate_gross_gas": 351674,
+      "saving_percent": 17.842,
+      "state_digest": "0xc02dba1dde504b3226642a16464ae225bdbd4ca1684e49a0ad9bf89c00f704f1"
+    }
+  ],
+  "receipts": {
+    "chain_id": 31337,
+    "hardfork": "cancun",
+    "block_gas_limit": 30000000,
+    "shape": "256 distinct resting ask prices, distinct owners",
+    "intrinsic_gas_included": true,
+    "refunds_applied": true,
+    "setup_and_approvals_excluded": true,
+    "variants": {
+      "baseline": [
+        {
+          "workload": "place",
+          "gas_used": 584885,
+          "logs_sha256": "8ff4e8284f0ded9fedb82c9b25afc5bb910502c6544d60965e4f1d231b9c489d",
+          "transaction_hash": "0x9cd71b0683c1696245a86205c280f29ed817627412e5317f964f5229f2e25a8f",
+          "status": 1
+        },
+        {
+          "workload": "cancel",
+          "gas_used": 246336,
+          "logs_sha256": "2bdea14097485401e73c4842667c228a71f4e33abe17b4753d4bbe6555091fa9",
+          "transaction_hash": "0x3358cc206679aaa3c9ea569695734e179d870031ec0ca513bc3c7db563d4feb5",
+          "status": 1
+        },
+        {
+          "workload": "reprice",
+          "gas_used": 377954,
+          "logs_sha256": "f1030014f842254b8ae527c4975aa7afe48292b4729ab108909be1cc3cdbf4dc",
+          "transaction_hash": "0x08bdd7156a727cb2a6e959670276db0abdf2cd4fa35df10bdddad7e16d8fc4cd",
+          "status": 1
+        },
+        {
+          "workload": "incoming_8",
+          "gas_used": 2962260,
+          "logs_sha256": "3d831eeab583424cf75cd084766474819e265f9110590e3a3ea4a9b6cd22aacc",
+          "transaction_hash": "0x472b8eead7834442eb69132884ff9aa70c00fb1cd97c7dbdc72d39b2744b0bc6",
+          "status": 1
+        }
+      ],
+      "bitmap": [
+        {
+          "workload": "place",
+          "gas_used": 486702,
+          "logs_sha256": "8ff4e8284f0ded9fedb82c9b25afc5bb910502c6544d60965e4f1d231b9c489d",
+          "transaction_hash": "0x9cd71b0683c1696245a86205c280f29ed817627412e5317f964f5229f2e25a8f",
+          "status": 1
+        },
+        {
+          "workload": "cancel",
+          "gas_used": 191955,
+          "logs_sha256": "2bdea14097485401e73c4842667c228a71f4e33abe17b4753d4bbe6555091fa9",
+          "transaction_hash": "0x3358cc206679aaa3c9ea569695734e179d870031ec0ca513bc3c7db563d4feb5",
+          "status": 1
+        },
+        {
+          "workload": "reprice",
+          "gas_used": 309336,
+          "logs_sha256": "f1030014f842254b8ae527c4975aa7afe48292b4729ab108909be1cc3cdbf4dc",
+          "transaction_hash": "0x08bdd7156a727cb2a6e959670276db0abdf2cd4fa35df10bdddad7e16d8fc4cd",
+          "status": 1
+        },
+        {
+          "workload": "incoming_8",
+          "gas_used": 2793022,
+          "logs_sha256": "3d831eeab583424cf75cd084766474819e265f9110590e3a3ea4a9b6cd22aacc",
+          "transaction_hash": "0x472b8eead7834442eb69132884ff9aa70c00fb1cd97c7dbdc72d39b2744b0bc6",
+          "status": 1
+        }
+      ]
+    }
+  }
+}

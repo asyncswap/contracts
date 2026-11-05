@@ -6,8 +6,8 @@ import {AsyncSwap} from "@async-swap/AsyncSwap.sol";
 import {PoolId} from "v4-core/types/PoolId.sol";
 
 /// @notice Bytecode checks of `formal/Refinement/Swarm/AsyncSwapBestOrder.lean`. `bestAtPrice` is opaque in the model;
-///         here it is the real linked (view) code. The expected walk is recomputed from raw storage:
-///         `T = isBuy ? bids : asks`, step = right (isBuy) / left, first leaf, its price, maker = orders[id].owner.
+///         here it is the real linked (view) code. The expected outer index result is recomputed from raw storage by a bit-by-bit scan of each bitmap word;
+///         the inner priority tree remains radix-based, and maker = orders[id].owner.
 contract AsyncSwapBestOrderFormalTest is FormalSlotsB {
     struct Result {
         bool found;
@@ -23,20 +23,29 @@ contract AsyncSwapBestOrderFormalTest is FormalSlotsB {
         if (ok) (r.found, r.priceKey, r.orderId, r.maker) = abi.decode(ret, (bool, uint128, bytes32, address));
     }
 
-    /// @dev `firstLeaf T isBuy fuel root` over raw storage; `fuel` stands in for `loopBound`.
-    function _walk(PoolId pid, bool isBuy, uint256 fuel) internal view returns (bool empty, bool hit, uint128 price) {
+    /// @dev Independent bit-by-bit scan of the bitmap's three words; no production bit-scan helper.
+    function _walk(PoolId pid, bool isBuy, uint256) internal view returns (bool empty, bool hit, uint128 price) {
         bytes32 t = _treeSlot(pid, isBuy);
-        uint256 c = uint32(uint256(_loadHook(t)));
-        if (c == 0) return (true, false, 0);
-        for (uint256 i; i < fuel; ++i) {
-            uint256 w = uint256(_loadHook(_nodeSlot(t, c)));
-            if ((w >> 232) & 0xff != 0) return (false, true, uint128(w >> 96));
-            c = isBuy ? uint32(w >> 64) : uint32(w >> 32);
-        }
-        return (false, false, 0);
+        uint256 root = uint256(_loadHook(t));
+        if (root == 0) return (true, false, 0);
+        uint256 group = _scanWord(root, isBuy);
+        uint256 mid = uint256(_loadHook(keccak256(abi.encode(group, uint256(t) + 1))));
+        if (mid == 0) return (false, false, 0);
+        uint256 word = group * 256 + _scanWord(mid, isBuy);
+        uint256 leaf = uint256(_loadHook(keccak256(abi.encode(word, uint256(t) + 2))));
+        if (leaf == 0) return (false, false, 0);
+        return (false, true, uint128(word * 256 + _scanWord(leaf, isBuy)));
     }
 
-    /// @dev Expected outcome of `bestOrder_run` for an acyclic side (walk ends within `fuel`), given the returned id.
+    function _scanWord(uint256 word, bool highest) internal pure returns (uint256) {
+        for (uint256 i; i < 256; ++i) {
+            uint256 bit = highest ? 255 - i : i;
+            if (word & (uint256(1) << bit) != 0) return bit;
+        }
+        revert("empty bitmap child");
+    }
+
+    /// @dev Expected bestOrder result for a valid occupied-bit path, given the returned id.
     function _checkRun(PoolId pid, bool isBuy, bool ok, Result memory r) internal view {
         (bool empty, bool hit, uint128 price) = _walk(pid, isBuy, 512);
         if (empty) {
@@ -50,28 +59,20 @@ contract AsyncSwapBestOrderFormalTest is FormalSlotsB {
         assertTrue(hit, "test setup: walk reaches a leaf");
         if (!ok) return; // a revert here can only come from the opaque bestAtPrice
         assertTrue(r.found);
-        assertEq(r.priceKey, price, "price of the first leaf on the walk");
+        assertEq(r.priceKey, price, "price of the selected occupied tick");
         assertEq(r.maker, address(uint160(uint256(_loadHook(_orderSlot(pid, r.orderId))))), "maker = orders[id].owner");
     }
 
-    /// @dev Synthetic side: `depth` branch nodes 1..depth chained along the walk direction (the other child random),
-    ///      ending in leaf `depth + 1` with `price`; the level head at that price is `id` owned by `maker`.
-    function _synthetic(PoolId pid, bool isBuy, uint8 depth, uint128 price, bytes32 id, address maker, uint256 noise)
-        internal
-    {
+    /// @dev A synthetic occupied tick with a real priority leaf. The outer domain is bounded;
+    ///      cyclic radix pointers no longer exist. Sparse tests cover multiple occupied groups.
+    function _synthetic(PoolId pid, bool isBuy, uint8, uint128 price, bytes32 id, address maker, uint256) internal {
+        price = 1 + price % 1_774_545;
         bytes32 t = _treeSlot(pid, isBuy);
-        uint256 n = uint256(depth) % 64;
-        vm.store(address(hook), t, bytes32(uint256(1)));
-        for (uint256 i = 1; i <= n; ++i) {
-            uint32 next = uint32(i + 1);
-            uint32 other = uint32(uint256(keccak256(abi.encode(noise, i))));
-            vm.store(
-                address(hook),
-                _nodeSlot(t, i),
-                isBuy ? _nodeWord(other, next, uint128(other), false) : _nodeWord(next, other, uint128(other), false)
-            );
-        }
-        vm.store(address(hook), _nodeSlot(t, n + 1), _nodeWord(0, 0, price, true));
+        uint256 word = uint256(price) >> 8;
+        uint256 group = word >> 8;
+        vm.store(address(hook), t, bytes32(uint256(1) << group));
+        vm.store(address(hook), keccak256(abi.encode(group, uint256(t) + 1)), bytes32(uint256(1) << (word & 255)));
+        vm.store(address(hook), keccak256(abi.encode(word, uint256(t) + 2)), bytes32(uint256(1) << (price & 255)));
         bytes32 level = _levelSlot(pid, isBuy, price);
         bytes32 priorityTree = _add(level, 1);
         vm.store(address(hook), level, bytes32(uint256(1)));
@@ -90,8 +91,8 @@ contract AsyncSwapBestOrderFormalTest is FormalSlotsB {
         if (populated) assertTrue(ok && r.found, "populated side has a best order");
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapBestOrder.lean:155 — full characterization on arbitrary (synthetic) tree
-    ///         shapes written into storage.
+    /// @notice formal/Refinement/Swarm/AsyncSwapBestOrder.lean:155 — full characterization on synthetic occupied ticks
+    ///         within the supported domain written into storage.
     function testFuzz_bestOrder_run_synthetic(
         bytes32 pid,
         bool isBuy,
@@ -129,23 +130,18 @@ contract AsyncSwapBestOrderFormalTest is FormalSlotsB {
         assertEq(r.maker, address(0));
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapBestOrder.lean:208 — a non-empty side whose walk never meets a leaf
-    ///         reverts. Model: "loop bound" after 2^64 steps; EVM: out of gas (asserted with a 5M-gas call).
-    function testFuzz_bestOrder_loopBound(bytes32 pid, bool isBuy, uint8 cycleLen, uint256 noise) public {
-        bytes32 t = _treeSlot(PoolId.wrap(pid), isBuy);
-        uint256 n = uint256(cycleLen) % 8 + 1;
-        vm.store(address(hook), t, bytes32(uint256(1)));
-        for (uint256 i = 1; i <= n; ++i) {
-            uint32 next = uint32(i % n + 1); // i -> i+1 -> ... -> n -> 1
-            uint32 other = uint32(uint256(keccak256(abi.encode(noise, i))));
-            vm.store(
-                address(hook),
-                _nodeSlot(t, i),
-                isBuy ? _nodeWord(other, next, uint128(noise), false) : _nodeWord(next, other, uint128(noise), false)
-            );
-        }
-        (bool ok,) = address(hook).call{gas: 5_000_000}(abi.encodeCall(AsyncSwap.bestOrder, (PoolId.wrap(pid), isBuy)));
-        assertFalse(ok);
+    /// @notice Bitmap replacement for the old cyclic-pointer test: every valid synthetic path
+    ///         terminates within the call budget; a parent with an empty child is rejected.
+    function testFuzz_bestOrder_boundedBitmapDepth(bytes32 pid, bool isBuy, uint8, uint256 noise) public {
+        PoolId p = PoolId.wrap(pid);
+        _synthetic(p, isBuy, 0, uint128(noise), bytes32(noise), address(this), 0);
+        (bool ok,) = address(hook).call{gas: 5_000_000}(abi.encodeCall(AsyncSwap.bestOrder, (p, isBuy)));
+        assertTrue(ok, "three-level lookup terminates");
+        bytes32 t = _treeSlot(p, isBuy);
+        uint256 group = (1 + uint128(noise) % 1_774_545) >> 16;
+        vm.store(address(hook), keccak256(abi.encode(group, uint256(t) + 1)), bytes32(0));
+        (ok,) = address(hook).call{gas: 5_000_000}(abi.encodeCall(AsyncSwap.bestOrder, (p, isBuy)));
+        assertFalse(ok, "missing occupied child rejected");
     }
 
     /// @notice formal/Refinement/Swarm/AsyncSwapBestOrder.lean:218 — success shape: empty ⇒ (false,0,0,0) and w' = w;

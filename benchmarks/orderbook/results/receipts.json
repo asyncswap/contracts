@@ -1,0 +1,71 @@
+{
+  "chain_id": 31337,
+  "hardfork": "cancun",
+  "block_gas_limit": 30000000,
+  "shape": "256 distinct resting ask prices, distinct owners",
+  "intrinsic_gas_included": true,
+  "refunds_applied": true,
+  "setup_and_approvals_excluded": true,
+  "variants": {
+    "baseline": [
+      {
+        "workload": "place",
+        "gas_used": 584885,
+        "logs_sha256": "8ff4e8284f0ded9fedb82c9b25afc5bb910502c6544d60965e4f1d231b9c489d",
+        "transaction_hash": "0x9cd71b0683c1696245a86205c280f29ed817627412e5317f964f5229f2e25a8f",
+        "status": 1
+      },
+      {
+        "workload": "cancel",
+        "gas_used": 246336,
+        "logs_sha256": "2bdea14097485401e73c4842667c228a71f4e33abe17b4753d4bbe6555091fa9",
+        "transaction_hash": "0x3358cc206679aaa3c9ea569695734e179d870031ec0ca513bc3c7db563d4feb5",
+        "status": 1
+      },
+      {
+        "workload": "reprice",
+        "gas_used": 377954,
+        "logs_sha256": "f1030014f842254b8ae527c4975aa7afe48292b4729ab108909be1cc3cdbf4dc",
+        "transaction_hash": "0x08bdd7156a727cb2a6e959670276db0abdf2cd4fa35df10bdddad7e16d8fc4cd",
+        "status": 1
+      },
+      {
+        "workload": "incoming_8",
+        "gas_used": 2962260,
+        "logs_sha256": "3d831eeab583424cf75cd084766474819e265f9110590e3a3ea4a9b6cd22aacc",
+        "transaction_hash": "0x472b8eead7834442eb69132884ff9aa70c00fb1cd97c7dbdc72d39b2744b0bc6",
+        "status": 1
+      }
+    ],
+    "bitmap": [
+      {
+        "workload": "place",
+        "gas_used": 486702,
+        "logs_sha256": "8ff4e8284f0ded9fedb82c9b25afc5bb910502c6544d60965e4f1d231b9c489d",
+        "transaction_hash": "0x9cd71b0683c1696245a86205c280f29ed817627412e5317f964f5229f2e25a8f",
+        "status": 1
+      },
+      {
+        "workload": "cancel",
+        "gas_used": 191955,
+        "logs_sha256": "2bdea14097485401e73c4842667c228a71f4e33abe17b4753d4bbe6555091fa9",
+        "transaction_hash": "0x3358cc206679aaa3c9ea569695734e179d870031ec0ca513bc3c7db563d4feb5",
+        "status": 1
+      },
+      {
+        "workload": "reprice",
+        "gas_used": 309336,
+        "logs_sha256": "f1030014f842254b8ae527c4975aa7afe48292b4729ab108909be1cc3cdbf4dc",
+        "transaction_hash": "0x08bdd7156a727cb2a6e959670276db0abdf2cd4fa35df10bdddad7e16d8fc4cd",
+        "status": 1
+      },
+      {
+        "workload": "incoming_8",
+        "gas_used": 2793022,
+        "logs_sha256": "3d831eeab583424cf75cd084766474819e265f9110590e3a3ea4a9b6cd22aacc",
+        "transaction_hash": "0x472b8eead7834442eb69132884ff9aa70c00fb1cd97c7dbdc72d39b2744b0bc6",
+        "status": 1
+      }
+    ]
+  }
+}

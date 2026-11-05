@@ -1,6 +1,6 @@
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/1389863a5546dee090eb3cb462f95789363b47fe/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/c9372ff9577ba3950fa321090a7bfb559fc964a4/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -810,6 +810,27 @@ function updatePrice(AsyncOrder calldata order, uint256 newAmountOutMin) externa
 | order | `AsyncOrder` |  |
 | newAmountOutMin | `uint256` |  |
 
+<a id="topuppriorityfee-asyncorder-uint256" />
+
+### topUpPriorityFee
+
+Increase an existing bid through the maker-authenticating Router inside an unlock.
+
+<i>
+  The Router must settle the additional numeraire debt before the unlock ends.
+</i>
+
+```solidity
+function topUpPriorityFee(AsyncOrder calldata order, uint256 addedFee) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| addedFee | `uint256` |  |
+
 <a id="cancelorder-asyncorder" />
 
 ### cancelOrder
@@ -1318,6 +1339,23 @@ event PoolPriceObserved(
 | tickAfter | `int24` |  |
 | refTick | `int24` |  |
 | observedBlock | `uint64` |  |
+
+### AsyncOrderPriorityFeeUpdated
+
+```solidity
+event AsyncOrderPriorityFeeUpdated(
+        PoolId indexed poolId, bytes32 indexed orderId, uint256 addedFee, uint256 newPriorityFee
+    );
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+| orderId | `bytes32` |  |
+| addedFee | `uint256` |  |
+| newPriorityFee | `uint256` |  |
 
 ## Errors
 

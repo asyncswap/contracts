@@ -5,6 +5,7 @@ An MEV-capturing DEX built as a Uniswap v4 hook: an on-chain order book and matc
 - [Async Swap, an MEV-capturing on-chain order book DEX on Uniswap v4](/index): An MEV-capturing DEX built as a Uniswap v4 hook. An on-chain order book and matching engine for USDC limit orders, where priority bids auction ordering to the protocol and a dynamic fee returns backrun profit to LPs.
 - [Async Swap protocol map](/protocol/overview): Contracts, custody, fees and authorization of the Async Swap hook, in diagrams: permissionless pools, minimum order and asset floor fixed at deployment, Router.multicall.
 - [Order lifecycle and priority bids](/protocol/order-lifecycle): How an order is placed, matched, filled, repriced and cancelled, how priority bids are paid, and how to cancel and withdraw claims in one Router.multicall.
+- [Priority fee top-ups](/protocol/priority-fee-top-ups)
 - [Contract call sequences](/protocol/contract-call-sequences): Step-by-step contract calls for opening pools and placing, matching, filling, cancelling (alone or batched) and redeeming orders.
 - [Price keys and crossing](/protocol/price-key-crossing): How limit prices map to price keys and when two orders cross.
 - [Dynamic fee ordering](/protocol/dynamic-fee-ordering): How Async Swap captures backrun MEV with a dynamic fee on pool fills that move the price back, split between LPs and the protocol.
@@ -16,7 +17,7 @@ An MEV-capturing DEX built as a Uniswap v4 hook: an on-chain order book and matc
 - [ImmutableState](/reference/src/ImmutableState): A collection of immutable state variables, commonly used across multiple contracts
 - [MatchingEngine](/reference/src/MatchingEngine): Standalone price-time matching harness. It maintains a radix-indexed limit book and emits deterministic fill instructions.
 - [NativeClaims](/reference/src/NativeClaims): Redeems the caller's PoolManager native ETH claims to a chosen recipient.
-- [Router](/reference/src/Router): Thin entrypoint for makers (`swap`, `cancelOrder`, `cancelAndWithdraw`, `withdrawClaims`), fillers (`fillOrder`) and keepers (`matchBook`, `fillFromPoolLiquidity`), batched with `multicall`. Each action goes through `IPoolManager.unlock` so the hook can operate on PM debts. Native payouts/refunds are PoolManager claims (ID 0), redeemable through NativeClaims or `withdrawClaims`; ERC20 payouts remain direct.
+- [Router](/reference/src/Router): Thin entrypoint for makers (`swap`, `topUpPriorityFee`, `cancelOrder`, `cancelAndWithdraw`, `withdrawClaims`), fillers (`fillOrder`) and keepers (`matchBook`, `fillFromPoolLiquidity`), batched with `multicall`. Each action goes through `IPoolManager.unlock` so the hook can operate on PM debts. Native payouts/refunds are PoolManager claims (ID 0), redeemable through NativeClaims or `withdrawClaims`; ERC20 payouts remain direct.
 - [TokenClaims](/reference/src/TokenClaims): Redeems the caller's PoolManager currency claims to a chosen recipient.
 - [BaseHook](/reference/src/BaseHook): abstract contract for hook implementations
 - [IFeeOwner](/reference/src/IFeeOwner)
@@ -28,6 +29,7 @@ An MEV-capturing DEX built as a Uniswap v4 hook: an on-chain order book and matc
 - [DynamicFeeOrdering](/reference/src/libraries/DynamicFeeOrdering): Linked library called by `AsyncMatching` in the hook's context.
 - [EligiblePrice](/reference/src/libraries/EligiblePrice): Exact-price summaries on a priority-key radix tree.
 - [OrderSignatures](/reference/src/libraries/OrderSignatures): EIP-712 types for signed AsyncSwap actions. Every type spells out the maker, both tokens and the amounts so wallets render a readable message instead of opaque calldata.
+- [PriorityFeeUpdates](/reference/src/libraries/PriorityFeeUpdates): Funded priority amendments, linked separately to keep the hook within EIP-170.
 - [RadixPriceTree](/reference/src/libraries/RadixPriceTree): Patricia radix index for uint128 price levels. Inserts and removals traverse at most 128 branch bits; each distinct price creates one leaf and at most one branch node. Node ids released by `remove` are recycled by later inserts, so the id counter only grows with the peak number of simultaneously stored prices and can never be exhausted in practice (2^31 simultaneous levels).
 - [TickBitmap](/reference/src/libraries/TickBitmap): Three-level occupancy bitmap for the bounded tick-key domain.
 - [TickPrice](/reference/src/libraries/TickPrice): Book levels on Uniswap v4 ticks: an order sits at the floor tick (spacing 1, 0.01% steps) of its exact currency1/currency0 limit. Levels are a fixed relative width at any price and for any token decimals; the exact limit still decides crossing within a level.

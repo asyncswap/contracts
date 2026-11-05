@@ -1,6 +1,6 @@
 # Router
 
-[Git Source](https://github.com/asyncswap/contracts/blob/1389863a5546dee090eb3cb462f95789363b47fe/src/Router.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/c9372ff9577ba3950fa321090a7bfb559fc964a4/src/Router.sol)
 
 **Inherits:** EIP712, Multicall
 
@@ -8,7 +8,7 @@
 
 **Author:** @msakiart
 
-Thin entrypoint for makers (`swap`, `cancelOrder`, `cancelAndWithdraw`, `withdrawClaims`), fillers
+Thin entrypoint for makers (`swap`, `topUpPriorityFee`, `cancelOrder`, `cancelAndWithdraw`, `withdrawClaims`), fillers
 (`fillOrder`) and keepers (`matchBook`, `fillFromPoolLiquidity`), batched with `multicall`. Each action
 goes through `IPoolManager.unlock` so the hook can operate on PM debts. Native payouts/refunds are
 PoolManager claims (ID 0), redeemable through NativeClaims or `withdrawClaims`; ERC20 payouts remain
@@ -347,6 +347,29 @@ function withdrawClaims(Currency[] calldata currencies, uint256[] calldata amoun
 | currencies | `Currency[]` |  |
 | amounts | `uint256[]` |  |
 
+<a id="topuppriorityfee-asyncorder-uint256" />
+
+### topUpPriorityFee
+
+Add `addedFee` numeraire units to the caller's remaining priority bid.
+
+<i>
+  Requires an ERC20 approval to this Router. Leaves amount and price unchanged and resets
+  fee-tier FIFO age. No matching or MEV tax; use multicall with matchBook to attempt matching.
+  Only the order's identity fields are used; addedFee is a delta, not a target total.
+</i>
+
+```solidity
+function topUpPriorityFee(AsyncOrder calldata order, uint256 addedFee) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| addedFee | `uint256` |  |
+
 <a id="matchbook-poolkey-uint8" />
 
 ### matchBook
@@ -484,25 +507,25 @@ function _settleWithPermit(Currency input, AsyncOrder memory order, PermitData m
 | order | `AsyncOrder` |  |
 | permit | `PermitData` |  |
 
-<a id="_settlepriorityfee-asyncorder" />
+<a id="_settlepriorityfee-address-uint256" />
 
 ### \_settlePriorityFee
 
 <i>
-  Pays the order's bid, which the hook escrowed as claims when it created the order, in the
-  pool's USDC numeraire. Signed orders also require an ERC-20 approval for the bid; the
+  Pays an initial bid or top-up in the pool's USDC numeraire, crediting the hook. Signed orders also require an ERC-20 approval for the bid; the
   signed order commits to its amount.
 </i>
 
 ```solidity
-function _settlePriorityFee(AsyncOrder memory order) private;
+function _settlePriorityFee(address owner, uint256 amount) private;
 ```
 
 **Parameters**
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| order | `AsyncOrder` |  |
+| owner | `address` |  |
+| amount | `uint256` |  |
 
 <a id="_orderid-asyncorder" />
 
@@ -648,7 +671,8 @@ enum ActionType {
         MatchBook,
         PoolLiquidityFill,
         CancelAndWithdraw,
-        WithdrawClaims
+        WithdrawClaims,
+        TopUpPriorityFee
     }
 ```
 
@@ -664,3 +688,4 @@ enum ActionType {
 | PoolLiquidityFill |  |
 | CancelAndWithdraw |  |
 | WithdrawClaims |  |
+| TopUpPriorityFee |  |

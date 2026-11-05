@@ -32,6 +32,8 @@ flowchart TD
     M -- "Private filler chooses order" --> O["Check live minimum against filler maxPrice"]
     O --> FF["Filler pays exactly the minimum; maker gets it less 0.02%, filler the input less 0.02%; settle bid; close order"]
     FF --> Z
+    M -- "Maker adds USDC priority fee" --> T["Fund additional bid; reset fee-tier queue age; keep price and maker age"]
+    T --> M
     M -- "Maker reprices" --> Q["Update minimum; re-enter book with fresh time priority"]
     Q --> M
     M -- "Owner or authorized cancellation" --> C["Return remaining input; settle remaining bid; close order"]
@@ -41,6 +43,14 @@ flowchart TD
 If no executable crossing pair exists, the initial matching pass leaves the order unchanged before the LP attempt. `Router.matchBook` accepts a bound of 1–8 pairs and does not itself retry LP liquidity. An LP retry does not require the order to be first in the book. Private fills require a maker-authorized executor (normally the Router); the filler pays exactly the live minimum in the same transaction, and the 0.02% trade fee comes out of each side's proceeds. That trade fee is separate from the LP fee on pool-liquidity fills. Book-match proceeds, and input returned below the pool minimum, are credited as PoolManager claims in every currency, redeemable through `TokenClaims` (ERC-20), `NativeClaims` (ETH) or `Router.withdrawClaims`; native fill proceeds and refunds are claims too. Filler and LP fills pay ERC-20 output directly, except a pool-first fill that stops at the best book level: the order stays open for the book, so its output is credited as claims. When the pool goes first, a remainder below the pool minimum that the book leaves is returned as claims.
 
 Sources: [Router](https://github.com/asyncswap/contracts/blob/main/src/Router.sol), [AsyncSwap](https://github.com/asyncswap/contracts/blob/main/src/AsyncSwap.sol), [AsyncMatching](https://github.com/asyncswap/contracts/blob/main/src/libraries/AsyncMatching.sol), and [AsyncFiller](https://github.com/asyncswap/contracts/blob/main/src/libraries/AsyncFiller.sol).
+
+## Fee top-ups
+
+An open order's maker can increase its remaining USDC bid through `Router.topUpPriorityFee(order, addedFee)`.
+The positive delta is funded atomically with the queue update. The resulting bid must meet the current
+remaining order's nonzero-bid minimum. A changed bid joins the back of its new fee tier; its input,
+limit price and original maker age stay unchanged. Matching is separate, optionally batched through
+`Router.multicall`. See [the API and agent example](/protocol/priority-fee-top-ups).
 
 ## Priority-bid settlement
 
@@ -57,6 +67,7 @@ flowchart TD
     B -- "Successful LP or private fill" --> F
     B -- "Authorized cancellation" --> F
     B -- "Reprice" --> E
+    B -- "Maker funds top-up" --> E
     C --> G{"Bid amount to settle is nonzero?"}
     F --> G
     G -- "No" --> H["No bid transfer"]

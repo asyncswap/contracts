@@ -73,6 +73,10 @@ For context, a [plain Uniswap v4 comparison](benchmarks/uniswap-v4/README.md)
 fit 250–288 single-hop swaps in the first block under the same budget and gas-limit
 policy. This uses official core test adapters, deep liquidity and no hook or
 initialized-tick crossings; it is not Universal Router or live-network throughput.
+The subsequent [Universal Router and periphery benchmark](benchmarks/universal-router/README.md)
+fit 244–250 swaps in the first block through released router 2.2.0 and Permit2,
+with deadline/minimum-output checks and standing token allowances. Approval
+setup and permit signatures are excluded; the route remains single-hop with no hook.
 
 ## Priority fees and future matching work
 

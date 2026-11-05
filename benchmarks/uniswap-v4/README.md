@@ -10,6 +10,11 @@ These are observed local workloads, not a fixed capacity or TPS limit for either
 protocol. Async Swap itself uses v4; this compares a plain AMM pool with the
 additional work performed by the order-book hook.
 
+The follow-up [Universal Router/periphery comparison](../universal-router/README.md)
+measured 244–250 swaps in the first block using released router 2.2.0 and Permit2,
+with standing approvals, deadlines and minimum-output checks. That is a separate
+production-source routing measurement; this page retains the core-adapter baseline.
+
 ## Measured baseline
 
 | Core test adapter | Direction | First-block swaps | Mean receipt gas | First 100 swaps' gas |

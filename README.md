@@ -14,11 +14,14 @@ every push to `main` that touches them; preview it locally with `cd site && bun 
 
 - [Protocol overview](docs/protocol.md): components, custody, order placement, authorization, and deployment.
 - [Order lifecycle and priority bids](docs/order-lifecycle.md): matching, fills, cancellation, and bid settlement.
+- [Priority-fee top-ups](docs/priority-fee-top-ups.md): maker authorization, funding, queue updates, and agent calls.
 - [Contract call sequences](docs/contract-call-sequences.md): calls, callbacks, responses, and withdrawals.
 - [Price-key crossing](docs/price-key-crossing.md): price comparisons and rounding.
 - [Dynamic fee ordering](docs/dynamic-fee-ordering.md): the dynamic fee on pool fills that backrun a price move, and who receives it. Open question: does charging half the price gap capture enough of a backrun's MEV for LPs and the protocol, or should the right to backrun a pool fill be auctioned through USDC priority bids, the way book matching already auctions ordering?
 
 ## Build and deployment
+
+v1.3.0 is deployed on **Unichain Sepolia** (test USDC) and **Robinhood Chain testnet** (test USDG). See [addresses and previous deployments](docs/deployments.md) and [live top-up validation](benchmarks/releases/README.md). All nine release modules on each network have exact source matches on Sourcify. Mainnet remains subject to [audit and readiness checks](MAINNET_READINESS.md).
 
 `AsyncMatching` is an external Solidity library linked into the hook. The deployment wrapper deploys and links `TickPrice`, `DynamicFeeOrdering`, `TickBitmap`, `EligiblePrice`, and `PriorityFeeUpdates` first. The fee-amendment library links to `EligiblePrice`. `script/deploy.sh <chain-key> [dry-run|broadcast|verify]` deploys the libraries through the shared CREATE2 deployer, links the hook bytecode, mines the hook salt, deploys the hook and Router, and records the addresses under `deployments/<chainId>/`. `verify` publishes sources through Sourcify, tries Blockscout, and writes standard JSON inputs for manual upload. An `ASYNC_MATCHING_LIBRARY_ADDRESS` override must match this build's predicted address. Foundry links the libraries automatically in tests.
 
@@ -60,6 +63,6 @@ An order's USDC priority bid breaks ties between equal exact limit prices. This 
 
 Makers can call `Router.topUpPriorityFee(order, addedFee)` to escrow additional USDC on an open order. The Router requires the maker's approval and caller identity; the amount is added to the **remaining** bid without changing the order's input budget or limit price. The resulting bid must meet the minimum for the remaining order. A top-up resets time priority within its new fee tier and preserves the original maker age used for settlement pricing. It does not trigger matching; an agent can combine it with `matchBook(key, maxMatches)` through `Router.multicall` in one atomic transaction. See [the top-up API and agent example](docs/priority-fee-top-ups.md).
 
-Priority bids, including top-ups, are non-refundable: they are spent proportionally on fills, with the remainder transferred to the FeeVault on cancellation or dust closure. They improve priority among equal exact-price orders without creating liquidity or guaranteeing execution. They are not direct keeper rewards. This feature is implemented in source and requires a new hook and Router deployment; existing deployments do not acquire it automatically.
+Priority bids, including top-ups, are non-refundable: they are spent proportionally on fills, with the remainder transferred to the FeeVault on cancellation or dust closure. They improve priority among equal exact-price orders without creating liquidity or guaranteeing execution. They are not direct keeper rewards. This feature is available on the v1.3.0 testnet hooks and Routers. Earlier deployments do not acquire it automatically; existing orders stay on their original hook.
 
 The current matcher already processes up to eight pairs per call and combines claim transfers. A uniform-price batch auction would additionally change when orders clear and which price they receive. It remains a separate research direction; no batch-auction gas or execution-quality improvement has been demonstrated for these contracts. See [the research notes](benchmarks/orderbook/research.md).

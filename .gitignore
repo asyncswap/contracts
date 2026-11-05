@@ -61,4 +61,4 @@ audit/formal-mind.audit.json
 # Audit: only the current scope and the index are tracked; earlier reports are at 2739d6c/audit/
 /audit/*
 !/audit/README.md
-!/audit/AUDIT_SCOPE_11_03_26.md
+!/audit/AUDIT_SCOPE_11_05_26.md

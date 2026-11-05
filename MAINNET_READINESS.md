@@ -1,7 +1,7 @@
 # Unichain mainnet readiness
 
-**Blocked: waiting for audit.** Scope: [`audit/AUDIT_SCOPE_11_03_26.md`](audit/AUDIT_SCOPE_11_03_26.md), frozen at
-`2739d6c`. If `src/` or `script/` changes before the audit starts, re-freeze in a new dated scope.
+**Blocked: waiting for audit.** Scope: [`audit/AUDIT_SCOPE_11_05_26.md`](audit/AUDIT_SCOPE_11_05_26.md), frozen at
+`c9372ff9577ba3950fa321090a7bfb559fc964a4`. If `src/` or `script/` changes before the audit starts, re-freeze in a new dated scope.
 
 ## Confirm before broadcast
 
@@ -29,5 +29,4 @@ The outer tick bitmap changes the order-book storage layout. Deploy a new hook w
 See [optimization validation](benchmarks/orderbook/README.md) for measurements and compiler settings.
 
 Fee top-ups add the linked `PriorityFeeUpdates` library and a maker-authorized Router endpoint.
-Include both in the next audit scope and deploy a new hook and Router; the current frozen scope
-has not been changed. See [fee top-ups](docs/priority-fee-top-ups.md).
+Both are included in the refreshed scope. Deploy a new hook and Router after audit clearance. See [fee top-ups](docs/priority-fee-top-ups.md).

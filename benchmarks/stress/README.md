@@ -75,6 +75,8 @@ stateful Foundry calls into new indexer receipts. The subsequent
 ten-minute workload: 98 transactions, all 96 lifecycle events reconciled in
 REST/WebSocket, and 10,016 successful reads with no failures. Its earlier
 interrupted attempts are preserved separately.
-Reorg/failure recovery and crossing-heavy 100-transaction block packing remain
-distinct measurements.
+The [crossing-capacity matrix](../crossing/README.md) subsequently settled all
+1,000 transactions and 5,200 pairs correctly, but 100 crossing transactions
+did not fit any of its 30-million-gas blocks. That capacity target remains unmet.
+Reorg/failure recovery remains a separate measurement.
 The audit and mainnet readiness gates remain open.

@@ -127,4 +127,6 @@ maximum capacity or a multi-hour production soak. Matching, LP fills and claim
 withdrawals were stressed locally in the preceding campaign; this live run does
 not repeat those operations. Delay is measured from receipt observation rather
 than block inclusion, so a WebSocket event can legitimately arrive first.
-The audit and crossing-heavy 100-transaction block-packing gates remain open.
+The [crossing-capacity tests](../crossing/README.md) are complete, but their
+100-crossing-transactions-per-block target was not met at 30 million gas.
+That target and the audit gate remain open.

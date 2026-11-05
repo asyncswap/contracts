@@ -63,6 +63,12 @@ passed a 10-minute 26-second run on both testnets: 98 transactions, all 96 lifec
 events reconciled through REST/WebSocket, and 10,016 reads with zero failures
 (p95 76.69 ms). This bounded run does not establish maximum capacity or multi-hour resilience.
 
+[Crossing-heavy block tests](benchmarks/crossing/README.md) settled all 1,000
+transactions and 5,200 matched pairs correctly. Under a 30-million-gas local
+block budget, the first blocks held 44–51 single-fill transactions or 10–12
+eight-fill transactions with the documented gas limits. The target of 100
+crossing transactions in one block was not met.
+
 ## Priority fees and future matching work
 
 An order's USDC priority bid breaks ties between equal exact limit prices. This is separate from the transaction's gas priority fee. Zero bids are allowed; for a nonzero bid, the required minimum is 0.1% of the order's USDC notional, rounded down and capped at $0.10 with the default six-decimal numeraire configuration. Users may bid more than that minimum.

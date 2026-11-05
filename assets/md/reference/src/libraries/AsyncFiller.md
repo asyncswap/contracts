@@ -1,6 +1,6 @@
 # AsyncFiller
 
-[Git Source](https://github.com/asyncswap/contracts/blob/dc0b25431a064efe05be84a43e34cf9e61b6e775/src/libraries/AsyncFiller.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/1389863a5546dee090eb3cb462f95789363b47fe/src/libraries/AsyncFiller.sol)
 
 **Title:** AsyncFiller
 
@@ -955,8 +955,8 @@ struct Book {
         uint64 openOrderCount;
         /// @dev $0.10 in this pool's numeraire base units. Zero uses the six-decimal default.
         uint64 priorityFeeCap;
-        RadixPriceTree.Tree bids;
-        RadixPriceTree.Tree asks;
+        TickBitmap.Tree bids;
+        TickBitmap.Tree asks;
         mapping(uint128 price => PriceLevel) bidLevels;
         mapping(uint128 price => PriceLevel) askLevels;
         /// @dev Least order size in numeraire base units (0: none); see `checkMinimum`.
@@ -973,8 +973,8 @@ struct Book {
 | nextSequence | `uint64` |  |
 | openOrderCount | `uint64` |  |
 | priorityFeeCap | `uint64` |  |
-| bids | `RadixPriceTree.Tree` |  |
-| asks | `RadixPriceTree.Tree` |  |
+| bids | `TickBitmap.Tree` |  |
+| asks | `TickBitmap.Tree` |  |
 | bidLevels | `mapping(uint128 price => PriceLevel)` |  |
 | askLevels | `mapping(uint128 price => PriceLevel)` |  |
 | minOrder | `uint256` |  |

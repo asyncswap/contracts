@@ -29,6 +29,7 @@ An MEV-capturing DEX built as a Uniswap v4 hook: an on-chain order book and matc
 - [EligiblePrice](/reference/src/libraries/EligiblePrice): Exact-price summaries on a priority-key radix tree.
 - [OrderSignatures](/reference/src/libraries/OrderSignatures): EIP-712 types for signed AsyncSwap actions. Every type spells out the maker, both tokens and the amounts so wallets render a readable message instead of opaque calldata.
 - [RadixPriceTree](/reference/src/libraries/RadixPriceTree): Patricia radix index for uint128 price levels. Inserts and removals traverse at most 128 branch bits; each distinct price creates one leaf and at most one branch node. Node ids released by `remove` are recycled by later inserts, so the id counter only grows with the peak number of simultaneously stored prices and can never be exhausted in practice (2^31 simultaneous levels).
+- [TickBitmap](/reference/src/libraries/TickBitmap): Three-level occupancy bitmap for the bounded tick-key domain.
 - [TickPrice](/reference/src/libraries/TickPrice): Book levels on Uniswap v4 ticks: an order sits at the floor tick (spacing 1, 0.01% steps) of its exact currency1/currency0 limit. Levels are a fixed relative width at any price and for any token decimals; the exact limit still decides crossing within a level.
 - [AsyncOrderLibrary](/reference/src/types/AsyncOrderLibrary): Helpers attached to AsyncOrder for identity and pricing.
 - [AsyncOrder](/reference/src/types/AsyncOrder): Represents an async order for a swap in the Uniswap V4 pool.

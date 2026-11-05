@@ -1,6 +1,6 @@
 # EligiblePrice
 
-[Git Source](https://github.com/asyncswap/contracts/blob/dc0b25431a064efe05be84a43e34cf9e61b6e775/src/libraries/EligiblePrice.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/1389863a5546dee090eb3cb462f95789363b47fe/src/libraries/EligiblePrice.sol)
 
 Exact-price summaries on a priority-key radix tree.
 
@@ -47,7 +47,7 @@ function refresh(
         uint128 rank,
         Ratio memory price,
         bool isBuy
-    ) internal;
+    ) public;
 ```
 
 **Parameters**
@@ -66,7 +66,7 @@ function refresh(
 
 ```solidity
 function remove(RadixPriceTree.Tree storage tree, mapping(uint32 => Ratio) storage bounds, uint128 rank, bool isBuy)
-        internal;
+        public;
 ```
 
 **Parameters**

@@ -70,7 +70,9 @@ The run completed **42,350 valid responses with zero failures**:
 
 These results complement the independent 100-transaction receipt and
 indexer/REST/WebSocket checks in interface PR #175. They do not turn the
-stateful Foundry calls into new indexer receipts. Public-testnet soak testing,
-simultaneous chain writes and API load, reorg/failure recovery, and
-crossing-heavy 100-transaction block packing remain distinct measurements.
+stateful Foundry calls into new indexer receipts. The subsequent
+[public-testnet ingestion/read soak](../soak/README.md) records two interrupted
+attempts with all confirmed events reconciled; its full-duration gate remains open.
+Reorg/failure recovery and crossing-heavy 100-transaction block packing remain
+distinct measurements.
 The audit and mainnet readiness gates remain open.

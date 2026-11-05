@@ -57,6 +57,10 @@ See [methodology and validation](benchmarks/orderbook/README.md), [receipt data]
 
 Fee top-ups measured separately use **186,710–235,267 gas** across four local fixtures, including an initially zero-bid order and a crowded price level. See [the top-up receipt benchmark](benchmarks/topups/README.md) for per-case results and reproduction instructions.
 
+[Local stress validation](benchmarks/stress/README.md) covers matching, liquidity fills,
+claim withdrawals and sustained API reads. The [public-testnet ingestion/read soak](benchmarks/soak/README.md)
+records interrupted attempts and cleanup evidence; its full-duration gate remains open.
+
 ## Priority fees and future matching work
 
 An order's USDC priority bid breaks ties between equal exact limit prices. This is separate from the transaction's gas priority fee. Zero bids are allowed; for a nonzero bid, the required minimum is 0.1% of the order's USDC notional, rounded down and capped at $0.10 with the default six-decimal numeraire configuration. Users may bid more than that minimum.

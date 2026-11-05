@@ -21,6 +21,8 @@ Fixed at deployment, with no setter:
   Local one-sided block packing passed in interface PR #175. Additional
   [matching, liquidity, withdrawals and sustained-read tests](benchmarks/stress/README.md)
   pass locally; these stateful tests do not close the broader block-packing gate.
+  [Public-testnet ingestion/read soak attempts](benchmarks/soak/README.md)
+  reconciled every confirmed event but were interrupted; the full soak remains open.
 - [ ] Rehearse the deployment on a Unichain fork, then pin and verify the bytecode.
 - [ ] Deploy `TokenClaims` and `NativeClaims` with the core contracts.
 - [ ] Ship claim redemption in the indexer and frontend.

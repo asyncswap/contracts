@@ -11,9 +11,10 @@
     "1301": "https://sepolia.unichain.org",
     "46630": "https://rpc.testnet.chain.robinhood.com"
   },
-  "checkoutBaseCommit": "94eb4b889762326c1e21f6f9635828453193a1fe",
+  "checkoutBaseCommit": "895b4d3d6c4ba736a35295e699800acca7397dfb",
   "runnerSha256": {
     "public_soak.py": "28ea8aa9cdffee1a3fa12d4c07976a8b6979b9a6bd83386df9f20823444aeaf2",
     "monitor.ts": "6dd84b027d338c4bf32ed7c26f7157087ee45b2234e46f2a61cdba1183d962a0"
-  }
+  },
+  "idleSleepInhibited": true
 }

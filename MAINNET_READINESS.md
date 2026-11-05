@@ -21,8 +21,10 @@ Fixed at deployment, with no setter:
   Local one-sided block packing passed in interface PR #175. Additional
   [matching, liquidity, withdrawals and sustained-read tests](benchmarks/stress/README.md)
   pass locally; these stateful tests do not close the broader block-packing gate.
-  [Public-testnet ingestion/read soak attempts](benchmarks/soak/README.md)
-  reconciled every confirmed event but were interrupted; the full soak remains open.
+  The [bounded public-testnet ingestion/read soak](benchmarks/soak/README.md)
+  passed: 98 transactions, 96 reconciled lifecycle events and 10,016 successful
+  reads over 10 minutes 26 seconds. This does not establish multi-hour resilience
+  or crossing-heavy block capacity.
 - [ ] Rehearse the deployment on a Unichain fork, then pin and verify the bytecode.
 - [ ] Deploy `TokenClaims` and `NativeClaims` with the core contracts.
 - [ ] Ship claim redemption in the indexer and frontend.

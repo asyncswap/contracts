@@ -59,7 +59,9 @@ Fee top-ups measured separately use **186,710–235,267 gas** across four local 
 
 [Local stress validation](benchmarks/stress/README.md) covers matching, liquidity fills,
 claim withdrawals and sustained API reads. The [public-testnet ingestion/read soak](benchmarks/soak/README.md)
-records interrupted attempts and cleanup evidence; its full-duration gate remains open.
+passed a 10-minute 26-second run on both testnets: 98 transactions, all 96 lifecycle
+events reconciled through REST/WebSocket, and 10,016 reads with zero failures
+(p95 76.69 ms). This bounded run does not establish maximum capacity or multi-hour resilience.
 
 ## Priority fees and future matching work
 

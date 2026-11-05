@@ -1,0 +1,64 @@
+{
+  "complete": true,
+  "durationSeconds": 626.322,
+  "chains": {
+    "1301": {
+      "confirmedTransactions": 49,
+      "completedCycles": 12,
+      "quoteFeeSpentBaseUnits": "12000",
+      "numeraire": "USDC",
+      "nativeSpentWei": "6668571011666",
+      "receiptExecutionFeeWei": "6668571000000",
+      "gasUsed": 13337142,
+      "remainingAllowance": 0,
+      "feeVaultIncrease": "12000",
+      "includingInterruptedAttempts": {
+        "quoteFeeSpentBaseUnits": "29000",
+        "nativeSpentWei": "16274100055157"
+      }
+    },
+    "46630": {
+      "confirmedTransactions": 49,
+      "completedCycles": 12,
+      "quoteFeeSpentBaseUnits": "12000",
+      "numeraire": "USDG",
+      "nativeSpentWei": "134388130000000",
+      "receiptExecutionFeeWei": "134388130000000",
+      "gasUsed": 13438813,
+      "remainingAllowance": 0,
+      "feeVaultIncrease": "12000",
+      "includingInterruptedAttempts": {
+        "quoteFeeSpentBaseUnits": "29000",
+        "nativeSpentWei": "328004640000000"
+      }
+    }
+  },
+  "readLoad": {
+    "clients": 8,
+    "targetRequestsPerSecond": 16,
+    "successful": 10016,
+    "failed": 0,
+    "p50Ms": 63.175958000007086,
+    "p95Ms": 76.68658300000243,
+    "p99Ms": 101.18820800003596
+  },
+  "ingestion": {
+    "confirmedLifecycleEvents": 96,
+    "restEvents": 96,
+    "websocketEvents": 96,
+    "disconnects": 0,
+    "restDelayAfterReceiptObservation": {
+      "p50Seconds": 4.118797063827515,
+      "p95Seconds": 4.991305112838745,
+      "maxSeconds": 5.198375940322876,
+      "observedBeforeReceiptPoll": 0
+    },
+    "websocketDelayAfterReceiptObservation": {
+      "p50Seconds": 0.5242371559143066,
+      "p95Seconds": 2.794687032699585,
+      "maxSeconds": 3.1563761234283447,
+      "observedBeforeReceiptPoll": 47
+    }
+  },
+  "scope": "Bounded live testnet lifecycle soak with concurrent public API reads. Read-client rate excludes history reconciliation checks. Delay starts when the runner observes a receipt, not block inclusion; earlier observations are counted separately and clipped to zero for percentiles. Not maximum capacity, a multi-hour soak, or crossing-heavy block packing."
+}

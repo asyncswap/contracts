@@ -5,11 +5,34 @@ Robinhood testnet (46630), the public indexer/API, and its WebSocket stream.
 It follows the local matching, liquidity-fill and withdrawal campaign in
 [`../stress/README.md`](../stress/README.md).
 
-**Status: incomplete.** Two public attempts exercised ingestion and reads, but
-neither completed the full planned duration and cycle count. All confirmed
-events reconciled, orders closed, and allowances were cleared. The final rerun
-is waiting for Olive authentication after Touch ID was canceled. The observer
-has been stopped. Current evidence is summarized in `results/status.json`.
+**Passed on 2026-11-05:** the final run completed all 12 cycles per chain over
+626.322 seconds, with simultaneous ingestion and public API reads. Earlier
+interrupted attempts remain preserved separately below.
+
+| Measurement | Final run |
+|---|---:|
+| Confirmed transactions | 98 (49 per chain, including approvals) |
+| Completed lifecycle cycles | 24 (12 per chain) |
+| Lifecycle events observed in REST / WebSocket | 96 / 96 |
+| Successful / failed load reads | 10,016 / 0 |
+| Read clients / target rate | 8 / 16 requests per second |
+| Read latency p50 / p95 / p99 | 63.18 / 76.69 / 101.19 ms |
+| WebSocket disconnects | 0 |
+| Remaining orders / token allowances | 0 / 0 |
+
+REST observation delay after receipt polling was 4.99 seconds at p95 and
+5.20 seconds maximum. WebSocket delay was 2.79 seconds at p95 and 3.16 seconds
+maximum; 47 events arrived before the runner observed their receipt. These are
+observer timings, including the writer's three-second RPC catch-up pause and
+history polling, not isolated indexer processing latency. Earlier WebSocket
+observations are counted separately and clipped to zero for delay percentiles.
+
+The final run spent 0.012 test USDC on Unichain and 0.012 test USDG on Robinhood
+in funded priority bids. Native spending was approximately 0.000006669 and
+0.000134388 test ETH respectively. Including interrupted attempts and cleanup,
+the campaign spent 0.029 test quote tokens per chain. Inputs were refunded and
+both final allowances were zero. See [`results/summary.json`](results/summary.json)
+for exact base-unit accounting and reconciled measurements.
 
 ## Workload and budget
 
@@ -42,9 +65,9 @@ balances and budgets first. The writer rejects existing output files and never
 retries a submission; a pending or uncertain hash must be reconciled manually.
 
 ```sh
-bun benchmarks/soak/monitor.ts /tmp/new-soak-transactions.json /tmp/new-soak-monitor.json
+caffeinate -i bun benchmarks/soak/monitor.ts /tmp/new-soak-transactions.json /tmp/new-soak-monitor.json
 # In another terminal, after the observer reports connected:
-olive exec new-deployer -- python3 benchmarks/soak/public_soak.py --broadcast \
+caffeinate -i olive exec new-deployer -- python3 benchmarks/soak/public_soak.py --broadcast \
   --output /tmp/new-soak-transactions.json --monitor /tmp/new-soak-monitor.json
 ```
 
@@ -55,7 +78,7 @@ for manual receipt reconciliation.
 
 ## Evidence and limits
 
-On a completed run, `results/public-transactions.json` contains transaction hashes, receipts and
+`results/public-transactions.json` contains transaction hashes, receipts and
 on-chain assertions. `results/ingestion-load.json` contains read metrics and
 per-event observation times. `summarize.py` checks completeness and writes
 `results/summary.json` after both processes finish.
@@ -65,7 +88,7 @@ checks without loading the broadcasting CLI: a lost submission response,
 a failed receipt lookup, and successful confirmation. The first two retain
 the known hash, block cleanup, and never resubmit.
 
-### Interrupted attempt
+### Interrupted attempts
 
 The first attempt stopped after seven cycles per chain when the Unichain public
 RPC timed out during submission. All 56 confirmed lifecycle events reached REST
@@ -90,18 +113,18 @@ No transaction was submitted and both balances and allowances were unchanged.
 The corrected signature-based construction passed an unsigned offline check
 before the final restart.
 
-This is a bounded lifecycle soak with simultaneous ingestion and reads, not
-maximum capacity or a multi-hour production soak. Matching, LP fills and claim
-withdrawals were stressed locally in the preceding campaign; this live run does
-not repeat those operations. Delay is measured from receipt observation rather
-than block inclusion, so a WebSocket event can legitimately arrive first.
-The audit and crossing-heavy 100-transaction block-packing gates remain open.
-
 The next attempt completed ten cycles per chain (80 reconciled events) before
 all eight local read clients timed out during Mac clamshell sleep. It recorded
 8,093 successful reads and eight failures, then closed orders and revoked both
 allowances. The journals and matching macOS power events are retained under
 `results/client-sleep/`; this interrupted attempt is not a passing soak.
 Subsequent read-only host checks found the live API/indexer healthy, with no
-container restarts or OOM kills. The planned rerun uses `caffeinate -i` against
+container restarts or OOM kills. The successful final run used `caffeinate -i` against
 idle sleep; clamshell sleep still requires keeping the lid open.
+
+This is a bounded lifecycle soak with simultaneous ingestion and reads, not
+maximum capacity or a multi-hour production soak. Matching, LP fills and claim
+withdrawals were stressed locally in the preceding campaign; this live run does
+not repeat those operations. Delay is measured from receipt observation rather
+than block inclusion, so a WebSocket event can legitimately arrive first.
+The audit and crossing-heavy 100-transaction block-packing gates remain open.

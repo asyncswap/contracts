@@ -1,6 +1,6 @@
 {
-  "complete": false,
-  "blockingCondition": "Final rerun requires Olive Touch ID authentication; latest authentication was canceled before broadcast. Observer stopped.",
+  "complete": true,
+  "blockingCondition": null,
   "attempts": [
     {
       "name": "RPC submission timeout",
@@ -36,5 +36,14 @@
     "durationSecondsAtLeast": 600,
     "confirmedLifecycleEvents": 96,
     "readFailures": 0
+  },
+  "state": "complete",
+  "finalRun": {
+    "summary": "summary.json",
+    "durationSeconds": 626.322,
+    "confirmedTransactions": 98,
+    "confirmedLifecycleEvents": 96,
+    "successfulReads": 10016,
+    "failedReads": 0
   }
 }

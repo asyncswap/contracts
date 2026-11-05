@@ -58,6 +58,11 @@ transactions-per-second measurements.
   gas unfilled or create a short final block. Changing gas limits can change the
   packing counts; dividing the block budget by average receipt gas is not an
   observed capacity result.
+
+The [plain Uniswap v4 baseline](../uniswap-v4/README.md) fit 250–288 single-hop
+swaps in the first block under the same budget and gas-limit policy. It uses
+core test adapters with no hook and no initialized-tick crossings. The comparison
+documents the different settlement work and excludes Universal Router overhead.
 - Check every successful receipt, block gas total and exact fill count; then
   verify price/FIFO maker IDs, asset and quote amounts, all closed orders, exact
   maker/taker net claims, accumulated protocol fees and funded bids, empty book,

@@ -69,6 +69,11 @@ block budget, the first blocks held 44–51 single-fill transactions or 10–12
 eight-fill transactions with the documented gas limits. The target of 100
 crossing transactions in one block was not met.
 
+For context, a [plain Uniswap v4 comparison](benchmarks/uniswap-v4/README.md)
+fit 250–288 single-hop swaps in the first block under the same budget and gas-limit
+policy. This uses official core test adapters, deep liquidity and no hook or
+initialized-tick crossings; it is not Universal Router or live-network throughput.
+
 ## Priority fees and future matching work
 
 An order's USDC priority bid breaks ties between equal exact limit prices. This is separate from the transaction's gas priority fee. Zero bids are allowed; for a nonzero bid, the required minimum is 0.1% of the order's USDC notional, rounded down and capped at $0.10 with the default six-decimal numeraire configuration. Users may bid more than that minimum.

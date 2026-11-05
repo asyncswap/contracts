@@ -7,6 +7,9 @@ import {DeployEligiblePrice} from "../script/00_DeployEligiblePrice.s.sol";
 import {TickBitmap} from "@async-swap/libraries/TickBitmap.sol";
 import {EligiblePrice} from "@async-swap/libraries/EligiblePrice.sol";
 
+import {DeployPriorityFeeUpdates} from "../script/00_DeployPriorityFeeUpdates.s.sol";
+import {PriorityFeeUpdates} from "@async-swap/libraries/PriorityFeeUpdates.sol";
+
 /// @dev Test stand-in for the deterministic proxy's salt || initcode calldata format.
 contract IndexCreate2Proxy {
     fallback() external payable {
@@ -55,13 +58,30 @@ contract IndexLibraryDeploymentTest is Test {
         vm.setEnv("DEPLOY_DRY_RUN", previous);
     }
 
+    function test_topUpPredictionAndIdempotentDryRun() public {
+        DeployPriorityFeeUpdates script = new DeployPriorityFeeUpdates();
+        string memory previous = vm.envOr("DEPLOY_DRY_RUN", string("false"));
+        vm.setEnv("DEPLOY_DRY_RUN", "true");
+        address target = script.predicted();
+        script.run();
+        assertEq(target.code.length, type(PriorityFeeUpdates).runtimeCode.length);
+        assertLe(target.code.length, 24_576);
+        bytes32 hash = target.codehash;
+        script.run();
+        assertEq(target.codehash, hash, "existing library preserved");
+        vm.setEnv("DEPLOY_DRY_RUN", previous);
+    }
+
     function test_missingFactoryRejected() public {
         vm.etch(FACTORY, "");
         DeployTickBitmap bitmap = new DeployTickBitmap();
         DeployEligiblePrice eligible = new DeployEligiblePrice();
+        DeployPriorityFeeUpdates topup = new DeployPriorityFeeUpdates();
         vm.expectRevert("CREATE2 deployer missing on this chain");
         bitmap.run();
         vm.expectRevert("CREATE2 deployer missing on this chain");
         eligible.run();
+        vm.expectRevert("CREATE2 deployer missing on this chain");
+        topup.run();
     }
 }

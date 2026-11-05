@@ -152,6 +152,7 @@ contract MatchingReferenceTest is SetupHook {
             assertEq(ao, r.minimum, "remaining minimum");
             assertEq(seq, r.sequence, "queue age");
             assertEq(fee, r.fee, "remaining fee");
+            if (r.input != 0) assertEq(hook.orderCreatedSequence(poolId, _id(r)), r.created, "maker age");
             assertEq(manager.balanceOf(r.order.owner, currency0.toId()), assetClaims[r.order.owner], "asset claim");
             assertEq(manager.balanceOf(r.order.owner, currency1.toId()), quoteClaims[r.order.owner], "quote claim");
             if (r.order.zeroForOne) assetEscrow += r.input;
@@ -216,6 +217,20 @@ contract MatchingReferenceTest is SetupHook {
         _check();
     }
 
+    function _topUpFee(uint256 index, uint256 addedFee) internal {
+        RefOrder storage r = refs[index];
+        if (r.input == 0) return;
+        // Independent admission rule: the resulting bid meets the remaining order's minimum.
+        uint256 floor = (r.order.zeroForOne ? r.minimum : r.input) / 1000;
+        if (floor > 100_000) floor = 100_000;
+        if (r.fee + addedFee < floor) addedFee = floor - r.fee;
+        vm.prank(r.order.owner);
+        router.topUpPriorityFee(r.order, addedFee);
+        r.fee += addedFee;
+        r.sequence = ++sequence;
+        _check();
+    }
+
     function _cancel(uint256 index) internal {
         RefOrder storage r = refs[index];
         if (r.input == 0) return;
@@ -244,7 +259,9 @@ contract MatchingReferenceTest is SetupHook {
                 _submit(sell, sell ? amount : quote, sell ? quote : amount, fee);
             } else if (action == 4) {
                 _cancel(index);
-            } else if (action < 7) {
+            } else if (action == 6) {
+                _topUpFee(index, 1 + (seed >> 96) % 1_000_000);
+            } else if (action == 5) {
                 RefOrder storage r = refs[index];
                 uint256 price = (1_000 + (seed >> 48) % 2001) * 1e6;
                 _reprice(index, r.order.zeroForOne ? r.input * price / 1 ether : r.input * 1 ether / price);
@@ -255,6 +272,17 @@ contract MatchingReferenceTest is SetupHook {
         for (uint256 i; i < 8; ++i) {
             _clear(8);
         }
+    }
+
+    function test_referenceTopUpsPreserveMakerAgeAndSettleNewBid() public {
+        _submit(true, 2 ether, 4_000e6, 100_000);
+        _submit(false, 6_000e6, 6 ether, 100_000);
+        _topUpFee(0, 200_000);
+        _reprice(1, 2 ether);
+        _clear(1);
+        assertEq(expected[0].quote, 4_000e6, "original maker sets settlement price");
+        assertEq(refs[0].input, 0);
+        assertGt(quoteClaims[address(hook.feeVault())], 300_000);
     }
 
     function test_referenceBacklogClearsInBoundedCalls() public {

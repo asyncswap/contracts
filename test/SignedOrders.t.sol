@@ -278,6 +278,22 @@ contract SignedOrdersTest is SetupHook {
 
     /// PoC: a reprice the maker signed but never relayed must not undo a later direct reprice. Here the
     /// maker signs a lower minimum, then raises it directly; the stale signature would lower it again.
+    function test_topUpPreservesPendingSignedRepriceAndCancel() public {
+        AsyncOrder memory order = _createSigned();
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes memory reprice = _updateSig(order, 0.9 ether, 41, deadline);
+        bytes memory cancel = _cancelSig(order, 42, deadline, makerPk);
+        vm.prank(maker);
+        router.topUpPriorityFee(order, 200_000);
+        assertEq(hook.asyncOrderPriorityFee(poolId, _id(order)), 300_000);
+        vm.prank(relayer);
+        hook.updatePriceWithSig(order, AMOUNT_IN, 0.9 ether, 41, deadline, reprice);
+        vm.prank(relayer);
+        router.cancelWithSig(order, 42, deadline, cancel);
+        assertEq(hook.asyncOrder(poolId, _id(order)), 0);
+        assertEq(manager.balanceOf(address(hook.feeVault()), currency1.toId()), 300_000);
+    }
+
     function test_updatePriceWithSig_rejectsSignatureAfterDirectReprice() public {
         AsyncOrder memory order = _createSigned();
         uint256 deadline = block.timestamp + 1 hours;

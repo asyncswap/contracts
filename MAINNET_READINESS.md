@@ -18,6 +18,9 @@ Fixed at deployment, with no setter:
 - [ ] Fix or acknowledge every finding, with a regression test for each fix.
 - [ ] Recheck contract sizes; AsyncMatching has 351 bytes and AsyncSwap has 417 bytes left under the 24,576-byte limit.
 - [ ] Stress test at 100 transactions per block.
+  Local one-sided block packing passed in interface PR #175. Additional
+  [matching, liquidity, withdrawals and sustained-read tests](benchmarks/stress/README.md)
+  pass locally; these stateful tests do not close the broader block-packing gate.
 - [ ] Rehearse the deployment on a Unichain fork, then pin and verify the bytecode.
 - [ ] Deploy `TokenClaims` and `NativeClaims` with the core contracts.
 - [ ] Ship claim redemption in the indexer and frontend.

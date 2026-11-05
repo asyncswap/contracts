@@ -16,10 +16,14 @@ Fixed at deployment, with no setter:
 ## After the audit
 
 - [ ] Fix or acknowledge every finding, with a regression test for each fix.
-- [ ] Recheck contract sizes; AsyncMatching has 441 bytes left under the 24,576-byte limit.
+- [ ] Recheck contract sizes; AsyncMatching has 351 bytes left under the 24,576-byte limit.
 - [ ] Stress test at 100 transactions per block.
 - [ ] Rehearse the deployment on a Unichain fork, then pin and verify the bytecode.
 - [ ] Deploy `TokenClaims` and `NativeClaims` with the core contracts.
 - [ ] Ship claim redemption in the indexer and frontend.
 
 `script/check-mainnet-readiness.sh` exits non-zero until all of this is done.
+
+The outer tick bitmap changes the order-book storage layout. Deploy a new hook with linked
+`TickBitmap` and `EligiblePrice` libraries; do not reinterpret an existing radix book as bitmap state.
+See [optimization validation](benchmarks/orderbook/README.md) for measurements and compiler settings.

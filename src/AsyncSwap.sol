@@ -4,7 +4,7 @@ pragma solidity 0.8.26;
 import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 import {AsyncMatching} from "@async-swap/libraries/AsyncMatching.sol";
 import {OrderSignatures} from "@async-swap/libraries/OrderSignatures.sol";
-import {RadixPriceTree} from "@async-swap/libraries/RadixPriceTree.sol";
+import {TickBitmap} from "@async-swap/libraries/TickBitmap.sol";
 import {TickPrice} from "@async-swap/libraries/TickPrice.sol";
 import {AsyncOrder, AsyncOrderLibrary} from "@async-swap/types/AsyncOrder.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
@@ -40,7 +40,7 @@ contract AsyncSwap is BaseHook, EIP712 {
     using AsyncFiller for AsyncFiller.Book;
     using AsyncOrderLibrary for AsyncOrder;
     using StateLibrary for IPoolManager;
-    using RadixPriceTree for RadixPriceTree.Tree;
+    using TickBitmap for TickBitmap.Tree;
 
     /// @notice Per-pool order book.
     mapping(PoolId poolId => AsyncFiller.State) public asyncOrders;

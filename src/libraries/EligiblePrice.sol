@@ -31,22 +31,23 @@ library EligiblePrice {
         }
     }
 
+    // Linked updates keep matching bytecode below the size limit; storage stays in the caller.
     function refresh(
         RadixPriceTree.Tree storage tree,
         mapping(uint32 => Ratio) storage bounds,
         uint128 rank,
         Ratio memory price,
         bool isBuy
-    ) internal {
+    ) public {
         uint32 leaf = tree.leaves[rank];
-        // Internal callers have just inserted rank or are refreshing a live order.
+        // Callers have just inserted rank or are refreshing a live order.
         // The leaf exists and order admission guarantees a positive denominator.
         bounds[leaf] = price;
         _repair(tree, bounds, tree.nodes[leaf].parent, isBuy, true);
     }
 
     function remove(RadixPriceTree.Tree storage tree, mapping(uint32 => Ratio) storage bounds, uint128 rank, bool isBuy)
-        internal
+        public
     {
         uint32 leaf = tree.leaves[rank];
         uint32 parent = tree.nodes[leaf].parent;

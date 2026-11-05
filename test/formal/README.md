@@ -58,6 +58,12 @@ bytecode (see [Named specs](#named-specs-for-the-opaque-functions)).
     transaction and transient storage is cleared between them; on chain those steps happen inside
     one transaction.
 
+The outer price index now uses a bounded tick bitmap. Representation-specific checks use its
+three-word path and updated Book offsets; priority trees remain radix trees. The old outer
+cyclic-pointer case is replaced by bounded lookup and missing-child rejection. Fee/sequence fuzzing
+still spans uint64, while synthetic outer keys stay in 1..1,774,545. These test ports do not update or
+re-prove the historical Lean model. See [the validation report](../../benchmarks/orderbook/README.md).
+
 Shared fixtures:
 - [`FormalBase.sol`](FormalBase.sol): `SetupHook` plus two funded makers, `_placeOrder`, and AsyncSwap's
   storage slots.

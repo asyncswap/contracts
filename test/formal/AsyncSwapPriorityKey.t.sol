@@ -22,7 +22,8 @@ contract AsyncSwapPriorityKeyFormalTest is FormalRefA {
         o.owner = address(0xA11CE);
         o.amountIn = 1;
         o.amountOutMin = 1;
-        o.price = price;
+        // The outer index accepts tick keys; fee and sequence still span all uint64 values.
+        o.price = 1 + price % 1_774_545;
         o.isBuy = isBuy;
         o.sequence = seq;
         o.priorityFee = fee;

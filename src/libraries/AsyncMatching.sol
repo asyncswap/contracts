@@ -15,6 +15,7 @@ import {TickMath} from "v4-core/libraries/TickMath.sol";
 import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {RadixPriceTree} from "@async-swap/libraries/RadixPriceTree.sol";
+import {TickBitmap} from "@async-swap/libraries/TickBitmap.sol";
 import {EligiblePrice} from "@async-swap/libraries/EligiblePrice.sol";
 import {DynamicFeeOrdering} from "@async-swap/libraries/DynamicFeeOrdering.sol";
 
@@ -26,6 +27,7 @@ library AsyncMatching {
     using AsyncFiller for AsyncFiller.State;
     using PoolIdLibrary for PoolKey;
     using RadixPriceTree for RadixPriceTree.Tree;
+    using TickBitmap for TickBitmap.Tree;
     using BalanceDeltaLibrary for BalanceDelta;
     using SafeCast for *;
     using StateLibrary for IPoolManager;

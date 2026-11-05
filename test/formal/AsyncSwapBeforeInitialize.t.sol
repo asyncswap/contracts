@@ -89,9 +89,9 @@ contract AsyncSwapBeforeInitializeFormalTest is FormalBase {
         (ok, ret) = address(hook).call(abi.encodeCall(hook.beforeInitialize, (sender, k, sp)));
     }
 
-    /// @dev `priceBooks[key.toId()].minOrder`: `priceBooks` is slot 3, `minOrder` word 11 of a `Book`.
+    /// @dev `priceBooks[key.toId()].minOrder`: `priceBooks` is slot 3, `minOrder` word 9 of a bitmap `Book`.
     function _minOrderSlot(PoolKey memory k) internal pure returns (uint256) {
-        return uint256(keccak256(abi.encode(PoolId.unwrap(k.toId()), uint256(3)))) + 11;
+        return uint256(keccak256(abi.encode(PoolId.unwrap(k.toId()), uint256(3)))) + 9;
     }
 
     function _priorityCapSlot(PoolKey memory k) internal pure returns (uint256) {

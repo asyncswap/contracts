@@ -1,6 +1,6 @@
 # AsyncMatching
 
-[Git Source](https://github.com/asyncswap/contracts/blob/3d592f69e844182d94aca28bdb34aff01eaadb94/src/libraries/AsyncMatching.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7cc0f3471ba542b534750d8031a5ccf41b883551/src/libraries/AsyncMatching.sol)
 
 Linked matching module operating on the hook's order and radix-book storage.
 
@@ -27,23 +27,6 @@ uint24 private constant POOL_LIQUIDITY_FILL_FEE = 200;
 ```
 
 ## Functions
-
-<a id="addorder-asyncfiller-state-asyncfiller-book-asyncfiller-neworder" />
-
-### addOrder
-
-```solidity
-function addOrder(AsyncFiller.State storage self, AsyncFiller.Book storage book, AsyncFiller.NewOrder memory order)
-        public;
-```
-
-**Parameters**
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| self | `AsyncFiller.State` |  |
-| book | `AsyncFiller.Book` |  |
-| order | `AsyncFiller.NewOrder` |  |
 
 <a id="bestorder-asyncfiller-state-asyncfiller-book-bool" />
 
@@ -122,7 +105,7 @@ function updatePrice(AsyncFiller.State storage self, AsyncFiller.Book storage bo
 | book | `AsyncFiller.Book` |  |
 | params | `UpdateParams` |  |
 
-<a id="matchincoming-asyncfiller-state-asyncfiller-book-poolkey-bytes32-address" />
+<a id="matchincoming-asyncfiller-state-asyncfiller-book-poolkey-bytes32" />
 
 ### matchIncoming
 
@@ -131,8 +114,7 @@ function matchIncoming(
         AsyncFiller.State storage self,
         AsyncFiller.Book storage book,
         PoolKey calldata key,
-        bytes32 incomingId,
-        address hook
+        bytes32 incomingId
     ) public returns (uint8 matched);
 ```
 
@@ -144,7 +126,6 @@ function matchIncoming(
 | book | `AsyncFiller.Book` |  |
 | key | `PoolKey` |  |
 | incomingId | `bytes32` |  |
-| hook | `address` |  |
 
 **Returns**
 
@@ -152,7 +133,7 @@ function matchIncoming(
 | ---- | ---- | ----------- |
 | matched | `uint8` |  |
 
-<a id="matchbook-asyncfiller-state-asyncfiller-book-poolkey-uint8-address" />
+<a id="matchbook-asyncfiller-state-asyncfiller-book-poolkey-uint8" />
 
 ### matchBook
 
@@ -161,8 +142,7 @@ function matchBook(
         AsyncFiller.State storage self,
         AsyncFiller.Book storage book,
         PoolKey calldata key,
-        uint8 maxMatches,
-        address hook
+        uint8 maxMatches
     ) public returns (uint8 matched);
 ```
 
@@ -174,7 +154,6 @@ function matchBook(
 | book | `AsyncFiller.Book` |  |
 | key | `PoolKey` |  |
 | maxMatches | `uint8` |  |
-| hook | `address` |  |
 
 **Returns**
 
@@ -418,7 +397,7 @@ function _matchPair(
         bytes32 buyId,
         bytes32 sellId,
         ClaimTransfers.Batch memory batch
-    ) private returns (bool);
+    ) internal returns (bool);
 ```
 
 **Parameters**
@@ -443,9 +422,9 @@ function _matchPair(
 ### \_matchAmounts
 
 ```solidity
-function _matchAmounts(AsyncFiller.OrderInfo storage sell, AsyncFiller.OrderInfo storage buy, bool restingBuy)
-        private
-        view
+function _matchAmounts(AsyncFiller.OrderInfo memory sell, AsyncFiller.OrderInfo memory buy, bool restingBuy)
+        internal
+        pure
         returns (AsyncFiller.MatchAmounts memory amounts);
 ```
 
@@ -504,7 +483,7 @@ function _settleTransfers(
         Payouts memory payouts,
         AsyncFiller.MatchAmounts memory amounts,
         ClaimTransfers.Batch memory batch
-    ) private;
+    ) internal;
 ```
 
 **Parameters**
@@ -588,7 +567,7 @@ function _reduceAfterMatch(
         ReductionParams memory params,
         ClaimTransfers.Batch memory batch,
         bool closeDust
-    ) private returns (uint256);
+    ) internal returns (uint256);
 ```
 
 **Parameters**
@@ -652,7 +631,7 @@ function _creditPriorityFee(
         address maker,
         uint256 amount,
         ClaimTransfers.Batch memory batch
-    ) private;
+    ) internal;
 ```
 
 **Parameters**

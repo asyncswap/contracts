@@ -22,12 +22,14 @@ An MEV-capturing DEX built as a Uniswap v4 hook: an on-chain order book and matc
 - [BaseHook](/reference/src/BaseHook): abstract contract for hook implementations
 - [IFeeOwner](/reference/src/IFeeOwner)
 - [ISignatureTransfer](/reference/src/interfaces/ISignatureTransfer): Minimal subset of Uniswap Permit2's SignatureTransfer interface used by the Router. Canonical Permit2 lives at 0x000000000022D473030F116dDEE9F6B43aC78BA3 on every chain.
+- [IIncomingLiquidity](/reference/src/libraries/IIncomingLiquidity)
 - [AsyncFiller](/reference/src/libraries/AsyncFiller): Stores open async orders and settles fills against them.
 - [AsyncMatching](/reference/src/libraries/AsyncMatching): Linked matching module operating on the hook's order and radix-book storage.
 - [ClaimTransfers](/reference/src/libraries/ClaimTransfers)
 - [CurrencySettler](/reference/src/libraries/CurrencySettler): Production copy of v4-core's test-only `CurrencySettler`, using safe transfers so tokens that return no data from `transfer` / `transferFrom` (e.g. USDT) settle correctly.
 - [DynamicFeeOrdering](/reference/src/libraries/DynamicFeeOrdering): Linked library called by `AsyncMatching` in the hook's context.
 - [EligiblePrice](/reference/src/libraries/EligiblePrice): Exact-price summaries on a priority-key radix tree.
+- [IncomingMatching](/reference/src/libraries/IncomingMatching): Fund a crossing arrival, match it in memory, then index only its remainder.
 - [OrderSignatures](/reference/src/libraries/OrderSignatures): EIP-712 types for signed AsyncSwap actions. Every type spells out the maker, both tokens and the amounts so wallets render a readable message instead of opaque calldata.
 - [PriorityFeeUpdates](/reference/src/libraries/PriorityFeeUpdates): Funded priority amendments, linked separately to keep the hook within EIP-170.
 - [RadixPriceTree](/reference/src/libraries/RadixPriceTree): Patricia radix index for uint128 price levels. Inserts and removals traverse at most 128 branch bits; each distinct price creates one leaf and at most one branch node. Node ids released by `remove` are recycled by later inserts, so the id counter only grows with the peak number of simultaneously stored prices and can never be exhausted in practice (2^31 simultaneous levels).

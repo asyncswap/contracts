@@ -24,12 +24,14 @@ Sitemap:
 - [BaseHook](/reference/src/BaseHook): abstract contract for hook implementations
 - [IFeeOwner](/reference/src/IFeeOwner)
 - [ISignatureTransfer](/reference/src/interfaces/ISignatureTransfer): Minimal subset of Uniswap Permit2's SignatureTransfer interface used by the Router. Canonical Permit2 lives at 0x000000000022D473030F116dDEE9F6B43aC78BA3 on every chain.
+- [IIncomingLiquidity](/reference/src/libraries/IIncomingLiquidity)
 - [AsyncFiller](/reference/src/libraries/AsyncFiller): Stores open async orders and settles fills against them.
 - [AsyncMatching](/reference/src/libraries/AsyncMatching): Linked matching module operating on the hook's order and radix-book storage.
 - [ClaimTransfers](/reference/src/libraries/ClaimTransfers)
 - [CurrencySettler](/reference/src/libraries/CurrencySettler): Production copy of v4-core's test-only `CurrencySettler`, using safe transfers so tokens that return no data from `transfer` / `transferFrom` (e.g. USDT) settle correctly.
 - [DynamicFeeOrdering](/reference/src/libraries/DynamicFeeOrdering): Linked library called by `AsyncMatching` in the hook's context.
 - [EligiblePrice](/reference/src/libraries/EligiblePrice): Exact-price summaries on a priority-key radix tree.
+- [IncomingMatching](/reference/src/libraries/IncomingMatching): Fund a crossing arrival, match it in memory, then index only its remainder.
 - [OrderSignatures](/reference/src/libraries/OrderSignatures): EIP-712 types for signed AsyncSwap actions. Every type spells out the maker, both tokens and the amounts so wallets render a readable message instead of opaque calldata.
 - [PriorityFeeUpdates](/reference/src/libraries/PriorityFeeUpdates): Funded priority amendments, linked separately to keep the hook within EIP-170.
 - [RadixPriceTree](/reference/src/libraries/RadixPriceTree): Patricia radix index for uint128 price levels. Inserts and removals traverse at most 128 branch bits; each distinct price creates one leaf and at most one branch node. Node ids released by `remove` are recycled by later inserts, so the id counter only grows with the peak number of simultaneously stored prices and can never be exhausted in practice (2^31 simultaneous levels).
@@ -447,6 +449,8 @@ not revive old signatures of either kind. See [`repricing-signatures.md`](https:
 
 Current behavior, checked against the contract source. See also [contract call sequences](/protocol/contract-call-sequences) and the [README](/).
 
+The current source includes incoming-order memory matching; deployed v1.3.0 contracts do not. When an arrival can cross and there is no active LP liquidity, it is staged in transient storage during funding, then matched in memory against the whole book. Only a remaining order is persisted. Noncrossing arrivals and active-LP pools use stored admission. If funding activates LP liquidity, the candidate is persisted before the usual venue selection. Persistent getters do not expose a staged order during its funding callback. See the [implementation, benchmarks and review](https://github.com/asyncswap/contracts/blob/main/benchmarks/incoming-memory/README.md).
+
 ## Order lifecycle
 
 These diagrams describe the current source, not a deployment or mainnet-readiness guarantee. Book matching ranks the best opposing price first; higher escrowed USDC bids break ties at that price, followed by earlier submission. Zero-bid orders are valid and keep time priority behind paid bids. Private fills and explicit LP retries target a specific order and do not enforce the book's global priority queue.
@@ -487,7 +491,7 @@ flowchart TD
 
 If no executable crossing pair exists, the initial matching pass leaves the order unchanged before the LP attempt. `Router.matchBook` accepts a bound of 1–8 pairs and does not itself retry LP liquidity. An LP retry does not require the order to be first in the book. Private fills require a maker-authorized executor (normally the Router); the filler pays exactly the live minimum in the same transaction, and the 0.02% trade fee comes out of each side's proceeds. That trade fee is separate from the LP fee on pool-liquidity fills. Book-match proceeds, and input returned below the pool minimum, are credited as PoolManager claims in every currency, redeemable through `TokenClaims` (ERC-20), `NativeClaims` (ETH) or `Router.withdrawClaims`; native fill proceeds and refunds are claims too. Filler and LP fills pay ERC-20 output directly, except a pool-first fill that stops at the best book level: the order stays open for the book, so its output is credited as claims. When the pool goes first, a remainder below the pool minimum that the book leaves is returned as claims.
 
-Sources: [Router](https://github.com/asyncswap/contracts/blob/main/src/Router.sol), [AsyncSwap](https://github.com/asyncswap/contracts/blob/main/src/AsyncSwap.sol), [AsyncMatching](https://github.com/asyncswap/contracts/blob/main/src/libraries/AsyncMatching.sol), and [AsyncFiller](https://github.com/asyncswap/contracts/blob/main/src/libraries/AsyncFiller.sol).
+Sources: [Router](https://github.com/asyncswap/contracts/blob/main/src/Router.sol), [AsyncSwap](https://github.com/asyncswap/contracts/blob/main/src/AsyncSwap.sol), [IncomingMatching](https://github.com/asyncswap/contracts/blob/main/src/libraries/IncomingMatching.sol), [AsyncMatching](https://github.com/asyncswap/contracts/blob/main/src/libraries/AsyncMatching.sol), and [AsyncFiller](https://github.com/asyncswap/contracts/blob/main/src/libraries/AsyncFiller.sol).
 
 ## Fee top-ups
 
@@ -644,7 +648,7 @@ The [protocol overview](/protocol/overview#3-placing-an-order) contains the shor
 
 Solid arrows are calls or actions; dashed arrows are returns or delivered results. Each sequence groups related transactions; it is not one transaction from top to bottom. The app and wallet represent the user interface, not trusted settlement components. An indexer may observe emitted events for discovery, but neither an API nor an indexer is required by the contracts.
 
-`AsyncMatching` is a linked external library called in the hook's context. `AsyncFiller`, the price tree, and currency-settlement helpers operate on that same context; they are not independent custodians. Arrows from the matching library to PoolManager therefore execute as the hook. ERC-6909 claims and LP fee accounting live inside PoolManager.
+`IncomingMatching` and `AsyncMatching` are linked external libraries called in the hook's context. `AsyncFiller`, the price tree, and currency-settlement helpers operate on that same context; they are not independent custodians. Arrows from the matching library to PoolManager therefore execute as the hook. ERC-6909 claims and LP fee accounting live inside PoolManager. These sequences describe current source; deployed v1.3.0 contracts predate the incoming-memory path.
 
 ### User order, book matching, and LP fallback
 
@@ -657,7 +661,7 @@ sequenceDiagram
     actor Relayer
     participant Router
     participant Hook as AsyncSwap hook
-    participant Match as AsyncMatching / AsyncFiller
+    participant Match as IncomingMatching / AsyncMatching / AsyncFiller
     participant Fee as DynamicFeeOrdering
     participant Permit as Permit2
     participant Token as ERC-20 / USDC
@@ -687,10 +691,10 @@ sequenceDiagram
     Router->>PM: swap(exact input, hook data)
     PM->>Hook: beforeSwap(...)
     Hook->>PM: mint input escrow claims to hook
-    Hook->>Match: Check pool minimum (USDC leg) and asset floor, add order to price book
+    Hook->>Match: Check minimums and stage crossing arrival, or add to price book
     Match->>PM: mint bid escrow claims to hook, hook owes bid
-    Match-->>Hook: Order recorded
-    Note over Hook,Match: AsyncOrderCreated event, order is not matched until input and bid funding finish.
+    Match-->>Hook: Order staged or indexed
+    Note over Hook,Match: Without active LPs, potentially crossing arrivals use transient storage during funding.<br/>AsyncOrderCreated is emitted; matching waits until input and bid funding finish.
     Hook-->>PM: beforeSwap selector and custom accounting delta
     PM-->>Router: Swap delta
     alt Direct input funding
@@ -711,9 +715,9 @@ sequenceDiagram
     end
     Router->>Hook: matchNewOrder(order)
     Note over Hook,PM: If the pool has active liquidity and its spot tick beats the best opposing level,<br/>the pool fill below runs first, limited at that level, and the book takes what it leaves.<br/>A remainder below the pool minimum that the book leaves is then refunded as claims.
-    Hook->>Match: matchIncoming(...)
+    Hook->>Match: matchNewOrder(...), recheck liquidity and load candidate
     loop Up to 8 executable crossing pairs
-        Match->>Match: Best bid and best ask across the whole book (price, then bid, then time)
+        Match->>Match: Best bid and ask across candidate plus stored book (price, then bid, then time)
         Match->>Match: Reduce both orders before any payout
         Match->>PM: Settle filled bid shares to FeeVault
         Match->>PM: Burn input claims and credit both order legs as claims
@@ -721,8 +725,9 @@ sequenceDiagram
         PM-->>Counterparty: Proceeds as claims (any currency)
         Note over Match,Vault: Re-rank remainders. A remainder below the pool minimum is returned as claims<br/>and its residual bid goes to FeeVault.
     end
+    Match->>Match: Persist only the memory candidate's remainder
     Match-->>Hook: Matched pair count
-    opt Incoming order still has a remainder
+    opt Stored route: incoming order still has a remainder
         Hook->>Hook: External self-call fillOrderFromPoolLiquidity(order, id)
         Hook->>Match: fillFromPoolLiquidity(...)
         Match->>PM: Burn the input claims less 0.01%, temporarily set 0.02% LP fee
@@ -1541,7 +1546,7 @@ match the code on `main`. Each page links to its source file.
 
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/3d592f69e844182d94aca28bdb34aff01eaadb94/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7cc0f3471ba542b534750d8031a5ccf41b883551/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -2224,37 +2229,6 @@ function matchNewOrder(AsyncOrder calldata order) external returns (uint8 matche
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | matched | `uint8` |  |
-
-<a id="_poolbeatsbook-poolkey-bool" />
-
-### \_poolBeatsBook
-
-<i>
-  True when the pool has active liquidity and its current price is strictly better for an
-  incoming order than the best resting order on the other side: below the best ask for a
-  buy, above the best bid for a sell (`TickPrice.poolBeatsLevel`). An empty opposite side or an equal level leaves the book first.
-  The spot price excludes the pool fill's fixed fees and price impact, so this is a heuristic; inside the
-  dynamic-fee window it counts the fee a fill back toward the reference pays. With it, the limit a pool-first
-  swap may not cross.
-</i>
-
-```solidity
-function _poolBeatsBook(PoolKey calldata key, bool isBuy) private view returns (bool, uint160);
-```
-
-**Parameters**
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| key | `PoolKey` |  |
-| isBuy | `bool` |  |
-
-**Returns**
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| \<none> | `bool` |  |
-| \<none> | `uint160` |  |
 
 <a id="tryfillorderfrompoolliquidity-asyncorder" />
 
@@ -3026,7 +3000,7 @@ struct UserParams {
 
 # FeeVault
 
-[Git Source](https://github.com/asyncswap/contracts/blob/3d592f69e844182d94aca28bdb34aff01eaadb94/src/FeeVault.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7cc0f3471ba542b534750d8031a5ccf41b883551/src/FeeVault.sol)
 
 Holds and redeems protocol fee claims, never maker escrow.
 
@@ -3133,7 +3107,7 @@ error ZeroAddress();
 
 # ImmutableState
 
-[Git Source](https://github.com/asyncswap/contracts/blob/3d592f69e844182d94aca28bdb34aff01eaadb94/src/ImmutableState.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7cc0f3471ba542b534750d8031a5ccf41b883551/src/ImmutableState.sol)
 
 **Title:** Immutable State
 
@@ -3185,7 +3159,7 @@ error NotPoolManager();
 
 # MatchingEngine
 
-[Git Source](https://github.com/asyncswap/contracts/blob/3d592f69e844182d94aca28bdb34aff01eaadb94/src/MatchingEngine.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7cc0f3471ba542b534750d8031a5ccf41b883551/src/MatchingEngine.sol)
 
 **Title:** MatchingEngine
 
@@ -3658,7 +3632,7 @@ struct Book {
 
 # NativeClaims
 
-[Git Source](https://github.com/asyncswap/contracts/blob/3d592f69e844182d94aca28bdb34aff01eaadb94/src/NativeClaims.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7cc0f3471ba542b534750d8031a5ccf41b883551/src/NativeClaims.sol)
 
 Redeems the caller's PoolManager native ETH claims to a chosen recipient.
 
@@ -3780,7 +3754,7 @@ error ReentrantRedemption();
 
 # Router
 
-[Git Source](https://github.com/asyncswap/contracts/blob/3d592f69e844182d94aca28bdb34aff01eaadb94/src/Router.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7cc0f3471ba542b534750d8031a5ccf41b883551/src/Router.sol)
 
 **Inherits:** EIP712, Multicall
 
@@ -4472,7 +4446,7 @@ enum ActionType {
 
 # TokenClaims
 
-[Git Source](https://github.com/asyncswap/contracts/blob/3d592f69e844182d94aca28bdb34aff01eaadb94/src/TokenClaims.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7cc0f3471ba542b534750d8031a5ccf41b883551/src/TokenClaims.sol)
 
 Redeems the caller's PoolManager currency claims to a chosen recipient.
 
@@ -4596,7 +4570,7 @@ error ReentrantRedemption();
 
 # BaseHook
 
-[Git Source](https://github.com/asyncswap/contracts/blob/3d592f69e844182d94aca28bdb34aff01eaadb94/src/BaseHook.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7cc0f3471ba542b534750d8031a5ccf41b883551/src/BaseHook.sol)
 
 **Inherits:** IHooks, [ImmutableState](/reference/src/ImmutableState)
 
@@ -5256,7 +5230,7 @@ error HookNotImplemented();
 
 # IFeeOwner
 
-[Git Source](https://github.com/asyncswap/contracts/blob/3d592f69e844182d94aca28bdb34aff01eaadb94/src/FeeVault.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7cc0f3471ba542b534750d8031a5ccf41b883551/src/FeeVault.sol)
 
 ## Functions
 
@@ -5276,7 +5250,7 @@ function owner() external view returns (address);
 
 # ISignatureTransfer
 
-[Git Source](https://github.com/asyncswap/contracts/blob/3d592f69e844182d94aca28bdb34aff01eaadb94/src/interfaces/ISignatureTransfer.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7cc0f3471ba542b534750d8031a5ccf41b883551/src/interfaces/ISignatureTransfer.sol)
 
 **Title:** ISignatureTransfer
 
@@ -5367,9 +5341,35 @@ struct SignatureTransferDetails {
 | to | `address` |  |
 | requestedAmount | `uint256` |  |
 
+# IIncomingLiquidity
+
+[Git Source](https://github.com/asyncswap/contracts/blob/7cc0f3471ba542b534750d8031a5ccf41b883551/src/libraries/IncomingMatching.sol)
+
+<i>
+  The hook's existing self-call boundary rolls back a failed LP attempt atomically.
+</i>
+
+## Functions
+
+<a id="fillorderfrompoolliquidity-asyncorder-bytes32-uint160" />
+
+### fillOrderFromPoolLiquidity
+
+```solidity
+function fillOrderFromPoolLiquidity(AsyncOrder calldata order, bytes32 id, uint160 sqrtPriceLimitX96) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| id | `bytes32` |  |
+| sqrtPriceLimitX96 | `uint160` |  |
+
 # AsyncFiller
 
-[Git Source](https://github.com/asyncswap/contracts/blob/3d592f69e844182d94aca28bdb34aff01eaadb94/src/libraries/AsyncFiller.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7cc0f3471ba542b534750d8031a5ccf41b883551/src/libraries/AsyncFiller.sol)
 
 **Title:** AsyncFiller
 
@@ -6351,7 +6351,7 @@ struct Book {
 
 # AsyncMatching
 
-[Git Source](https://github.com/asyncswap/contracts/blob/3d592f69e844182d94aca28bdb34aff01eaadb94/src/libraries/AsyncMatching.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7cc0f3471ba542b534750d8031a5ccf41b883551/src/libraries/AsyncMatching.sol)
 
 Linked matching module operating on the hook's order and radix-book storage.
 
@@ -6378,23 +6378,6 @@ uint24 private constant POOL_LIQUIDITY_FILL_FEE = 200;
 ```
 
 ## Functions
-
-<a id="addorder-asyncfiller-state-asyncfiller-book-asyncfiller-neworder" />
-
-### addOrder
-
-```solidity
-function addOrder(AsyncFiller.State storage self, AsyncFiller.Book storage book, AsyncFiller.NewOrder memory order)
-        public;
-```
-
-**Parameters**
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| self | `AsyncFiller.State` |  |
-| book | `AsyncFiller.Book` |  |
-| order | `AsyncFiller.NewOrder` |  |
 
 <a id="bestorder-asyncfiller-state-asyncfiller-book-bool" />
 
@@ -6473,7 +6456,7 @@ function updatePrice(AsyncFiller.State storage self, AsyncFiller.Book storage bo
 | book | `AsyncFiller.Book` |  |
 | params | `UpdateParams` |  |
 
-<a id="matchincoming-asyncfiller-state-asyncfiller-book-poolkey-bytes32-address" />
+<a id="matchincoming-asyncfiller-state-asyncfiller-book-poolkey-bytes32" />
 
 ### matchIncoming
 
@@ -6482,8 +6465,7 @@ function matchIncoming(
         AsyncFiller.State storage self,
         AsyncFiller.Book storage book,
         PoolKey calldata key,
-        bytes32 incomingId,
-        address hook
+        bytes32 incomingId
     ) public returns (uint8 matched);
 ```
 
@@ -6495,7 +6477,6 @@ function matchIncoming(
 | book | `AsyncFiller.Book` |  |
 | key | `PoolKey` |  |
 | incomingId | `bytes32` |  |
-| hook | `address` |  |
 
 **Returns**
 
@@ -6503,7 +6484,7 @@ function matchIncoming(
 | ---- | ---- | ----------- |
 | matched | `uint8` |  |
 
-<a id="matchbook-asyncfiller-state-asyncfiller-book-poolkey-uint8-address" />
+<a id="matchbook-asyncfiller-state-asyncfiller-book-poolkey-uint8" />
 
 ### matchBook
 
@@ -6512,8 +6493,7 @@ function matchBook(
         AsyncFiller.State storage self,
         AsyncFiller.Book storage book,
         PoolKey calldata key,
-        uint8 maxMatches,
-        address hook
+        uint8 maxMatches
     ) public returns (uint8 matched);
 ```
 
@@ -6525,7 +6505,6 @@ function matchBook(
 | book | `AsyncFiller.Book` |  |
 | key | `PoolKey` |  |
 | maxMatches | `uint8` |  |
-| hook | `address` |  |
 
 **Returns**
 
@@ -6769,7 +6748,7 @@ function _matchPair(
         bytes32 buyId,
         bytes32 sellId,
         ClaimTransfers.Batch memory batch
-    ) private returns (bool);
+    ) internal returns (bool);
 ```
 
 **Parameters**
@@ -6794,9 +6773,9 @@ function _matchPair(
 ### \_matchAmounts
 
 ```solidity
-function _matchAmounts(AsyncFiller.OrderInfo storage sell, AsyncFiller.OrderInfo storage buy, bool restingBuy)
-        private
-        view
+function _matchAmounts(AsyncFiller.OrderInfo memory sell, AsyncFiller.OrderInfo memory buy, bool restingBuy)
+        internal
+        pure
         returns (AsyncFiller.MatchAmounts memory amounts);
 ```
 
@@ -6855,7 +6834,7 @@ function _settleTransfers(
         Payouts memory payouts,
         AsyncFiller.MatchAmounts memory amounts,
         ClaimTransfers.Batch memory batch
-    ) private;
+    ) internal;
 ```
 
 **Parameters**
@@ -6939,7 +6918,7 @@ function _reduceAfterMatch(
         ReductionParams memory params,
         ClaimTransfers.Batch memory batch,
         bool closeDust
-    ) private returns (uint256);
+    ) internal returns (uint256);
 ```
 
 **Parameters**
@@ -7003,7 +6982,7 @@ function _creditPriorityFee(
         address maker,
         uint256 amount,
         ClaimTransfers.Batch memory batch
-    ) private;
+    ) internal;
 ```
 
 **Parameters**
@@ -7245,7 +7224,7 @@ struct UpdateParams {
 
 # ClaimTransfers
 
-[Git Source](https://github.com/asyncswap/contracts/blob/3d592f69e844182d94aca28bdb34aff01eaadb94/src/libraries/ClaimTransfers.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7cc0f3471ba542b534750d8031a5ccf41b883551/src/libraries/ClaimTransfers.sol)
 
 <i>
   At most 16 makers and the FeeVault can each receive two currencies in eight matches.
@@ -7325,7 +7304,7 @@ struct Batch {
 
 # CurrencySettler
 
-[Git Source](https://github.com/asyncswap/contracts/blob/3d592f69e844182d94aca28bdb34aff01eaadb94/src/libraries/CurrencySettler.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7cc0f3471ba542b534750d8031a5ccf41b883551/src/libraries/CurrencySettler.sol)
 
 **Title:** CurrencySettler
 
@@ -7376,7 +7355,7 @@ function take(Currency currency, IPoolManager manager, address recipient, uint25
 
 # DynamicFeeOrdering
 
-[Git Source](https://github.com/asyncswap/contracts/blob/3d592f69e844182d94aca28bdb34aff01eaadb94/src/libraries/DynamicFeeOrdering.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7cc0f3471ba542b534750d8031a5ccf41b883551/src/libraries/DynamicFeeOrdering.sol)
 
 **Title:** Dynamic fee ordering on pool-liquidity fills
 
@@ -7524,7 +7503,7 @@ event PoolPriceObserved(
 
 # EligiblePrice
 
-[Git Source](https://github.com/asyncswap/contracts/blob/3d592f69e844182d94aca28bdb34aff01eaadb94/src/libraries/EligiblePrice.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7cc0f3471ba542b534750d8031a5ccf41b883551/src/libraries/EligiblePrice.sol)
 
 Exact-price summaries on a priority-key radix tree.
 
@@ -7701,9 +7680,397 @@ struct Ratio {
 | numerator | `uint256` |  |
 | denominator | `uint256` |  |
 
+# IncomingMatching
+
+[Git Source](https://github.com/asyncswap/contracts/blob/7cc0f3471ba542b534750d8031a5ccf41b883551/src/libraries/IncomingMatching.sol)
+
+Fund a crossing arrival, match it in memory, then index only its remainder.
+
+<i>
+  Active LP pools retain the existing storage path. Pending orders cannot match before funding.
+</i>
+
+## Constants
+
+### STAGE
+
+```solidity
+bytes32 private constant STAGE = keccak256("asyncswap.incoming.record");
+```
+
+### POOL
+
+```solidity
+bytes32 private constant POOL = keccak256("asyncswap.incoming.pool");
+```
+
+### ID
+
+```solidity
+bytes32 private constant ID = keccak256("asyncswap.incoming.id");
+```
+
+## Functions
+
+<a id="pending-poolid" />
+
+### pending
+
+```solidity
+function pending(PoolId poolId) public view returns (bool result);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolId | `PoolId` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| result | `bool` |  |
+
+<a id="addorder-asyncfiller-state-asyncfiller-book-asyncfiller-neworder" />
+
+### addOrder
+
+<i>
+  Shared stored-admission wrapper. Keeping it here avoids duplicating admission
+  bytecode in AsyncMatching, which only needs reductions and settlement for existing orders.
+</i>
+
+```solidity
+function addOrder(AsyncFiller.State storage self, AsyncFiller.Book storage book, AsyncFiller.NewOrder memory order)
+        public;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| book | `AsyncFiller.Book` |  |
+| order | `AsyncFiller.NewOrder` |  |
+
+<a id="stage-asyncfiller-state-asyncfiller-book-asyncfiller-neworder" />
+
+### stage
+
+```solidity
+function stage(AsyncFiller.State storage self, AsyncFiller.Book storage book, AsyncFiller.NewOrder memory order)
+        public;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| book | `AsyncFiller.Book` |  |
+| order | `AsyncFiller.NewOrder` |  |
+
+<a id="_cancross-asyncfiller-book-asyncfiller-neworder" />
+
+### \_canCross
+
+<i>
+  Resting-only arrivals keep ordinary admission. The memory bridge pays off when
+  an opposite order crosses; repeat full selection after funding because callbacks can reprice.
+</i>
+
+```solidity
+function _canCross(AsyncFiller.Book storage book, AsyncFiller.NewOrder memory order) private view returns (bool);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| book | `AsyncFiller.Book` |  |
+| order | `AsyncFiller.NewOrder` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bool` |  |
+
+<a id="matchneworder-asyncfiller-state-asyncfiller-book-asyncorder-bytes32" />
+
+### matchNewOrder
+
+<i>
+  Delegatecall keeps escrow and the LP self-call in the hook context, while moving
+  venue orchestration out of the hook's size-constrained runtime. Funding/auth stay in the Router/hook.
+</i>
+
+```solidity
+function matchNewOrder(
+        AsyncFiller.State storage self,
+        AsyncFiller.Book storage book,
+        AsyncOrder calldata order,
+        bytes32 id
+    ) public returns (uint8 matched);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| book | `AsyncFiller.Book` |  |
+| order | `AsyncOrder` |  |
+| id | `bytes32` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| matched | `uint8` |  |
+
+<a id="_poolbeatsbook-asyncfiller-state-asyncfiller-book-poolkey-bool" />
+
+### \_poolBeatsBook
+
+<i>
+  The pool goes first only while its adjusted price beats the best opposite level.
+  An equal level or empty opposite side leaves the book first; the existing LP limit is unchanged.
+</i>
+
+```solidity
+function _poolBeatsBook(
+        AsyncFiller.State storage self,
+        AsyncFiller.Book storage book,
+        PoolKey calldata key,
+        bool isBuy
+    ) private view returns (bool, uint160);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| book | `AsyncFiller.Book` |  |
+| key | `PoolKey` |  |
+| isBuy | `bool` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bool` |  |
+| \<none> | `uint160` |  |
+
+<a id="_matchpending-asyncfiller-state-asyncfiller-book-poolkey-bytes32-address" />
+
+### \_matchPending
+
+```solidity
+function _matchPending(
+        AsyncFiller.State storage self,
+        AsyncFiller.Book storage book,
+        PoolKey calldata key,
+        bytes32 id,
+        address owner
+    ) private returns (bool handled, uint8 matched);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| book | `AsyncFiller.Book` |  |
+| key | `PoolKey` |  |
+| id | `bytes32` |  |
+| owner | `address` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| handled | `bool` |  |
+| matched | `uint8` |  |
+
+<a id="_load-bytes32-address" />
+
+### \_load
+
+```solidity
+function _load(bytes32 id, address owner) private returns (AsyncFiller.OrderInfo memory incoming);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| id | `bytes32` |  |
+| owner | `address` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| incoming | `AsyncFiller.OrderInfo` |  |
+
+<a id="_crosses-asyncfiller-state-asyncfiller-orderinfo-bytes32-bytes32-bytes32" />
+
+### \_crosses
+
+```solidity
+function _crosses(
+        AsyncFiller.State storage self,
+        AsyncFiller.OrderInfo memory incoming,
+        bytes32 id,
+        bytes32 bid,
+        bytes32 ask
+    ) private view returns (bool);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| incoming | `AsyncFiller.OrderInfo` |  |
+| id | `bytes32` |  |
+| bid | `bytes32` |  |
+| ask | `bytes32` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bool` |  |
+
+<a id="_persist-asyncfiller-state-asyncfiller-book-bytes32-asyncfiller-orderinfo" />
+
+### \_persist
+
+```solidity
+function _persist(
+        AsyncFiller.State storage self,
+        AsyncFiller.Book storage book,
+        bytes32 id,
+        AsyncFiller.OrderInfo memory info
+    ) private;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| book | `AsyncFiller.Book` |  |
+| id | `bytes32` |  |
+| info | `AsyncFiller.OrderInfo` |  |
+
+<a id="_best-asyncfiller-state-asyncfiller-book-asyncfiller-orderinfo-bytes32-bool" />
+
+### \_best
+
+```solidity
+function _best(
+        AsyncFiller.State storage self,
+        AsyncFiller.Book storage book,
+        AsyncFiller.OrderInfo memory incoming,
+        bytes32 id,
+        bool buy
+    ) private view returns (bytes32);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| book | `AsyncFiller.Book` |  |
+| incoming | `AsyncFiller.OrderInfo` |  |
+| id | `bytes32` |  |
+| buy | `bool` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bytes32` |  |
+
+<a id="_match-asyncfiller-state-asyncfiller-book-poolkey-bytes32-asyncfiller-orderinfo-bytes32-bytes32-claimtransfers-batch" />
+
+### \_match
+
+```solidity
+function _match(
+        AsyncFiller.State storage self,
+        AsyncFiller.Book storage book,
+        PoolKey calldata key,
+        bytes32 id,
+        AsyncFiller.OrderInfo memory incoming,
+        bytes32 bid,
+        bytes32 ask,
+        ClaimTransfers.Batch memory batch
+    ) private returns (bool);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| book | `AsyncFiller.Book` |  |
+| key | `PoolKey` |  |
+| id | `bytes32` |  |
+| incoming | `AsyncFiller.OrderInfo` |  |
+| bid | `bytes32` |  |
+| ask | `bytes32` |  |
+| batch | `ClaimTransfers.Batch` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bool` |  |
+
+<a id="_reduce-asyncfiller-state-asyncfiller-book-poolkey-bytes32-asyncfiller-orderinfo-uint256-claimtransfers-batch" />
+
+### \_reduce
+
+```solidity
+function _reduce(
+        AsyncFiller.State storage self,
+        AsyncFiller.Book storage book,
+        PoolKey calldata key,
+        bytes32 id,
+        AsyncFiller.OrderInfo memory info,
+        uint256 consumed,
+        ClaimTransfers.Batch memory batch
+    ) private returns (uint256 refund);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| book | `AsyncFiller.Book` |  |
+| key | `PoolKey` |  |
+| id | `bytes32` |  |
+| info | `AsyncFiller.OrderInfo` |  |
+| consumed | `uint256` |  |
+| batch | `ClaimTransfers.Batch` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| refund | `uint256` |  |
+
 # OrderSignatures
 
-[Git Source](https://github.com/asyncswap/contracts/blob/3d592f69e844182d94aca28bdb34aff01eaadb94/src/libraries/OrderSignatures.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7cc0f3471ba542b534750d8031a5ccf41b883551/src/libraries/OrderSignatures.sol)
 
 **Title:** OrderSignatures
 
@@ -7958,7 +8325,7 @@ function hashCancel(
 
 # PriorityFeeUpdates
 
-[Git Source](https://github.com/asyncswap/contracts/blob/3d592f69e844182d94aca28bdb34aff01eaadb94/src/libraries/PriorityFeeUpdates.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7cc0f3471ba542b534750d8031a5ccf41b883551/src/libraries/PriorityFeeUpdates.sol)
 
 Funded priority amendments, linked separately to keep the hook within EIP-170.
 
@@ -8013,7 +8380,7 @@ event AsyncOrderPriorityFeeUpdated(
 
 # RadixPriceTree
 
-[Git Source](https://github.com/asyncswap/contracts/blob/3d592f69e844182d94aca28bdb34aff01eaadb94/src/libraries/RadixPriceTree.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7cc0f3471ba542b534750d8031a5ccf41b883551/src/libraries/RadixPriceTree.sol)
 
 Patricia radix index for uint128 price levels. Inserts and removals
 traverse at most 128 branch bits; each distinct price creates one
@@ -8229,7 +8596,7 @@ struct Tree {
 
 # TickBitmap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/3d592f69e844182d94aca28bdb34aff01eaadb94/src/libraries/TickBitmap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7cc0f3471ba542b534750d8031a5ccf41b883551/src/libraries/TickBitmap.sol)
 
 Three-level occupancy bitmap for the bounded tick-key domain.
 
@@ -8363,7 +8730,7 @@ struct Tree {
 
 # TickPrice
 
-[Git Source](https://github.com/asyncswap/contracts/blob/3d592f69e844182d94aca28bdb34aff01eaadb94/src/libraries/TickPrice.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7cc0f3471ba542b534750d8031a5ccf41b883551/src/libraries/TickPrice.sol)
 
 Book levels on Uniswap v4 ticks: an order sits at the floor tick (spacing 1, 0.01% steps)
 of its exact currency1/currency0 limit. Levels are a fixed relative width at any price and
@@ -8472,7 +8839,7 @@ function floorTick(uint256 num, uint256 den) internal pure returns (int24);
 
 # AsyncOrderLibrary
 
-[Git Source](https://github.com/asyncswap/contracts/blob/3d592f69e844182d94aca28bdb34aff01eaadb94/src/types/AsyncOrder.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7cc0f3471ba542b534750d8031a5ccf41b883551/src/types/AsyncOrder.sol)
 
 **Title:** AsyncOrderLibrary
 
@@ -8514,7 +8881,7 @@ function orderId(AsyncOrder calldata order) internal view returns (bytes32);
 
 # AsyncOrder
 
-[Git Source](https://github.com/asyncswap/contracts/blob/3d592f69e844182d94aca28bdb34aff01eaadb94/src/types/AsyncOrder.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7cc0f3471ba542b534750d8031a5ccf41b883551/src/types/AsyncOrder.sol)
 
 Represents an async order for a swap in the Uniswap V4 pool.
 

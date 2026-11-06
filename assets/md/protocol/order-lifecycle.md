@@ -2,6 +2,8 @@
 
 Current behavior, checked against the contract source. See also [contract call sequences](/protocol/contract-call-sequences) and the [README](/).
 
+The current source includes incoming-order memory matching; deployed v1.3.0 contracts do not. When an arrival can cross and there is no active LP liquidity, it is staged in transient storage during funding, then matched in memory against the whole book. Only a remaining order is persisted. Noncrossing arrivals and active-LP pools use stored admission. If funding activates LP liquidity, the candidate is persisted before the usual venue selection. Persistent getters do not expose a staged order during its funding callback. See the [implementation, benchmarks and review](https://github.com/asyncswap/contracts/blob/main/benchmarks/incoming-memory/README.md).
+
 ## Order lifecycle
 
 These diagrams describe the current source, not a deployment or mainnet-readiness guarantee. Book matching ranks the best opposing price first; higher escrowed USDC bids break ties at that price, followed by earlier submission. Zero-bid orders are valid and keep time priority behind paid bids. Private fills and explicit LP retries target a specific order and do not enforce the book's global priority queue.
@@ -42,7 +44,7 @@ flowchart TD
 
 If no executable crossing pair exists, the initial matching pass leaves the order unchanged before the LP attempt. `Router.matchBook` accepts a bound of 1–8 pairs and does not itself retry LP liquidity. An LP retry does not require the order to be first in the book. Private fills require a maker-authorized executor (normally the Router); the filler pays exactly the live minimum in the same transaction, and the 0.02% trade fee comes out of each side's proceeds. That trade fee is separate from the LP fee on pool-liquidity fills. Book-match proceeds, and input returned below the pool minimum, are credited as PoolManager claims in every currency, redeemable through `TokenClaims` (ERC-20), `NativeClaims` (ETH) or `Router.withdrawClaims`; native fill proceeds and refunds are claims too. Filler and LP fills pay ERC-20 output directly, except a pool-first fill that stops at the best book level: the order stays open for the book, so its output is credited as claims. When the pool goes first, a remainder below the pool minimum that the book leaves is returned as claims.
 
-Sources: [Router](https://github.com/asyncswap/contracts/blob/main/src/Router.sol), [AsyncSwap](https://github.com/asyncswap/contracts/blob/main/src/AsyncSwap.sol), [AsyncMatching](https://github.com/asyncswap/contracts/blob/main/src/libraries/AsyncMatching.sol), and [AsyncFiller](https://github.com/asyncswap/contracts/blob/main/src/libraries/AsyncFiller.sol).
+Sources: [Router](https://github.com/asyncswap/contracts/blob/main/src/Router.sol), [AsyncSwap](https://github.com/asyncswap/contracts/blob/main/src/AsyncSwap.sol), [IncomingMatching](https://github.com/asyncswap/contracts/blob/main/src/libraries/IncomingMatching.sol), [AsyncMatching](https://github.com/asyncswap/contracts/blob/main/src/libraries/AsyncMatching.sol), and [AsyncFiller](https://github.com/asyncswap/contracts/blob/main/src/libraries/AsyncFiller.sol).
 
 ## Fee top-ups
 

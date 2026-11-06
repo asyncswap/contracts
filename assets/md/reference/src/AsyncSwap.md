@@ -1,6 +1,6 @@
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/3d592f69e844182d94aca28bdb34aff01eaadb94/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/7cc0f3471ba542b534750d8031a5ccf41b883551/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -683,37 +683,6 @@ function matchNewOrder(AsyncOrder calldata order) external returns (uint8 matche
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | matched | `uint8` |  |
-
-<a id="_poolbeatsbook-poolkey-bool" />
-
-### \_poolBeatsBook
-
-<i>
-  True when the pool has active liquidity and its current price is strictly better for an
-  incoming order than the best resting order on the other side: below the best ask for a
-  buy, above the best bid for a sell (`TickPrice.poolBeatsLevel`). An empty opposite side or an equal level leaves the book first.
-  The spot price excludes the pool fill's fixed fees and price impact, so this is a heuristic; inside the
-  dynamic-fee window it counts the fee a fill back toward the reference pays. With it, the limit a pool-first
-  swap may not cross.
-</i>
-
-```solidity
-function _poolBeatsBook(PoolKey calldata key, bool isBuy) private view returns (bool, uint160);
-```
-
-**Parameters**
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| key | `PoolKey` |  |
-| isBuy | `bool` |  |
-
-**Returns**
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| \<none> | `bool` |  |
-| \<none> | `uint160` |  |
 
 <a id="tryfillorderfrompoolliquidity-asyncorder" />
 

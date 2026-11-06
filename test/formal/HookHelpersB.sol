@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
+import {PoolId} from "v4-core/types/PoolId.sol";
 
 import {HookUnlockBase} from "./HookUnlockBase.sol";
 import {LibHelpersCasesB, RadixTreeHarnessB} from "./LibHelpersB.sol";
@@ -81,7 +82,9 @@ abstract contract HookHelpersCasesB is HookUnlockBase, LibHelpersCasesB {
     /// @dev Create an order owned by this contract without the Router's `matchNewOrder`, so it rests
     ///      even when it crosses the book.
     function _rest(bool zeroForOne, uint256 amountIn, uint256 amountOutMin) internal returns (bytes32 id) {
+        (bytes32 liquiditySlot, bytes32 previousLiquidity) = _storedAdmissionFixture(PoolId.unwrap(poolId));
         _run(_createCalls(key, zeroForOne, amountIn, amountOutMin, 100_000));
+        _restoreAdmissionFixture(liquiditySlot, previousLiquidity);
         id = _idOf(_selfOrder(key, zeroForOne, amountIn, amountOutMin, 100_000));
     }
 

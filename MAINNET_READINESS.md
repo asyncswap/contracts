@@ -18,6 +18,17 @@ Fixed at deployment, with no setter:
 - [ ] Fix or acknowledge every finding, with a regression test for each fix.
 - [ ] Recheck contract sizes; AsyncMatching has 351 bytes and AsyncSwap has 417 bytes left under the 24,576-byte limit.
 - [ ] Stress test at 100 transactions per block.
+  Local one-sided block packing passed in interface PR #175. Additional
+  [matching, liquidity, withdrawals and sustained-read tests](benchmarks/stress/README.md)
+  pass locally; these stateful tests do not close the broader block-packing gate.
+  The [bounded public-testnet ingestion/read soak](benchmarks/soak/README.md)
+  passed: 98 transactions, 96 reconciled lifecycle events and 10,016 successful
+  reads over 10 minutes 26 seconds. This does not establish multi-hour resilience
+  or crossing-heavy block capacity. The [crossing-capacity matrix](benchmarks/crossing/README.md)
+  is now measured: all 1,000 transactions and 5,200 pairs settled correctly,
+  but no workload fit 100 crossing transactions into a 30-million-gas block.
+  The observed first blocks held 44–51 single-fill transactions or 10–12
+  eight-fill transactions. This capacity target remains unmet at that budget.
 - [ ] Rehearse the deployment on a Unichain fork, then pin and verify the bytecode.
 - [ ] Deploy `TokenClaims` and `NativeClaims` with the core contracts.
 - [ ] Ship claim redemption in the indexer and frontend.

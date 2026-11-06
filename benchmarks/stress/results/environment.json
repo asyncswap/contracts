@@ -1,0 +1,8 @@
+{
+  "contractsRelease": "v1.3.0",
+  "sourceCommit": "021e9300476bc4f23cf9cd99a46cafcbe4ec3673",
+  "forge": "forge Version: 1.9.0",
+  "contractTestCommand": "STRESS_ROUNDS=128 forge test --match-path test/StressCompletion.t.sol --match-test test_stress --gas-limit 1000000000000 --json",
+  "regressionCommand": "forge test --match-contract '^(PoolLiquidityFillTest|RouterClaimsTest|AsyncSwapTest)$' --json",
+  "scope": "Local Foundry stateful stress plus bounded localhost API read load. Not separate blockchain transaction receipts or a public testnet soak."
+}

@@ -1,0 +1,46 @@
+{
+  "startedAt": 1793910653.398746,
+  "complete": false,
+  "owner": "0x33ce69DA05c3ad30A3b525625F950fAda8673205",
+  "cyclesPerChain": 12,
+  "maxFeePerGas": 20000000,
+  "gasLimit": 1000000,
+  "maxTransactionsPerChain": 52,
+  "chains": {
+    "1301": {
+      "hook": "0x914B6D0B00f0897a1FdaE43329556F477cf86888",
+      "router": "0xd31b1B308090e461c9944510fECdA447f849Ca52",
+      "poolId": "0xe9b3a8f53a97c03dddbc5e99b9e07903f6857739316c01cf849c6741104ab49f",
+      "nativeBefore": "61245100516277630",
+      "quoteBefore": "106973600",
+      "quoteAfter": "106973600",
+      "quoteSpent": "0",
+      "nativeAfter": "61245100516277630",
+      "allowance": 0,
+      "feeVaultIncrease": "0"
+    },
+    "46630": {
+      "hook": "0x917943DEE316842D941FE188bE7f149Dc3D32888",
+      "router": "0xA93F36580aBA92a85A8C75B0c6f52C213c0226A5",
+      "poolId": "0xab5c10937f065c9768eeed043fd851108dc5eb34e5674710cafd61b53890966c",
+      "nativeBefore": "3807936340000000",
+      "quoteBefore": "99992000",
+      "quoteAfter": "99992000",
+      "quoteSpent": "0",
+      "nativeAfter": "3807936340000000",
+      "allowance": 0,
+      "feeVaultIncrease": "0"
+    }
+  },
+  "transactions": [
+    {
+      "chainId": 1301,
+      "action": "approve",
+      "nonce": 102,
+      "attemptedAt": 1793910656.911653,
+      "to": "0x31d0220469e10c4e71834a79b1f276d740d3768f"
+    }
+  ],
+  "orders": [],
+  "error": "cast mktx failed: CalledProcessError"
+}

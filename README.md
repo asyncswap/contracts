@@ -57,6 +57,34 @@ See [methodology and validation](benchmarks/orderbook/README.md), [receipt data]
 
 Fee top-ups measured separately use **186,710–235,267 gas** across four local fixtures, including an initially zero-bid order and a crowded price level. See [the top-up receipt benchmark](benchmarks/topups/README.md) for per-case results and reproduction instructions.
 
+[Local stress validation](benchmarks/stress/README.md) covers matching, liquidity fills,
+claim withdrawals and sustained API reads. The [public-testnet ingestion/read soak](benchmarks/soak/README.md)
+passed a 10-minute 26-second run on both testnets: 98 transactions, all 96 lifecycle
+events reconciled through REST/WebSocket, and 10,016 reads with zero failures
+(p95 76.69 ms). This bounded run does not establish maximum capacity or multi-hour resilience.
+
+[Crossing-heavy block tests](benchmarks/crossing/README.md) settled all 1,000
+transactions and 5,200 matched pairs correctly. Under a 30-million-gas local
+block budget, the first blocks held 44–51 single-fill transactions or 10–12
+eight-fill transactions with the documented gas limits. The target of 100
+crossing transactions in one block was not met.
+
+The current-source [incoming-memory implementation](benchmarks/incoming-memory/README.md)
+reduces mean gas by **28.9–55.7%** on the same ten crossing workloads. All 1,000
+transactions and 5,200 pairs pass accounting checks; first blocks now hold 71–77
+single-fill or 22–27 eight-fill transactions. Four noncrossing controls cost
+2.86–3.21% more. The hook and matcher have about 1.5 KB of runtime-size headroom
+each. This change requires new deployments and is not included in deployed v1.3.0.
+
+For context, a [plain Uniswap v4 comparison](benchmarks/uniswap-v4/README.md)
+fit 250–288 single-hop swaps in the first block under the same budget and gas-limit
+policy. This uses official core test adapters, deep liquidity and no hook or
+initialized-tick crossings; it is not Universal Router or live-network throughput.
+The subsequent [Universal Router and periphery benchmark](benchmarks/universal-router/README.md)
+fit 244–250 swaps in the first block through released router 2.2.0 and Permit2,
+with deadline/minimum-output checks and standing token allowances. Approval
+setup and permit signatures are excluded; the route remains single-hop with no hook.
+
 ## Priority fees and future matching work
 
 An order's USDC priority bid breaks ties between equal exact limit prices. This is separate from the transaction's gas priority fee. Zero bids are allowed; for a nonzero bid, the required minimum is 0.1% of the order's USDC notional, rounded down and capped at $0.10 with the default six-decimal numeraire configuration. Users may bid more than that minimum.

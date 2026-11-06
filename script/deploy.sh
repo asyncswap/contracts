@@ -7,7 +7,7 @@
 # "prepared". Per-chain wrappers (deploy-unichain.sh, deploy-arc.sh) call this script.
 #
 #   dry-run    simulate everything against the RPC, mine the hook salt, send nothing (default)
-#   broadcast  deploy AsyncMatching (if missing), the hook and the Router; sync the registry
+#   broadcast  deploy linked matching libraries (if missing), the hook and the Router; sync the registry
 #   verify     publish sources for every registry entry via Sourcify, then try Blockscout and
 #              write standard JSON inputs for manual upload as a fallback
 #
@@ -151,16 +151,16 @@ registry="$ROOT_DIR/deployments/$chain_id/$chain_id.json"
 # ---- verify mode ----------------------------------------------------------------------------
 if [[ "$mode" == "verify" ]]; then
   [[ -f "$registry" ]] || { echo "No registry at $registry; broadcast first." >&2; exit 1; }
-  read -r lib_addr hook_addr router_addr vault_addr tick_addr ordering_addr bitmap_addr eligible_addr topup_addr <<< "$(python3 - "$registry" <<'PY'
+  read -r lib_addr hook_addr router_addr vault_addr tick_addr ordering_addr bitmap_addr eligible_addr topup_addr incoming_addr <<< "$(python3 - "$registry" <<'PY'
 import json, sys
 c = json.load(open(sys.argv[1]))["contracts"]
 def a(n):
     e = c.get(n)
     return e["address"] if e else "-"
-print(a("AsyncMatching"), a("AsyncSwap"), a("Router"), a("FeeVault"), a("TickPrice"), a("DynamicFeeOrdering"), a("TickBitmap"), a("EligiblePrice"), a("PriorityFeeUpdates"))
+print(a("AsyncMatching"), a("AsyncSwap"), a("Router"), a("FeeVault"), a("TickPrice"), a("DynamicFeeOrdering"), a("TickBitmap"), a("EligiblePrice"), a("PriorityFeeUpdates"), a("IncomingMatching"))
 PY
 )"
-  for pair in "AsyncMatching:$lib_addr" "AsyncSwap:$hook_addr" "Router:$router_addr" "FeeVault:$vault_addr" "TickPrice:$tick_addr" "DynamicFeeOrdering:$ordering_addr" "TickBitmap:$bitmap_addr" "EligiblePrice:$eligible_addr" "PriorityFeeUpdates:$topup_addr"; do
+  for pair in "AsyncMatching:$lib_addr" "AsyncSwap:$hook_addr" "Router:$router_addr" "FeeVault:$vault_addr" "TickPrice:$tick_addr" "DynamicFeeOrdering:$ordering_addr" "TickBitmap:$bitmap_addr" "EligiblePrice:$eligible_addr" "PriorityFeeUpdates:$topup_addr" "IncomingMatching:$incoming_addr"; do
     [[ "${pair#*:}" != "-" ]] || { echo "Registry is missing ${pair%%:*}." >&2; exit 1; }
   done
   # Constructor arguments are read from the deployment transactions themselves, so verification uses
@@ -188,6 +188,7 @@ PY
   bitmap_flag="src/libraries/TickBitmap.sol:TickBitmap:$bitmap_addr"
   eligible_flag="src/libraries/EligiblePrice.sol:EligiblePrice:$eligible_addr"
   topup_flag="src/libraries/PriorityFeeUpdates.sol:PriorityFeeUpdates:$topup_addr"
+  incoming_flag="src/libraries/IncomingMatching.sol:IncomingMatching:$incoming_addr"
   out_dir="$ROOT_DIR/deployments/$chain_id/verify"
   mkdir -p "$out_dir"
 
@@ -195,7 +196,8 @@ PY
     local name="$1" addr="$2" target="$3" args="$4"
     local extra=()
     [[ -n "$args" ]] && extra+=(--constructor-args "$args")
-    [[ "$name" == "AsyncSwap" ]] && extra+=(--libraries "$topup_flag" --libraries "$lib_flag" --libraries "$tick_flag" --libraries "$ordering_flag" --libraries "$bitmap_flag" --libraries "$eligible_flag")
+    [[ "$name" == "AsyncSwap" ]] && extra+=(--libraries "$incoming_flag" --libraries "$topup_flag" --libraries "$lib_flag" --libraries "$tick_flag" --libraries "$ordering_flag" --libraries "$bitmap_flag" --libraries "$eligible_flag")
+    [[ "$name" == "IncomingMatching" ]] && extra+=(--libraries "$lib_flag" --libraries "$tick_flag" --libraries "$bitmap_flag" --libraries "$eligible_flag" --libraries "$ordering_flag")
     [[ "$name" == "AsyncMatching" ]] && extra+=(--libraries "$tick_flag" --libraries "$ordering_flag" --libraries "$bitmap_flag" --libraries "$eligible_flag")
     [[ "$name" == "PriorityFeeUpdates" ]] && extra+=(--libraries "$eligible_flag")
     echo "== $name @ $addr"
@@ -213,6 +215,7 @@ PY
   verify_one EligiblePrice "$eligible_addr" src/libraries/EligiblePrice.sol:EligiblePrice ""
   verify_one PriorityFeeUpdates "$topup_addr" src/libraries/PriorityFeeUpdates.sol:PriorityFeeUpdates ""
   verify_one AsyncMatching "$lib_addr" src/libraries/AsyncMatching.sol:AsyncMatching ""
+  verify_one IncomingMatching "$incoming_addr" src/libraries/IncomingMatching.sol:IncomingMatching ""
   verify_one AsyncSwap "$hook_addr" src/AsyncSwap.sol:AsyncSwap "$hook_args"
   verify_one Router "$router_addr" src/Router.sol:Router "$router_args"
   verify_one FeeVault "$vault_addr" src/FeeVault.sol:FeeVault "$vault_args"
@@ -320,6 +323,22 @@ else
   fi
 fi
 
+# ---- incoming-order library (links the existing matcher and index helpers) ---------------------
+incoming_links=(--libraries "src/libraries/AsyncMatching.sol:AsyncMatching:$lib_addr" --libraries "$tick_flag" --libraries "$ordering_flag" --libraries "$bitmap_flag" --libraries "$eligible_flag")
+incoming_init_code="$(forge inspect src/libraries/IncomingMatching.sol:IncomingMatching bytecode "${incoming_links[@]}")"
+incoming_salt="$(cast keccak "asyncswap.v2.IncomingMatching")"
+incoming_addr="$(cast create2 --deployer "$CREATE2_DEPLOYER" --salt "$incoming_salt" --init-code-hash "$(cast keccak "$incoming_init_code")" | awk '/Address:/ {print $2} /^0x/ {print $1}' | tail -1)"
+incoming_flag="src/libraries/IncomingMatching.sol:IncomingMatching:$incoming_addr"
+if has_code "$incoming_addr"; then
+  echo "IncomingMatching already deployed at $incoming_addr."
+elif [[ "$mode" == "broadcast" ]]; then
+  DEPLOY_DRY_RUN=false forge script "$ROOT_DIR/script/00_DeployIncomingMatching.s.sol" "${incoming_links[@]}" \
+    --rpc-url "$RPC_URL" --sender "$OWNER" --broadcast --account "$DEPLOYER_ACCOUNT" ${gas_flags[@]+"${gas_flags[@]}"}
+  wait_for_code "$incoming_addr" || { echo "IncomingMatching deployment missing" >&2; exit 1; }
+else
+  DEPLOY_DRY_RUN=true forge script "$ROOT_DIR/script/00_DeployIncomingMatching.s.sol" "${incoming_links[@]}" --rpc-url "$RPC_URL" --sender "$OWNER"
+fi
+
 # ---- hook + router ----------------------------------------------------------------------------
 forge_args=(
   script "$ROOT_DIR/script/01_DeployHook.s.sol"
@@ -332,6 +351,7 @@ forge_args=(
   --libraries "$bitmap_flag"
   --libraries "$eligible_flag"
   --libraries "$topup_flag"
+  --libraries "$incoming_flag"
 )
 if [[ "$mode" == "broadcast" ]]; then
   : "${DEPLOYER_ACCOUNT:?Set DEPLOYER_ACCOUNT to a Foundry keystore in .env.deploy}"

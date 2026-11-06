@@ -23,6 +23,20 @@ contract FormalBase is SetupHook {
     uint256 constant PENDING_OWNER_SLOT = 5;
     uint256 constant NONCE_USED_SLOT = 6;
 
+    /// @dev Stored-book unit tests deliberately arrange crossed orders without the Router's
+    /// handoff. Select the persisted LP admission branch only while arranging that fixture,
+    /// then restore the exact liquidity word before the operation under test. No LP swap runs.
+    /// IncomingMemoryReference/Funding exercise the actual funded memory path separately.
+    function _storedAdmissionFixture(bytes32 pid) internal returns (bytes32 slot, bytes32 previous) {
+        slot = bytes32(uint256(keccak256(abi.encode(pid, uint256(6)))) + 3);
+        previous = vm.load(address(manager), slot);
+        vm.store(address(manager), slot, bytes32(uint256(previous) | 1));
+    }
+
+    function _restoreAdmissionFixture(bytes32 slot, bytes32 previous) internal {
+        vm.store(address(manager), slot, previous);
+    }
+
     bool private _inOneTx;
 
     /// @dev Run the test body as one nested call, so it is a single transaction for transient storage.

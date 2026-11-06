@@ -100,6 +100,9 @@ contract CrossingCapacityTest is SetupHook {
         vm.etch(address(token0), address(token0).code);
         vm.etch(address(token1), address(token1).code);
         hook.asyncOrders(poolId);
+        // Include the linked view library even when memory admission never calls it.
+        hook.bestOrder(poolId, true);
+        hook.bestOrder(poolId, false);
         vm.dumpState(string.concat("deployments/crossing-", name, ".json"));
         console2.log(
             string.concat(

@@ -4,7 +4,7 @@ The [protocol overview](protocol.md#3-placing-an-order) contains the short order
 
 Solid arrows are calls or actions; dashed arrows are returns or delivered results. Each sequence groups related transactions; it is not one transaction from top to bottom. The app and wallet represent the user interface, not trusted settlement components. An indexer may observe emitted events for discovery, but neither an API nor an indexer is required by the contracts.
 
-`AsyncMatching` is a linked external library called in the hook's context. `AsyncFiller`, the price tree, and currency-settlement helpers operate on that same context; they are not independent custodians. Arrows from the matching library to PoolManager therefore execute as the hook. ERC-6909 claims and LP fee accounting live inside PoolManager.
+`IncomingMatching` and `AsyncMatching` are linked external libraries called in the hook's context. `AsyncFiller`, the price tree, and currency-settlement helpers operate on that same context; they are not independent custodians. Arrows from the matching library to PoolManager therefore execute as the hook. ERC-6909 claims and LP fee accounting live inside PoolManager. These sequences describe current source; deployed v1.3.0 contracts predate the incoming-memory path.
 
 ### User order, book matching, and LP fallback
 
@@ -17,7 +17,7 @@ sequenceDiagram
     actor Relayer
     participant Router
     participant Hook as AsyncSwap hook
-    participant Match as AsyncMatching / AsyncFiller
+    participant Match as IncomingMatching / AsyncMatching / AsyncFiller
     participant Fee as DynamicFeeOrdering
     participant Permit as Permit2
     participant Token as ERC-20 / USDC
@@ -47,10 +47,10 @@ sequenceDiagram
     Router->>PM: swap(exact input, hook data)
     PM->>Hook: beforeSwap(...)
     Hook->>PM: mint input escrow claims to hook
-    Hook->>Match: Check pool minimum (USDC leg) and asset floor, add order to price book
+    Hook->>Match: Check minimums and stage crossing arrival, or add to price book
     Match->>PM: mint bid escrow claims to hook, hook owes bid
-    Match-->>Hook: Order recorded
-    Note over Hook,Match: AsyncOrderCreated event, order is not matched until input and bid funding finish.
+    Match-->>Hook: Order staged or indexed
+    Note over Hook,Match: Without active LPs, potentially crossing arrivals use transient storage during funding.<br/>AsyncOrderCreated is emitted; matching waits until input and bid funding finish.
     Hook-->>PM: beforeSwap selector and custom accounting delta
     PM-->>Router: Swap delta
     alt Direct input funding
@@ -71,9 +71,9 @@ sequenceDiagram
     end
     Router->>Hook: matchNewOrder(order)
     Note over Hook,PM: If the pool has active liquidity and its spot tick beats the best opposing level,<br/>the pool fill below runs first, limited at that level, and the book takes what it leaves.<br/>A remainder below the pool minimum that the book leaves is then refunded as claims.
-    Hook->>Match: matchIncoming(...)
+    Hook->>Match: matchNewOrder(...), recheck liquidity and load candidate
     loop Up to 8 executable crossing pairs
-        Match->>Match: Best bid and best ask across the whole book (price, then bid, then time)
+        Match->>Match: Best bid and ask across candidate plus stored book (price, then bid, then time)
         Match->>Match: Reduce both orders before any payout
         Match->>PM: Settle filled bid shares to FeeVault
         Match->>PM: Burn input claims and credit both order legs as claims
@@ -81,8 +81,9 @@ sequenceDiagram
         PM-->>Counterparty: Proceeds as claims (any currency)
         Note over Match,Vault: Re-rank remainders. A remainder below the pool minimum is returned as claims<br/>and its residual bid goes to FeeVault.
     end
+    Match->>Match: Persist only the memory candidate's remainder
     Match-->>Hook: Matched pair count
-    opt Incoming order still has a remainder
+    opt Stored route: incoming order still has a remainder
         Hook->>Hook: External self-call fillOrderFromPoolLiquidity(order, id)
         Hook->>Match: fillFromPoolLiquidity(...)
         Match->>PM: Burn the input claims less 0.01%, temporarily set 0.02% LP fee

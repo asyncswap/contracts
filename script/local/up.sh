@@ -76,16 +76,20 @@ topup_addr="$(addr asyncswap.v2.PriorityFeeUpdates "$(forge inspect src/librarie
 topup_flag="src/libraries/PriorityFeeUpdates.sol:PriorityFeeUpdates:$topup_addr"
 matching_links=(--libraries "$tick_flag" --libraries "$ordering_flag" --libraries "$bitmap_flag" --libraries "$eligible_flag")
 lib_addr="$(addr asyncswap.v2.AsyncMatching "$(forge inspect src/libraries/AsyncMatching.sol:AsyncMatching bytecode "${matching_links[@]}")")"
+incoming_links=(--libraries "src/libraries/AsyncMatching.sol:AsyncMatching:$lib_addr" "${matching_links[@]}")
+incoming_addr="$(addr asyncswap.v2.IncomingMatching "$(forge inspect src/libraries/IncomingMatching.sol:IncomingMatching bytecode "${incoming_links[@]}")")"
+incoming_flag="src/libraries/IncomingMatching.sol:IncomingMatching:$incoming_addr"
 script script/00_DeployTickPrice.s.sol
 script script/00_DeployDynamicFeeOrdering.s.sol
 script script/00_DeployTickBitmap.s.sol
 script script/00_DeployEligiblePrice.s.sol
 script script/00_DeployPriorityFeeUpdates.s.sol --libraries "$eligible_flag"
 script script/00_DeployMatchingLibrary.s.sol "${matching_links[@]}"
+script script/00_DeployIncomingMatching.s.sol "${incoming_links[@]}"
 
 echo "Deploying the hook and Router (mining the hook salt)..."
 DEPLOY_NUMERAIRE_ADDRESS="$USDC" script script/01_DeployHook.s.sol --ffi \
-  --libraries "src/libraries/AsyncMatching.sol:AsyncMatching:$lib_addr" "${matching_links[@]}" --libraries "$topup_flag"
+  --libraries "src/libraries/AsyncMatching.sol:AsyncMatching:$lib_addr" "${matching_links[@]}" --libraries "$topup_flag" --libraries "$incoming_flag"
 registry="$ROOT/deployments/31337/31337.json"
 HOOK="$(jq -r '.contracts.AsyncSwap.address' "$registry")"
 ROUTER="$(jq -r '.contracts.Router.address' "$registry")"

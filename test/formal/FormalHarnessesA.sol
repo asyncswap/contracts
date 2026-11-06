@@ -107,7 +107,7 @@ contract AsyncBookHarness {
     }
 
     function matchBook(PoolKey calldata key, uint8 maxMatches) external returns (uint8) {
-        return AsyncMatching.matchBook(st, book, key, maxMatches, address(this));
+        return AsyncMatching.matchBook(st, book, key, maxMatches);
     }
 
     function crosses(bytes32 bid, bytes32 ask) external view returns (bool) {

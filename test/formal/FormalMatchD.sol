@@ -225,7 +225,9 @@ abstract contract FormalMatchD is HookUnlockBase {
             token1.mint(address(this), bid);
             cs = _cat(cs, _payToHookCalls(currency1, bid));
         }
+        (bytes32 liquiditySlot, bytes32 previousLiquidity) = _storedAdmissionFixture(PoolId.unwrap(k.toId()));
         _run(cs);
+        _restoreAdmissionFixture(liquiditySlot, previousLiquidity);
         require(hook.asyncOrder(k.toId(), id) == amountIn, "order not created at the predicted id");
     }
 

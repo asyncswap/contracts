@@ -8,7 +8,7 @@ import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 
 /// @notice Bytecode checks of `formal/Refinement/Swarm/AsyncSwapAddOrder.lean`.
 ///
-///         `AsyncFiller.addOrder` is `internal` and `AsyncMatching.addOrder` is a linked `public` library
+///         `AsyncFiller.addOrder` is `internal` and `IncomingMatching.addOrder` is a linked `public` library
 ///         function, so both run in `AsyncFillerBookHarness` on its own `pid → State` / `pid → Book`
 ///         storage (the same code the hook runs on `asyncOrders[pid]` / `priceBooks[pid]`). The model
 ///         leaves `_append` opaque: the theorems describe the storage `addOrder` hands to `_append`.
@@ -474,9 +474,9 @@ contract AsyncSwapAddOrderFormalTest is FormalSlotsB {
         }
     }
 
-    // ================================================================ AsyncMatching.addOrder
+    // ================================================================ IncomingMatching.addOrder
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapAddOrder.lean:255 — AsyncMatching.addOrder(order) behaves exactly as AsyncFiller.addOrder on the NewOrder's fields (same revert data, or same storage).
+    /// @notice formal/Refinement/Swarm/AsyncSwapAddOrder.lean:255 — IncomingMatching.addOrder(order) behaves exactly as AsyncFiller.addOrder on the NewOrder's fields (same revert data, or same storage).
     function testFuzz_matching_addOrder_eq(In memory x) public {
         AsyncFiller.NewOrder memory o = _setup(x, x.mode % 2);
         vm.record();
@@ -487,27 +487,27 @@ contract AsyncSwapAddOrderFormalTest is FormalSlotsB {
         _assertSameStorage();
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapAddOrder.lean:263 — AsyncMatching.addOrder has addOrder_run's full case split on the NewOrder's fields.
+    /// @notice formal/Refinement/Swarm/AsyncSwapAddOrder.lean:263 — IncomingMatching.addOrder has addOrder_run's full case split on the NewOrder's fields.
     function testFuzz_matching_addOrder_run(In memory x) public {
         _checkRun(x, true);
     }
 
-    /// @notice AsyncMatching.addOrder rejects nonzero priority bids below the minimum; zero is valid.
+    /// @notice IncomingMatching.addOrder rejects nonzero priority bids below the minimum; zero is valid.
     function testFuzz_matching_addOrder_feeTooSmall(In memory x) public {
         _checkFeeTooSmall(x, true);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapAddOrder.lean:299 — AsyncMatching.addOrder: past guards 1-2, order.priorityFee > MAX_PRIORITY_FEE reverts PriorityFeeTooLarge.
+    /// @notice formal/Refinement/Swarm/AsyncSwapAddOrder.lean:299 — IncomingMatching.addOrder: past guards 1-2, order.priorityFee > MAX_PRIORITY_FEE reverts PriorityFeeTooLarge.
     function testFuzz_matching_addOrder_feeTooLarge(In memory x) public {
         _checkFeeTooLarge(x, true);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapAddOrder.lean:309 — AsyncMatching.addOrder: guards passing and _priceKey succeeding, nextSequence = 2^64 - 1 panics 0x11.
+    /// @notice formal/Refinement/Swarm/AsyncSwapAddOrder.lean:309 — IncomingMatching.addOrder: guards passing and _priceKey succeeding, nextSequence = 2^64 - 1 panics 0x11.
     function testFuzz_matching_addOrder_seqOverflow(In memory x) public {
         _checkSeqOverflow(x, true);
     }
 
-    /// @notice formal/Refinement/Swarm/AsyncSwapAddOrder.lean:324 — AsyncMatching.addOrder success implies the guards passed, p in [1, 2^128), seq fits, final state = _append(addState(...)).
+    /// @notice formal/Refinement/Swarm/AsyncSwapAddOrder.lean:324 — IncomingMatching.addOrder success implies the guards passed, p in [1, 2^128), seq fits, final state = _append(addState(...)).
     function testFuzz_matching_addOrder_ok(In memory x) public {
         _checkOk(x, true);
     }

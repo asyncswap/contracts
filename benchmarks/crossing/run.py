@@ -14,7 +14,6 @@ import time
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / "benchmarks/crossing/results"
 BLOCK_GAS = 30_000_000
 SIZE = 10**18
 BID = 100_000
@@ -29,7 +28,13 @@ p.add_argument(
     help="Debug only: reuse the local fixture export",
 )
 p.add_argument("--workload", help="Run one named workload instead of all ten")
+p.add_argument(
+    "--output-dir",
+    default="benchmarks/crossing/results",
+    help="Separate result directory for prototype comparisons",
+)
 a = p.parse_args()
+OUT = ROOT / a.output_dir
 OUT.mkdir(parents=True, exist_ok=True)
 log = ROOT / ".local/crossing/export.log"
 log.parent.mkdir(parents=True, exist_ok=True)

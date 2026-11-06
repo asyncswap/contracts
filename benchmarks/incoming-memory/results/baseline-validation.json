@@ -1,0 +1,3762 @@
+{
+  "command": "forge test --no-match-contract UnichainForkTest --json",
+  "counts": {
+    "Success": 1047
+  },
+  "tests": {
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_RevertWhen_ExactOutputSwap()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_RevertWhen_RouterCallbackNotFromPoolManager()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_cancel_makerReclaimsInput()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_cancel_revertsAfterFill()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_cancel_revertsForNonOwner()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_crossingOrdersMatchAndTransferEscrowedTokens()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_crossingOrdersPartiallyFillAndKeepResidualOnBook()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_fill_makerReceivesPricedOutput_fillerReceivesInput()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_fill_reverseDirection_token1ForToken0()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_fill_revertsAfterCancel()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_fill_revertsWhenOrderMissing()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_fill_usesUpdatedPrice()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_filledPriorityBidGoesToFeeVaultNotActiveLps()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_lpLiquidityFillsOrderWhenMakerMinimumIsMet()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_lpLiquidityFillsReverseDirection()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_lpPriceFailureLeavesOrderOpenAndRetryCanFill()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_matchBookContinuesAfterAutomaticMatchBound()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_partialMatchAndCancelForfeitTheEntirePriorityBid()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_priceBookReturnsHighestNumeraireBid()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_priceBookSortsBidsAndPreservesFifoAtPrice()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_priceBookUpdateAndCancelMaintainBestLevel()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_priorityFeeBelowTenCentsReverts()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_priorityFeeBreaksEqualPriceTiesAfterPricePriority()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_setExecutor_emitsGrant()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_setExecutor_emitsRevocation()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_swap_createsOrderWithPrice()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_swap_duplicateParamsTriggerSaltWalk()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_swap_twoOrdersSameMaker_distinctSalts()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_updatePrice_makerCanRaisePrice()": {
+      "status": "Success"
+    },
+    "test/AsyncSwap.t.sol:AsyncSwapTest::test_updatePrice_revertsForNonOwner()": {
+      "status": "Success"
+    },
+    "test/BackrunCapture.t.sol:BackrunCaptureTest::test_backrunPaysAShareOfTheGap()": {
+      "status": "Success"
+    },
+    "test/BackrunCapture.t.sol:BackrunCaptureTest::test_noPremiumAfterTheWindow()": {
+      "status": "Success"
+    },
+    "test/BackrunCapture.t.sol:BackrunCaptureTest::test_splittingTheBackrunDoesNotPayLess()": {
+      "status": "Success"
+    },
+    "test/BaseHookDefaults.t.sol:BaseHookDefaultsTest::test_RevertWhen_CalledByAnyoneButThePoolManager()": {
+      "status": "Success"
+    },
+    "test/BaseHookDefaults.t.sol:BaseHookDefaultsTest::test_unimplementedCallbacksRevert()": {
+      "status": "Success"
+    },
+    "test/BestPriceRouting.t.sol:BestPriceRoutingTest::test_buyFillsFromThePoolWhenItBeatsTheBestAsk()": {
+      "status": "Success"
+    },
+    "test/BestPriceRouting.t.sol:BestPriceRoutingTest::test_sellFillsFromThePoolWhenItBeatsTheBestBid()": {
+      "status": "Success"
+    },
+    "test/EligiblePrice.t.sol:EligiblePriceTest::testFuzz_fullWidthComparison(uint256,uint256,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/EligiblePrice.t.sol:EligiblePriceTest::testFuzz_mutationsAndEligibility(uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/EligiblePrice.t.sol:EligiblePriceTest::test_full128BranchPathAndIdReuse()": {
+      "status": "Success"
+    },
+    "test/EligiblePrice.t.sol:EligiblePriceTest::test_fullWidthRatioComparison()": {
+      "status": "Success"
+    },
+    "test/EligiblePrice.t.sol:EligiblePriceTest::test_recycledBuySummaryMustPropagateToNewAncestors()": {
+      "status": "Success"
+    },
+    "test/EligiblePrice.t.sol:EligiblePriceTest::test_recycledSummaryMustPropagateToNewAncestors()": {
+      "status": "Success"
+    },
+    "test/ExactPriorityInvariant.t.sol:ExactPriorityInvariantTest::invariant_assetsConserved()": {
+      "status": "Success",
+      "invariant": {
+        "runs": 64,
+        "calls": 4096,
+        "reverts": 0
+      }
+    },
+    "test/FeeEvents.t.sol:FeeEventsTest::test_bookMatchLogsBothTradeFees()": {
+      "status": "Success"
+    },
+    "test/FeeEvents.t.sol:FeeEventsTest::test_dynamicFeeIsLogged()": {
+      "status": "Success"
+    },
+    "test/FeeEvents.t.sol:FeeEventsTest::test_fillerAndPoolFillFeesCarryThePoolId()": {
+      "status": "Success"
+    },
+    "test/IndexLibraryDeployment.t.sol:IndexLibraryDeploymentTest::test_bitmapPredictionAndIdempotentDryRun()": {
+      "status": "Success"
+    },
+    "test/IndexLibraryDeployment.t.sol:IndexLibraryDeploymentTest::test_eligiblePredictionAndIdempotentDryRun()": {
+      "status": "Success"
+    },
+    "test/IndexLibraryDeployment.t.sol:IndexLibraryDeploymentTest::test_missingFactoryRejected()": {
+      "status": "Success"
+    },
+    "test/IndexLibraryDeployment.t.sol:IndexLibraryDeploymentTest::test_topUpPredictionAndIdempotentDryRun()": {
+      "status": "Success"
+    },
+    "test/MatchingAdversarial.t.sol:MatchingAdversarialTest::test_RevertWhen_NativeOutputForwardFails()": {
+      "status": "Success"
+    },
+    "test/MatchingAdversarial.t.sol:MatchingAdversarialTest::test_cancel_nativeInput_makerReclaimsEth()": {
+      "status": "Success"
+    },
+    "test/MatchingAdversarial.t.sol:MatchingAdversarialTest::test_fill_nativeInput_fillerSendsEth_receivesErc20()": {
+      "status": "Success"
+    },
+    "test/MatchingAdversarial.t.sol:MatchingAdversarialTest::test_fill_nativeOutput_fillerSendsErc20_receivesEth()": {
+      "status": "Success"
+    },
+    "test/MatchingAdversarial.t.sol:MatchingAdversarialTest::test_rejectingBestBuyerReceivesClaimsWithoutBlocking()": {
+      "status": "Success"
+    },
+    "test/MatchingAdversarial.t.sol:MatchingAdversarialTest::test_swap_nativeInput_create()": {
+      "status": "Success"
+    },
+    "test/MatchingAdversarial.t.sol:MatchingAdversarialTest::test_swap_nativeOutput_create()": {
+      "status": "Success"
+    },
+    "test/MatchingEngine.t.sol:MatchingEngineTest::testBestPricesAreOrderedByTheRadixTree()": {
+      "status": "Success"
+    },
+    "test/MatchingEngine.t.sol:MatchingEngineTest::testCancelUnlinksMiddleOfPriceLevel()": {
+      "status": "Success"
+    },
+    "test/MatchingEngine.t.sol:MatchingEngineTest::testCrossedRemainderCanBeClearedInBoundedChunks()": {
+      "status": "Success"
+    },
+    "test/MatchingEngine.t.sol:MatchingEngineTest::testFuzzBestAskMatchesMinimum(uint128[16])": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/MatchingEngine.t.sol:MatchingEngineTest::testGas_100OrdersAtDistinctPrices()": {
+      "status": "Success"
+    },
+    "test/MatchingEngine.t.sol:MatchingEngineTest::testGas_OneCallMatchesEightDistinctLevels()": {
+      "status": "Success"
+    },
+    "test/MatchingEngine.t.sol:MatchingEngineTest::testIncomingAskFillsBestBidAtTheBidPrice()": {
+      "status": "Success"
+    },
+    "test/MatchingEngine.t.sol:MatchingEngineTest::testMatchBookUsesTheOlderBidAsMaker()": {
+      "status": "Success"
+    },
+    "test/MatchingEngine.t.sol:MatchingEngineTest::testMatchBoundCannotBeRaisedByCaller()": {
+      "status": "Success"
+    },
+    "test/MatchingEngine.t.sol:MatchingEngineTest::testPartiallyFilledOrderKeepsItsTimePriority()": {
+      "status": "Success"
+    },
+    "test/MatchingEngine.t.sol:MatchingEngineTest::testPriceTimePriorityAndPartialFills()": {
+      "status": "Success"
+    },
+    "test/MatchingEngine.t.sol:MatchingEngineTest::testRevertWhenAmountOrPriceIsZero()": {
+      "status": "Success"
+    },
+    "test/MatchingEngine.t.sol:MatchingEngineTest::testRevertWhenCancellingMissingOrAnotherOwnersOrder()": {
+      "status": "Success"
+    },
+    "test/MatchingInvariant.t.sol:LpMatchingInvariantTest::invariant_assetsConserved()": {
+      "status": "Success",
+      "invariant": {
+        "runs": 64,
+        "calls": 4096,
+        "reverts": 0
+      }
+    },
+    "test/MatchingInvariant.t.sol:LpMatchingInvariantTest::test_campaignPricesReachThePool()": {
+      "status": "Success"
+    },
+    "test/MatchingInvariant.t.sol:MatchingInvariantTest::invariant_assetsConserved()": {
+      "status": "Success",
+      "invariant": {
+        "runs": 64,
+        "calls": 4096,
+        "reverts": 0
+      }
+    },
+    "test/MatchingInvariant.t.sol:PriorityMatchingInvariantTest::invariant_assetsConserved()": {
+      "status": "Success",
+      "invariant": {
+        "runs": 64,
+        "calls": 4096,
+        "reverts": 0
+      }
+    },
+    "test/MatchingReference.t.sol:DustMatchingReferenceTest::testFuzz_referenceMixedOperations(uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/MatchingReference.t.sol:DustMatchingReferenceTest::test_referenceBacklogClearsInBoundedCalls()": {
+      "status": "Success"
+    },
+    "test/MatchingReference.t.sol:DustMatchingReferenceTest::test_referenceClosesAndRefundsDust()": {
+      "status": "Success"
+    },
+    "test/MatchingReference.t.sol:DustMatchingReferenceTest::test_referenceExactPriceFeeAndMakerAge()": {
+      "status": "Success"
+    },
+    "test/MatchingReference.t.sol:DustMatchingReferenceTest::test_referenceTopUpsPreserveMakerAgeAndSettleNewBid()": {
+      "status": "Success"
+    },
+    "test/MatchingReference.t.sol:MatchingReferenceTest::testFuzz_referenceMixedOperations(uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/MatchingReference.t.sol:MatchingReferenceTest::test_referenceBacklogClearsInBoundedCalls()": {
+      "status": "Success"
+    },
+    "test/MatchingReference.t.sol:MatchingReferenceTest::test_referenceExactPriceFeeAndMakerAge()": {
+      "status": "Success"
+    },
+    "test/MatchingReference.t.sol:MatchingReferenceTest::test_referenceTopUpsPreserveMakerAgeAndSettleNewBid()": {
+      "status": "Success"
+    },
+    "test/NativeAsyncSwap.t.sol:NativeAsyncSwapTest::test_RevertWhen_NativeOutputForwardFails()": {
+      "status": "Success"
+    },
+    "test/NativeAsyncSwap.t.sol:NativeAsyncSwapTest::test_cancel_nativeInput_makerReclaimsEth()": {
+      "status": "Success"
+    },
+    "test/NativeAsyncSwap.t.sol:NativeAsyncSwapTest::test_fill_nativeInput_fillerSendsEth_receivesErc20()": {
+      "status": "Success"
+    },
+    "test/NativeAsyncSwap.t.sol:NativeAsyncSwapTest::test_fill_nativeOutput_fillerSendsErc20_receivesEth()": {
+      "status": "Success"
+    },
+    "test/NativeAsyncSwap.t.sol:NativeAsyncSwapTest::test_swap_nativeInput_create()": {
+      "status": "Success"
+    },
+    "test/NativeAsyncSwap.t.sol:NativeAsyncSwapTest::test_swap_nativeOutput_create()": {
+      "status": "Success"
+    },
+    "test/NativeClaims.t.sol:NativeClaimsTest::test_RevertWhen_NativeOutputForwardFails()": {
+      "status": "Success"
+    },
+    "test/NativeClaims.t.sol:NativeClaimsTest::test_cancel_nativeInput_makerReclaimsEth()": {
+      "status": "Success"
+    },
+    "test/NativeClaims.t.sol:NativeClaimsTest::test_cannotRedeemAnotherOwnerOrCallCallback()": {
+      "status": "Success"
+    },
+    "test/NativeClaims.t.sol:NativeClaimsTest::test_failedRedemptionPreservesClaimsAndAllowance()": {
+      "status": "Success"
+    },
+    "test/NativeClaims.t.sol:NativeClaimsTest::test_fill_nativeInput_fillerSendsEth_receivesErc20()": {
+      "status": "Success"
+    },
+    "test/NativeClaims.t.sol:NativeClaimsTest::test_fill_nativeOutput_fillerSendsErc20_receivesEth()": {
+      "status": "Success"
+    },
+    "test/NativeClaims.t.sol:NativeClaimsTest::test_nativeLpFillCreditsClaims()": {
+      "status": "Success"
+    },
+    "test/NativeClaims.t.sol:NativeClaimsTest::test_redeemPartialToChosenRecipientThenNoDoubleSpend()": {
+      "status": "Success"
+    },
+    "test/NativeClaims.t.sol:NativeClaimsTest::test_reentrantRedemptionCannotUnlockAgain()": {
+      "status": "Success"
+    },
+    "test/NativeClaims.t.sol:NativeClaimsTest::test_swap_nativeInput_create()": {
+      "status": "Success"
+    },
+    "test/NativeClaims.t.sol:NativeClaimsTest::test_swap_nativeOutput_create()": {
+      "status": "Success"
+    },
+    "test/Numeraire.t.sol:NumeraireTest::testFuzz_rejectPairsWithoutNumeraire(address,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/Numeraire.t.sol:NumeraireTest::test_acceptNativeUsdcPool()": {
+      "status": "Success"
+    },
+    "test/Numeraire.t.sol:NumeraireTest::test_acceptNumeraireOnEitherSortedSide()": {
+      "status": "Success"
+    },
+    "test/Numeraire.t.sol:NumeraireTest::test_buyAssetWithSixDecimalUsdc()": {
+      "status": "Success"
+    },
+    "test/Numeraire.t.sol:NumeraireTest::test_minimumAndCapFollowNumeraireDecimals()": {
+      "status": "Success"
+    },
+    "test/Numeraire.t.sol:NumeraireTest::test_numeraireIsConfiguredToken()": {
+      "status": "Success"
+    },
+    "test/Numeraire.t.sol:NumeraireTest::test_ownerIsExplicitArgumentNotDeployer()": {
+      "status": "Success"
+    },
+    "test/Numeraire.t.sol:NumeraireTest::test_poolParametersFixedAtDeployment()": {
+      "status": "Success"
+    },
+    "test/Numeraire.t.sol:NumeraireTest::test_rejectNativeNonUsdcPool()": {
+      "status": "Success"
+    },
+    "test/Numeraire.t.sol:NumeraireTest::test_rejectNonContractNumeraire()": {
+      "status": "Success"
+    },
+    "test/Numeraire.t.sol:NumeraireTest::test_rejectNumeraireDecimalsOutOfRange()": {
+      "status": "Success"
+    },
+    "test/Numeraire.t.sol:NumeraireTest::test_rejectTokenWithUsdcSymbolButWrongAddress()": {
+      "status": "Success"
+    },
+    "test/Numeraire.t.sol:NumeraireTest::test_rejectZeroNumeraire()": {
+      "status": "Success"
+    },
+    "test/Numeraire.t.sol:NumeraireTest::test_rejectZeroOwner()": {
+      "status": "Success"
+    },
+    "test/Numeraire.t.sol:NumeraireTest::test_sellAssetForSixDecimalUsdc()": {
+      "status": "Success"
+    },
+    "test/PoolLiquidityFill.t.sol:PoolLiquidityFillSixDecimalTest::test_buyAssetWithUsdcAtMarket()": {
+      "status": "Success"
+    },
+    "test/PoolLiquidityFill.t.sol:PoolLiquidityFillSixDecimalTest::test_dustInputNeverFillsForZeroOutput()": {
+      "status": "Success"
+    },
+    "test/PoolLiquidityFill.t.sol:PoolLiquidityFillSixDecimalTest::test_limitAboveSpotRestsOnBothSides()": {
+      "status": "Success"
+    },
+    "test/PoolLiquidityFill.t.sol:PoolLiquidityFillSixDecimalTest::test_sellAssetForUsdcAtMarket()": {
+      "status": "Success"
+    },
+    "test/PoolLiquidityFill.t.sol:PoolLiquidityFillTest::testFuzz_fillOrRestUntouched(uint256,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/PoolLiquidityFill.t.sol:PoolLiquidityFillTest::test_bookMatchesFirstThenPoolFillsRemainder()": {
+      "status": "Success"
+    },
+    "test/PoolLiquidityFill.t.sol:PoolLiquidityFillTest::test_directSelfCallEntryIsRejected()": {
+      "status": "Success"
+    },
+    "test/PoolLiquidityFill.t.sol:PoolLiquidityFillTest::test_failedPoolFillKeepsPriorityBidEscrowed()": {
+      "status": "Success"
+    },
+    "test/PoolLiquidityFill.t.sol:PoolLiquidityFillTest::test_fillAccountingAndEvent()": {
+      "status": "Success"
+    },
+    "test/PoolLiquidityFill.t.sol:PoolLiquidityFillTest::test_limitFailureRestoresFeeAndPrice()": {
+      "status": "Success"
+    },
+    "test/PoolLiquidityFill.t.sol:PoolLiquidityFillTest::test_lpCollectsFillFeeOnWithdraw()": {
+      "status": "Success"
+    },
+    "test/PoolLiquidityFill.t.sol:PoolLiquidityFillTest::test_noLiquidity_orderRestsAndEscrowIsIntact()": {
+      "status": "Success"
+    },
+    "test/PoolLiquidityFill.t.sol:PoolLiquidityFillTest::test_orderLargerThanRangeIsRejectedAtomically()": {
+      "status": "Success"
+    },
+    "test/PoolLiquidityFill.t.sol:PoolLiquidityFillTest::test_outOfRangeLiquidityCountsAsNoLiquidity()": {
+      "status": "Success"
+    },
+    "test/PoolLiquidityFill.t.sol:PoolLiquidityFillTest::test_retryAfterFillReverts()": {
+      "status": "Success"
+    },
+    "test/PoolLiquidityFill.t.sol:PoolLiquidityFillTest::test_retryAlwaysAuthorizedSinceRouterCannotBeRevoked()": {
+      "status": "Success"
+    },
+    "test/PoolLiquidityFill.t.sol:PoolLiquidityFillTest::test_retryFillsPartiallyMatchedRemainder()": {
+      "status": "Success"
+    },
+    "test/PoolLiquidityFill.t.sol:PoolLiquidityFillTest::test_retryUnknownOrderReverts()": {
+      "status": "Success"
+    },
+    "test/PriorityFeeTopUp.t.sol:NumeraireZeroTopUpTest::test_topUpsFundCurrencyZeroForBothDirections()": {
+      "status": "Success"
+    },
+    "test/PriorityFeeTopUp.t.sol:PriorityFeeTopUpTest::testFuzz_additiveFundingAndQueue(uint64,uint64)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/PriorityFeeTopUp.t.sol:PriorityFeeTopUpTest::test_buyQueueAndInputEscrowStaySeparate()": {
+      "status": "Success"
+    },
+    "test/PriorityFeeTopUp.t.sol:PriorityFeeTopUpTest::test_exactPriceStillPrecedesFeeWithinOneTick()": {
+      "status": "Success"
+    },
+    "test/PriorityFeeTopUp.t.sol:PriorityFeeTopUpTest::test_failedMulticallRollsBackFundingAndQueue()": {
+      "status": "Success"
+    },
+    "test/PriorityFeeTopUp.t.sol:PriorityFeeTopUpTest::test_fundedTopUpPreservesOrderAndEmitsEvent()": {
+      "status": "Success"
+    },
+    "test/PriorityFeeTopUp.t.sol:PriorityFeeTopUpTest::test_missingAllowanceRollsBackQueueAndEscrow()": {
+      "status": "Success"
+    },
+    "test/PriorityFeeTopUp.t.sol:PriorityFeeTopUpTest::test_missingBalanceRollsBackFundingAndQueue()": {
+      "status": "Success"
+    },
+    "test/PriorityFeeTopUp.t.sol:PriorityFeeTopUpTest::test_noNativeMevTaxForFeeOnlyUpdate()": {
+      "status": "Success"
+    },
+    "test/PriorityFeeTopUp.t.sol:PriorityFeeTopUpTest::test_orderClosedDuringPaymentRollsBackEntireTopUp()": {
+      "status": "Success"
+    },
+    "test/PriorityFeeTopUp.t.sol:PriorityFeeTopUpTest::test_ownerOnlyEvenForRegisteredExecutorWithAllowance()": {
+      "status": "Success"
+    },
+    "test/PriorityFeeTopUp.t.sol:PriorityFeeTopUpTest::test_partialFillUsesRemainingBidAndRestoresCurrentFloor()": {
+      "status": "Success"
+    },
+    "test/PriorityFeeTopUp.t.sol:PriorityFeeTopUpTest::test_paymentCallbackCannotSeeUnfundedBidAndUsesLiveRemainder()": {
+      "status": "Success"
+    },
+    "test/PriorityFeeTopUp.t.sol:PriorityFeeTopUpTest::test_rekeyGoesBehindExistingEqualFeeThenWinsWithHigherFee()": {
+      "status": "Success"
+    },
+    "test/PriorityFeeTopUp.t.sol:PriorityFeeTopUpTest::test_shortPaymentCannotLeaveUnfundedPriority()": {
+      "status": "Success"
+    },
+    "test/PriorityFeeTopUp.t.sol:PriorityFeeTopUpTest::test_topUpDoesNotMatchButMulticallCan()": {
+      "status": "Success"
+    },
+    "test/PriorityFeeTopUp.t.sol:PriorityFeeTopUpTest::test_unknownWrongOwnerDirectionAndClosedOrderRejected()": {
+      "status": "Success"
+    },
+    "test/PriorityFeeTopUp.t.sol:PriorityFeeTopUpTest::test_zeroBidAdmissionAndSmallOrderFloor()": {
+      "status": "Success"
+    },
+    "test/PriorityFeeTopUp.t.sol:PriorityFeeTopUpTest::test_zeroOverflowAndMaximumBid()": {
+      "status": "Success"
+    },
+    "test/PriorityFeeTopUp.t.sol:TopUpNumeraireDecimalsTest::test_topUpUsesConfiguredNumeraireDecimals()": {
+      "status": "Success"
+    },
+    "test/ProtocolFee.t.sol:ProtocolFeeTest::testFuzz_noFillerSurcharge(uint24,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/ProtocolFee.t.sol:ProtocolFeeTest::test_fillPaysMinimumAndChargesTradeFeeBothSides()": {
+      "status": "Success"
+    },
+    "test/ProtocolFee.t.sol:ProtocolFeeTest::test_noFillerSurcharge()": {
+      "status": "Success"
+    },
+    "test/RadixPriceTree.t.sol:RadixPriceTreeTest::test_counterTracksPeakNotHistory()": {
+      "status": "Success"
+    },
+    "test/RadixPriceTree.t.sol:RadixPriceTreeTest::test_recycledIdsKeepBestCorrect(uint128[12],uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/RouterClaims.t.sol:RouterClaimsTest::testFuzz_updatedRouterCancellationAuthorization(bool,bool,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/RouterClaims.t.sol:RouterClaimsTest::testFuzz_withdrawClaimsAmountAndAllowance(uint96,uint96)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/RouterClaims.t.sol:RouterClaimsTest::test_RevertWhen_NativeOutputForwardFails()": {
+      "status": "Success"
+    },
+    "test/RouterClaims.t.sol:RouterClaimsTest::test_cancelAndWithdrawReturnsETHWithoutConsumingExistingClaims()": {
+      "status": "Success"
+    },
+    "test/RouterClaims.t.sol:RouterClaimsTest::test_cancel_nativeInput_makerReclaimsEth()": {
+      "status": "Success"
+    },
+    "test/RouterClaims.t.sol:RouterClaimsTest::test_erc20CancellationReturnsTokensWithoutClaimApproval()": {
+      "status": "Success"
+    },
+    "test/RouterClaims.t.sol:RouterClaimsTest::test_fill_nativeInput_fillerSendsEth_receivesErc20()": {
+      "status": "Success"
+    },
+    "test/RouterClaims.t.sol:RouterClaimsTest::test_fill_nativeOutput_fillerSendsErc20_receivesEth()": {
+      "status": "Success"
+    },
+    "test/RouterClaims.t.sol:RouterClaimsTest::test_invalidWithdrawalBatchesRevert()": {
+      "status": "Success"
+    },
+    "test/RouterClaims.t.sol:RouterClaimsTest::test_laterBatchFailureRollsBackEarlierWithdrawal()": {
+      "status": "Success"
+    },
+    "test/RouterClaims.t.sol:RouterClaimsTest::test_missingClaimApprovalRollsBackCancellation()": {
+      "status": "Success"
+    },
+    "test/RouterClaims.t.sol:RouterClaimsTest::test_nativeReceiverCannotReenterWithdraw()": {
+      "status": "Success"
+    },
+    "test/RouterClaims.t.sol:RouterClaimsTest::test_otherWalletCannotCancelAndWithdraw()": {
+      "status": "Success"
+    },
+    "test/RouterClaims.t.sol:RouterClaimsTest::test_partialFillCancelsAndWithdrawsOnlyLiveRemainder()": {
+      "status": "Success"
+    },
+    "test/RouterClaims.t.sol:RouterClaimsTest::test_rejectedETHRollsBackClaimsAndAllowance()": {
+      "status": "Success"
+    },
+    "test/RouterClaims.t.sol:RouterClaimsTest::test_swap_nativeInput_create()": {
+      "status": "Success"
+    },
+    "test/RouterClaims.t.sol:RouterClaimsTest::test_swap_nativeOutput_create()": {
+      "status": "Success"
+    },
+    "test/RouterClaims.t.sol:RouterClaimsTest::test_unlockCallbackRejectsCallsOutsidePoolManager()": {
+      "status": "Success"
+    },
+    "test/RouterClaims.t.sol:RouterClaimsTest::test_updatedRouterCancelsExistingHookOrdersAfterExecutorGrant()": {
+      "status": "Success"
+    },
+    "test/RouterClaims.t.sol:RouterClaimsTest::test_withdrawBatchBoundsRejectMismatchedAndOversizedArrays()": {
+      "status": "Success"
+    },
+    "test/RouterClaims.t.sol:RouterClaimsTest::test_withdrawClaimsToOwnerAndRejectDoubleSpend()": {
+      "status": "Success"
+    },
+    "test/RouterClaims.t.sol:RouterClaimsTest::test_withdrawNativeAndERC20ClaimsInOneBatch()": {
+      "status": "Success"
+    },
+    "test/RouterMulticall.t.sol:RouterMulticallTest::test_RevertWhen_BatchIncludesAnotherMakersOrder()": {
+      "status": "Success"
+    },
+    "test/RouterMulticall.t.sol:RouterMulticallTest::test_RevertWhen_MulticallSentEth()": {
+      "status": "Success"
+    },
+    "test/RouterMulticall.t.sol:RouterMulticallTest::test_RevertWhen_OneCallFails_wholeBatchRollsBack()": {
+      "status": "Success"
+    },
+    "test/RouterMulticall.t.sol:RouterMulticallTest::test_cancelAndWithdrawClaimsInOneTransaction()": {
+      "status": "Success"
+    },
+    "test/RouterMulticall.t.sol:RouterMulticallTest::test_cancelTwoOrdersInOneTransaction()": {
+      "status": "Success"
+    },
+    "test/RouterMulticall.t.sol:RouterMulticallTest::test_maxPriceDoesNotCarryAcrossCalls()": {
+      "status": "Success"
+    },
+    "test/RouterMulticall.t.sol:RouterMulticallTest::test_swapThenFillInOneTransaction()": {
+      "status": "Success"
+    },
+    "test/SignedOrders.t.sol:SignedOrdersTest::test_RevertWhen_setExecutorWithSig_revokesTrustedRouter()": {
+      "status": "Success"
+    },
+    "test/SignedOrders.t.sol:SignedOrdersTest::test_RevertWhen_useNonceByNonExecutor()": {
+      "status": "Success"
+    },
+    "test/SignedOrders.t.sol:SignedOrdersTest::test_cancelWithSig_rejectsExpired()": {
+      "status": "Success"
+    },
+    "test/SignedOrders.t.sol:SignedOrdersTest::test_cancelWithSig_rejectsReplayOnRecurringOrderId()": {
+      "status": "Success"
+    },
+    "test/SignedOrders.t.sol:SignedOrdersTest::test_cancelWithSig_rejectsUnusedSignatureOnReplacement()": {
+      "status": "Success"
+    },
+    "test/SignedOrders.t.sol:SignedOrdersTest::test_cancelWithSig_rejectsWrongSigner()": {
+      "status": "Success"
+    },
+    "test/SignedOrders.t.sol:SignedOrdersTest::test_cancelWithSig_returnsInputToMaker()": {
+      "status": "Success"
+    },
+    "test/SignedOrders.t.sol:SignedOrdersTest::test_cancelWithSig_revokedByInvalidateNonce()": {
+      "status": "Success"
+    },
+    "test/SignedOrders.t.sol:SignedOrdersTest::test_cancelWithSig_sharesHookNonces()": {
+      "status": "Success"
+    },
+    "test/SignedOrders.t.sol:SignedOrdersTest::test_invalidateNonce_revokesSignedUpdate()": {
+      "status": "Success"
+    },
+    "test/SignedOrders.t.sol:SignedOrdersTest::test_setExecutorWithSig_emitsGrantForMaker()": {
+      "status": "Success"
+    },
+    "test/SignedOrders.t.sol:SignedOrdersTest::test_setExecutorWithSig_emitsRevocationForMaker()": {
+      "status": "Success"
+    },
+    "test/SignedOrders.t.sol:SignedOrdersTest::test_swapWithSig_relayerCreatesOrder_andGrantsExecutor()": {
+      "status": "Success"
+    },
+    "test/SignedOrders.t.sol:SignedOrdersTest::test_swapWithSig_replayReverts()": {
+      "status": "Success"
+    },
+    "test/SignedOrders.t.sol:SignedOrdersTest::test_swapWithSig_revertsWhenRelayerAltersPrice()": {
+      "status": "Success"
+    },
+    "test/SignedOrders.t.sol:SignedOrdersTest::test_swapWithSig_revertsWithoutExecutorGrant()": {
+      "status": "Success"
+    },
+    "test/SignedOrders.t.sol:SignedOrdersTest::test_swapWithSig_skipsGrantWhenAlreadyAuthorized()": {
+      "status": "Success"
+    },
+    "test/SignedOrders.t.sol:SignedOrdersTest::test_swapWithSig_thenFill()": {
+      "status": "Success"
+    },
+    "test/SignedOrders.t.sol:SignedOrdersTest::test_topUpPreservesPendingSignedRepriceAndCancel()": {
+      "status": "Success"
+    },
+    "test/SignedOrders.t.sol:SignedOrdersTest::test_typeStrings()": {
+      "status": "Success"
+    },
+    "test/SignedOrders.t.sol:SignedOrdersTest::test_updatePriceWithSig_rejectsExpired()": {
+      "status": "Success"
+    },
+    "test/SignedOrders.t.sol:SignedOrdersTest::test_updatePriceWithSig_rejectsSignatureAfterDirectReprice()": {
+      "status": "Success"
+    },
+    "test/SignedOrders.t.sol:SignedOrdersTest::test_updatePriceWithSig_rejectsTamperedPrice()": {
+      "status": "Success"
+    },
+    "test/SignedOrders.t.sol:SignedOrdersTest::test_updatePriceWithSig_rejectsUnusedSignatureOnReplacement()": {
+      "status": "Success"
+    },
+    "test/SignedOrders.t.sol:SignedOrdersTest::test_updatePriceWithSig_rejectsWrongSigner()": {
+      "status": "Success"
+    },
+    "test/SignedOrders.t.sol:SignedOrdersTest::test_updatePriceWithSig_relayerUpdates()": {
+      "status": "Success"
+    },
+    "test/StressCompletion.t.sol:NativeWithdrawalStressTest::testFuzz_updatedRouterCancellationAuthorization(bool,bool,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/StressCompletion.t.sol:NativeWithdrawalStressTest::testFuzz_withdrawClaimsAmountAndAllowance(uint96,uint96)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/StressCompletion.t.sol:NativeWithdrawalStressTest::test_RevertWhen_NativeOutputForwardFails()": {
+      "status": "Success"
+    },
+    "test/StressCompletion.t.sol:NativeWithdrawalStressTest::test_cancelAndWithdrawReturnsETHWithoutConsumingExistingClaims()": {
+      "status": "Success"
+    },
+    "test/StressCompletion.t.sol:NativeWithdrawalStressTest::test_cancel_nativeInput_makerReclaimsEth()": {
+      "status": "Success"
+    },
+    "test/StressCompletion.t.sol:NativeWithdrawalStressTest::test_erc20CancellationReturnsTokensWithoutClaimApproval()": {
+      "status": "Success"
+    },
+    "test/StressCompletion.t.sol:NativeWithdrawalStressTest::test_fill_nativeInput_fillerSendsEth_receivesErc20()": {
+      "status": "Success"
+    },
+    "test/StressCompletion.t.sol:NativeWithdrawalStressTest::test_fill_nativeOutput_fillerSendsErc20_receivesEth()": {
+      "status": "Success"
+    },
+    "test/StressCompletion.t.sol:NativeWithdrawalStressTest::test_invalidWithdrawalBatchesRevert()": {
+      "status": "Success"
+    },
+    "test/StressCompletion.t.sol:NativeWithdrawalStressTest::test_laterBatchFailureRollsBackEarlierWithdrawal()": {
+      "status": "Success"
+    },
+    "test/StressCompletion.t.sol:NativeWithdrawalStressTest::test_missingClaimApprovalRollsBackCancellation()": {
+      "status": "Success"
+    },
+    "test/StressCompletion.t.sol:NativeWithdrawalStressTest::test_nativeReceiverCannotReenterWithdraw()": {
+      "status": "Success"
+    },
+    "test/StressCompletion.t.sol:NativeWithdrawalStressTest::test_otherWalletCannotCancelAndWithdraw()": {
+      "status": "Success"
+    },
+    "test/StressCompletion.t.sol:NativeWithdrawalStressTest::test_partialFillCancelsAndWithdrawsOnlyLiveRemainder()": {
+      "status": "Success"
+    },
+    "test/StressCompletion.t.sol:NativeWithdrawalStressTest::test_rejectedETHRollsBackClaimsAndAllowance()": {
+      "status": "Success"
+    },
+    "test/StressCompletion.t.sol:NativeWithdrawalStressTest::test_stress_nativePartialWithdrawalAndDoubleSpend()": {
+      "status": "Success"
+    },
+    "test/StressCompletion.t.sol:NativeWithdrawalStressTest::test_swap_nativeInput_create()": {
+      "status": "Success"
+    },
+    "test/StressCompletion.t.sol:NativeWithdrawalStressTest::test_swap_nativeOutput_create()": {
+      "status": "Success"
+    },
+    "test/StressCompletion.t.sol:NativeWithdrawalStressTest::test_unlockCallbackRejectsCallsOutsidePoolManager()": {
+      "status": "Success"
+    },
+    "test/StressCompletion.t.sol:NativeWithdrawalStressTest::test_updatedRouterCancelsExistingHookOrdersAfterExecutorGrant()": {
+      "status": "Success"
+    },
+    "test/StressCompletion.t.sol:NativeWithdrawalStressTest::test_withdrawBatchBoundsRejectMismatchedAndOversizedArrays()": {
+      "status": "Success"
+    },
+    "test/StressCompletion.t.sol:NativeWithdrawalStressTest::test_withdrawClaimsToOwnerAndRejectDoubleSpend()": {
+      "status": "Success"
+    },
+    "test/StressCompletion.t.sol:NativeWithdrawalStressTest::test_withdrawNativeAndERC20ClaimsInOneBatch()": {
+      "status": "Success"
+    },
+    "test/StressCompletion.t.sol:StressCompletionTest::test_stress_deepCrossingBookBoundedContinuation()": {
+      "status": "Success"
+    },
+    "test/StressCompletion.t.sol:StressCompletionTest::test_stress_liquidityRetryAndAlternatingFills()": {
+      "status": "Success"
+    },
+    "test/StressCompletion.t.sol:StressCompletionTest::test_stress_sustainedMatchingAndWithdrawals()": {
+      "status": "Success"
+    },
+    "test/TickBitmap.t.sol:TickBitmapTest::testFuzz_sparseDomainChurn(uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/TickBitmap.t.sol:TickBitmapTest::test_boundariesDuplicatesAndMissingKeys()": {
+      "status": "Success"
+    },
+    "test/TickBitmap.t.sol:TickBitmapTest::test_everyGroupCanBeEmptiedAndReused()": {
+      "status": "Success"
+    },
+    "test/TickPriceKey.t.sol:TickPriceKeyTest::testFuzz_key_dependsOnlyOnThePrice(bool,bool,uint256,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/TickPriceKey.t.sol:TickPriceKeyTest::test_key_ofLargeOrders()": {
+      "status": "Success"
+    },
+    "test/TickPricePoolBeatsLevel.t.sol:TickPricePoolBeatsLevelTest::testFuzz_limitIsAValidSwapLimit(bool,bool,uint128)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/TickPricePoolBeatsLevel.t.sol:TickPricePoolBeatsLevelTest::test_priceJustBelowTwoTo128IsTheEndKey()": {
+      "status": "Success"
+    },
+    "test/TickPricePoolBeatsLevel.t.sol:TickPricePoolBeatsLevelTest::test_quote0Buy_limitIsOneTickAboveTheAsk()": {
+      "status": "Success"
+    },
+    "test/TickPricePoolBeatsLevel.t.sol:TickPricePoolBeatsLevelTest::test_quote0Sell_limitIsTheBidTick()": {
+      "status": "Success"
+    },
+    "test/TickPricePoolBeatsLevel.t.sol:TickPricePoolBeatsLevelTest::test_quote0_levelBetterThanThePoolGoesToTheBook()": {
+      "status": "Success"
+    },
+    "test/TickPricePoolBeatsLevel.t.sol:TickPricePoolBeatsLevelTest::test_quote1Buy_awayFromTheReferencePaysNoFee()": {
+      "status": "Success"
+    },
+    "test/TickPricePoolBeatsLevel.t.sol:TickPricePoolBeatsLevelTest::test_quote1Buy_feeWindowSendsTheOrderToTheBook()": {
+      "status": "Success"
+    },
+    "test/TickPricePoolBeatsLevel.t.sol:TickPricePoolBeatsLevelTest::test_quote1Buy_outsideTheWindowPaysNoFee()": {
+      "status": "Success"
+    },
+    "test/TokenClaims.t.sol:TokenClaimsTest::test_RevertWhen_CallbackNotFromPoolManager()": {
+      "status": "Success"
+    },
+    "test/TokenClaims.t.sol:TokenClaimsTest::test_RevertWhen_InvalidRedemption()": {
+      "status": "Success"
+    },
+    "test/TokenClaims.t.sol:TokenClaimsTest::test_RevertWhen_RedeemingAnotherOwnersClaims()": {
+      "status": "Success"
+    },
+    "test/TokenClaims.t.sol:TokenClaimsTest::test_RevertWhen_RedeemingWithoutApproval()": {
+      "status": "Success"
+    },
+    "test/TokenClaims.t.sol:TokenClaimsTest::test_failedTransferPreservesClaimsAndAllowance()": {
+      "status": "Success"
+    },
+    "test/TokenClaims.t.sol:TokenClaimsTest::test_redeemPartialToChosenRecipientThenNoDoubleSpend()": {
+      "status": "Success"
+    },
+    "test/TokenClaims.t.sol:TokenClaimsTest::test_redeemsEachCurrencySeparately()": {
+      "status": "Success"
+    },
+    "test/TokenClaims.t.sol:TokenClaimsTest::test_reentrantRedemptionIsBlocked()": {
+      "status": "Success"
+    },
+    "test/TradeFees.t.sol:TradeFeesTest::test_bookMatchChargesBothSides()": {
+      "status": "Success"
+    },
+    "test/TradeFees.t.sol:TradeFeesTest::test_cancelRefundsTheWholeDeposit()": {
+      "status": "Success"
+    },
+    "test/TradeFees.t.sol:TradeFeesTest::test_exactlyTouchingLimitsMatch()": {
+      "status": "Success"
+    },
+    "test/TradeFees.t.sol:TradeFeesTest::test_fillerFillChargesMakerAndFiller()": {
+      "status": "Success"
+    },
+    "test/TradeFees.t.sol:TradeFeesTest::test_lpFillPaysLpsTwoBpsAndProtocolOneBp()": {
+      "status": "Success"
+    },
+    "test/fizz/FoundryTester.sol:FoundryTester::test_handlerPaths()": {
+      "status": "Success"
+    },
+    "test/fizz/FoundryTester.sol:FoundryTester::test_sequence()": {
+      "status": "Success"
+    },
+    "test/formal/AsyncSwapAcceptOwnership.t.sol:AsyncSwapAcceptOwnershipFormalTest::testFuzz_acceptOwnership_notPending(address,address,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAcceptOwnership.t.sol:AsyncSwapAcceptOwnershipFormalTest::testFuzz_acceptOwnership_ok_iff(address,address,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAcceptOwnership.t.sol:AsyncSwapAcceptOwnershipFormalTest::testFuzz_acceptOwnership_ok_state(address,address,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAcceptOwnership.t.sol:AsyncSwapAcceptOwnershipFormalTest::testFuzz_acceptOwnership_reverts_iff(address,address,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAcceptOwnership.t.sol:AsyncSwapAcceptOwnershipFormalTest::testFuzz_acceptOwnership_run(address,address,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAddOrder.t.sol:AsyncSwapAddOrderFormalTest::testFuzz_addOrder_feeTooLarge((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAddOrder.t.sol:AsyncSwapAddOrderFormalTest::testFuzz_addOrder_feeTooSmall((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAddOrder.t.sol:AsyncSwapAddOrderFormalTest::testFuzz_addOrder_ok((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAddOrder.t.sol:AsyncSwapAddOrderFormalTest::testFuzz_addOrder_run((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAddOrder.t.sol:AsyncSwapAddOrderFormalTest::testFuzz_addOrder_seqOverflow((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAddOrder.t.sol:AsyncSwapAddOrderFormalTest::testFuzz_addState_book((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAddOrder.t.sol:AsyncSwapAddOrderFormalTest::testFuzz_addState_frame(bool,uint256,uint256,address,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAddOrder.t.sol:AsyncSwapAddOrderFormalTest::testFuzz_addState_order((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAddOrder.t.sol:AsyncSwapAddOrderFormalTest::testFuzz_addState_other_order((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAddOrder.t.sol:AsyncSwapAddOrderFormalTest::testFuzz_addState_other_pool((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAddOrder.t.sol:AsyncSwapAddOrderFormalTest::testFuzz_matching_addOrder_eq((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAddOrder.t.sol:AsyncSwapAddOrderFormalTest::testFuzz_matching_addOrder_feeTooLarge((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAddOrder.t.sol:AsyncSwapAddOrderFormalTest::testFuzz_matching_addOrder_feeTooSmall((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAddOrder.t.sol:AsyncSwapAddOrderFormalTest::testFuzz_matching_addOrder_ok((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAddOrder.t.sol:AsyncSwapAddOrderFormalTest::testFuzz_matching_addOrder_run((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAddOrder.t.sol:AsyncSwapAddOrderFormalTest::testFuzz_matching_addOrder_seqOverflow((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAddOrder.t.sol:AsyncSwapAddOrderFormalTest::testFuzz_priorityKey_bidAndSequence((bytes32,address,uint256,uint256,bool,bool,uint256,uint8,uint8,uint8,uint8,uint64,uint8,uint256,uint8))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAddOrder.t.sol:AsyncSwapAddOrderFormalTest::test_addOrder_tickDirectionZeroBoundary()": {
+      "status": "Success"
+    },
+    "test/formal/AsyncSwapAddOrder.t.sol:AsyncSwapAddOrderFormalTest::test_addOrder_tickExtremeRatioClamps()": {
+      "status": "Success"
+    },
+    "test/formal/AsyncSwapAfterAddLiquidity.t.sol:AsyncSwapAfterAddLiquidityFormalTest::testFuzz_afterAddLiquidity_never_ok((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAfterAddLiquidity.t.sol:AsyncSwapAfterAddLiquidityFormalTest::testFuzz_afterAddLiquidity_notPoolManager((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAfterAddLiquidity.t.sol:AsyncSwapAfterAddLiquidityFormalTest::testFuzz_afterAddLiquidity_poolManager((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAfterAddLiquidity.t.sol:AsyncSwapAfterAddLiquidityFormalTest::testFuzz_afterAddLiquidity_spec((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAfterDonate.t.sol:AsyncSwapAfterDonateFormalTest::testFuzz_afterDonate_never_ok((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAfterDonate.t.sol:AsyncSwapAfterDonateFormalTest::testFuzz_afterDonate_notPoolManager((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAfterDonate.t.sol:AsyncSwapAfterDonateFormalTest::testFuzz_afterDonate_poolManager((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAfterDonate.t.sol:AsyncSwapAfterDonateFormalTest::testFuzz_afterDonate_spec((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAfterInitialize.t.sol:AsyncSwapAfterInitializeFormalTest::testFuzz_afterInitialize_hookNotImplemented((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAfterInitialize.t.sol:AsyncSwapAfterInitializeFormalTest::testFuzz_afterInitialize_never_ok((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAfterInitialize.t.sol:AsyncSwapAfterInitializeFormalTest::testFuzz_afterInitialize_notPoolManager((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAfterInitialize.t.sol:AsyncSwapAfterInitializeFormalTest::testFuzz_afterInitialize_spec((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAfterRemoveLiquidity.t.sol:AsyncSwapAfterRemoveLiquidityFormalTest::testFuzz_afterRemoveLiquidity_hookNotImplemented((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAfterRemoveLiquidity.t.sol:AsyncSwapAfterRemoveLiquidityFormalTest::testFuzz_afterRemoveLiquidity_never_ok((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAfterRemoveLiquidity.t.sol:AsyncSwapAfterRemoveLiquidityFormalTest::testFuzz_afterRemoveLiquidity_notPoolManager((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAfterRemoveLiquidity.t.sol:AsyncSwapAfterRemoveLiquidityFormalTest::testFuzz_afterRemoveLiquidity_spec((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAfterSwap.t.sol:AsyncSwapAfterSwapFormalTest::testFuzz_afterSwap_hookNotImplemented((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAfterSwap.t.sol:AsyncSwapAfterSwapFormalTest::testFuzz_afterSwap_never_ok((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAfterSwap.t.sol:AsyncSwapAfterSwapFormalTest::testFuzz_afterSwap_notPoolManager((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAfterSwap.t.sol:AsyncSwapAfterSwapFormalTest::testFuzz_afterSwap_spec((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAsyncOrder.t.sol:AsyncSwapAsyncOrderFormalTest::testFuzz_asyncOrder_never_reverts(address,bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint32,uint64,uint128,uint64),bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAsyncOrder.t.sol:AsyncSwapAsyncOrderFormalTest::testFuzz_asyncOrder_ok_iff(bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint32,uint64,uint128,uint64),uint96)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAsyncOrder.t.sol:AsyncSwapAsyncOrderFormalTest::testFuzz_asyncOrder_reads_only_asyncOrders(bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint32,uint64,uint128,uint64),uint256,address,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAsyncOrder.t.sol:AsyncSwapAsyncOrderFormalTest::testFuzz_asyncOrder_run(address,bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint32,uint64,uint128,uint64))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAsyncOrderInfo.t.sol:AsyncSwapAsyncOrderInfoFormalTest::testFuzz_asyncOrderInfo_never_reverts(address,bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint32,uint64,uint128,uint64),bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAsyncOrderInfo.t.sol:AsyncSwapAsyncOrderInfoFormalTest::testFuzz_asyncOrderInfo_ok_iff(bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint32,uint64,uint128,uint64),uint96)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAsyncOrderInfo.t.sol:AsyncSwapAsyncOrderInfoFormalTest::testFuzz_asyncOrderInfo_reads_only_asyncOrders(bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint32,uint64,uint128,uint64),uint256,address,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAsyncOrderInfo.t.sol:AsyncSwapAsyncOrderInfoFormalTest::testFuzz_asyncOrderInfo_run(address,bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint32,uint64,uint128,uint64))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAsyncOrderPriorityFee.t.sol:AsyncSwapAsyncOrderPriorityFeeFormalTest::testFuzz_asyncOrderPriorityFee_escrowed(bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint32,uint64,uint128,uint64),uint64)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAsyncOrderPriorityFee.t.sol:AsyncSwapAsyncOrderPriorityFeeFormalTest::testFuzz_asyncOrderPriorityFee_never_reverts(address,bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint32,uint64,uint128,uint64),bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAsyncOrderPriorityFee.t.sol:AsyncSwapAsyncOrderPriorityFeeFormalTest::testFuzz_asyncOrderPriorityFee_ok_iff(bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint32,uint64,uint128,uint64))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAsyncOrderPriorityFee.t.sol:AsyncSwapAsyncOrderPriorityFeeFormalTest::testFuzz_asyncOrderPriorityFee_reads_only_asyncOrders(bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint32,uint64,uint128,uint64),uint256,address,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapAsyncOrderPriorityFee.t.sol:AsyncSwapAsyncOrderPriorityFeeFormalTest::testFuzz_asyncOrderPriorityFee_run(address,bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint32,uint64,uint128,uint64))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeAddLiquidity.t.sol:AsyncSwapBeforeAddLiquidityFormalTest::testFuzz_beforeAddLiquidity_frame((address,bool,address,address,address,uint24,int24,address,int24,int24,int256,bytes32,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeAddLiquidity.t.sol:AsyncSwapBeforeAddLiquidityFormalTest::testFuzz_beforeAddLiquidity_notPoolManager((address,bool,address,address,address,uint24,int24,address,int24,int24,int256,bytes32,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeAddLiquidity.t.sol:AsyncSwapBeforeAddLiquidityFormalTest::testFuzz_beforeAddLiquidity_ok((address,bool,address,address,address,uint24,int24,address,int24,int24,int256,bytes32,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeAddLiquidity.t.sol:AsyncSwapBeforeAddLiquidityFormalTest::testFuzz_beforeAddLiquidity_spec((address,bool,address,address,address,uint24,int24,address,int24,int24,int256,bytes32,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeAddLiquidity.t.sol:AsyncSwapBeforeAddLiquidityFormalTest::test_beforeAddLiquidity_ok_viaPoolManager()": {
+      "status": "Success"
+    },
+    "test/formal/AsyncSwapBeforeDonate.t.sol:AsyncSwapBeforeDonateFormalTest::testFuzz_beforeDonate_never_ok((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeDonate.t.sol:AsyncSwapBeforeDonateFormalTest::testFuzz_beforeDonate_notPoolManager((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeDonate.t.sol:AsyncSwapBeforeDonateFormalTest::testFuzz_beforeDonate_poolManager((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeDonate.t.sol:AsyncSwapBeforeDonateFormalTest::testFuzz_beforeDonate_spec((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeInitialize.t.sol:AsyncSwapBeforeInitializeFormalTest::testFuzz_beforeInitialize_anySender(address,address,bool,int24,address,uint160)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeInitialize.t.sol:AsyncSwapBeforeInitializeFormalTest::testFuzz_beforeInitialize_dynamicFeeRequired(address,address,bool,bool,uint24,int24,address,uint160)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeInitialize.t.sol:AsyncSwapBeforeInitializeFormalTest::testFuzz_beforeInitialize_frame(address,address,bool,int24,address,uint160,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeInitialize.t.sol:AsyncSwapBeforeInitializeFormalTest::testFuzz_beforeInitialize_notPoolManager(address,address,address,address,uint24,int24,address,uint160)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeInitialize.t.sol:AsyncSwapBeforeInitializeFormalTest::testFuzz_beforeInitialize_numeraireRequired(address,address,address,uint24,int24,address,uint160)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeInitialize.t.sol:AsyncSwapBeforeInitializeFormalTest::testFuzz_beforeInitialize_ok(address,address,bool,int24,address,uint160,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeInitialize.t.sol:AsyncSwapBeforeInitializeFormalTest::testFuzz_beforeInitialize_ok_inv((address,bool,address,address,address,bool,bool,uint24,bool,int24,address,uint160))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeInitialize.t.sol:AsyncSwapBeforeInitializeFormalTest::testFuzz_beforeInitialize_rejectsCodelessAsset(address,address,bool,int24,uint160)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeInitialize.t.sol:AsyncSwapBeforeInitializeFormalTest::testFuzz_beforeInitialize_run_ok(address,address,bool,int24,address,uint160)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeInitialize.t.sol:AsyncSwapBeforeInitializeFormalTest::testFuzz_beforeInitialize_succeeds_iff((address,bool,address,address,address,bool,bool,uint24,bool,int24,address,uint160))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeInitialize.t.sol:AsyncSwapBeforeInitializeFormalTest::test_beforeInitialize_dynamicFeeRequired_viaPoolManager()": {
+      "status": "Success"
+    },
+    "test/formal/AsyncSwapBeforeInitialize.t.sol:AsyncSwapBeforeInitializeFormalTest::test_beforeInitialize_run_ok_viaPoolManager()": {
+      "status": "Success"
+    },
+    "test/formal/AsyncSwapBeforeRemoveLiquidity.t.sol:AsyncSwapBeforeRemoveLiquidityFormalTest::testFuzz_beforeRemoveLiquidity_hookNotImplemented((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeRemoveLiquidity.t.sol:AsyncSwapBeforeRemoveLiquidityFormalTest::testFuzz_beforeRemoveLiquidity_never_ok((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeRemoveLiquidity.t.sol:AsyncSwapBeforeRemoveLiquidityFormalTest::testFuzz_beforeRemoveLiquidity_notPoolManager((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeRemoveLiquidity.t.sol:AsyncSwapBeforeRemoveLiquidityFormalTest::testFuzz_beforeRemoveLiquidity_spec((address,bool,address,address,address,uint24,int24,address,uint256,uint256,int256,int256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeSwap.t.sol:AsyncSwapBeforeSwapFormalTest::testFuzz_beforeSwap_badDecode(address,address,address,uint24,int24,bool,int256,uint160,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeSwap.t.sol:AsyncSwapBeforeSwapFormalTest::testFuzz_beforeSwap_badDecode_dirtyAddress(address,bool,int256,uint256,uint256,uint256,uint256,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeSwap.t.sol:AsyncSwapBeforeSwapFormalTest::testFuzz_beforeSwap_exactInputOnly(address,address,address,uint24,int24,(bool,int256,uint160),bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeSwap.t.sol:AsyncSwapBeforeSwapFormalTest::testFuzz_beforeSwap_negOverflow(address,address,address,uint24,int24,bool,uint160,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeSwap.t.sol:AsyncSwapBeforeSwapFormalTest::testFuzz_beforeSwap_notExecutor(address,address,address,uint24,int24,bool,int256,address,address,uint256,uint256,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeSwap.t.sol:AsyncSwapBeforeSwapFormalTest::testFuzz_beforeSwap_notPoolManager(address,address,address,address,uint24,int24,(bool,int256,uint160),bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeSwap.t.sol:AsyncSwapBeforeSwapFormalTest::testFuzz_beforeSwap_notTrustedRouter(address,address,address,uint24,int24,bool,int256,address,address,uint256,uint256,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeSwap.t.sol:AsyncSwapBeforeSwapFormalTest::testFuzz_beforeSwap_ok_delta((address,bool,address,bool,bool,address,address,uint24,int24,bool,int256,bool,uint160,bool,address,address,uint256,uint256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 2048
+    },
+    "test/formal/AsyncSwapBeforeSwap.t.sol:AsyncSwapBeforeSwapFormalTest::testFuzz_beforeSwap_ok_inv((address,bool,address,bool,bool,address,address,uint24,int24,bool,int256,bool,uint160,bool,address,address,uint256,uint256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 2048
+    },
+    "test/formal/AsyncSwapBeforeSwap.t.sol:AsyncSwapBeforeSwapFormalTest::testFuzz_beforeSwap_ok_returns((address,bool,address,bool,bool,address,address,uint24,int24,bool,int256,bool,uint160,bool,address,address,uint256,uint256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 2048
+    },
+    "test/formal/AsyncSwapBeforeSwap.t.sol:AsyncSwapBeforeSwapFormalTest::testFuzz_beforeSwap_run_ok(bool,uint256,address,address,uint256,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeSwap.t.sol:AsyncSwapBeforeSwapFormalTest::testFuzz_beforeSwap_run_ok_tailErrors(bool,uint256,address,address,uint256,uint256,bool,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBeforeSwap.t.sol:AsyncSwapBeforeSwapFormalTest::testFuzz_beforeSwap_succeeds_iff((address,bool,address,bool,bool,address,address,uint24,int24,bool,int256,bool,uint160,bool,address,address,uint256,uint256,bool,bytes,bool))": {
+      "status": "Success",
+      "fuzzRuns": 2048
+    },
+    "test/formal/AsyncSwapBeforeSwap.t.sol:AsyncSwapBeforeSwapFormalTest::test_beforeSwap_run_ok_viaRouter()": {
+      "status": "Success"
+    },
+    "test/formal/AsyncSwapBestOrder.t.sol:AsyncSwapBestOrderFormalTest::testFuzz_bestOrder_boundedBitmapDepth(bytes32,bool,uint8,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBestOrder.t.sol:AsyncSwapBestOrderFormalTest::testFuzz_bestOrder_empty(bytes32,bool,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBestOrder.t.sol:AsyncSwapBestOrderFormalTest::testFuzz_bestOrder_ok(uint256,bool,bool,bool,bool,uint8,uint128)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBestOrder.t.sol:AsyncSwapBestOrderFormalTest::testFuzz_bestOrder_readOnly(uint256,bool,bool,bool,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBestOrder.t.sol:AsyncSwapBestOrderFormalTest::testFuzz_bestOrder_run(uint256,bool,bool,bool,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBestOrder.t.sol:AsyncSwapBestOrderFormalTest::testFuzz_bestOrder_run_synthetic(bytes32,bool,uint8,uint128,bytes32,address,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBitSet.t.sol:AsyncSwapBitSetFormalTest::testFuzz_bitSet_noRevert(uint128,uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBitSet.t.sol:AsyncSwapBitSetFormalTest::testFuzz_bitSet_spec(uint128,uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBitSet.t.sol:AsyncSwapBitSetFormalTest::testFuzz_bitSet_testBit(uint128,uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBubbleUpAndRevertWith.t.sol:AsyncSwapBubbleUpAndRevertWithFormalTest::testFuzz_bubbleUpAndRevertWith_indep(bool,bytes,address,bytes4,bytes4,bool,bytes,address,bytes4,bytes4)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBubbleUpAndRevertWith.t.sol:AsyncSwapBubbleUpAndRevertWithFormalTest::testFuzz_bubbleUpAndRevertWith_never_ok(bool,bytes,address,bytes4,bytes4)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBubbleUpAndRevertWith.t.sol:AsyncSwapBubbleUpAndRevertWithFormalTest::testFuzz_bubbleUpAndRevertWith_reverts(bool,bytes,address,bytes4,bytes4)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapBubbleUpAndRevertWith.t.sol:AsyncSwapBubbleUpAndRevertWithFormalTest::testFuzz_bubbleUpAndRevertWith_reverts_(bool,bytes,address,bytes4,bytes4)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapCalculateHookFee.t.sol:AsyncSwapCalculateHookFeeFormalTest::testFuzz_calculateHookFee_const(uint256,uint256,address,address,uint64)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapCalculateHookFee.t.sol:AsyncSwapCalculateHookFeeFormalTest::testFuzz_calculateHookFee_never_reverts(address,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapCalculateHookFee.t.sol:AsyncSwapCalculateHookFeeFormalTest::testFuzz_calculateHookFee_ok_iff(uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapCalculateHookFee.t.sol:AsyncSwapCalculateHookFeeFormalTest::testFuzz_calculateHookFee_run(address,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapCalculatePoolFee.t.sol:AsyncSwapCalculatePoolFeeFormalTest::testFuzz_calculatePoolFee_le(uint24,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapCalculatePoolFee.t.sol:AsyncSwapCalculatePoolFeeFormalTest::testFuzz_calculatePoolFee_ok(uint24,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapCalculatePoolFee.t.sol:AsyncSwapCalculatePoolFeeFormalTest::testFuzz_calculatePoolFee_run(uint24,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapCalculatePoolFee.t.sol:AsyncSwapCalculatePoolFeeFormalTest::test_calculatePoolFee_ok_edges()": {
+      "status": "Success"
+    },
+    "test/formal/AsyncSwapCallOptionalReturn.t.sol:AsyncSwapCallOptionalReturnFormalTest::testFuzz_callOptionalReturn_after(uint8,uint256,bytes,address,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapCallOptionalReturn.t.sol:AsyncSwapCallOptionalReturnFormalTest::testFuzz_callOptionalReturn_call_reverts((address,bool,bool,uint8,uint256,bytes),address,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapCallOptionalReturn.t.sol:AsyncSwapCallOptionalReturnFormalTest::testFuzz_callOptionalReturn_false_reverts(bytes,address,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapCallOptionalReturn.t.sol:AsyncSwapCallOptionalReturnFormalTest::testFuzz_callOptionalReturn_ok((address,bool,bool,uint8,uint256,bytes),address,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapCancelOrder.t.sol:AsyncSwapCancelOrderFormalTest::testFuzz_cancelOrder_notFound(bool,bool,bytes32,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapCancelOrder.t.sol:AsyncSwapCancelOrderFormalTest::testFuzz_cancelOrder_ok(uint256,bool,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapCancelOrder.t.sol:AsyncSwapCancelOrderFormalTest::testFuzz_cancelOrder_ok_nativeInput(uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapCancelOrder.t.sol:AsyncSwapCancelOrderFormalTest::testFuzz_cancelOrder_ok_paidBid(uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapCancelOrder.t.sol:AsyncSwapCancelOrderFormalTest::testFuzz_cancelOrder_reentry_reverts(uint8,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapCancelOrder.t.sol:AsyncSwapCancelOrderFormalTest::testFuzz_cancelOrder_run(uint8,bool,bool,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapCancelOrder.t.sol:AsyncSwapCancelOrderFormalTest::testFuzz_cancelOrder_unauthorized(address,bool,bytes32)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapConstructor.t.sol:AsyncSwapConstructorFormalTest::testFuzz_DOMAIN_SEPARATOR_eq_built(uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapConstructor.t.sol:AsyncSwapConstructorFormalTest::testFuzz_ctor_deployed(address,uint8,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapConstructor.t.sol:AsyncSwapConstructorFormalTest::testFuzz_ctor_fresh_state(address,uint8,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapConstructor.t.sol:AsyncSwapConstructorFormalTest::testFuzz_ctor_invalidNumeraire(address,address,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapConstructor.t.sol:AsyncSwapConstructorFormalTest::testFuzz_ctor_ok_iff(address,address,bool,uint8,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapConstructor.t.sol:AsyncSwapConstructorFormalTest::testFuzz_ctor_reverts_iff(address,address,bool,uint8,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapConstructor.t.sol:AsyncSwapConstructorFormalTest::testFuzz_ctor_zeroOwner(address,uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapConstructor.t.sol:AsyncSwapConstructorFormalTest::testFuzz_domainSeparatorV4_eq_built(uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapConstructor.t.sol:AsyncSwapConstructorFormalTest::testFuzz_owner_nonzero_acceptOwnership(address,address,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapConstructor.t.sol:AsyncSwapConstructorFormalTest::testFuzz_owner_nonzero_transferOwnership(address,address,address,bool,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapCrosses.t.sol:AsyncSwapCrossesFormalTest::testFuzz_crosses_frame(uint128,uint128,(uint256,uint256,uint256,uint256),bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapCrosses.t.sol:AsyncSwapCrossesFormalTest::testFuzz_crosses_ne_any(uint128,uint128,(uint256,uint256,uint256,uint256))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapCrosses.t.sol:AsyncSwapCrossesFormalTest::testFuzz_crosses_reverts_div0(uint128,uint256,uint256,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapCrosses.t.sol:AsyncSwapCrossesFormalTest::testFuzz_crosses_reverts_overflow(uint128,(uint256,uint256,uint256,uint256))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapCrosses.t.sol:AsyncSwapCrossesFormalTest::testFuzz_crosses_run(uint128,uint128,(uint256,uint256,uint256,uint256),bool,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapCrosses.t.sol:AsyncSwapCrossesFormalTest::test_crosses_reverts_div0_counterexample()": {
+      "status": "Success"
+    },
+    "test/formal/AsyncSwapDOMAIN_SEPARATOR.t.sol:AsyncSwapDOMAIN_SEPARATORFormalTest::testFuzz_DOMAIN_SEPARATOR_never_reverts(address,uint64)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapDOMAIN_SEPARATOR.t.sol:AsyncSwapDOMAIN_SEPARATORFormalTest::testFuzz_DOMAIN_SEPARATOR_preserves(uint64,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapDOMAIN_SEPARATOR.t.sol:AsyncSwapDOMAIN_SEPARATORFormalTest::testFuzz_DOMAIN_SEPARATOR_spec(address,uint64,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapExecuteOrder.t.sol:AsyncSwapExecuteOrderFormalTest::testFuzz_afterNative_run(uint256,uint256,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapExecuteOrder.t.sol:AsyncSwapExecuteOrderFormalTest::testFuzz_calculatePoolFee_run(uint24,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapExecuteOrder.t.sol:AsyncSwapExecuteOrderFormalTest::testFuzz_executeOrder_decode(bytes,uint256,bool,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapExecuteOrder.t.sol:AsyncSwapExecuteOrderFormalTest::testFuzz_executeOrder_nativeOverflow(uint256,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapExecuteOrder.t.sol:AsyncSwapExecuteOrderFormalTest::testFuzz_executeOrder_notFound(bytes32,bool,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapExecuteOrder.t.sol:AsyncSwapExecuteOrderFormalTest::testFuzz_executeOrder_ok(bool,uint256,uint256,uint160)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapExecuteOrder.t.sol:AsyncSwapExecuteOrderFormalTest::testFuzz_executeOrder_ok_native(uint256,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapExecuteOrder.t.sol:AsyncSwapExecuteOrderFormalTest::testFuzz_executeOrder_run(uint8,bool,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapExecuteOrder.t.sol:AsyncSwapExecuteOrderFormalTest::testFuzz_executeOrder_unaccountedNative(uint256,uint256,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapExecuteOrder.t.sol:AsyncSwapExecuteOrderFormalTest::testFuzz_executeOrder_unauthorized(address,bool,bytes32,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapExecuteOrder.t.sol:AsyncSwapExecuteOrderFormalTest::testFuzz_fill_run(bool,bool,bool,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapExecuteOrder.t.sol:AsyncSwapExecuteOrderFormalTest::testFuzz_pf_le(uint24,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapFillOrderFromPoolLiquidity.t.sol:AsyncSwapFillOrderFromPoolLiquidityFormalTest::testFuzz_fillOrderFromPoolLiquidity_noLiquidity(uint256,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapFillOrderFromPoolLiquidity.t.sol:AsyncSwapFillOrderFromPoolLiquidityFormalTest::testFuzz_fillOrderFromPoolLiquidity_notFound(bytes32,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapFillOrderFromPoolLiquidity.t.sol:AsyncSwapFillOrderFromPoolLiquidityFormalTest::testFuzz_fillOrderFromPoolLiquidity_notSelf(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),bytes32)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapFillOrderFromPoolLiquidity.t.sol:AsyncSwapFillOrderFromPoolLiquidityFormalTest::testFuzz_fillOrderFromPoolLiquidity_ok(uint256,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapFillOrderFromPoolLiquidity.t.sol:AsyncSwapFillOrderFromPoolLiquidityFormalTest::testFuzz_fillOrderFromPoolLiquidity_ok_full(uint256,address,bool,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapFillOrderFromPoolLiquidity.t.sol:AsyncSwapFillOrderFromPoolLiquidityFormalTest::testFuzz_fillOrderFromPoolLiquidity_reentry_reverts(uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapFillOrderFromPoolLiquidity.t.sol:AsyncSwapFillOrderFromPoolLiquidityFormalTest::testFuzz_swapAgainstPool_ok(uint256,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapFreeNode.t.sol:AsyncSwapFreeNodeFormalTest::testFuzz_freeNode_footprint(uint32,(uint32,uint32,uint32,uint128,uint8,bool),uint128,uint32[],uint32,uint128)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapFreeNode.t.sol:AsyncSwapFreeNodeFormalTest::testFuzz_freeNode_no_revert(uint32,(uint32,uint32,uint32,uint128,uint8,bool),uint128,uint32[])": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapFreeNode.t.sol:AsyncSwapFreeNodeFormalTest::testFuzz_freeNode_run(uint32,(uint32,uint32,uint32,uint128,uint8,bool),uint128,uint32[],uint32,uint128)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapFreeNode.t.sol:AsyncSwapFreeNodeFormalTest::testFuzz_freeNode_run_wrapped(uint32,(uint32,uint32,uint32,uint128,uint8,bool),uint128,uint32[],uint32,uint128)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapFunctionCall.t.sol:AsyncSwapFunctionCallFormalTest::testFuzz_functionCall_eq_withValue((address,bool,bool,uint8,uint256,bytes),bytes,uint128)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapFunctionCall.t.sol:AsyncSwapFunctionCallFormalTest::testFuzz_functionCall_ok((address,bool,bool,uint8,uint256,bytes),bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapFunctionCall.t.sol:AsyncSwapFunctionCallFormalTest::testFuzz_functionCall_run((address,bool,bool,uint8,uint256,bytes),bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapFunctionCallWithValue.t.sol:AsyncSwapFunctionCallWithValueFormalTest::testFuzz_functionCallWithValue_ok((address,bool,bool,uint8,uint256,bytes),bytes,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapFunctionCallWithValue.t.sol:AsyncSwapFunctionCallWithValueFormalTest::testFuzz_functionCallWithValue_reverts_insufficient((address,bool,bool,uint8,uint256,bytes),bytes,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapFunctionCallWithValue.t.sol:AsyncSwapFunctionCallWithValueFormalTest::testFuzz_functionCallWithValue_run((address,bool,bool,uint8,uint256,bytes),bytes,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapGetHookPermissions.t.sol:AsyncSwapGetHookPermissionsFormalTest::testFuzz_getHookPermissions_never_reverts(address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapGetHookPermissions.t.sol:AsyncSwapGetHookPermissionsFormalTest::testFuzz_getHookPermissions_run(address,uint64)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapGetHookPermissions.t.sol:AsyncSwapGetHookPermissionsFormalTest::test_getHookPermissions_fields()": {
+      "status": "Success"
+    },
+    "test/formal/AsyncSwapGetHookPermissions.t.sol:AsyncSwapGetHookPermissionsFormalTest::test_getHookPermissions_ok_iff()": {
+      "status": "Success"
+    },
+    "test/formal/AsyncSwapHelpers.t.sol:AsyncSwapHelpersFormalTest::testFuzz_address_revert_run(bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapHelpers.t.sol:AsyncSwapHelpersFormalTest::testFuzz_bitSet_run(uint128,uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapHelpers.t.sol:AsyncSwapHelpersFormalTest::testFuzz_bubbleUpAndRevertWith_reverts(bool,bytes,bytes4,bytes4)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapHelpers.t.sol:AsyncSwapHelpersFormalTest::testFuzz_byteLength_le(bytes32)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapHelpers.t.sol:AsyncSwapHelpersFormalTest::testFuzz_byteLength_run(bytes32)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapHelpers.t.sol:AsyncSwapHelpersFormalTest::testFuzz_callOptionalReturn_after(address,address,uint256,uint8,bool,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapHelpers.t.sol:AsyncSwapHelpersFormalTest::testFuzz_callOptionalReturn_call_reverts(address,address,uint256,bool,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapHelpers.t.sol:AsyncSwapHelpersFormalTest::testFuzz_crosses_eq(uint256,uint256,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapHelpers.t.sol:AsyncSwapHelpersFormalTest::testFuzz_crosses_ne(uint256,uint256,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapHelpers.t.sol:AsyncSwapHelpersFormalTest::testFuzz_eip712Name_eq(string,string)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapHelpers.t.sol:AsyncSwapHelpersFormalTest::testFuzz_eip712Version_eq(string,string)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapHelpers.t.sol:AsyncSwapHelpersFormalTest::testFuzz_freeNode_run(uint128[5],uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapHelpers.t.sol:AsyncSwapHelpersFormalTest::testFuzz_functionCallWithValue_eq(uint256,uint256,bool,bytes,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapHelpers.t.sol:AsyncSwapHelpersFormalTest::testFuzz_functionCallWithValue_insufficient(uint256,uint256,bool,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapHelpers.t.sol:AsyncSwapHelpersFormalTest::testFuzz_functionCall_eq(uint256,bool,bytes,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapHelpers.t.sol:AsyncSwapHelpersFormalTest::testFuzz_mulDiv_rounding_eq(uint256,uint256,uint256,uint8,bool,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapHelpers.t.sol:AsyncSwapHelpersFormalTest::testFuzz_priceKey_eq(uint256,uint256,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapHelpers.t.sol:AsyncSwapHelpersFormalTest::testFuzz_priceKey_range(uint256,uint256,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapHelpers.t.sol:AsyncSwapHelpersFormalTest::testFuzz_priorityKey_lt_iff(uint64,uint64,uint64,bool,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapHelpers.t.sol:AsyncSwapHelpersFormalTest::testFuzz_priorityKey_run(uint64,uint64,bool,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapHelpers.t.sol:AsyncSwapHelpersFormalTest::testFuzz_safeTransferFrom_eq(address,address,uint256,uint8,bool,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapHelpers.t.sol:AsyncSwapHelpersFormalTest::testFuzz_unsignedRoundsUp_run(uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapHelpers.t.sol:AsyncSwapHelpersFormalTest::testFuzz_verifyCallResult_fail(bytes,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapHelpers.t.sol:AsyncSwapHelpersFormalTest::testFuzz_verifyCallResult_ok(bytes,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapHelpers.t.sol:AsyncSwapHelpersFormalTest::test_priceKey_eq_formerHighClamp()": {
+      "status": "Success"
+    },
+    "test/formal/AsyncSwapHelpers.t.sol:AsyncSwapHelpersFormalTest::test_priceKey_eq_formerLowClamp()": {
+      "status": "Success"
+    },
+    "test/formal/AsyncSwapInitAccess.t.sol:AsyncSwapInitAccessTest::testFuzz_anyoneCanInitialize(address,uint160)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapInitAccess.t.sol:AsyncSwapInitAccessTest::test_ownershipHandoverDoesNotGateInit(address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapInitAccess.t.sol:AsyncSwapInitAccessTest::test_relayCanInitialize()": {
+      "status": "Success"
+    },
+    "test/formal/AsyncSwapInsert.t.sol:AsyncSwapInsertFormalTest::testFuzz_insert_empty(uint32[],uint32,uint128,(uint32,uint32,uint32,uint128,uint8,bool))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapInsert.t.sol:AsyncSwapInsertFormalTest::testFuzz_insert_footprint(uint128[],uint8,uint128,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapInsert.t.sol:AsyncSwapInsertFormalTest::testFuzz_insert_overflow(uint128,uint32)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapInsert.t.sol:AsyncSwapInsertFormalTest::testFuzz_insert_present(uint128,uint32,uint32,uint32,uint32[])": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapInsert.t.sol:AsyncSwapInsertFormalTest::testFuzz_insert_reverts(uint128[],uint8,uint128,bool,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapInsert.t.sol:AsyncSwapInsertFormalTest::testFuzz_newNode_err(uint128,uint128,bool,bool,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapInsert.t.sol:AsyncSwapInsertFormalTest::testFuzz_newNode_ok(uint32[],uint32,uint128,uint128,uint32)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapInvalidateNonce.t.sol:AsyncSwapInvalidateNonceFormalTest::testFuzz_invalidateNonce_ok_iff(address,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapInvalidateNonce.t.sol:AsyncSwapInvalidateNonceFormalTest::testFuzz_invalidateNonce_ok_state(address,uint256,uint256,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapInvalidateNonce.t.sol:AsyncSwapInvalidateNonceFormalTest::testFuzz_invalidateNonce_other_maker(address,uint256,address,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapInvalidateNonce.t.sol:AsyncSwapInvalidateNonceFormalTest::testFuzz_invalidateNonce_reverts_iff(address,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapInvalidateNonce.t.sol:AsyncSwapInvalidateNonceFormalTest::testFuzz_invalidateNonce_run(address,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapInvalidateNonce.t.sol:AsyncSwapInvalidateNonceFormalTest::testFuzz_invalidateNonce_used(address,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapLibHelpers.t.sol:AsyncSwapLibHelpersFormalTest::testFuzz_EIP712Name_run(string,string)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapLibHelpers.t.sol:AsyncSwapLibHelpersFormalTest::testFuzz_EIP712Version_run(string,string)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapLibHelpers.t.sol:AsyncSwapLibHelpersFormalTest::testFuzz_bubbleUpAndRevertWith_run(bool,bytes,bytes4,bytes4)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapLibHelpers.t.sol:AsyncSwapLibHelpersFormalTest::testFuzz_byteLength_ok(bytes32)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapLibHelpers.t.sol:AsyncSwapLibHelpersFormalTest::testFuzz_byteLength_run(bytes32)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapLibHelpers.t.sol:AsyncSwapLibHelpersFormalTest::testFuzz_callOptionalReturn_run(address,address,uint256,uint8,bool,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapLibHelpers.t.sol:AsyncSwapLibHelpersFormalTest::testFuzz_functionCallWithValue_run(uint256,uint256,bool,bytes,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapLibHelpers.t.sol:AsyncSwapLibHelpersFormalTest::testFuzz_functionCall_run(uint256,bool,bytes,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapLibHelpers.t.sol:AsyncSwapLibHelpersFormalTest::testFuzz_priorityKey_run(uint64,uint64,bool,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapLibHelpers.t.sol:AsyncSwapLibHelpersFormalTest::testFuzz_revert_never_ok(bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapLibHelpers.t.sol:AsyncSwapLibHelpersFormalTest::testFuzz_revert_run(bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapLibHelpers.t.sol:AsyncSwapLibHelpersFormalTest::testFuzz_safeTransferFrom_ok(address,address,uint256,uint8,bool,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapLibHelpers.t.sol:AsyncSwapLibHelpersFormalTest::testFuzz_safeTransferFrom_run(address,address,uint256,uint8,bool,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapLibHelpers.t.sol:AsyncSwapLibHelpersFormalTest::testFuzz_verify_ok_iff(bool,bytes,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapLibHelpers.t.sol:AsyncSwapLibHelpersFormalTest::testFuzz_verify_run(bool,bytes,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchAmounts.t.sol:AsyncSwapMatchAmountsFormalTest::testFuzz_ceil_run(uint256,uint256,uint256,uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchAmounts.t.sol:AsyncSwapMatchAmountsFormalTest::testFuzz_floor_run(uint256,uint256,uint256,uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchAmounts.t.sol:AsyncSwapMatchAmountsFormalTest::testFuzz_matchAmounts_ok(uint256[6],bool,uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchAmounts.t.sol:AsyncSwapMatchAmountsFormalTest::testFuzz_matchAmounts_ok_sound(uint256[6],bool,uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchAmounts.t.sol:AsyncSwapMatchAmountsFormalTest::testFuzz_matchAmounts_reverts_restingBuy(uint256[6],uint256,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchAmounts.t.sol:AsyncSwapMatchAmountsFormalTest::testFuzz_matchAmounts_reverts_restingSell(uint256[6],uint256,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchAmounts.t.sol:AsyncSwapMatchAmountsFormalTest::testFuzz_matchAmounts_succeeds(uint256[6],bool,uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchAmounts.t.sol:AsyncSwapMatchAmountsFormalTest::testFuzz_noerr_restingBuy(uint256[6],uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchAmounts.t.sol:AsyncSwapMatchAmountsFormalTest::testFuzz_noerr_restingSell(uint256[6],uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchAmounts.t.sol:AsyncSwapMatchAmountsFormalTest::testFuzz_ok_restingBuy(uint256[6],uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchAmounts.t.sol:AsyncSwapMatchAmountsFormalTest::testFuzz_ok_restingSell(uint256[6],uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchBook.t.sol:AsyncSwapMatchBookFormalTest::testFuzz_asyncMatching_matchBook_ok(uint8,uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchBook.t.sol:AsyncSwapMatchBookFormalTest::testFuzz_matchBook_bound_noOk(uint8,bool,uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchBook.t.sol:AsyncSwapMatchBookFormalTest::testFuzz_matchBook_invalidBound((address,address,uint24,int24,address),uint8,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchBook.t.sol:AsyncSwapMatchBookFormalTest::testFuzz_matchBook_ok(uint8,uint8,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchNewOrder.t.sol:AsyncSwapMatchNewOrderFormalTest::testFuzz_matchIncoming_le(uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchNewOrder.t.sol:AsyncSwapMatchNewOrderFormalTest::testFuzz_matchNewOrder_emptyOrder(address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchNewOrder.t.sol:AsyncSwapMatchNewOrderFormalTest::testFuzz_matchNewOrder_ok(uint8,address,address,bool,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchNewOrder.t.sol:AsyncSwapMatchNewOrderFormalTest::testFuzz_matchNewOrder_reentry_reverts(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchNewOrder.t.sol:AsyncSwapMatchNewOrderFormalTest::testFuzz_matchNewOrder_run(bool,bool,uint8,bool,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchNewOrder.t.sol:AsyncSwapMatchNewOrderFormalTest::testFuzz_matchNewOrder_unauthorized(address,bool,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchNewOrder.t.sol:AsyncSwapMatchNewOrderFormalTest::testFuzz_matchNewOrder_wrongOwner(address,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchNewOrder.t.sol:AsyncSwapMatchNewOrderFormalTest::test_matchIncoming_empty()": {
+      "status": "Success"
+    },
+    "test/formal/AsyncSwapMatchPair.t.sol:AsyncSwapMatchPairFormalTest::testFuzz_matchPair_eq(uint256[6],uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchPair.t.sol:AsyncSwapMatchPairFormalTest::testFuzz_matchPair_error(uint256[6],uint8,uint8,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchPair.t.sol:AsyncSwapMatchPairFormalTest::testFuzz_matchPair_ok(uint256[6],uint8,uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchPair.t.sol:AsyncSwapMatchPairFormalTest::testFuzz_matchPair_reverts_restingZero(uint256[6],bool,uint256,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchPair.t.sol:AsyncSwapMatchPairFormalTest::testFuzz_matchPair_skip(uint256[6],uint8,uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchPair.t.sol:AsyncSwapMatchPairFormalTest::testFuzz_matchPair_true(uint256[6],uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMatchPair.t.sol:AsyncSwapMatchPairFormalTest::testFuzz_matchRun_ok(uint256[6],uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMostSignificantBit.t.sol:AsyncSwapMostSignificantBitFormalTest::testFuzz_mostSignificantBit_bounds(uint128,uint128)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMostSignificantBit.t.sol:AsyncSwapMostSignificantBitFormalTest::testFuzz_mostSignificantBit_eq_log2(uint128,uint128)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMostSignificantBit.t.sol:AsyncSwapMostSignificantBitFormalTest::testFuzz_mostSignificantBit_noRevert(uint128,uint128)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMostSignificantBit.t.sol:AsyncSwapMostSignificantBitFormalTest::testFuzz_mostSignificantBit_spec(uint128,uint128)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMulDiv.t.sol:AsyncSwapMulDivFormalTest::testFuzz_mulDiv_eq_mulDivFloor(uint256,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMulDiv.t.sol:AsyncSwapMulDivFormalTest::testFuzz_mulDiv_ok(uint256,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMulDiv.t.sol:AsyncSwapMulDivFormalTest::testFuzz_mulDiv_overflow(uint256,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMulDiv.t.sol:AsyncSwapMulDivFormalTest::testFuzz_mulDiv_spec(uint256,uint256,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapMulDiv.t.sol:AsyncSwapMulDivFormalTest::testFuzz_mulDiv_zero(uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapNewNode.t.sol:AsyncSwapNewNodeFormalTest::testFuzz_newNode_footprint(uint32[],uint32,uint128,uint128,uint32,(uint32,uint32,uint32,uint128,uint8,bool),bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapNewNode.t.sol:AsyncSwapNewNodeFormalTest::testFuzz_newNode_reverts_iff(uint32[],uint32,uint128,bool,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapNewNode.t.sol:AsyncSwapNewNodeFormalTest::testFuzz_newNode_run_free(uint32[],uint32,uint128)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapNewNode.t.sol:AsyncSwapNewNodeFormalTest::testFuzz_newNode_run_fresh(uint32,uint128,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapOnlyOwner.t.sol:AsyncSwapOnlyOwnerFormalTest::testFuzz_onlyOwner_notOwner(address,address,uint8,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapOnlyOwner.t.sol:AsyncSwapOnlyOwnerFormalTest::testFuzz_onlyOwner_ok(address,address,bool,uint8,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapOnlyOwner.t.sol:AsyncSwapOnlyOwnerFormalTest::testFuzz_onlyOwner_owner(address,uint8,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapOnlyOwner.t.sol:AsyncSwapOnlyOwnerFormalTest::testFuzz_onlyOwner_reverts_NotOwner_iff(address,address,bool,uint8,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapOnlyOwner.t.sol:AsyncSwapOnlyOwnerFormalTest::testFuzz_onlyOwner_run(address,address,bool,uint8,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapOrderBookLevel.t.sol:AsyncSwapOrderBookLevelFormalTest::testFuzz_orderBookLevel_congr(uint256,bool,uint256,bool,uint128,address,address,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapOrderBookLevel.t.sol:AsyncSwapOrderBookLevelFormalTest::testFuzz_orderBookLevel_readOnly(uint256,bool,bool,uint256,bool,uint128)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapOrderBookLevel.t.sol:AsyncSwapOrderBookLevelFormalTest::testFuzz_orderBookLevel_view(uint256,bool,bool,uint256,bool,uint128,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapOrderBookOrder.t.sol:AsyncSwapOrderBookOrderFormalTest::testFuzz_orderBookOrder_congr(bytes32,bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint32,uint64,uint128,uint64),(address,uint256,uint256,uint128,bool,bool,uint64,uint32,uint64,uint128,uint64),uint256,address,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapOrderBookOrder.t.sol:AsyncSwapOrderBookOrderFormalTest::testFuzz_orderBookOrder_never_reverts(address,bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint32,uint64,uint128,uint64),bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapOrderBookOrder.t.sol:AsyncSwapOrderBookOrderFormalTest::testFuzz_orderBookOrder_readOnly(bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint32,uint64,uint128,uint64))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapOrderBookOrder.t.sol:AsyncSwapOrderBookOrderFormalTest::testFuzz_orderBookOrder_run(address,bytes32,bytes32,(address,uint256,uint256,uint128,bool,bool,uint64,uint32,uint64,uint128,uint64))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapPriorityKey.t.sol:AsyncSwapPriorityKeyFormalTest::testFuzz_priorityKey_ok(uint64,uint64,bool,uint128)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapPriorityKey.t.sol:AsyncSwapPriorityKeyFormalTest::testFuzz_priorityKey_run(uint64,uint64,bool,uint128)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapPriorityKey.t.sol:AsyncSwapPriorityKeyFormalTest::testFuzz_priorityKey_spec(uint64,uint64,bool,uint128)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapReceive.t.sol:AsyncSwapReceiveFormalTest::testFuzz_receive_frame(address,uint256,uint256,bytes32,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapReceive.t.sol:AsyncSwapReceiveFormalTest::testFuzz_receive_never_reverts(address,uint256,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapReceive.t.sol:AsyncSwapReceiveFormalTest::testFuzz_receive_ok(address,uint256,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapReceive.t.sol:AsyncSwapReceiveFormalTest::testFuzz_receive_run(address,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapReceive.t.sol:AsyncSwapReceiveFormalTest::test_probe_roundTrip()": {
+      "status": "Success"
+    },
+    "test/formal/AsyncSwapReduceAfterMatch.t.sol:AsyncSwapReduceAfterMatchFormalTest::testFuzz_priceKey_ok(uint256[6],uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapReduceAfterMatch.t.sol:AsyncSwapReduceAfterMatchFormalTest::testFuzz_reduceAfterMatch_ok_close(uint256[6],uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapReduceAfterMatch.t.sol:AsyncSwapReduceAfterMatchFormalTest::testFuzz_reduceAfterMatch_ok_partial(uint256[6],uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapReduceMatchedOrders.t.sol:AsyncSwapReduceMatchedOrdersFormalTest::testFuzz_reduceMatchedOrders_eq(uint256[6],uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapReduceMatchedOrders.t.sol:AsyncSwapReduceMatchedOrdersFormalTest::testFuzz_reduceMatchedOrders_ok_bounds(uint256[6],uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapReduceMatchedOrders.t.sol:AsyncSwapReduceMatchedOrdersFormalTest::testFuzz_reduceMatchedOrders_ok_iff(uint256[6],uint8,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapRemove.t.sol:AsyncSwapRemoveFormalTest::testFuzz_remove_footprint(uint256[8],uint32,uint32,uint128,uint128,uint32,uint32[],uint32)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapRemove.t.sol:AsyncSwapRemoveFormalTest::testFuzz_remove_ok(uint256[8],uint32,uint32,uint128)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapRemove.t.sol:AsyncSwapRemoveFormalTest::testFuzz_remove_ok_validTree(uint128[],uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapRemove.t.sol:AsyncSwapRemoveFormalTest::testFuzz_remove_reverts_iff(uint256[8],uint32,uint32,uint128,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapRemove.t.sol:AsyncSwapRemoveFormalTest::testFuzz_remove_run(uint256[8],uint32,uint32,uint128,uint32[],uint32,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapRevert.t.sol:AsyncSwapRevertFormalTest::testFuzz_revert_never_ok(bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapRevert.t.sol:AsyncSwapRevertFormalTest::testFuzz_revert_nonempty(bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapRevert.t.sol:AsyncSwapRevertFormalTest::testFuzz_revert_run(bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapRevert.t.sol:AsyncSwapRevertFormalTest::test_revert_empty()": {
+      "status": "Success"
+    },
+    "test/formal/AsyncSwapSafeTransferFrom.t.sol:AsyncSwapSafeTransferFromFormalTest::testFuzz_safeTransferFrom_ok_iff((address,bool,bool,uint8,uint256,bytes),address,address,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSafeTransferFrom.t.sol:AsyncSwapSafeTransferFromFormalTest::testFuzz_safeTransferFrom_spec((address,bool,bool,uint8,uint256,bytes),address,address,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSetExecutorWithSig.t.sol:AsyncSwapSetExecutorWithSigFormalTest::testFuzz_setExecutorWithSig_expired(address,bool,uint256,uint256,bool,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSetExecutorWithSig.t.sol:AsyncSwapSetExecutorWithSigFormalTest::testFuzz_setExecutorWithSig_frame(address,bool,uint256,address,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSetExecutorWithSig.t.sol:AsyncSwapSetExecutorWithSigFormalTest::testFuzz_setExecutorWithSig_invalid_sig(address,bool,uint256,uint256,uint256,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSetExecutorWithSig.t.sol:AsyncSwapSetExecutorWithSigFormalTest::testFuzz_setExecutorWithSig_no_replay(address,bool,uint256,address,bool,uint256,uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSetExecutorWithSig.t.sol:AsyncSwapSetExecutorWithSigFormalTest::testFuzz_setExecutorWithSig_nonce_used(address,bool,uint256,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSetExecutorWithSig.t.sol:AsyncSwapSetExecutorWithSigFormalTest::testFuzz_setExecutorWithSig_ok(address,address,bool,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSetExecutorWithSig.t.sol:AsyncSwapSetExecutorWithSigFormalTest::testFuzz_setExecutorWithSig_ok_inv(address,bool,uint256,uint256,uint8,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSetExecutorWithSig.t.sol:AsyncSwapSetExecutorWithSigFormalTest::testFuzz_setExecutorWithSig_ok_state(address,bool,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSettleMatchedPriorityFee.t.sol:AsyncSwapSettleMatchedPriorityFeeFormalTest::testFuzz_settleMatchedPriorityFee_matched(uint256[6],uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSettleMatchedPriorityFee.t.sol:AsyncSwapSettleMatchedPriorityFeeFormalTest::testFuzz_settleMatchedPriorityFee_no_fee(uint256[6],uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSettleMatchedPriorityFee.t.sol:AsyncSwapSettleMatchedPriorityFeeFormalTest::testFuzz_settleMatchedPriorityFee_ok(uint256[6],uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSettleMatchedPriorityFee.t.sol:AsyncSwapSettleMatchedPriorityFeeFormalTest::testFuzz_settleMatchedPriorityFee_run(uint256[6],uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSettleOrderPriorityFee.t.sol:AsyncSwapSettleOrderPriorityFeeFormalTest::testFuzz_settleOrderPriorityFee_escrowed(bytes32,address,uint64,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSettleOrderPriorityFee.t.sol:AsyncSwapSettleOrderPriorityFeeFormalTest::testFuzz_settleOrderPriorityFee_run(bytes32,address,uint64,bool,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSettleOrderPriorityFee.t.sol:AsyncSwapSettleOrderPriorityFeeFormalTest::testFuzz_settleOrderPriorityFee_zero_fee(bytes32,address,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSettleTransfers.t.sol:AsyncSwapSettleTransfersFormalTest::testFuzz_settleTransfers_ok(uint256[6],uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSettleTransfers.t.sol:AsyncSwapSettleTransfersFormalTest::testFuzz_settleTransfers_ok_same_manager(uint256[6],uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSettleTransfers.t.sol:AsyncSwapSettleTransfersFormalTest::testFuzz_settleTransfers_reverts_iff(uint256[6],uint8,uint8,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSettleTransfers.t.sol:AsyncSwapSettleTransfersFormalTest::testFuzz_settleTransfers_run(uint256[6],uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSwapAgainstPool.t.sol:AsyncSwapSwapAgainstPoolFormalTest::testFuzz_swapAgainstPool_amountIn_lt(uint256,bool,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSwapAgainstPool.t.sol:AsyncSwapSwapAgainstPoolFormalTest::testFuzz_swapAgainstPool_noLiquidity(uint256,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSwapAgainstPool.t.sol:AsyncSwapSwapAgainstPoolFormalTest::testFuzz_swapAgainstPool_ok_liquidity_min(uint256,uint256,bool,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSwapAgainstPool.t.sol:AsyncSwapSwapAgainstPoolFormalTest::testFuzz_swapAgainstPool_spec(uint256,uint256,bool,int128,int128,uint8,uint24)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSwapAgainstPool.t.sol:AsyncSwapSwapAgainstPoolFormalTest::testFuzz_swapAgainstPool_success(uint256,bool,uint24)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSweep.t.sol:AsyncSwapSweepFormalTest::testFuzz_sweep_notOwner(address,address,address,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSweep.t.sol:AsyncSwapSweepFormalTest::testFuzz_sweep_ok(address,address,bool,uint8,uint128,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSweep.t.sol:AsyncSwapSweepFormalTest::testFuzz_sweep_reverts_unless(address,address,bool,uint8,uint128,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSweep.t.sol:AsyncSwapSweepFormalTest::testFuzz_sweep_run(uint8,uint128,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSweep.t.sol:AsyncSwapSweepFormalTest::testFuzz_sweep_storage_unchanged(uint8,uint128,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapSweep.t.sol:AsyncSwapSweepFormalTest::testFuzz_sweep_zeroTo(address,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapTransferEscrow.t.sol:AsyncSwapTransferEscrowFormalTest::testFuzz_transferEscrow_claim_transfer_reverts(uint256[6],uint8,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapTransferEscrow.t.sol:AsyncSwapTransferEscrowFormalTest::testFuzz_transferEscrow_erc20(uint256[6],uint8,bool,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapTransferEscrow.t.sol:AsyncSwapTransferEscrowFormalTest::testFuzz_transferEscrow_native(uint256[6],uint8,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapTransferEscrow.t.sol:AsyncSwapTransferEscrowFormalTest::testFuzz_transferEscrow_ok(uint256[6],uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapTransferEscrow.t.sol:AsyncSwapTransferEscrowFormalTest::testFuzz_transferEscrow_reverts_iff(uint256[6],uint8,uint8,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapTransferEscrow.t.sol:AsyncSwapTransferEscrowFormalTest::testFuzz_transferEscrow_run(uint256[6],uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapTransferOwnership.t.sol:AsyncSwapTransferOwnershipFormalTest::testFuzz_transferOwnership_notOwner(address,address,address,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapTransferOwnership.t.sol:AsyncSwapTransferOwnershipFormalTest::testFuzz_transferOwnership_ok_iff(address,address,address,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapTransferOwnership.t.sol:AsyncSwapTransferOwnershipFormalTest::testFuzz_transferOwnership_ok_state(address,address,address,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapTransferOwnership.t.sol:AsyncSwapTransferOwnershipFormalTest::testFuzz_transferOwnership_reverts_iff(address,address,address,address,bool,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapTransferOwnership.t.sol:AsyncSwapTransferOwnershipFormalTest::testFuzz_transferOwnership_run(address,address,address,address,bool,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapTransferOwnership.t.sol:AsyncSwapTransferOwnershipFormalTest::testFuzz_transferOwnership_zero(address,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapTryFillOrderFromPoolLiquidity.t.sol:AsyncSwapTryFillOrderFromPoolLiquidityFormalTest::testFuzz_tryFillOrderFromPoolLiquidity_eq(bool,bool,bool,uint256,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapTryFillOrderFromPoolLiquidity.t.sol:AsyncSwapTryFillOrderFromPoolLiquidityFormalTest::testFuzz_tryFillOrderFromPoolLiquidity_false_noop(bool,uint256,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapTryFillOrderFromPoolLiquidity.t.sol:AsyncSwapTryFillOrderFromPoolLiquidityFormalTest::testFuzz_tryFillOrderFromPoolLiquidity_notExecutor(address,bool,bytes32)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapTryFillOrderFromPoolLiquidity.t.sol:AsyncSwapTryFillOrderFromPoolLiquidityFormalTest::testFuzz_tryFillOrderFromPoolLiquidity_notFound(address,bytes32,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapTryFillOrderFromPoolLiquidity.t.sol:AsyncSwapTryFillOrderFromPoolLiquidityFormalTest::testFuzz_tryFillOrderFromPoolLiquidity_ok(uint8,bool,bool,uint256,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapTryFillOrderFromPoolLiquidity.t.sol:AsyncSwapTryFillOrderFromPoolLiquidityFormalTest::testFuzz_tryFillOrderFromPoolLiquidity_pass(bool,bool,uint256,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapTryFillOrderFromPoolLiquidity.t.sol:AsyncSwapTryFillOrderFromPoolLiquidityFormalTest::testFuzz_tryFillOrderFromPoolLiquidity_reverts_iff(address,bool,bool,uint256,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapTryFillOrderFromPoolLiquidity.t.sol:AsyncSwapTryFillOrderFromPoolLiquidityFormalTest::testFuzz_tryFillOrderFromPoolLiquidity_storage(uint256,uint256,bool,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapUpdatePrice.t.sol:AsyncSwapUpdatePriceFormalTest::testFuzz_midState_frame(uint256,address,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapUpdatePrice.t.sol:AsyncSwapUpdatePriceFormalTest::testFuzz_midState_order(bool,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapUpdatePrice.t.sol:AsyncSwapUpdatePriceFormalTest::testFuzz_midState_other_order(uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapUpdatePrice.t.sol:AsyncSwapUpdatePriceFormalTest::testFuzz_midState_other_pool(uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapUpdatePrice.t.sol:AsyncSwapUpdatePriceFormalTest::testFuzz_mid_ok(bool,uint256,uint256,uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapUpdatePrice.t.sol:AsyncSwapUpdatePriceFormalTest::testFuzz_priceKey_ok(bool,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapUpdatePrice.t.sol:AsyncSwapUpdatePriceFormalTest::testFuzz_updatePrice_notFound(((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapUpdatePrice.t.sol:AsyncSwapUpdatePriceFormalTest::testFuzz_updatePrice_notOwner(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapUpdatePrice.t.sol:AsyncSwapUpdatePriceFormalTest::testFuzz_updatePrice_ok(address,bool,uint256,bool,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapUpdatePrice.t.sol:AsyncSwapUpdatePriceFormalTest::testFuzz_updatePrice_run(uint8,uint256,bool,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapUpdatePrice.t.sol:AsyncSwapUpdatePriceFormalTest::testFuzz_updatePrice_zero(((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapUpdatePriceWithSig.t.sol:AsyncSwapUpdatePriceWithSigFormalTest::testFuzz_updatePriceWithSig_burns_nonce(uint256,uint256,uint256,uint256,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapUpdatePriceWithSig.t.sol:AsyncSwapUpdatePriceWithSigFormalTest::testFuzz_updatePriceWithSig_expired(((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint256,uint256,uint256,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapUpdatePriceWithSig.t.sol:AsyncSwapUpdatePriceWithSigFormalTest::testFuzz_updatePriceWithSig_invalidSig(uint8,uint256,uint256,uint256,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapUpdatePriceWithSig.t.sol:AsyncSwapUpdatePriceWithSigFormalTest::testFuzz_updatePriceWithSig_missing_reverts(bool,bytes32,uint256,uint256,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapUpdatePriceWithSig.t.sol:AsyncSwapUpdatePriceWithSigFormalTest::testFuzz_updatePriceWithSig_noOwnerGuard(address,uint256,uint256,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapUpdatePriceWithSig.t.sol:AsyncSwapUpdatePriceWithSigFormalTest::testFuzz_updatePriceWithSig_nonceUsed(uint256,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapUpdatePriceWithSig.t.sol:AsyncSwapUpdatePriceWithSigFormalTest::testFuzz_updatePriceWithSig_notFound(bytes32,uint256,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapUpdatePriceWithSig.t.sol:AsyncSwapUpdatePriceWithSigFormalTest::testFuzz_updatePriceWithSig_ok(uint256,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapUpdatePriceWithSig.t.sol:AsyncSwapUpdatePriceWithSigFormalTest::testFuzz_updatePriceWithSig_run(bool,bool,uint256,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapUpdatePriceWithSig.t.sol:AsyncSwapUpdatePriceWithSigFormalTest::testFuzz_updatePriceWithSig_zero(uint256,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapUpdatePriceWithSig.t.sol:AsyncSwapUpdatePriceWithSigFormalTest::testFuzz_verify_ok_inv(uint256,uint256,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapUpdatePriceWithSig.t.sol:AsyncSwapUpdatePriceWithSigFormalTest::testFuzz_verify_run(bool,bool,bool,uint256,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapVerifyCallResultFromTarget.t.sol:AsyncSwapVerifyCallResultFromTargetFormalTest::testFuzz_verify_frame(address,bool,bool,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapVerifyCallResultFromTarget.t.sol:AsyncSwapVerifyCallResultFromTargetFormalTest::testFuzz_verify_ok_iff(address,bool,bool,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/AsyncSwapVerifyCallResultFromTarget.t.sol:AsyncSwapVerifyCallResultFromTargetFormalTest::testFuzz_verify_run(address,bool,bool,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/Eip712ConstantsLog.t.sol:Eip712ConstantsLog::test_log()": {
+      "status": "Success"
+    },
+    "test/formal/Eip712Domain.t.sol:AsyncSwapEip712DomainFormalTest::testFuzz_EIP712Name_spec(bytes32,bytes32,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/Eip712Domain.t.sol:AsyncSwapEip712DomainFormalTest::testFuzz_EIP712Version_spec(bytes32,bytes32,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/Eip712Domain.t.sol:AsyncSwapEip712DomainFormalTest::testFuzz_eip712Domain_matches_DOMAIN_SEPARATOR(bytes32,bytes32,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/Eip712Domain.t.sol:AsyncSwapEip712DomainFormalTest::testFuzz_eip712Domain_never_reverts(bytes32,bytes32,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/Eip712Domain.t.sol:AsyncSwapEip712DomainFormalTest::testFuzz_eip712Domain_ok(bytes32,bytes32,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/Eip712Domain.t.sol:AsyncSwapEip712DomainFormalTest::testFuzz_eip712Domain_short(bytes32,bytes32,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/Eip712Domain.t.sol:AsyncSwapEip712DomainFormalTest::testFuzz_eip712Domain_spec(bytes32,bytes32,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/Eip712Domain.t.sol:RouterEip712DomainFormalTest::testFuzz_EIP712Name_spec(bytes32,bytes32,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/Eip712Domain.t.sol:RouterEip712DomainFormalTest::testFuzz_EIP712Version_spec(bytes32,bytes32,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/Eip712Domain.t.sol:RouterEip712DomainFormalTest::testFuzz_eip712Domain_matches_DOMAIN_SEPARATOR(bytes32,bytes32,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/Eip712Domain.t.sol:RouterEip712DomainFormalTest::testFuzz_eip712Domain_never_reverts(bytes32,bytes32,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/Eip712Domain.t.sol:RouterEip712DomainFormalTest::testFuzz_eip712Domain_ok(bytes32,bytes32,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/Eip712Domain.t.sol:RouterEip712DomainFormalTest::testFuzz_eip712Domain_short(bytes32,bytes32,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/Eip712Domain.t.sol:RouterEip712DomainFormalTest::testFuzz_eip712Domain_spec(bytes32,bytes32,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/FeeVaultCollect.t.sol:FeeVaultCollectFormalTest::testFuzz_collect_ok(bool,bool,uint96,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/FeeVaultCollect.t.sol:FeeVaultCollectFormalTest::testFuzz_collect_only_owner(address,bool,uint8,address,address,uint96)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/FeeVaultCollect.t.sol:FeeVaultCollectFormalTest::testFuzz_collect_owner_view_reverts(address,uint8,address,address,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/FeeVaultCollect.t.sol:FeeVaultCollectFormalTest::testFuzz_collect_reverts_iff(address,uint8,address,address,uint96,uint96)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/FeeVaultCollect.t.sol:FeeVaultCollectFormalTest::testFuzz_collect_run(address,uint8,address,address,uint96,uint96)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/FeeVaultCollect.t.sol:FeeVaultCollectFormalTest::testFuzz_collect_unauthorized(address,bool,uint8,address,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/FeeVaultCollect.t.sol:FeeVaultCollectFormalTest::testFuzz_collect_zero_recipient(bool,uint8,address,uint96)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/FeeVaultUnlockCallback.t.sol:FeeVaultUnlockCallbackFormalTest::testFuzz_unlockCallback_badData((uint8,bytes32,bytes32,bytes,uint256))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/FeeVaultUnlockCallback.t.sol:FeeVaultUnlockCallbackFormalTest::testFuzz_unlockCallback_burn_fails(uint96,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/FeeVaultUnlockCallback.t.sol:FeeVaultUnlockCallbackFormalTest::testFuzz_unlockCallback_nonzero(uint96,address,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/FeeVaultUnlockCallback.t.sol:FeeVaultUnlockCallbackFormalTest::testFuzz_unlockCallback_ok(address,uint8,(uint8,bytes32,bytes32,bytes,uint256),uint96)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/FeeVaultUnlockCallback.t.sol:FeeVaultUnlockCallbackFormalTest::testFuzz_unlockCallback_reverts_iff(address,bool,(uint8,bytes32,bytes32,bytes,uint256),uint96)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/FeeVaultUnlockCallback.t.sol:FeeVaultUnlockCallbackFormalTest::testFuzz_unlockCallback_run(address,bool,(uint8,bytes32,bytes32,bytes,uint256),uint96)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/FeeVaultUnlockCallback.t.sol:FeeVaultUnlockCallbackFormalTest::testFuzz_unlockCallback_take_eq_own_balance(uint96,uint96,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/FeeVaultUnlockCallback.t.sol:FeeVaultUnlockCallbackFormalTest::testFuzz_unlockCallback_unauthorized(address,bytes,uint96)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/FeeVaultUnlockCallback.t.sol:FeeVaultUnlockCallbackFormalTest::testFuzz_unlockCallback_view_reverts(address,address,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/FeeVaultUnlockCallback.t.sol:FeeVaultUnlockCallbackFormalTest::testFuzz_unlockCallback_zero(address,address,bytes,uint96)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/FeeVaultUnlockCallback.t.sol:FeeVaultUnlockCallbackFormalTest::test_unlockCallback_burn_fails_overflow()": {
+      "status": "Success"
+    },
+    "test/formal/NativeClaimsRedeem.t.sol:NativeClaimsRedeemFormalTest::testFuzz_redeem_invalid(address,address,uint256,bool,uint96)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/NativeClaimsRedeem.t.sol:NativeClaimsRedeemFormalTest::testFuzz_redeem_nested_reverts(uint96,uint256,address,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/NativeClaimsRedeem.t.sol:NativeClaimsRedeemFormalTest::testFuzz_redeem_ok(address,address,uint256,uint96,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/NativeClaimsRedeem.t.sol:NativeClaimsRedeemFormalTest::testFuzz_redeem_ok_state(uint96,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/NativeClaimsRedeem.t.sol:NativeClaimsRedeemFormalTest::testFuzz_redeem_reentrant(address,address,uint256,uint96)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/NativeClaimsRedeem.t.sol:NativeClaimsRedeemFormalTest::testFuzz_redeem_reverts_iff(address,bool,bool,address,uint256,uint96,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/NativeClaimsRedeem.t.sol:NativeClaimsRedeemFormalTest::testFuzz_redeem_run(address,bool,bool,address,uint256,uint96,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/NativeClaimsUnlockCallback.t.sol:NativeClaimsUnlockCallbackFormalTest::testFuzz_unlockCallback_badData((uint8,bytes32,bytes32,bytes32,bytes,uint256))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/NativeClaimsUnlockCallback.t.sol:NativeClaimsUnlockCallbackFormalTest::testFuzz_unlockCallback_burn_fails(uint96,uint256,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/NativeClaimsUnlockCallback.t.sol:NativeClaimsUnlockCallbackFormalTest::testFuzz_unlockCallback_ok(uint96,uint256,uint256,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/NativeClaimsUnlockCallback.t.sol:NativeClaimsUnlockCallbackFormalTest::testFuzz_unlockCallback_ok_args(bytes32,bytes32,uint96,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/NativeClaimsUnlockCallback.t.sol:NativeClaimsUnlockCallbackFormalTest::testFuzz_unlockCallback_onlyPoolManager(address,bytes,uint96)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/NativeClaimsUnlockCallback.t.sol:NativeClaimsUnlockCallbackFormalTest::testFuzz_unlockCallback_reverts_iff(address,bool,uint96,uint256,uint8,uint256,uint256,(uint8,bytes32,bytes32,bytes32,bytes,uint256))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/NativeClaimsUnlockCallback.t.sol:NativeClaimsUnlockCallbackFormalTest::testFuzz_unlockCallback_run(address,bool,(uint8,bytes32,bytes32,bytes32,bytes,uint256),uint96)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/NativeClaimsUnlockCallback.t.sol:NativeClaimsUnlockCallbackFormalTest::testFuzz_unlockCallback_run_unlocked((uint8,bytes32,bytes32,bytes32,bytes,uint256),uint96,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RefinementAsyncSwap.t.sol:RefinementAsyncSwapFormalTest::testFuzz_isExecutor_refines(bytes32,address,address,bool,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RefinementAsyncSwap.t.sol:RefinementAsyncSwapFormalTest::testFuzz_setExecutor_frame(address,bytes32,address,bool,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RefinementAsyncSwap.t.sol:RefinementAsyncSwapFormalTest::testFuzz_setExecutor_refines(address,address,bool,address,address,bool,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RefinementAsyncSwap.t.sol:RefinementAsyncSwapFormalTest::testFuzz_setExecutor_run(address,bytes32,address,bool,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RefinementRouter.t.sol:RefinementRouterFormalTest::testFuzz_cancelOrder_complete(((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RefinementRouter.t.sol:RefinementRouterFormalTest::testFuzz_cancelOrder_sound(((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RefinementRouter.t.sol:RefinementRouterFormalTest::testFuzz_fillOrder_forwards(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),bool,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RefinementRouter.t.sol:RefinementRouterFormalTest::testFuzz_fillOrder_maxPrice(uint256,uint256,uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RefinementRouter.t.sol:RefinementRouterFormalTest::testFuzz_fillOrder_value_sound(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),bool,uint256,uint256,uint256,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RefinementRouter.t.sol:RefinementRouterFormalTest::testFuzz_swap_complete((address,address,bool,bool,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint8,uint8,uint8,bytes))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RefinementRouter.t.sol:RefinementRouterFormalTest::testFuzz_swap_sound((address,address,bool,bool,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint8,uint8,uint8,bytes))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RefinementRouter.t.sol:RefinementRouterFormalTest::testFuzz_unlockCallback_cancel(((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),bool,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RefinementRouter.t.sol:RefinementRouterFormalTest::testFuzz_unlockCallback_fill_maxPrice(address,bytes32,uint256,uint256,uint256,uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterCancelWithSig.t.sol:RouterCancelWithSigFormalTest::testFuzz_cancelWithSig_expired(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint256,uint256,uint256,bytes,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterCancelWithSig.t.sol:RouterCancelWithSigFormalTest::testFuzz_cancelWithSig_invalid_sig(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint256,uint256,uint256,uint256,uint256,bool,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterCancelWithSig.t.sol:RouterCancelWithSigFormalTest::testFuzz_cancelWithSig_neverReadsOrderInfo(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint256,uint256,bytes,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterCancelWithSig.t.sol:RouterCancelWithSigFormalTest::testFuzz_cancelWithSig_no_replay(uint256,uint256,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint256,bytes,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterCancelWithSig.t.sol:RouterCancelWithSigFormalTest::testFuzz_cancelWithSig_nonce_used(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint256,uint256,uint256,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterCancelWithSig.t.sol:RouterCancelWithSigFormalTest::testFuzz_cancelWithSig_ok(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint256,uint256,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterCancelWithSig.t.sol:RouterCancelWithSigFormalTest::testFuzz_cancelWithSig_ok_inv(((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),(address,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint8,uint8))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterCancelWithSig.t.sol:RouterCancelWithSigFormalTest::testFuzz_cancelWithSig_ok_state(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint256,uint256,uint256,uint256,address,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterCancelWithSig.t.sol:RouterCancelWithSigFormalTest::testFuzz_cancelWithSig_reentry_reverts(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint256,uint256,uint256,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterConstructor.t.sol:RouterConstructorFormalTest::testFuzz_CtorSpec(address,address,address,uint64)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterConstructor.t.sol:RouterConstructorFormalTest::testFuzz_CtorSpec_name_word(address,address,address,uint64)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterConstructor.t.sol:RouterConstructorFormalTest::testFuzz_CtorSpec_version_word(address,address,address,uint64)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterConstructor.t.sol:RouterConstructorFormalTest::testFuzz_DOMAIN_SEPARATOR_deployed(uint64,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterConstructor.t.sol:RouterConstructorFormalTest::testFuzz_DOMAIN_SEPARATOR_eq_built(uint64,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterConstructor.t.sol:RouterConstructorFormalTest::testFuzz_ctor_deployed(address,address,address,uint64)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterConstructor.t.sol:RouterConstructorFormalTest::testFuzz_ctor_never_reverts(address,address,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterConstructor.t.sol:RouterConstructorFormalTest::testFuzz_ctor_ok(address,address,address,uint64)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterConstructor.t.sol:RouterConstructorFormalTest::testFuzz_domainSeparatorV4_eq_built(uint64,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterConstructor.t.sol:RouterConstructorFormalTest::test_typeHash_eq()": {
+      "status": "Success"
+    },
+    "test/formal/RouterDOMAIN_SEPARATOR.t.sol:RouterDOMAIN_SEPARATORFormalTest::testFuzz_DOMAIN_SEPARATOR_never_reverts(uint64,address,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterDOMAIN_SEPARATOR.t.sol:RouterDOMAIN_SEPARATORFormalTest::testFuzz_DOMAIN_SEPARATOR_preserves(uint64,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterDOMAIN_SEPARATOR.t.sol:RouterDOMAIN_SEPARATORFormalTest::testFuzz_DOMAIN_SEPARATOR_spec(uint64,bool,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterFillFromPoolLiquidity.t.sol:RouterFillFromPoolLiquidityFormalTest::testFuzz_fillFromPoolLiquidityPre_get(address,address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterFillFromPoolLiquidity.t.sol:RouterFillFromPoolLiquidityFormalTest::testFuzz_fillFromPoolLiquidity_eq(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterFillFromPoolLiquidity.t.sol:RouterFillFromPoolLiquidityFormalTest::testFuzz_fillFromPoolLiquidity_ok_iff(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterFillFromPoolLiquidity.t.sol:RouterFillFromPoolLiquidityFormalTest::testFuzz_fillFromPoolLiquidity_revert_iff(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),bool,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterHelpers.t.sol:RouterHelpersFormalTest::testFuzz_address_revert_run(bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterHelpers.t.sol:RouterHelpersFormalTest::testFuzz_bubbleUpAndRevertWith_reverts(bool,bytes,bytes4,bytes4)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterHelpers.t.sol:RouterHelpersFormalTest::testFuzz_byteLength_le(bytes32)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterHelpers.t.sol:RouterHelpersFormalTest::testFuzz_byteLength_run(bytes32)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterHelpers.t.sol:RouterHelpersFormalTest::testFuzz_callOptionalReturn_after(address,address,uint256,uint8,bool,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterHelpers.t.sol:RouterHelpersFormalTest::testFuzz_callOptionalReturn_call_reverts(address,address,uint256,bool,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterHelpers.t.sol:RouterHelpersFormalTest::testFuzz_eip712Name_eq(string,string)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterHelpers.t.sol:RouterHelpersFormalTest::testFuzz_eip712Version_eq(string,string)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterHelpers.t.sol:RouterHelpersFormalTest::testFuzz_functionCallWithValue_eq(uint256,uint256,bool,bytes,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterHelpers.t.sol:RouterHelpersFormalTest::testFuzz_functionCallWithValue_insufficient(uint256,uint256,bool,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterHelpers.t.sol:RouterHelpersFormalTest::testFuzz_functionCall_eq(uint256,bool,bytes,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterHelpers.t.sol:RouterHelpersFormalTest::testFuzz_safeTransferFrom_eq(address,address,uint256,uint8,bool,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterHelpers.t.sol:RouterHelpersFormalTest::testFuzz_verifyCallResult_fail(bytes,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterHelpers.t.sol:RouterHelpersFormalTest::testFuzz_verifyCallResult_ok(bytes,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterLibHelpers.t.sol:RouterLibHelpersFormalTest::testFuzz_EIP712Name_run(string,string)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterLibHelpers.t.sol:RouterLibHelpersFormalTest::testFuzz_EIP712Version_run(string,string)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterLibHelpers.t.sol:RouterLibHelpersFormalTest::testFuzz_bubbleUpAndRevertWith_run(bool,bytes,bytes4,bytes4)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterLibHelpers.t.sol:RouterLibHelpersFormalTest::testFuzz_byteLength_ok(bytes32)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterLibHelpers.t.sol:RouterLibHelpersFormalTest::testFuzz_byteLength_run(bytes32)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterLibHelpers.t.sol:RouterLibHelpersFormalTest::testFuzz_callOptionalReturn_run(address,address,uint256,uint8,bool,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterLibHelpers.t.sol:RouterLibHelpersFormalTest::testFuzz_functionCallWithValue_run(uint256,uint256,bool,bytes,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterLibHelpers.t.sol:RouterLibHelpersFormalTest::testFuzz_functionCall_run(uint256,bool,bytes,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterLibHelpers.t.sol:RouterLibHelpersFormalTest::testFuzz_revert_never_ok(bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterLibHelpers.t.sol:RouterLibHelpersFormalTest::testFuzz_revert_run(bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterLibHelpers.t.sol:RouterLibHelpersFormalTest::testFuzz_safeTransferFrom_ok(address,address,uint256,uint8,bool,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterLibHelpers.t.sol:RouterLibHelpersFormalTest::testFuzz_safeTransferFrom_run(address,address,uint256,uint8,bool,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterLibHelpers.t.sol:RouterLibHelpersFormalTest::testFuzz_verify_ok_iff(bool,bytes,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterLibHelpers.t.sol:RouterLibHelpersFormalTest::testFuzz_verify_run(bool,bytes,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterMatchBook.t.sol:RouterMatchBookFormalTest::testFuzz_matchBook_eq(address,address,(address,address,uint24,int24,address),uint8,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterMatchBook.t.sol:RouterMatchBookFormalTest::testFuzz_matchBook_ok_iff(address,(address,address,uint24,int24,address),uint8,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterMatchBook.t.sol:RouterMatchBookFormalTest::testFuzz_matchBook_revert_iff(address,(address,address,uint24,int24,address),uint8,bool,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterSwapWithSig.t.sol:RouterSwapWithSigFormalTest::testFuzz_swapWithSigPre_filler(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),(uint256,uint256,bytes))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterSwapWithSig.t.sol:RouterSwapWithSigFormalTest::testFuzz_swapWithSigPre_get(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),(uint256,uint256,bytes),(uint256,uint256,bytes),bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterSwapWithSig.t.sol:RouterSwapWithSigFormalTest::testFuzz_swapWithSigPre_user(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),(uint256,uint256,bytes))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterSwapWithSig.t.sol:RouterSwapWithSigFormalTest::testFuzz_swapWithSig_alreadyExecutor(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),(uint256,uint256,bytes),(uint256,uint256,bytes))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterSwapWithSig.t.sol:RouterSwapWithSigFormalTest::testFuzz_swapWithSig_grant(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),(uint256,uint256,bytes),(uint256,uint256,bytes),bool,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterSwapWithSig.t.sol:RouterSwapWithSigFormalTest::testFuzz_swapWithSig_native(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),(uint256,uint256,bytes),(uint256,uint256,bytes))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterSwapWithSig.t.sol:RouterSwapWithSigFormalTest::testFuzz_swapWithSig_neverReadsIsExecutor(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),(uint256,uint256,bytes),(uint256,uint256,bytes),bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterSwapWithSig.t.sol:RouterSwapWithSigFormalTest::testFuzz_swapWithSig_noGrant(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),(uint256,uint256,bytes),(uint256,uint256,bytes))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RouterSwapWithSig.t.sol:RouterSwapWithSigFormalTest::testFuzz_swapWithSig_ok_input(address,((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),(uint256,uint256,bytes),(uint256,uint256,bytes),bool,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/RoutingPoolImpact.t.sol:RoutingPoolImpactTest::test_poolSpotBetterNoLongerTakesWholeOrderPastTheBook()": {
+      "status": "Success"
+    },
+    "test/formal/RoutingPoolImpact.t.sol:RoutingPoolImpactTest::test_poolStillTakesAnOrderItFillsBeforeTheBookLevel()": {
+      "status": "Success"
+    },
+    "test/formal/SpecBook.t.sol:SpecBookFormalTest::testFuzz_AppendSpec_post((uint256,uint8,bool,bool,uint8,uint64,uint64,bool,uint256,uint8))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecBook.t.sol:SpecBookFormalTest::testFuzz_AppendSpec_post_guards((uint256,uint8,bool,bool,uint8,uint64,uint64,bool,uint256,uint8))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecBook.t.sol:SpecBookFormalTest::testFuzz_AppendSpec_progress((uint256,uint8,bool,bool,uint8,uint64,uint64,bool,uint256,uint8))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecBook.t.sol:SpecBookFormalTest::testFuzz_BestAtPriceSpec_priority((uint256,uint8,bool,uint8,uint256))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecBook.t.sol:SpecBookFormalTest::testFuzz_LevelSpec_priority((uint256,uint8,bool,uint8,uint256))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecBook.t.sol:SpecBookFormalTest::testFuzz_RemoveSpec_post((uint256,uint8,uint8,bool,uint8,uint256))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecBook.t.sol:SpecBookFormalTest::testFuzz_RemoveSpec_progress((uint256,uint8,uint8,bool,uint8,uint256))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecBook.t.sol:SpecBookFormalTest::testFuzz_RemoveSpec_reverts((uint256,uint8,uint8,bool,uint8,uint256))": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecCore.t.sol:SpecCoreFormalTest::testFuzz_CreateOrderSpec_notAuthorised(address,address,bool,uint256,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecCore.t.sol:SpecCoreFormalTest::testFuzz_CreateOrderSpec_run(address,address,bool,uint256,uint256,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecCore.t.sol:SpecCoreFormalTest::testFuzz_CreateOrderSpec_run_addOrderGuards(address,address,bool,uint256,uint256,uint256,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecCore.t.sol:SpecCoreFormalTest::testFuzz_CreateOrderSpec_run_repeat(address,address,bool,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecCore.t.sol:SpecCoreFormalTest::testFuzz_CreateOrderSpec_zeroAmount(address,address,bool,uint256,uint256,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecCore.t.sol:SpecCoreFormalTest::testFuzz_PoolStateSlotSpec_pure_ok(bytes32)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecCore.t.sol:SpecCoreFormalTest::testFuzz_PoolStateSlotSpec_value(bytes32)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecCore.t.sol:SpecCoreFormalTest::testFuzz_Router_TransferSpec_erc20(uint8,uint256,bytes,address,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecCore.t.sol:SpecCoreFormalTest::testFuzz_Router_TransferSpec_frame(bool,uint256,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecCore.t.sol:SpecCoreFormalTest::testFuzz_Router_TransferSpec_native(uint8,address,bytes,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecCore.t.sol:SpecCoreFormalTest::testFuzz_Router_TransferSpec_ok_iff(bool,uint8,uint256,bytes,address,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecCore.t.sol:SpecCoreFormalTest::testFuzz_TransferSpec_erc20(uint8,uint256,bytes,address,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecCore.t.sol:SpecCoreFormalTest::testFuzz_TransferSpec_erc20_noCode(address,address,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecCore.t.sol:SpecCoreFormalTest::testFuzz_TransferSpec_frame(bool,uint256,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecCore.t.sol:SpecCoreFormalTest::testFuzz_TransferSpec_native(uint8,address,bytes,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecCore.t.sol:SpecCoreFormalTest::testFuzz_TransferSpec_ok_iff(bool,uint8,uint256,bytes,address,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecCore.t.sol:SpecCoreFormalTest::testFuzz_TransferSpec_viaSweep(bool,bool,bytes,uint256,uint8,uint256,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecCore.t.sol:SpecCoreFormalTest::testFuzz_beforeSwap_frame_of_spec(address,address,bool,uint256,uint256,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecCore.t.sol:SpecCoreFormalTest::testFuzz_createBody_frame(address,address,bool,uint256,uint256,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecCore.t.sol:SpecCoreFormalTest::testFuzz_getLiquidity_of_spec(bytes32,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecCore.t.sol:SpecCoreFormalTest::testFuzz_getLiquidity_zero_of_spec(bytes32,uint128)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecCore.t.sol:SpecCoreFormalTest::testFuzz_getSlot0_of_spec(bytes32,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecCore.t.sol:SpecCoreFormalTest::test_note_beforeSwap_frame_hcreate_false()": {
+      "status": "Success"
+    },
+    "test/formal/SpecEip712.t.sol:AssumptionsFormalTest::test_asyncSwapRouter_short()": {
+      "status": "Success"
+    },
+    "test/formal/SpecEip712.t.sol:AssumptionsFormalTest::test_asyncSwap_short()": {
+      "status": "Success"
+    },
+    "test/formal/SpecEip712.t.sol:AssumptionsFormalTest::test_decode_asyncSwap()": {
+      "status": "Success"
+    },
+    "test/formal/SpecEip712.t.sol:AssumptionsFormalTest::test_decode_asyncSwapRouter()": {
+      "status": "Success"
+    },
+    "test/formal/SpecEip712.t.sol:AssumptionsFormalTest::test_decode_one()": {
+      "status": "Success"
+    },
+    "test/formal/SpecEip712.t.sol:AssumptionsFormalTest::test_deployed_short()": {
+      "status": "Success"
+    },
+    "test/formal/SpecEip712.t.sol:AssumptionsFormalTest::test_fallbackStore_none()": {
+      "status": "Success"
+    },
+    "test/formal/SpecEip712.t.sol:AssumptionsFormalTest::test_hash_constants()": {
+      "status": "Success"
+    },
+    "test/formal/SpecEip712.t.sol:AssumptionsFormalTest::test_one_short()": {
+      "status": "Success"
+    },
+    "test/formal/SpecEip712.t.sol:AsyncSwapCtorSpecFormalTest::testFuzz_CtorSpec(address,uint8,address,uint64)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecEip712.t.sol:AsyncSwapCtorSpecFormalTest::testFuzz_CtorSpec_name_word(address,uint8,address,uint64)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecEip712.t.sol:AsyncSwapCtorSpecFormalTest::testFuzz_CtorSpec_version_word(address,uint8,address,uint64)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecEip712.t.sol:AsyncSwapCtorSpecFormalTest::testFuzz_DOMAIN_SEPARATOR_deployed(uint64,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecEip712.t.sol:AsyncSwapSpecEip712FormalTest::testFuzz_Eip712DomainSpec_body(bytes32,bytes32,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecEip712.t.sol:AsyncSwapSpecEip712FormalTest::testFuzz_name_ne_sentinel(bytes32,bytes32,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecEip712.t.sol:AsyncSwapSpecEip712FormalTest::testFuzz_toString_name(bytes32,bytes32,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecEip712.t.sol:AsyncSwapSpecEip712FormalTest::testFuzz_toString_version(bytes32,bytes32,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecEip712.t.sol:AsyncSwapSpecEip712FormalTest::testFuzz_version_ne_sentinel(bytes32,bytes32,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecEip712.t.sol:RouterSpecEip712FormalTest::testFuzz_Eip712DomainSpec_body(bytes32,bytes32,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecEip712.t.sol:RouterSpecEip712FormalTest::testFuzz_name_ne_sentinel(bytes32,bytes32,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecEip712.t.sol:RouterSpecEip712FormalTest::testFuzz_toString_name(bytes32,bytes32,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecEip712.t.sol:RouterSpecEip712FormalTest::testFuzz_toString_version(bytes32,bytes32,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecEip712.t.sol:RouterSpecEip712FormalTest::testFuzz_version_ne_sentinel(bytes32,bytes32,uint64,address,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecEip712.t.sol:SpecEip712ShortStringsFormalTest::testFuzz_ShortStringsSpec_toString_ok(bytes32,uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecEip712.t.sol:SpecEip712ShortStringsFormalTest::testFuzz_ShortStringsSpec_toString_reverts(bytes32,uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecEip712.t.sol:SpecEip712ShortStringsFormalTest::testFuzz_ShortStringsSpec_withFallback(bytes32,bool,string)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecEip712.t.sol:SpecEip712ShortStringsFormalTest::testFuzz_byteLength_eq(bytes32)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecEip712.t.sol:SpecEip712ShortStringsFormalTest::testFuzz_toString_eq(bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecEip712.t.sol:SpecEip712ShortStringsFormalTest::testFuzz_toString_reverts_iff_byteLength(bytes32,bool,uint8)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecSig.t.sol:SpecSigFormalTest::testFuzz_ERC1271Spec_onHook(bool,bytes,bool,uint8,bool,address,bool,uint256,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecSig.t.sol:SpecSigFormalTest::testFuzz_ERC1271Spec_onRouter(((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),bool,bytes,bool,uint8,bool,uint256,uint256,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecSig.t.sol:SpecSigFormalTest::testFuzz_ERC1271Spec_readOnly(bool,bytes,bool,uint8,bool,bytes32,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecSig.t.sol:SpecSigFormalTest::testFuzz_ERC1271Spec_result(bool,bytes,bool,uint8,bytes32,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecSig.t.sol:SpecSigFormalTest::testFuzz_ERC1271Spec_result_calldata(bytes32,bytes,bytes32)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecSig.t.sol:SpecSigFormalTest::testFuzz_ERC1271Spec_result_noCode_precompile(bytes32,bytes,uint32)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecSig.t.sol:SpecSigFormalTest::testFuzz_ERC1271Spec_total(uint8,bool,bytes,bool,uint8,bool,bytes32,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecSig.t.sol:SpecSigFormalTest::testFuzz_HashPoolKeySpec_result(address,address,uint24,int24,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecSig.t.sol:SpecSigFormalTest::testFuzz_HashPoolKeySpec_total_readOnly(address,address,uint24,int24,address)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecSig.t.sol:SpecSigFormalTest::testFuzz_HashSetExecutorSpec_onHook(uint256,int24,address,bool,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecSig.t.sol:SpecSigFormalTest::testFuzz_HashSetExecutorSpec_result(address,address,uint24,int24,address,address,address,bool,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecSig.t.sol:SpecSigFormalTest::testFuzz_HashSetExecutorSpec_total_readOnly(address,address,uint24,int24,address,address,address,bool,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecSig.t.sol:SpecSigFormalTest::testFuzz_TypedDataHashSpec_readOnly(bytes32,bytes32)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecSig.t.sol:SpecSigFormalTest::testFuzz_TypedDataHashSpec_result(bytes32,bytes32,address,uint64,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecSig.t.sol:SpecSigFormalTest::testFuzz_TypedDataHashSpec_total(bytes32,bytes32)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecSig.t.sol:SpecSigFormalTest::testFuzz_hashTypedDataV4_run(uint64,address,bool,uint256,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecSig.t.sol:SpecSigFormalTest::testFuzz_hashTypedDataV4_run_router(((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint64,uint256,uint256,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecSig.t.sol:SpecSigFormalTest::testFuzz_isValidSignatureNow_run(uint256,bool,bytes,bool,address,bool,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecSig.t.sol:SpecSigFormalTest::testFuzz_isValidSignatureNow_run_router(((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint256,bool,bytes,bool,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecSig.t.sol:SpecSigFormalTest::testFuzz_tryRecover_5888_ok(((address,address,uint24,int24,address),address,bool,uint256,uint256,uint256,uint160,bytes32),uint256,uint256,uint256,bytes)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecSig.t.sol:SpecSigFormalTest::testFuzz_tryRecover_9821_ok(address,bool,uint256,bytes,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/formal/SpecSig.t.sol:SpecSigFormalTest::test_SpecSig_typehash_words()": {
+      "status": "Success"
+    },
+    "test/nethermind_auditagent/NethermindAuditAgent.t.sol:NethermindAuditAgentTest::test_H1_fill_orderClosedBeforeMakerPayout()": {
+      "status": "Success"
+    },
+    "test/nethermind_auditagent/NethermindAuditAgent.t.sol:NethermindAuditAgentTest::test_H1_match_orderReducedBeforeMakerPayout()": {
+      "status": "Success"
+    },
+    "test/nethermind_auditagent/NethermindAuditAgent.t.sol:NethermindAuditAgentTest::test_H2_poolLiquidityFill_orderClosedBeforeMakerPayout()": {
+      "status": "Success"
+    },
+    "test/nethermind_auditagent/NethermindAuditAgent.t.sol:NethermindAuditAgentTest::test_M10_repriceKeepsMakerRole()": {
+      "status": "Success"
+    },
+    "test/nethermind_auditagent/NethermindAuditAgent.t.sol:NethermindAuditAgentTest::test_M4_liquidityAddedBeforeFillGetsNoBid()": {
+      "status": "Success"
+    },
+    "test/nethermind_auditagent/NethermindAuditAgent.t.sol:NethermindAuditAgentTest::test_M5_RevertWhen_LiveInputBelowFillerExpectation()": {
+      "status": "Success"
+    },
+    "test/nethermind_auditagent/NethermindAuditAgent.t.sol:NethermindAuditAgentTest::test_M5_fillSucceeds_WhenFillerAcceptsLiveInput()": {
+      "status": "Success"
+    },
+    "test/nethermind_auditagent/NethermindAuditAgent.t.sol:NethermindAuditAgentTest::test_M6_favorablePartialFill_keepsBuyerRemainderLimit()": {
+      "status": "Success"
+    },
+    "test/nethermind_auditagent/NethermindAuditAgent.t.sol:NethermindAuditAgentTest::test_M6_favorablePartialFill_keepsRemainderLimit()": {
+      "status": "Success"
+    },
+    "test/nethermind_auditagent/NethermindAuditAgent.t.sol:NethermindAuditAgentTest::test_M6_partialFillMeetingWholeMinimum_keepsRemainderResting()": {
+      "status": "Success"
+    },
+    "test/nethermind_auditagent/NethermindAuditAgent.t.sol:NethermindAuditAgentTest::test_M8_crossedBacklogClearsBeforeNewerOrder()": {
+      "status": "Success"
+    },
+    "test/nethermind_auditagent/NethermindAuditAgent.t.sol:NethermindAuditAgentTest::test_M9_blockedRecipientDoesNotBlockMatch()": {
+      "status": "Success"
+    },
+    "test/security/AssetPrecision.t.sol:AssetPrecisionTest::test_RevertWhen_BuyMinimumOutputBelowFloor()": {
+      "status": "Success"
+    },
+    "test/security/AssetPrecision.t.sol:AssetPrecisionTest::test_RevertWhen_BuyRepricedBelowFloor()": {
+      "status": "Success"
+    },
+    "test/security/AssetPrecision.t.sol:AssetPrecisionTest::test_RevertWhen_SellInputBelowFloor()": {
+      "status": "Success"
+    },
+    "test/security/AssetPrecision.t.sol:AssetPrecisionTest::test_buyAtFloorRests()": {
+      "status": "Success"
+    },
+    "test/security/AssetPrecision.t.sol:AssetPrecisionTest::test_floorFollowsAssetDecimals()": {
+      "status": "Success"
+    },
+    "test/security/AssetPrecision.t.sol:AssetPrecisionTest::test_floorIsFourDecimalsOfAnEighteenDecimalAsset()": {
+      "status": "Success"
+    },
+    "test/security/AssetPrecision.t.sol:AssetPrecisionTest::test_nativeAssetUsesEighteenDecimals()": {
+      "status": "Success"
+    },
+    "test/security/AssetPrecision.t.sol:AssetPrecisionTest::test_reportedDecimalsAreCappedAt36()": {
+      "status": "Success"
+    },
+    "test/security/AssetPrecision.t.sol:AssetPrecisionTest::test_sellAtFloorRests()": {
+      "status": "Success"
+    },
+    "test/security/AssetPrecision.t.sol:AssetPrecisionTest::test_tokenWithoutDecimalsGetsOneUnitFloor()": {
+      "status": "Success"
+    },
+    "test/security/ClaimTransfers.t.sol:ClaimTransfersTest::test_aggregatesByRecipientAndCurrencyInFirstCreditOrder()": {
+      "status": "Success"
+    },
+    "test/security/ClaimTransfers.t.sol:ClaimTransfersTest::test_capacityCoversThirtyThreeDistinctCredits()": {
+      "status": "Success"
+    },
+    "test/security/ClaimTransfers.t.sol:ClaimTransfersTest::test_selfCreditsDoNotAggregateOrOverflow()": {
+      "status": "Success"
+    },
+    "test/security/CoarsePriceBlocking.t.sol:CoarsePriceBlockingTest::test_higherBidOnCrossingOrderCanBypassBlocker()": {
+      "status": "Success"
+    },
+    "test/security/CoarsePriceBlocking.t.sol:CoarsePriceBlockingTest::test_incomingSellSkipsHigherFeeNoncrossingBuy()": {
+      "status": "Success"
+    },
+    "test/security/CoarsePriceBlocking.t.sol:CoarsePriceBlockingTest::test_sameTickBestBidBeatsHigherFeeAndEarlierAge()": {
+      "status": "Success"
+    },
+    "test/security/CoarsePriceBlocking.t.sol:CoarsePriceBlockingTest::test_sameTickExactPriceBeatsHigherFeeAndEarlierAge()": {
+      "status": "Success"
+    },
+    "test/security/CoarsePriceBlocking.t.sol:CoarsePriceBlockingTest::test_twoDollarBlockerCannotStallTwentyThousandDollars()": {
+      "status": "Success"
+    },
+    "test/security/CoarsePriceBlocking.t.sol:CoarsePriceBlockingTest::test_worsePriceCannotJumpAheadWithBidOrAge()": {
+      "status": "Success"
+    },
+    "test/security/EligibleGas.t.sol:EligibleGasTest::test_gas128Blockers()": {
+      "status": "Success"
+    },
+    "test/security/EligibleGas.t.sol:EligibleGasTest::test_gas128BlockersDistinctOwners()": {
+      "status": "Success"
+    },
+    "test/security/EligibleGas.t.sol:EligibleGasTest::test_gasNoBlockers()": {
+      "status": "Success"
+    },
+    "test/security/EligibleGas.t.sol:EligibleGasTest::test_gasOneBlocker()": {
+      "status": "Success"
+    },
+    "test/security/EligibleGas.t.sol:EligibleGasTest::test_gasSixteenBlockers()": {
+      "status": "Success"
+    },
+    "test/security/EligiblePythonVectors.t.sol:EligiblePython0Test::test_pythonStatefulTrace()": {
+      "status": "Success"
+    },
+    "test/security/EligiblePythonVectors.t.sol:EligiblePython1Test::test_pythonStatefulTrace()": {
+      "status": "Success"
+    },
+    "test/security/EligiblePythonVectors.t.sol:EligiblePython2Test::test_pythonStatefulTrace()": {
+      "status": "Success"
+    },
+    "test/security/EligiblePythonVectors.t.sol:EligiblePython3Test::test_pythonStatefulTrace()": {
+      "status": "Success"
+    },
+    "test/security/EligiblePythonVectors.t.sol:EligiblePython4Test::test_pythonStatefulTrace()": {
+      "status": "Success"
+    },
+    "test/security/EligiblePythonVectors.t.sol:EligiblePython5Test::test_pythonStatefulTrace()": {
+      "status": "Success"
+    },
+    "test/security/EligiblePythonVectors.t.sol:EligiblePython6Test::test_pythonStatefulTrace()": {
+      "status": "Success"
+    },
+    "test/security/EligiblePythonVectors.t.sol:EligiblePython7Test::test_pythonStatefulTrace()": {
+      "status": "Success"
+    },
+    "test/security/EligibleRemainder.t.sol:EligibleRemainderTest::test_refreshWhenPriceKeyAndFeeAreUnchanged()": {
+      "status": "Success"
+    },
+    "test/security/ExecutorAuthorization.t.sol:ExecutorAuthorizationTest::test_RevertWhen_UnauthorizedExecutorCreatesOrFills()": {
+      "status": "Success"
+    },
+    "test/security/ExecutorRevocation.t.sol:ExecutorRevocationTest::test_RevertWhen_MakerRevokesTrustedRouter()": {
+      "status": "Success"
+    },
+    "test/security/ExecutorRevocation.t.sol:ExecutorRevocationTest::test_RevertWhen_NonOwnerCancelsThroughRouter()": {
+      "status": "Success"
+    },
+    "test/security/ExecutorRevocation.t.sol:ExecutorRevocationTest::test_RevertWhen_RevokedOtherExecutorCancels()": {
+      "status": "Success"
+    },
+    "test/security/ExecutorRevocation.t.sol:ExecutorRevocationTest::test_eoaCancelsThroughRouter()": {
+      "status": "Success"
+    },
+    "test/security/ExecutorRevocation.t.sol:ExecutorRevocationTest::test_fillerWithoutAnyGrantCanFill()": {
+      "status": "Success"
+    },
+    "test/security/FeeClaims.t.sol:FeeClaimsTest::testFuzz_cancelNeverChargesFees(uint96,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/security/FeeClaims.t.sol:FeeClaimsTest::testFuzz_fillConservesInput(uint96,bool)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/security/FeeClaims.t.sol:FeeClaimsTest::test_callbackCannotBeCalledDirectly()": {
+      "status": "Success"
+    },
+    "test/security/FeeClaims.t.sol:FeeClaimsTest::test_cancelReverseDirection_refundsFullDeposit()": {
+      "status": "Success"
+    },
+    "test/security/FeeClaims.t.sol:FeeClaimsTest::test_collectBeforeFill_cannotTakeEscrow()": {
+      "status": "Success"
+    },
+    "test/security/FeeClaims.t.sol:FeeClaimsTest::test_collectionAuthorizationFollowsOwnership()": {
+      "status": "Success"
+    },
+    "test/security/FeeClaims.t.sol:FeeClaimsTest::test_emptyAndRepeatedCollection()": {
+      "status": "Success"
+    },
+    "test/security/FeeClaims.t.sol:FeeClaimsTest::test_failedFillDoesNotEarnFees()": {
+      "status": "Success"
+    },
+    "test/security/FeeClaims.t.sol:FeeClaimsTest::test_failedNativeRecipient_preservesClaims()": {
+      "status": "Success"
+    },
+    "test/security/FeeClaims.t.sol:FeeClaimsTest::test_feeUsesStoredOutput_andCollectionPreservesOtherOrders()": {
+      "status": "Success"
+    },
+    "test/security/FeeClaims.t.sol:FeeClaimsTest::test_nativeCancellation_refundsFullDeposit()": {
+      "status": "Success"
+    },
+    "test/security/FeeClaims.t.sol:FeeClaimsTest::test_zeroRecipientRejected()": {
+      "status": "Success"
+    },
+    "test/security/FeeCollect.t.sol:FeeCollectTest::test_customExecutor_underpayingFee_ERC20Output_reverts()": {
+      "status": "Success"
+    },
+    "test/security/FeeCollect.t.sol:FeeCollectTest::test_customExecutor_underpayingFee_nativeOutput_reverts()": {
+      "status": "Success"
+    },
+    "test/security/FeeCollect.t.sol:FeeCollectTest::test_info_collectRevertsIfClaimsExceedInt128()": {
+      "status": "Success"
+    },
+    "test/security/FeeCollect.t.sol:FeeCollectTest::test_ownerCannotReachEscrow_onlyFees()": {
+      "status": "Success"
+    },
+    "test/security/FeeCollect.t.sol:FeeCollectTest::test_reentrantMaker_cannotSpendHookFeeCredit()": {
+      "status": "Success"
+    },
+    "test/security/FeeCollect.t.sol:FeeCollectTest::test_thirdParty_cannotTransferOrBurnVaultClaims()": {
+      "status": "Success"
+    },
+    "test/security/FillerMaxPrice.t.sol:FillerMaxPriceTest::test_RevertWhen_LivePriceExceedsFillerMax()": {
+      "status": "Success"
+    },
+    "test/security/HookBalanceIsolation.t.sol:HookBalanceIsolationTest::test_RevertWhen_SelfExecutorFillsFromHookBalance()": {
+      "status": "Success"
+    },
+    "test/security/MakerIdentity.t.sol:MakerIdentityTest::test_mismatchedOwnerRevertsBeforeTransfer()": {
+      "status": "Success"
+    },
+    "test/security/MakerIdentity.t.sol:MakerIdentityTest::test_mismatchedUserDataRevertsBeforeTransfer()": {
+      "status": "Success"
+    },
+    "test/security/MevTax.t.sol:MevTaxSignedTest::test_relayerPaysTheTax()": {
+      "status": "Success"
+    },
+    "test/security/MevTax.t.sol:MevTaxTest::test_cancelIsNotTaxed()": {
+      "status": "Success"
+    },
+    "test/security/MevTax.t.sol:MevTaxTest::test_fillOrderPaysTheTax()": {
+      "status": "Success"
+    },
+    "test/security/MevTax.t.sol:MevTaxTest::test_multicallTaxedActionNeedsNoPriority()": {
+      "status": "Success"
+    },
+    "test/security/MevTax.t.sol:MevTaxTest::test_noPriorityPaysNothing()": {
+      "status": "Success"
+    },
+    "test/security/MevTax.t.sol:MevTaxTest::test_poolRetryPaysTheTax()": {
+      "status": "Success"
+    },
+    "test/security/MevTax.t.sol:MevTaxTest::test_swapPaysTheTaxToTheVault()": {
+      "status": "Success"
+    },
+    "test/security/MevTax.t.sol:MevTaxTest::test_taxIsPriorityTimesTaxGas()": {
+      "status": "Success"
+    },
+    "test/security/MinimumOrder.t.sol:MinimumOrderBidFloorTest::test_RevertWhen_updatePrice_raisesSellBidFloor_withMinimum()": {
+      "status": "Success"
+    },
+    "test/security/MinimumOrder.t.sol:MinimumOrderTest::test_RevertWhen_BuyBelowMinimum()": {
+      "status": "Success"
+    },
+    "test/security/MinimumOrder.t.sol:MinimumOrderTest::test_RevertWhen_SellAsksBelowMinimum()": {
+      "status": "Success"
+    },
+    "test/security/MinimumOrder.t.sol:MinimumOrderTest::test_RevertWhen_UpdatePriceBelowMinimum()": {
+      "status": "Success"
+    },
+    "test/security/MinimumOrder.t.sol:MinimumOrderTest::test_buyAtMinimum_rests()": {
+      "status": "Success"
+    },
+    "test/security/MinimumOrder.t.sol:MinimumOrderTest::test_minimumIsFixedAtDeployment()": {
+      "status": "Success"
+    },
+    "test/security/MinimumOrder.t.sol:MinimumOrderTest::test_newPoolsTakeTheHookMinimum()": {
+      "status": "Success"
+    },
+    "test/security/MinimumOrder.t.sol:MinimumOrderTest::test_partialMatchBuyRemainderBelowMinimum_refunded()": {
+      "status": "Success"
+    },
+    "test/security/MinimumOrder.t.sol:MinimumOrderTest::test_partialMatchRemainderBelowMinimum_refunded()": {
+      "status": "Success"
+    },
+    "test/security/MinimumOrder.t.sol:MinimumOrderTest::test_sellAtMinimum_rests()": {
+      "status": "Success"
+    },
+    "test/security/MinimumOrder.t.sol:MinimumOrderTest::test_sellAtMinimum_rests_numeraireIsCurrency0()": {
+      "status": "Success"
+    },
+    "test/security/MinimumOrder.t.sol:MinimumOrderTest::test_sellJudgedByMinimumOutputNotInput()": {
+      "status": "Success"
+    },
+    "test/security/MinimumOrder.t.sol:MinimumOrderTest::test_sellJudgedByMinimumOutputNotInput_numeraireIsCurrency0()": {
+      "status": "Success"
+    },
+    "test/security/MinimumOrder.t.sol:MinimumOrderTest::test_strangerOpensPoolAtExtremePrice_minimumStillHolds()": {
+      "status": "Success"
+    },
+    "test/security/MinimumOrder.t.sol:MinimumOrderTieredBidTest::test_RevertWhen_priorityFee_smallOrderBelowTenBps()": {
+      "status": "Success"
+    },
+    "test/security/MinimumOrder.t.sol:MinimumOrderTieredBidTest::test_priorityFee_smallOrderPaysTenBps()": {
+      "status": "Success"
+    },
+    "test/security/MinimumOrder.t.sol:MinimumOrderTieredBidTest::test_updatePrice_buyUnaffectedBySellBidFloor()": {
+      "status": "Success"
+    },
+    "test/security/MinimumOrder.t.sol:MinimumOrderTieredBidTest::test_updatePrice_partiallyFilledSellKeepsProRatedBid()": {
+      "status": "Success"
+    },
+    "test/security/MinimumOrder.t.sol:MinimumOrderTieredBidTest::test_updatePrice_withinSellBidFloor()": {
+      "status": "Success"
+    },
+    "test/security/MinimumOrder.t.sol:MinimumOrderTieredBidTest::test_updatePrice_zeroBidRemainsOptional()": {
+      "status": "Success"
+    },
+    "test/security/NativeFillExactPayment.t.sol:NativeFillExactPaymentTest::testFuzz_overpaymentReverts(uint96)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/security/NativeFillExactPayment.t.sol:NativeFillExactPaymentTest::test_control_fairFill_noStranding()": {
+      "status": "Success"
+    },
+    "test/security/NativeFillExactPayment.t.sol:NativeFillExactPaymentTest::test_exactLivePrice_succeedsWithStaleStruct()": {
+      "status": "Success"
+    },
+    "test/security/NativeFillExactPayment.t.sol:NativeFillExactPaymentTest::test_inflatedStructPrice_rejectsOverpayment()": {
+      "status": "Success"
+    },
+    "test/security/NativeFillExactPayment.t.sol:NativeFillExactPaymentTest::test_livePriceAboveMax_revertsAtomically()": {
+      "status": "Success"
+    },
+    "test/security/NativeFillExactPayment.t.sol:NativeFillExactPaymentTest::test_loweredPrice_rejectsStaleDeposit()": {
+      "status": "Success"
+    },
+    "test/security/NativeFillExactPayment.t.sol:NativeFillExactPaymentTest::test_nativeInput_rejectsMismatchedOwner()": {
+      "status": "Success"
+    },
+    "test/security/NativeFillExactPayment.t.sol:NativeFillExactPaymentTest::test_ownerSweep_recoversDonationsWithoutTouchingOpenOrder()": {
+      "status": "Success"
+    },
+    "test/security/NativeFillExactPayment.t.sol:NativeFillExactPaymentTest::test_underpayment_cannotConsumeDonatedEth()": {
+      "status": "Success"
+    },
+    "test/security/NativeInputMsgValue.t.sol:NativeInputMsgValueTest::test_RevertWhen_NativeInputMsgValueMismatch()": {
+      "status": "Success"
+    },
+    "test/security/NativeOutputEscrow.t.sol:NativeOutputEscrowTest::test_RevertWhen_FillerDoesNotDepositNativeOutput()": {
+      "status": "Success"
+    },
+    "test/security/NativeSettlementReentrancy.t.sol:NativeSettlementReentrancyTest::test_control_eoaFill_succeeds()": {
+      "status": "Success"
+    },
+    "test/security/NativeSettlementReentrancy.t.sol:NativeSettlementReentrancyTest::test_reentrancyOnCancel_blocked()": {
+      "status": "Success"
+    },
+    "test/security/NativeSettlementReentrancy.t.sol:NativeSettlementReentrancyTest::test_reentrancyOnFill_blocked()": {
+      "status": "Success"
+    },
+    "test/security/NoDollarMinimum.t.sol:NoDollarMinimumTest::testFuzz_remaindersNeverStallTheBook(uint256,uint256,uint256)": {
+      "status": "Success",
+      "fuzzRuns": 256
+    },
+    "test/security/NoDollarMinimum.t.sol:NoDollarMinimumTest::test_belowTheFloorReverts()": {
+      "status": "Success"
+    },
+    "test/security/NoDollarMinimum.t.sol:NoDollarMinimumTest::test_floorIsTheOnlyMinimum()": {
+      "status": "Success"
+    },
+    "test/security/NoDollarMinimum.t.sol:NoDollarMinimumTest::test_sellAskingNothingLeavesTheBookWorking()": {
+      "status": "Success"
+    },
+    "test/security/NoReturnToken.t.sol:NoReturnTokenTest::test_noReturnTokenAsFillerOutput_fill()": {
+      "status": "Success"
+    },
+    "test/security/NoReturnToken.t.sol:NoReturnTokenTest::test_noReturnTokenAsMakerInput_createAndCancel()": {
+      "status": "Success"
+    },
+    "test/security/OrderSpoofing.t.sol:OrderSpoofingTest::test_RevertWhen_NonExecutorOpensOrderForMaker()": {
+      "status": "Success"
+    },
+    "test/security/OwnerDirectCancel.t.sol:OwnerDirectCancelTest::test_owner_can_cancel_directly()": {
+      "status": "Success"
+    },
+    "test/security/PashovFindings.t.sol:DustDynamicFeeTest::test_oneWeiFeeGoesWhollyToTheVault()": {
+      "status": "Success"
+    },
+    "test/security/PashovFindings.t.sol:EmptyRangeTest::test_poolFillCannotParkThePriceInAnEmptyRange()": {
+      "status": "Success"
+    },
+    "test/security/PashovFindings.t.sol:ExtremeLevelTest::test_dustAskAtTheEndKeyDoesNotBlockPoolBuys()": {
+      "status": "Success"
+    },
+    "test/security/PashovFindings.t.sol:ExtremeLevelTest::test_dustBidAtTheEndKeyDoesNotBlockPoolSells()": {
+      "status": "Success"
+    },
+    "test/security/PashovFindings.t.sol:FeeBaseTest::test_feeIsChargedOnlyOnTheOutputThatClosesTheGap()": {
+      "status": "Success"
+    },
+    "test/security/PashovFindings.t.sol:GrantFrontRunTest::test_frontRunGrantDoesNotRevertTheRelayedOrder()": {
+      "status": "Success"
+    },
+    "test/security/PashovFindings.t.sol:PoolFirstOvershootTest::test_poolFirstSellDoesNotTradeBelowTheBid()": {
+      "status": "Success"
+    },
+    "test/security/PashovFindings.t.sol:RemainderRoundingKnownIssueTest::test_knownIssue_partlyMatchedOrderFallsBehindAnEqualOrder()": {
+      "status": "Success"
+    },
+    "test/security/PashovFindings.t.sol:VenueDynamicFeeTest::test_orderMovingBackTowardTheReferenceMatchesTheBookFirst()": {
+      "status": "Success"
+    },
+    "test/security/PoolFirstPartialFill.t.sol:PoolFirstPartialFillMinimumTest::test_dustRemainderIsRefunded()": {
+      "status": "Success"
+    },
+    "test/security/PoolFirstPartialFill.t.sol:PoolFirstPartialFillMinimumTest::test_dustRemainderStillMatchesTheBook()": {
+      "status": "Success"
+    },
+    "test/security/PoolFirstPartialFill.t.sol:PoolFirstPartialFillMinimumTest::test_poolFillsToTheBookLevelThenTheBookTakesTheRest()": {
+      "status": "Success"
+    },
+    "test/security/PoolFirstPartialFill.t.sol:PoolFirstPartialFillMinimumTest::test_remainderRestsAtTheMakersLimit()": {
+      "status": "Success"
+    },
+    "test/security/PoolFirstPartialFill.t.sol:PoolFirstPartialFillTest::test_poolFillsToTheBookLevelThenTheBookTakesTheRest()": {
+      "status": "Success"
+    },
+    "test/security/PoolFirstPartialFill.t.sol:PoolFirstPartialFillTest::test_remainderRestsAtTheMakersLimit()": {
+      "status": "Success"
+    },
+    "test/security/PriceKeyCrossing.t.sol:PriceKeyCrossingTest::test_equalKeyNonCrossingPairDoesNotBlockMatching()": {
+      "status": "Success"
+    },
+    "test/security/PriceKeyCrossing.t.sol:PriceKeyCrossingTest::test_exactTieExecutes()": {
+      "status": "Success"
+    },
+    "test/security/PriceKeyCrossing.t.sol:PriceKeyCrossingTest::test_matchBookMakesNoFalseMatch()": {
+      "status": "Success"
+    },
+    "test/security/PriorityFeeOnly.t.sol:PriorityFeeCap18DecimalTest::test_18DecimalNumeraireUsesScaledOptionalBidFloor()": {
+      "status": "Success"
+    },
+    "test/security/PriorityFeeOnly.t.sol:PriorityFeeOnlyTest::test_RevertWhen_ExecutorSkipsTheBid()": {
+      "status": "Success"
+    },
+    "test/security/PriorityFeeOnly.t.sol:PriorityFeeOnlyTest::test_RevertWhen_UntrustedExecutorOpensOrder()": {
+      "status": "Success"
+    },
+    "test/security/PriorityFeeOnly.t.sol:PriorityFeeOnlyTest::test_customExecutor_canRestOrderWhenBidIsPaid()": {
+      "status": "Success"
+    },
+    "test/security/PriorityFeeOnly.t.sol:PriorityFeeOnlyTest::test_equalBids_keepSubmissionOrder()": {
+      "status": "Success"
+    },
+    "test/security/PriorityFeeOnly.t.sol:PriorityFeeOnlyTest::test_newPoolOrderCanHaveNoBid()": {
+      "status": "Success"
+    },
+    "test/security/PriorityFeeOnly.t.sol:PriorityFeeOnlyTest::test_newPool_equalPricesQueueByBid()": {
+      "status": "Success"
+    },
+    "test/security/PriorityFeeOnly.t.sol:PriorityFeeOnlyTest::test_setOrderingModeIsGone()": {
+      "status": "Success"
+    },
+    "test/security/PriorityFeeOnly.t.sol:PriorityFeeOnlyTest::test_zeroBidsKeepTimePriorityAndAllowRepricing()": {
+      "status": "Success"
+    },
+    "test/security/PriorityPythonHashes.t.sol:PriorityPythonHashesTest::test_pythonHashesMatchSolidityLibrary()": {
+      "status": "Success"
+    },
+    "test/security/PriorityPythonVectors.t.sol:PriorityPythonVectorsTest::test_oneHundredPythonVectors()": {
+      "status": "Success"
+    },
+    "test/security/RouterOrderWindow.t.sol:RouterOrderWindowTest::test_RevertWhen_OrderChangesDuringFillPayment()": {
+      "status": "Success"
+    },
+    "test/security/RouterOrderWindow.t.sol:RouterOrderWindowTest::test_pendingOrder_notMatchableBeforeInputSettled()": {
+      "status": "Success"
+    },
+    "test/security/UseNonceScope.t.sol:UseNonceScopeTest::test_executorOnThisPoolCannotBurnTheMakersNonce()": {
+      "status": "Success"
+    },
+    "test/security/UseNonceScope.t.sol:UseNonceScopeTest::test_otherExecutorCannotBurnTheMakersNonce()": {
+      "status": "Success"
+    },
+    "test/security/UserDataMatchesOrder.t.sol:UserDataMatchesOrderTest::test_RevertWhen_UserDataDivergesFromOrder()": {
+      "status": "Success"
+    },
+    "test/security/poc/DustTradeFee.t.sol:DustTradeFeeNoMinimumPoc::test_control_normalMatchFee()": {
+      "status": "Success"
+    },
+    "test/security/poc/DustTradeFee.t.sol:DustTradeFeeNoMinimumPoc::test_poc_buyerPaysQuoteReceivesZeroAsset()": {
+      "status": "Success"
+    },
+    "test/security/poc/DustTradeFee.t.sol:DustTradeFeeNoMinimumPoc::test_poc_effectiveFeeRateOnSmallAssetLegs()": {
+      "status": "Success"
+    },
+    "test/security/poc/DustTradeFee.t.sol:DustTradeFeeProductionPoc::test_control_smallestLegalMatchFee()": {
+      "status": "Success"
+    },
+    "test/security/poc/DustTradeFee.t.sol:DustTradeFeeProductionPoc::test_poc_dustOrdersRejectedUnderProductionKnobs()": {
+      "status": "Success"
+    },
+    "test/security/poc/DustTradeFee.t.sol:DustTradeFeeProductionPoc::test_poc_dustSellRemainderClosesAndRefunds()": {
+      "status": "Success"
+    },
+    "test/security/poc/GrantReplay.t.sol:GrantReplayPoc::test_RevertWhen_SignedRevocationOfTrustedRouter()": {
+      "status": "Success"
+    },
+    "test/security/poc/GrantReplay.t.sol:GrantReplayPoc::test_grantSpentEvenWhenRouterAlreadyExecutor()": {
+      "status": "Success"
+    },
+    "test/security/poc/GrantReplay.t.sol:GrantReplayPoc::test_grantSpentWhenRouterNotYetExecutor()": {
+      "status": "Success"
+    },
+    "test/security/poc/PoolFirstFrontRun.t.sol:PoolFirstFrontRunPoc::test_control_buyFillsFromPool()": {
+      "status": "Success"
+    },
+    "test/security/poc/PoolFirstFrontRun.t.sol:PoolFirstFrontRunPoc::test_frontRunAskNoLongerForcesWorseBookMatch()": {
+      "status": "Success"
+    },
+    "test/security/poc/PoolSquatAssetFloor.t.sol:PoolSquatAssetFloorPoc::test_cannotSquatPoolBeforeTokenIsDeployed()": {
+      "status": "Success"
+    },
+    "test/security/poc/PoolSquatAssetFloor.t.sol:PoolSquatAssetFloorPoc::test_control_poolAfterDeployHasFloor()": {
+      "status": "Success"
+    },
+    "test/security/poc/SignedCancelGrief.t.sol:SignedCancelGriefPoc::test_control_cancelSucceedsWithoutInterference()": {
+      "status": "Success"
+    },
+    "test/security/poc/SignedCancelGrief.t.sol:SignedCancelGriefPoc::test_dustMatchNoLongerBreaksRelayedCancel()": {
+      "status": "Success"
+    },
+    "test/security/poc/SignedCancelGrief.t.sol:SignedCancelGriefPoc::test_dustMatchNoLongerBreaksRelayedReprice()": {
+      "status": "Success"
+    },
+    "test/security/poc/SignedCancelGrief.t.sol:SignedCancelGriefPoc::test_repriceRejectsSignedSizeBelowTheOrder()": {
+      "status": "Success"
+    },
+    "test/security/poc/SignedCancelGrief.t.sol:SignedCancelGriefPoc::test_staleRepriceCannotUndoALaterOne()": {
+      "status": "Success"
+    }
+  }
+}

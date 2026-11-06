@@ -1,0 +1,37 @@
+{
+  "command": "forge test --match-contract IncomingLibraryDeploymentTest --json",
+  "toolchain": "Foundry v1.8.6 (CI-pinned), solc 0.8.26, optimizer 10000, Cancun",
+  "sourceSha256": {
+    "src/AsyncSwap.sol": "2464f21c378835d92920ea0a460ec3f54a7649e8343fd8ad5e98c616f9e8fa9e",
+    "src/BaseHook.sol": "e910e8e809f50335b1bd0da2109e417ae87213b517c0d1d8720e3bf0a1259ab9",
+    "src/FeeVault.sol": "7f8ccecc58e131b4b0712ec0721ae7042400ed7073af4017cfad08f2aa9e4bda",
+    "src/ImmutableState.sol": "81780a696bbff93efda8c21052c04b2b98cc97fb0af5ca7c23d30a37adcbfb8e",
+    "src/MatchingEngine.sol": "e6e63450d77a1af80c075eb34d113604734e35d75985b94ab177d58f6d603ddd",
+    "src/NativeClaims.sol": "b02920e5ddb1d06c862a16cf1b4f740e37d23d14159f960e7a5196833e976d7d",
+    "src/Router.sol": "40f9ace55e00be6e9b79082466ee075e56435ffeef79db1676b0bec624cc8730",
+    "src/TokenClaims.sol": "7d087a18c541658df2ebfa2af9469dbc00c1e70b8c7d9c82e58a090a8b2a59fa",
+    "src/interfaces/ISignatureTransfer.sol": "fdd4edd4221ad8df5968da0d0f8aed1127e9bfe56bcb1c8cb77ea7e66875f54b",
+    "src/libraries/AsyncFiller.sol": "9015299b187cf70ece0840490aba0c9bef9109ebef72630b9864b33c31e1cf0a",
+    "src/libraries/AsyncMatching.sol": "28189f8b222b9d2202b3935a5a35a7d9b130e7d5433feed365958e2bf4626257",
+    "src/libraries/ClaimTransfers.sol": "7e6ed08d2c629a25890dfa1f9b86a41b62d142d3d0272864c374b356ef862bdc",
+    "src/libraries/CurrencySettler.sol": "35fa91cd314c39fa825192ab2ceae2561ce14ff6b57a9be09fe4b1c3d652340d",
+    "src/libraries/DynamicFeeOrdering.sol": "14ef4bbb9831bb4ee02f9e18af58a2f712b137380d477c8c01c81ec8286edaa7",
+    "src/libraries/EligiblePrice.sol": "30b2a388afefc5a68d24afec6d2262c7f4aa7ffd570faf13460971d0dc3cd5ca",
+    "src/libraries/IncomingMatching.sol": "3a3e9f52210b4b19cde4ca90a98acb55767f75b6a493fe0c0f55ca527c9fcda2",
+    "src/libraries/OrderSignatures.sol": "61c1e4ddbe0243123b1ef29636fc88d80dda9e8a941704c4e4bb8d5f2fdd0a2d",
+    "src/libraries/PriorityFeeUpdates.sol": "5d421e14f8dc28b40eab5c71172ff887808650531a9f5030dbc49b6a23b37987",
+    "src/libraries/RadixPriceTree.sol": "b2a672b6629caf28aa30df3a727b9026ddf3271ca422623a284f459db525dc53",
+    "src/libraries/TickBitmap.sol": "81e69010c0177a50b2496488727e98febd58884461716301fd28142549e8fe29",
+    "src/libraries/TickPrice.sol": "b4ec58fa775a17534379abf2480938531997069fa4da397ece40c1e8d2f7d220",
+    "src/types/AsyncOrder.sol": "1e18d34e727f7acb42131b56e65d4d56ff58c80d814fb60da37aad45493fe2bd"
+  },
+  "counts": {
+    "Success": 1
+  },
+  "tests": {
+    "test/IncomingLibraryDeployment.t.sol:IncomingLibraryDeploymentTest::test_deterministicDeploymentAndIdempotentRerun()": {
+      "status": "Success"
+    }
+  },
+  "scope": "Local test VM CREATE2 deployment and idempotent rerun; no public broadcast."
+}

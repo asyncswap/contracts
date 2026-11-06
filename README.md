@@ -69,6 +69,13 @@ block budget, the first blocks held 44–51 single-fill transactions or 10–12
 eight-fill transactions with the documented gas limits. The target of 100
 crossing transactions in one block was not met.
 
+The current-source [incoming-memory implementation](benchmarks/incoming-memory/README.md)
+reduces mean gas by **28.9–55.7%** on the same ten crossing workloads. All 1,000
+transactions and 5,200 pairs pass accounting checks; first blocks now hold 71–77
+single-fill or 22–27 eight-fill transactions. Four noncrossing controls cost
+2.86–3.21% more. The hook and matcher have about 1.5 KB of runtime-size headroom
+each. This change requires new deployments and is not included in deployed v1.3.0.
+
 For context, a [plain Uniswap v4 comparison](benchmarks/uniswap-v4/README.md)
 fit 250–288 single-hop swaps in the first block under the same budget and gas-limit
 policy. This uses official core test adapters, deep liquidity and no hook or

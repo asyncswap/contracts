@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
-required = {'AsyncSwap', 'AsyncMatching', 'Router', 'FeeVault', 'NativeClaims', 'TokenClaims',
+required = {'AsyncSwap', 'AsyncMatching', 'IncomingMatching', 'Router', 'FeeVault', 'NativeClaims', 'TokenClaims',
             'MatchingEngine', 'TickPrice', 'TickBitmap', 'EligiblePrice', 'PriorityFeeUpdates', 'DynamicFeeOrdering'}
 rows = []
 for path in sorted((root / 'out').glob('*/*.json')):

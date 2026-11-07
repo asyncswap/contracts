@@ -66,3 +66,21 @@ audit/formal-mind.audit.json
 # Isolated Solar compiler validation artifacts
 out-solar/
 cache-solar/
+
+# Isolated Solar adversarial validation artifacts
+out-solar-adversarial/
+cache-solar-adversarial/
+
+# Isolated LP validation build
+out-lp-validation/
+cache-lp-validation/
+
+# Matching disk metadata for Solar coverage
+out-solar-coverage/
+cache-solar-coverage/
+
+# Generated source-only coverage report
+/coverage/
+
+# Python validation helpers
+__pycache__/

@@ -62,3 +62,7 @@ audit/formal-mind.audit.json
 /audit/*
 !/audit/README.md
 !/audit/AUDIT_SCOPE_11_05_26.md
+
+# Isolated Solar compiler validation artifacts
+out-solar/
+cache-solar/

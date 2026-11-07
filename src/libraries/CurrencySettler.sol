@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
+import {TokenTransfers} from "./TokenTransfers.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
@@ -22,9 +23,9 @@ library CurrencySettler {
         } else {
             manager.sync(currency);
             if (payer != address(this)) {
-                IERC20(Currency.unwrap(currency)).safeTransferFrom(payer, address(manager), amount);
+                TokenTransfers.transferFrom(Currency.unwrap(currency), payer, address(manager), amount);
             } else {
-                currency.transfer(address(manager), amount);
+                TokenTransfers.transfer(Currency.unwrap(currency), address(manager), amount);
             }
             manager.settle();
         }
@@ -33,6 +34,7 @@ library CurrencySettler {
     /// @notice Take (receive) a currency from the PoolManager.
     /// @param claims If true, mint ERC-6909 claims instead of transferring tokens.
     function take(Currency currency, IPoolManager manager, address recipient, uint256 amount, bool claims) internal {
-        claims ? manager.mint(recipient, currency.toId(), amount) : manager.take(currency, recipient, amount);
+        if (claims) manager.mint(recipient, currency.toId(), amount);
+        else TokenTransfers.take(manager, currency, recipient, amount);
     }
 }

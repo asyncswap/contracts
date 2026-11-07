@@ -7,6 +7,7 @@ fs_permissions = [
   # Formal immutable checks read compiler-declared byte ranges from artifacts.
   { access = "read", path = "./out/" },
   { access = "read", path = "./out-solar/" },
+  { access = "read", path = "./out-solar-coverage/" },
   { access = "read", path = "./broadcast/" },
   { access = "read-write", path = "./deployments/" },
 ]

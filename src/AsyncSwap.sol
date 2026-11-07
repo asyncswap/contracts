@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity 0.8.26;
 
+import {TokenTransfers} from "./libraries/TokenTransfers.sol";
 import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 import {IncomingMatching} from "@async-swap/libraries/IncomingMatching.sol";
 import {AsyncMatching} from "@async-swap/libraries/AsyncMatching.sol";
@@ -455,7 +456,8 @@ contract AsyncSwap is BaseHook, EIP712 {
         if (asyncOrders[order.key.toId()].orders[id].amountIn == 0) revert AsyncFiller.OrderNotFound();
         try this.fillOrderFromPoolLiquidity(order, id, 0) {
             return true;
-        } catch {
+        } catch (bytes memory reason) {
+            TokenTransfers.bubbleUnsupported(reason);
             return false;
         }
     }

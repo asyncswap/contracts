@@ -84,3 +84,6 @@ cache-solar-coverage/
 
 # Python validation helpers
 __pycache__/
+
+# benchmark
+/benchmarks/

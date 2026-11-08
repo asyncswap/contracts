@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity 0.8.26;
 
+import {TokenTransfers} from "./libraries/TokenTransfers.sol";
 import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
+import {IncomingMatching} from "@async-swap/libraries/IncomingMatching.sol";
 import {AsyncMatching} from "@async-swap/libraries/AsyncMatching.sol";
+import {PriorityFeeUpdates} from "@async-swap/libraries/PriorityFeeUpdates.sol";
 import {OrderSignatures} from "@async-swap/libraries/OrderSignatures.sol";
-import {RadixPriceTree} from "@async-swap/libraries/RadixPriceTree.sol";
-import {TickPrice} from "@async-swap/libraries/TickPrice.sol";
 import {AsyncOrder, AsyncOrderLibrary} from "@async-swap/types/AsyncOrder.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
@@ -14,7 +15,6 @@ import {CurrencySettler} from "@async-swap/libraries/CurrencySettler.sol";
 import {IPoolManager, ModifyLiquidityParams, SwapParams} from "v4-core/interfaces/IPoolManager.sol";
 import {Hooks} from "v4-core/libraries/Hooks.sol";
 import {LPFeeLibrary} from "v4-core/libraries/LPFeeLibrary.sol";
-import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
 import {TickMath} from "v4-core/libraries/TickMath.sol";
 import {SafeCast} from "v4-core/libraries/SafeCast.sol";
 import {BeforeSwapDelta, toBeforeSwapDelta} from "v4-core/types/BeforeSwapDelta.sol";
@@ -39,8 +39,6 @@ contract AsyncSwap is BaseHook, EIP712 {
     using AsyncFiller for AsyncFiller.State;
     using AsyncFiller for AsyncFiller.Book;
     using AsyncOrderLibrary for AsyncOrder;
-    using StateLibrary for IPoolManager;
-    using RadixPriceTree for RadixPriceTree.Tree;
 
     /// @notice Per-pool order book.
     mapping(PoolId poolId => AsyncFiller.State) public asyncOrders;
@@ -445,44 +443,7 @@ contract AsyncSwap is BaseHook, EIP712 {
             tstore(PENDING_MATCH_EXECUTOR_SLOT, 0)
         }
         if (id == bytes32(0) || msg.sender != executor) revert AsyncFiller.NotAuthorizedExecutor();
-        AsyncFiller.State storage state = asyncOrders[order.key.toId()];
-        if (state.orders[id].owner != order.owner || state.orders[id].amountIn == 0) {
-            revert AsyncFiller.OrderNotFound();
-        }
-        // The better venue goes first, then the other, each only while input remains. A failed quote,
-        // insufficient active liquidity, or a price outside the maker's minimum reverts only the
-        // external pool self-call; whatever neither venue takes rests on the book.
-        // Going first, the pool may take the order only at prices better than the best resting level
-        // (FM-01): the swap is limited at that level, fills up to it, and leaves the rest to the book (M-02).
-        // Going second, the pool keeps the maker's own minimum as its limit and must take the whole rest.
-        (bool poolFirst, uint160 bookLimit) = _poolBeatsBook(order.key, state.orders[id].isBuy);
-        AsyncFiller.Book storage book = priceBooks[order.key.toId()];
-        for (uint256 step; step < 2 && state.orders[id].amountIn != 0; ++step) {
-            if ((step == 0) == poolFirst) {
-                try this.fillOrderFromPoolLiquidity(order, id, bookLimit) {} catch {}
-            } else {
-                matched = AsyncMatching.matchIncoming(state, book, order.key, id, address(this));
-            }
-        }
-        // A pool part can leave less than the minimum, which the book may not have taken.
-        if (poolFirst) AsyncMatching.closeBelowMinimum(state, book, order.key, id);
-    }
-
-    /// @dev True when the pool has active liquidity and its current price is strictly better for an
-    ///      incoming order than the best resting order on the other side: below the best ask for a
-    ///      buy, above the best bid for a sell (`TickPrice.poolBeatsLevel`). An empty opposite side or an equal level leaves the book first.
-    ///      The spot price excludes the pool fill's fixed fees and price impact, so this is a heuristic; inside the
-    ///      dynamic-fee window it counts the fee a fill back toward the reference pays. With it, the limit a pool-first
-    ///      swap may not cross.
-    function _poolBeatsBook(PoolKey calldata key, bool isBuy) private view returns (bool, uint160) {
-        PoolId poolId = key.toId();
-        AsyncFiller.Book storage book = priceBooks[poolId];
-        (bool found, uint128 bookKey) = (isBuy ? book.asks : book.bids).best(!isBuy);
-        if (!found) return (false, 0);
-        AsyncFiller.State storage state = asyncOrders[poolId];
-        return TickPrice.poolBeatsLevel(
-            poolManager, poolId, key.currency1 == numeraire, isBuy, bookKey, state.refTick, state.refBlock
-        );
+        return IncomingMatching.matchNewOrder(asyncOrders[order.key.toId()], priceBooks[order.key.toId()], order, id);
     }
 
     /// @notice Permissionless executor entry for retrying a resting order against current pool LPs.
@@ -495,7 +456,8 @@ contract AsyncSwap is BaseHook, EIP712 {
         if (asyncOrders[order.key.toId()].orders[id].amountIn == 0) revert AsyncFiller.OrderNotFound();
         try this.fillOrderFromPoolLiquidity(order, id, 0) {
             return true;
-        } catch {
+        } catch (bytes memory reason) {
+            TokenTransfers.bubbleUnsupported(reason);
             return false;
         }
     }
@@ -516,14 +478,17 @@ contract AsyncSwap is BaseHook, EIP712 {
     /// @notice Permissionlessly continue a crossed book inside a PoolManager unlock.
     /// @dev The Router exposes the unlock wrapper; each call processes at most eight pairs.
     function matchBook(PoolKey calldata key, uint8 maxMatches) external returns (uint8 matched) {
-        // An order created in this unlock is on the book before its maker's input is settled; the
-        // book waits until the Router hands it to `matchNewOrder`.
+        // An arrival may be staged or indexed while input and bid are being paid. Both forms
+        // wait until the Router hands the fully funded order to `matchNewOrder`.
         bytes32 pending;
         assembly ("memory-safe") {
             pending := tload(PENDING_MATCH_ID_SLOT)
         }
-        if (pending != bytes32(0) && asyncOrders[key.toId()].orders[pending].amountIn != 0) return 0;
-        return AsyncMatching.matchBook(asyncOrders[key.toId()], priceBooks[key.toId()], key, maxMatches, address(this));
+        if (
+            pending != bytes32(0)
+                && (asyncOrders[key.toId()].orders[pending].amountIn != 0 || IncomingMatching.pending(key.toId()))
+        ) return 0;
+        return AsyncMatching.matchBook(asyncOrders[key.toId()], priceBooks[key.toId()], key, maxMatches);
     }
 
     /// @notice Maker updates the limit price of an unfilled order. Direct call from the maker —
@@ -535,6 +500,18 @@ contract AsyncSwap is BaseHook, EIP712 {
             priceBooks[order.key.toId()],
             AsyncMatching.UpdateParams({order: order, id: id, newAmountOutMin: newAmountOutMin, caller: msg.sender})
         );
+    }
+
+    event AsyncOrderPriorityFeeUpdated(
+        PoolId indexed poolId, bytes32 indexed orderId, uint256 addedFee, uint256 newPriorityFee
+    );
+
+    /// @notice Increase an existing bid through the maker-authenticating Router inside an unlock.
+    /// @dev The Router must settle the additional numeraire debt before the unlock ends.
+    function topUpPriorityFee(AsyncOrder calldata order, uint256 addedFee) external {
+        if (msg.sender != router) revert NotTrustedRouter();
+        PoolId poolId = order.key.toId();
+        PriorityFeeUpdates.topUp(asyncOrders[poolId], priceBooks[poolId], poolId, order.orderId(), addedFee);
     }
 
     /// @notice Maker cancels an unfilled order. Must be called via an authorized executor inside
@@ -619,7 +596,7 @@ contract AsyncSwap is BaseHook, EIP712 {
             id = keccak256(abi.encode(block.chainid, poolId, hookData.user, zeroForOne, salt));
         }
 
-        AsyncMatching.addOrder(
+        IncomingMatching.stage(
             state,
             priceBooks[poolId],
             AsyncFiller.NewOrder({

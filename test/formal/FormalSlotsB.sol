@@ -180,7 +180,7 @@ abstract contract FormalSlotsB is FormalBase {
 
     /// @dev `priceBooks[pid].bids` (isBuy) or `.asks` base slot.
     function _treeSlot(PoolId pid, bool isBuy) internal pure returns (bytes32) {
-        return _add(_bookSlot(pid), isBuy ? 1 : 5);
+        return _add(_bookSlot(pid), isBuy ? 1 : 4);
     }
 
     function _nodeSlot(bytes32 tree, uint256 id) internal pure returns (bytes32) {
@@ -196,6 +196,6 @@ abstract contract FormalSlotsB is FormalBase {
 
     /// @dev `bidLevels[price]` / `askLevels[price]` base slot.
     function _levelSlot(PoolId pid, bool isBuy, uint128 price) internal pure returns (bytes32) {
-        return keccak256(abi.encode(uint256(price), uint256(_bookSlot(pid)) + (isBuy ? 9 : 10)));
+        return keccak256(abi.encode(uint256(price), uint256(_bookSlot(pid)) + (isBuy ? 7 : 8)));
     }
 }

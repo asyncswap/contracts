@@ -15,6 +15,7 @@ import {TickMath} from "v4-core/libraries/TickMath.sol";
 import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {RadixPriceTree} from "@async-swap/libraries/RadixPriceTree.sol";
+import {TickBitmap} from "@async-swap/libraries/TickBitmap.sol";
 import {EligiblePrice} from "@async-swap/libraries/EligiblePrice.sol";
 import {DynamicFeeOrdering} from "@async-swap/libraries/DynamicFeeOrdering.sol";
 
@@ -26,6 +27,7 @@ library AsyncMatching {
     using AsyncFiller for AsyncFiller.State;
     using PoolIdLibrary for PoolKey;
     using RadixPriceTree for RadixPriceTree.Tree;
+    using TickBitmap for TickBitmap.Tree;
     using BalanceDeltaLibrary for BalanceDelta;
     using SafeCast for *;
     using StateLibrary for IPoolManager;
@@ -92,22 +94,6 @@ library AsyncMatching {
         PoolId indexed poolId, bytes32 indexed orderId, address indexed maker, uint256 amountIn, uint256 amountOut
     );
 
-    function addOrder(AsyncFiller.State storage self, AsyncFiller.Book storage book, AsyncFiller.NewOrder memory order)
-        public
-    {
-        AsyncFiller.checkMinimum(book, order.isBuy, order.amountIn, order.amountOutMin);
-        self.addOrder(
-            book,
-            order.id,
-            order.owner,
-            order.amountIn,
-            order.amountOutMin,
-            order.isBuy,
-            order.zeroForOne,
-            order.priorityFee
-        );
-    }
-
     function bestOrder(AsyncFiller.State storage self, AsyncFiller.Book storage book, bool isBuy)
         public
         view
@@ -136,21 +122,19 @@ library AsyncMatching {
         AsyncFiller.State storage self,
         AsyncFiller.Book storage book,
         PoolKey calldata key,
-        bytes32 incomingId,
-        address hook
+        bytes32 incomingId
     ) public returns (uint8 matched) {
         if (self.orders[incomingId].amountIn == 0) revert AsyncFiller.OrderNotFound();
         // Admission has already inserted and funded the order. Use the same book-wide
         // priority rule for arrivals and backlog, sharing one bounded match budget.
-        return matchBook(self, book, key, MAX_MATCHES_PER_CALL, hook);
+        return matchBook(self, book, key, MAX_MATCHES_PER_CALL);
     }
 
     function matchBook(
         AsyncFiller.State storage self,
         AsyncFiller.Book storage book,
         PoolKey calldata key,
-        uint8 maxMatches,
-        address hook
+        uint8 maxMatches
     ) public returns (uint8 matched) {
         if (maxMatches == 0 || maxMatches > MAX_MATCHES_PER_CALL) revert InvalidMatchBound();
         ClaimTransfers.Batch memory batch;
@@ -339,7 +323,7 @@ library AsyncMatching {
         bytes32 buyId,
         bytes32 sellId,
         ClaimTransfers.Batch memory batch
-    ) private returns (bool) {
+    ) internal returns (bool) {
         AsyncFiller.OrderInfo storage buy = self.orders[buyId];
         AsyncFiller.OrderInfo storage sell = self.orders[sellId];
         if (buy.amountIn == 0 || sell.amountIn == 0) return false;
@@ -364,31 +348,24 @@ library AsyncMatching {
         return true;
     }
 
-    function _matchAmounts(AsyncFiller.OrderInfo storage sell, AsyncFiller.OrderInfo storage buy, bool restingBuy)
-        private
-        view
+    function _matchAmounts(AsyncFiller.OrderInfo memory sell, AsyncFiller.OrderInfo memory buy, bool restingBuy)
+        internal
+        pure
         returns (AsyncFiller.MatchAmounts memory amounts)
     {
-        if (restingBuy) {
-            amounts.quoteAmount = buy.amountOutMin != 0 && sell.amountIn >= buy.amountOutMin
-                ? buy.amountIn
-                : Math.mulDiv(sell.amountIn, buy.amountIn, buy.amountOutMin);
-            if (amounts.quoteAmount == 0) return amounts;
-            amounts.assetAmount = Math.mulDiv(amounts.quoteAmount, buy.amountOutMin, buy.amountIn, Math.Rounding.Ceil);
-            if (amounts.assetAmount > sell.amountIn) return AsyncFiller.MatchAmounts(0, 0);
-            uint256 sellerMinimum =
-                Math.mulDiv(amounts.assetAmount, sell.amountOutMin, sell.amountIn, Math.Rounding.Ceil);
-            if (amounts.quoteAmount < sellerMinimum) return AsyncFiller.MatchAmounts(0, 0);
-        } else {
-            amounts.assetAmount = sell.amountOutMin != 0 && buy.amountIn >= sell.amountOutMin
-                ? sell.amountIn
-                : Math.mulDiv(buy.amountIn, sell.amountIn, sell.amountOutMin);
-            if (amounts.assetAmount == 0) return amounts;
-            amounts.quoteAmount = Math.mulDiv(amounts.assetAmount, sell.amountOutMin, sell.amountIn, Math.Rounding.Ceil);
-            if (amounts.quoteAmount > buy.amountIn) return AsyncFiller.MatchAmounts(0, 0);
-            uint256 buyerMinimum = Math.mulDiv(amounts.quoteAmount, buy.amountOutMin, buy.amountIn, Math.Rounding.Ceil);
-            if (amounts.assetAmount < buyerMinimum) return AsyncFiller.MatchAmounts(0, 0);
+        // Both directions use the same maker/taker sizing. Cap affordability before mulDiv:
+        // its uncapped quotient could overflow even though the full maker amount fits.
+        AsyncFiller.OrderInfo memory maker = restingBuy ? buy : sell;
+        AsyncFiller.OrderInfo memory taker = restingBuy ? sell : buy;
+        uint256 used = maker.amountOutMin != 0 && taker.amountIn >= maker.amountOutMin
+            ? maker.amountIn
+            : Math.mulDiv(taker.amountIn, maker.amountIn, maker.amountOutMin);
+        if (used == 0) return amounts;
+        uint256 paid = Math.mulDiv(used, maker.amountOutMin, maker.amountIn, Math.Rounding.Ceil);
+        if (paid > taker.amountIn || used < Math.mulDiv(paid, taker.amountOutMin, taker.amountIn, Math.Rounding.Ceil)) {
+            return AsyncFiller.MatchAmounts(0, 0);
         }
+        return restingBuy ? AsyncFiller.MatchAmounts(paid, used) : AsyncFiller.MatchAmounts(used, paid);
     }
 
     function _payouts(AsyncFiller.State storage self, PoolKey calldata key, bytes32 buyId, bytes32 sellId)
@@ -411,7 +388,7 @@ library AsyncMatching {
         Payouts memory payouts,
         AsyncFiller.MatchAmounts memory amounts,
         ClaimTransfers.Batch memory batch
-    ) private {
+    ) internal {
         uint256 assetFee = AsyncFiller.tradeFee(amounts.assetAmount);
         uint256 quoteFee = AsyncFiller.tradeFee(amounts.quoteAmount);
         _transferEscrow(manager, payouts.sellInput, payouts.buyOwner, amounts.assetAmount - assetFee, batch);
@@ -460,7 +437,7 @@ library AsyncMatching {
         ReductionParams memory params,
         ClaimTransfers.Batch memory batch,
         bool closeDust
-    ) private returns (uint256) {
+    ) internal returns (uint256) {
         AsyncFiller.OrderInfo storage info = self.orders[params.id];
         uint256 oldInput = info.amountIn;
         uint256 remainingInput = oldInput - params.inputUsed;
@@ -523,7 +500,7 @@ library AsyncMatching {
         address maker,
         uint256 amount,
         ClaimTransfers.Batch memory batch
-    ) private {
+    ) internal {
         if (amount == 0) return;
         ClaimTransfers.credit(batch, self.poolManager, self.numeraire, self.feeVault, amount);
         emit AsyncFiller.PriorityFeeForfeited(key.toId(), id, maker, amount);

@@ -68,14 +68,28 @@ tick_addr="$(addr asyncswap.v2.TickPrice "$(forge inspect src/libraries/TickPric
 tick_flag="src/libraries/TickPrice.sol:TickPrice:$tick_addr"
 ordering_addr="$(addr asyncswap.v2.DynamicFeeOrdering "$(forge inspect src/libraries/DynamicFeeOrdering.sol:DynamicFeeOrdering bytecode)")"
 ordering_flag="src/libraries/DynamicFeeOrdering.sol:DynamicFeeOrdering:$ordering_addr"
-lib_addr="$(addr asyncswap.v2.AsyncMatching "$(forge inspect src/libraries/AsyncMatching.sol:AsyncMatching bytecode --libraries "$tick_flag" --libraries "$ordering_flag")")"
+bitmap_addr="$(addr asyncswap.v2.TickBitmap "$(forge inspect src/libraries/TickBitmap.sol:TickBitmap bytecode)")"
+bitmap_flag="src/libraries/TickBitmap.sol:TickBitmap:$bitmap_addr"
+eligible_addr="$(addr asyncswap.v2.EligiblePrice "$(forge inspect src/libraries/EligiblePrice.sol:EligiblePrice bytecode)")"
+eligible_flag="src/libraries/EligiblePrice.sol:EligiblePrice:$eligible_addr"
+topup_addr="$(addr asyncswap.v2.PriorityFeeUpdates "$(forge inspect src/libraries/PriorityFeeUpdates.sol:PriorityFeeUpdates bytecode --libraries "$eligible_flag")")"
+topup_flag="src/libraries/PriorityFeeUpdates.sol:PriorityFeeUpdates:$topup_addr"
+matching_links=(--libraries "$tick_flag" --libraries "$ordering_flag" --libraries "$bitmap_flag" --libraries "$eligible_flag")
+lib_addr="$(addr asyncswap.v2.AsyncMatching "$(forge inspect src/libraries/AsyncMatching.sol:AsyncMatching bytecode "${matching_links[@]}")")"
+incoming_links=(--libraries "src/libraries/AsyncMatching.sol:AsyncMatching:$lib_addr" "${matching_links[@]}")
+incoming_addr="$(addr asyncswap.v2.IncomingMatching "$(forge inspect src/libraries/IncomingMatching.sol:IncomingMatching bytecode "${incoming_links[@]}")")"
+incoming_flag="src/libraries/IncomingMatching.sol:IncomingMatching:$incoming_addr"
 script script/00_DeployTickPrice.s.sol
 script script/00_DeployDynamicFeeOrdering.s.sol
-script script/00_DeployMatchingLibrary.s.sol --libraries "$tick_flag" --libraries "$ordering_flag"
+script script/00_DeployTickBitmap.s.sol
+script script/00_DeployEligiblePrice.s.sol
+script script/00_DeployPriorityFeeUpdates.s.sol --libraries "$eligible_flag"
+script script/00_DeployMatchingLibrary.s.sol "${matching_links[@]}"
+script script/00_DeployIncomingMatching.s.sol "${incoming_links[@]}"
 
 echo "Deploying the hook and Router (mining the hook salt)..."
 DEPLOY_NUMERAIRE_ADDRESS="$USDC" script script/01_DeployHook.s.sol --ffi \
-  --libraries "src/libraries/AsyncMatching.sol:AsyncMatching:$lib_addr" --libraries "$tick_flag" --libraries "$ordering_flag"
+  --libraries "src/libraries/AsyncMatching.sol:AsyncMatching:$lib_addr" "${matching_links[@]}" --libraries "$topup_flag" --libraries "$incoming_flag"
 registry="$ROOT/deployments/31337/31337.json"
 HOOK="$(jq -r '.contracts.AsyncSwap.address' "$registry")"
 ROUTER="$(jq -r '.contracts.Router.address' "$registry")"

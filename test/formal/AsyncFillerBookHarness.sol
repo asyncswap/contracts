@@ -2,11 +2,11 @@
 pragma solidity ^0.8.26;
 
 import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
-import {AsyncMatching} from "@async-swap/libraries/AsyncMatching.sol";
+import {IncomingMatching} from "src/libraries/IncomingMatching.sol";
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {Currency} from "v4-core/types/Currency.sol";
 
-/// @notice Runs the real `AsyncFiller.addOrder` / `_append` / `_remove` and `AsyncMatching.addOrder`
+/// @notice Runs the real `AsyncFiller.addOrder` / `_append` / `_remove` and `IncomingMatching.addOrder`
 ///         (linked, reached by DELEGATECALL as from the hook) on its own `pid → State` / `pid → Book`
 ///         mappings, which mirror AsyncSwap's `asyncOrders` / `priceBooks`. Used by the bytecode checks
 ///         of `formal/Refinement/Swarm/AsyncSwapAddOrder.lean` and `AsyncFillerRemoveQueue.lean`.
@@ -28,7 +28,7 @@ contract AsyncFillerBookHarness {
     }
 
     function matchingAddOrder(bytes32 pid, AsyncFiller.NewOrder memory o) external {
-        AsyncMatching.addOrder(pools[pid], books[pid], o);
+        IncomingMatching.addOrder(pools[pid], books[pid], o);
     }
 
     function remove(bytes32 pid, bytes32 id) external {

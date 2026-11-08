@@ -57,3 +57,33 @@ audit/formal-mind.audit.json
 /docs/src/
 /docs/vocs.config.ts
 /docs/vocs.sidebar.ts
+
+# Audit: only the current scope and the index are tracked; earlier reports are at 2739d6c/audit/
+/audit/*
+!/audit/README.md
+!/audit/AUDIT_SCOPE_11_05_26.md
+
+# Isolated Solar compiler validation artifacts
+out-solar/
+cache-solar/
+
+# Isolated Solar adversarial validation artifacts
+out-solar-adversarial/
+cache-solar-adversarial/
+
+# Isolated LP validation build
+out-lp-validation/
+cache-lp-validation/
+
+# Matching disk metadata for Solar coverage
+out-solar-coverage/
+cache-solar-coverage/
+
+# Generated source-only coverage report
+/coverage/
+
+# Python validation helpers
+__pycache__/
+
+# benchmark
+/benchmarks/

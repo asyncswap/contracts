@@ -1,0 +1,60 @@
+{
+  "chainId": 1301,
+  "owner": "0x33ce69DA05c3ad30A3b525625F950fAda8673205",
+  "hook": "0x914B6D0B00f0897a1FdaE43329556F477cf86888",
+  "router": "0xd31b1B308090e461c9944510fECdA447f849Ca52",
+  "transactions": [
+    {
+      "action": "initialize",
+      "hash": "0xff8f0540ee674d370d9b170616f3c191d8825629c822a575cf6857e0e1d0b043",
+      "blockNumber": 67050131,
+      "gasUsed": 175617,
+      "status": 1
+    },
+    {
+      "action": "approve_exact_input_and_topup",
+      "hash": "0xb23293f20af2346ce416d2b245bd7a7a649809ab9e379fc2c17be4fa1e46c32d",
+      "blockNumber": 67050166,
+      "gasUsed": 55437,
+      "status": 1
+    },
+    {
+      "action": "authorize_router",
+      "hash": "0xc55154c1c7cd6749a476c408ba8a56f5be0d3b8f26c4325dea8c47847d6263d0",
+      "blockNumber": 67050246,
+      "gasUsed": 47249,
+      "status": 1
+    },
+    {
+      "action": "create",
+      "hash": "0x0a500c9d8067fcaa5e5cc519be9c2a97d989caf18f37873ca2a3c91198631228",
+      "blockNumber": 67050250,
+      "gasUsed": 539055,
+      "status": 1
+    },
+    {
+      "action": "top_up",
+      "hash": "0x9ec3954249d7d42e4ad3f92b697f66e92e09a218167a453ce7beb47338b80b78",
+      "blockNumber": 67050255,
+      "gasUsed": 200740,
+      "status": 1
+    },
+    {
+      "action": "cancel",
+      "hash": "0x0c13c08c6fbb279de60e93db63f64922d0ae5f46be34b9ba408792d408e26faf",
+      "blockNumber": 67050260,
+      "gasUsed": 196952,
+      "status": 1
+    }
+  ],
+  "complete": true,
+  "poolId": "0xe9b3a8f53a97c03dddbc5e99b9e07903f6857739316c01cf849c6741104ab49f",
+  "orderId": "0x32e0846b8016290872a504e105a106d65b03ed52fc6e998d304e112aba9ebfbc",
+  "addedFee": 1000,
+  "inputReturned": 1000000,
+  "makerAgePreserved": true,
+  "orderTermsPreserved": true,
+  "topupEventVerified": true,
+  "feeVaultCredited": true,
+  "remainingTokenAllowance": 0
+}

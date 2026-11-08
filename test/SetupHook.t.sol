@@ -92,7 +92,7 @@ contract SetupHook is Test {
     }
 
     /// @dev Deploys the hook with `router` as its one trusted swap caller: `_deployRouter` runs first.
-    function _deployHook() internal {
+    function _deployHook() internal virtual {
         _mockNumeraireDecimals();
         deployCodeTo(
             "AsyncSwap.sol",

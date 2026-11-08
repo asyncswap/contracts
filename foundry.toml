@@ -4,6 +4,10 @@ out = "out"
 libs = ["dependencies"]
 ffi = true
 fs_permissions = [
+  # Formal immutable checks read compiler-declared byte ranges from artifacts.
+  { access = "read", path = "./out/" },
+  { access = "read", path = "./out-solar/" },
+  { access = "read", path = "./out-solar-coverage/" },
   { access = "read", path = "./broadcast/" },
   { access = "read-write", path = "./deployments/" },
 ]
@@ -16,7 +20,7 @@ optimizer_runs = 10_000
 # skips them; `FOUNDRY_PROFILE=findings forge test` runs exactly those.
 no_match_test = "_finding_"
 
-# The invariant campaign MAINNET_READINESS.md records.
+# The invariant campaign the audit scope (audit/AUDIT_SCOPE_11_03_26.md) records.
 # Foundry's own default, 256 runs x depth 500, takes about half an hour here: the invariants scan
 # every order placed so far after each call. For a longer campaign: FOUNDRY_PROFILE=deep forge test.
 [profile.default.invariant]

@@ -1,0 +1,112 @@
+{
+  "release": "v1.3.0",
+  "sourceCommit": "c9372ff9577ba3950fa321090a7bfb559fc964a4",
+  "chainId": 46630,
+  "checkedAtBlock": 149102727,
+  "runtimeChecks": {
+    "TickPrice": {
+      "address": "0xDd2b08533dB75ED63AEe52D9b3e2c8DaA1C63b61",
+      "runtimeBytes": 5204,
+      "executableRuntimeMatchesBuildExceptImmutables": true,
+      "metadataCompared": false,
+      "sourcify": {
+        "status": "exact_match",
+        "jobUrl": "https://sourcify.dev/server/verify-ui/jobs/e3fc91a1-555c-42b6-ba78-9085280d5e7b"
+      }
+    },
+    "DynamicFeeOrdering": {
+      "address": "0x4c5901d2d168106C2fC274eF9445e085e9164Ae3",
+      "runtimeBytes": 2896,
+      "executableRuntimeMatchesBuildExceptImmutables": true,
+      "metadataCompared": false,
+      "sourcify": {
+        "status": "exact_match",
+        "jobUrl": "https://sourcify.dev/server/verify-ui/jobs/0c7adb04-80c6-43f8-84dc-83541bcc386c"
+      }
+    },
+    "TickBitmap": {
+      "address": "0x977Aee08690CB39A5dab41937eCdbD70e1Bf4a21",
+      "runtimeBytes": 696,
+      "executableRuntimeMatchesBuildExceptImmutables": true,
+      "metadataCompared": false,
+      "sourcify": {
+        "status": "exact_match",
+        "jobUrl": "https://sourcify.dev/server/verify-ui/jobs/6ddebdb2-080b-415e-980f-fe86a3673f7d"
+      }
+    },
+    "EligiblePrice": {
+      "address": "0x5C51B17E1b1D842C168aeDcF001014Fe55b60f8e",
+      "runtimeBytes": 1966,
+      "executableRuntimeMatchesBuildExceptImmutables": true,
+      "metadataCompared": false,
+      "sourcify": {
+        "status": "exact_match",
+        "jobUrl": "https://sourcify.dev/server/verify-ui/jobs/1402e64f-2d51-4c3c-a0e8-046004210184"
+      }
+    },
+    "PriorityFeeUpdates": {
+      "address": "0xB4852dD48089D4ec47e8f622111FE305F70dDB6C",
+      "runtimeBytes": 5537,
+      "executableRuntimeMatchesBuildExceptImmutables": true,
+      "metadataCompared": false,
+      "sourcify": {
+        "status": "exact_match",
+        "jobUrl": "https://sourcify.dev/server/verify-ui/jobs/65cb6e2a-4100-40bb-b8c7-649fc0af20a5"
+      }
+    },
+    "AsyncMatching": {
+      "address": "0x25d47EC632B406D307e5d3803b13015452156521",
+      "runtimeBytes": 24225,
+      "executableRuntimeMatchesBuildExceptImmutables": true,
+      "metadataCompared": false,
+      "sourcify": {
+        "status": "exact_match",
+        "jobUrl": "https://sourcify.dev/server/verify-ui/jobs/5044845d-74a2-4db6-82f7-37e4a33698e2"
+      }
+    },
+    "AsyncSwap": {
+      "address": "0x917943DEE316842D941FE188bE7f149Dc3D32888",
+      "runtimeBytes": 24159,
+      "executableRuntimeMatchesBuildExceptImmutables": true,
+      "metadataCompared": false,
+      "sourcify": {
+        "status": "exact_match",
+        "jobUrl": "https://sourcify.dev/server/verify-ui/jobs/bc4516c7-1d22-4fdc-86f1-85ee1816c935"
+      }
+    },
+    "Router": {
+      "address": "0xA93F36580aBA92a85A8C75B0c6f52C213c0226A5",
+      "runtimeBytes": 23061,
+      "executableRuntimeMatchesBuildExceptImmutables": true,
+      "metadataCompared": false,
+      "sourcify": {
+        "status": "exact_match",
+        "jobUrl": "https://sourcify.dev/server/verify-ui/jobs/9fe24dc4-393a-4ca5-8527-12fb1f7f07aa"
+      }
+    },
+    "FeeVault": {
+      "address": "0xbB3570634FB375c483046534b42e77B0599DF8f2",
+      "runtimeBytes": 2320,
+      "executableRuntimeMatchesBuildExceptImmutables": true,
+      "metadataCompared": false,
+      "sourcify": {
+        "status": "exact_match",
+        "jobUrl": "https://sourcify.dev/server/verify-ui/jobs/e2f52b37-ea0f-4600-81d2-6962c81fd6f9"
+      }
+    }
+  },
+  "configuration": {
+    "owner": "0x33ce69DA05c3ad30A3b525625F950fAda8673205",
+    "numeraire": "0x7E955252E15c84f5768B83c41a71F9eba181802F",
+    "router": "0xA93F36580aBA92a85A8C75B0c6f52C213c0226A5",
+    "poolManager": "0x8366a39CC670B4001A1121B8F6A443A643e40951",
+    "feeVault": "0xbB3570634FB375c483046534b42e77B0599DF8f2",
+    "minOrder": "0",
+    "assetPrecision": "4",
+    "priorityFeeCap": "100000",
+    "permit2": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+    "mevTaxGas": "0",
+    "routerConstructorVerified": true
+  },
+  "explorerVerification": "Submitted to Blockscout; Sourcify exact verification succeeded"
+}

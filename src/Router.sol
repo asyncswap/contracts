@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
+import {TokenTransfers} from "./libraries/TokenTransfers.sol";
 import {ISignatureTransfer} from "@async-swap/interfaces/ISignatureTransfer.sol";
 import {OrderSignatures} from "@async-swap/libraries/OrderSignatures.sol";
+import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
@@ -18,7 +20,7 @@ import {AsyncSwap} from "src/AsyncSwap.sol";
 
 /// @title Router
 /// @author @msakiart
-/// @notice Thin entrypoint for makers (`swap`, `cancelOrder`, `cancelAndWithdraw`, `withdrawClaims`), fillers
+/// @notice Thin entrypoint for makers (`swap`, `topUpPriorityFee`, `cancelOrder`, `cancelAndWithdraw`, `withdrawClaims`), fillers
 ///         (`fillOrder`) and keepers (`matchBook`, `fillFromPoolLiquidity`), batched with `multicall`. Each action
 ///         goes through `IPoolManager.unlock` so the hook can operate on PM debts. Native payouts/refunds are
 ///         PoolManager claims (ID 0), redeemable through NativeClaims or `withdrawClaims`; ERC20 payouts remain
@@ -72,7 +74,8 @@ contract Router is EIP712, Multicall {
         MatchBook,
         PoolLiquidityFill,
         CancelAndWithdraw,
-        WithdrawClaims
+        WithdrawClaims,
+        TopUpPriorityFee
     }
 
     struct SwapCallback {
@@ -296,6 +299,17 @@ contract Router is EIP712, Multicall {
         POOLMANAGER.unlock(abi.encode(ActionType.WithdrawClaims, msg.sender, currencies, amounts));
     }
 
+    /// @notice Add `addedFee` numeraire units to the caller's remaining priority bid.
+    /// @dev Requires an ERC20 approval to this Router. Leaves amount and price unchanged and resets
+    ///      fee-tier FIFO age. No matching or MEV tax; use multicall with matchBook to attempt matching.
+    ///      Only the order's identity fields are used; addedFee is a delta, not a target total.
+    function topUpPriorityFee(AsyncOrder calldata order, uint256 addedFee) external {
+        require(msg.sender == order.owner, "Only owner can top up");
+        if (addedFee == 0) revert AsyncFiller.ZeroAmount();
+        if (addedFee > type(uint64).max) revert AsyncFiller.PriorityFeeTooLarge();
+        POOLMANAGER.unlock(abi.encode(ActionType.TopUpPriorityFee, order, addedFee));
+    }
+
     /// @notice Anyone can continue a crossed book after a transaction hits the automatic match cap.
     /// @dev Work is capped at eight matched pairs per unlock to keep gas predictable.
     function matchBook(PoolKey calldata key, uint8 maxMatches) external {
@@ -343,6 +357,13 @@ contract Router is EIP712, Multicall {
             }
             return "";
         }
+        if (action == uint8(ActionType.TopUpPriorityFee)) {
+            (, AsyncOrder memory order, uint256 addedFee) = abi.decode(data, (ActionType, AsyncOrder, uint256));
+            // Fund before rekeying: token callbacks cannot observe an unpaid priority increase.
+            _settlePriorityFee(order.owner, addedFee);
+            HOOK.topUpPriorityFee(order, addedFee);
+            return "";
+        }
         SwapCallback memory orderData = abi.decode(data, (SwapCallback));
 
         if (action == uint8(ActionType.Swap) || action == uint8(ActionType.SwapWithSig)) {
@@ -369,7 +390,7 @@ contract Router is EIP712, Multicall {
             } else {
                 input.settle(POOLMANAGER, user, orderData.order.amountIn, false);
             }
-            _settlePriorityFee(orderData.order);
+            _settlePriorityFee(orderData.order.owner, orderData.order.priorityFee);
             // The hook records the order during `swap`, but it only becomes matchable after
             // this maker's input has been settled into PoolManager escrow.
             HOOK.matchNewOrder(orderData.order);
@@ -395,7 +416,7 @@ contract Router is EIP712, Multicall {
             // forwarded in fillOrder() above.
             if (!output.isAddressZero()) {
                 POOLMANAGER.sync(output);
-                IERC20(Currency.unwrap(output)).safeTransferFrom(user, address(POOLMANAGER), gross);
+                TokenTransfers.transferFrom(Currency.unwrap(output), user, address(POOLMANAGER), gross);
                 POOLMANAGER.settleFor(address(HOOK));
                 // The pull ran the token's code: fill only the order as it was checked above.
                 _requireUnchanged(orderData.order, id, liveAmountIn, livePrice);
@@ -436,7 +457,7 @@ contract Router is EIP712, Multicall {
 
     function _withdrawClaim(address owner, Currency currency, uint256 amount) private {
         POOLMANAGER.burn(owner, currency.toId(), amount);
-        POOLMANAGER.take(currency, owner, amount);
+        TokenTransfers.take(POOLMANAGER, currency, owner, amount);
         emit ClaimWithdrawn(owner, currency, amount);
     }
 
@@ -453,6 +474,7 @@ contract Router is EIP712, Multicall {
     ///      signature over the transfer AND the order witness, so a relayer cannot alter the order.
     function _settleWithPermit(Currency input, AsyncOrder memory order, PermitData memory permit) private {
         POOLMANAGER.sync(input);
+        uint256 beforeBalance = IERC20(Currency.unwrap(input)).balanceOf(order.owner);
         PERMIT2.permitWitnessTransferFrom(
             ISignatureTransfer.PermitTransferFrom({
                 permitted: ISignatureTransfer.TokenPermissions({token: Currency.unwrap(input), amount: order.amountIn}),
@@ -465,18 +487,17 @@ contract Router is EIP712, Multicall {
             OrderSignatures.PERMIT2_WITNESS_TYPE,
             permit.signature
         );
+        TokenTransfers.verifyDebit(Currency.unwrap(input), order.owner, order.amountIn, beforeBalance);
         POOLMANAGER.settle();
     }
 
-    /// @dev Pays the order's bid, which the hook escrowed as claims when it created the order, in the
-    ///      pool's USDC numeraire. Signed orders also require an ERC-20 approval for the bid; the
+    /// @dev Pays an initial bid or top-up in the pool's USDC numeraire, crediting the hook. Signed orders also require an ERC-20 approval for the bid; the
     ///      signed order commits to its amount.
-    function _settlePriorityFee(AsyncOrder memory order) private {
-        uint256 amount = order.priorityFee;
+    function _settlePriorityFee(address owner, uint256 amount) private {
         if (amount == 0) return;
         Currency numeraire = HOOK.numeraire();
         POOLMANAGER.sync(numeraire);
-        IERC20(Currency.unwrap(numeraire)).safeTransferFrom(order.owner, address(POOLMANAGER), amount);
+        TokenTransfers.transferFrom(Currency.unwrap(numeraire), owner, address(POOLMANAGER), amount);
         POOLMANAGER.settleFor(address(HOOK));
     }
 

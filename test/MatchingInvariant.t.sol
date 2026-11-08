@@ -38,6 +38,7 @@ contract MatchingHandler is Test {
     uint256 public cancellations;
     uint256 public updates;
     uint256 public lpFills;
+    uint256 public feeTopUps;
 
     constructor(AsyncSwap h, Router r, MockERC20 u, PoolKey memory k, bool p) {
         hook = h;
@@ -104,6 +105,17 @@ contract MatchingHandler is Test {
         vm.prank(order.owner);
         hook.updatePrice(order, minimum);
         ++updates;
+    }
+
+    function topUpFee(uint256 index, uint256 amount) external {
+        if (orders.length == 0) return;
+        AsyncOrder memory order = orders[index % orders.length];
+        if (hook.asyncOrder(key.toId(), id(order)) == 0) return;
+        // At least the full admission cap, so any partially consumed bid can be amended.
+        uint256 added = bound(amount, 100_000, 10e6);
+        vm.prank(order.owner);
+        router.topUpPriorityFee(order, added);
+        ++feeTopUps;
     }
 
     function redeem(uint256 who, uint256 size) external {
@@ -175,12 +187,13 @@ contract MatchingInvariantTest is StdInvariant, Test {
     function _seedLiquidity() internal virtual {}
 
     function _selectors() internal pure virtual returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](5);
+        selectors = new bytes4[](6);
         selectors[0] = MatchingHandler.submit.selector;
         selectors[1] = MatchingHandler.cancel.selector;
         selectors[2] = MatchingHandler.reprice.selector;
         selectors[3] = MatchingHandler.clear.selector;
         selectors[4] = MatchingHandler.redeem.selector;
+        selectors[5] = MatchingHandler.topUpFee.selector;
     }
 
     function setUp() public virtual {

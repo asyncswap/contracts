@@ -36,6 +36,7 @@ export default defineConfig({
       items: [
         { text: 'Overview', link: '/protocol/overview' },
         { text: 'Order lifecycle and priority bids', link: '/protocol/order-lifecycle' },
+        { text: 'Priority fee top-ups', link: '/protocol/priority-fee-top-ups' },
         { text: 'Contract call sequences', link: '/protocol/contract-call-sequences' },
         { text: 'Price keys and crossing', link: '/protocol/price-key-crossing' },
         { text: 'Dynamic fee ordering', link: '/protocol/dynamic-fee-ordering' },
@@ -44,7 +45,7 @@ export default defineConfig({
     { text: 'Deployments', link: '/deployments' },
     {
       text: 'Security',
-      items: [{ text: 'Audit status', link: '/audit/status' }],
+      items: [{ text: 'Audit scope', link: '/audit/scope' }],
     },
     {
       text: 'Contract reference',

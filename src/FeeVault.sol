@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity 0.8.26;
 
+import {TokenTransfers} from "./libraries/TokenTransfers.sol";
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {Currency} from "v4-core/types/Currency.sol";
 
@@ -38,7 +39,7 @@ contract FeeVault {
         uint256 amount = poolManager.balanceOf(address(this), id);
         if (amount != 0) {
             poolManager.burn(address(this), id, amount);
-            poolManager.take(currency, recipient, amount);
+            TokenTransfers.take(poolManager, currency, recipient, amount);
         }
         emit FeesCollected(currency, recipient, amount);
         return "";

@@ -86,7 +86,7 @@ contract SpecBookFormalTest is Test {
     }
 
     function _sideBase(bool isBuy) internal view returns (bytes32) {
-        return bytes32(uint256(h.bookSlot(PID)) + (isBuy ? 1 : 5));
+        return bytes32(uint256(h.bookSlot(PID)) + (isBuy ? 1 : 4));
     }
 
     function _levelBase(bool isBuy, uint128 price) internal view returns (bytes32) {
@@ -304,6 +304,44 @@ contract SpecBookFormalTest is Test {
         assertEq(writes.length, 0, "view wrote storage");
     }
 
+    // Bitmap write footprint: only the leaf word and its two ancestors can change.
+    bytes32[3] internal bitmapSlots;
+    uint256[3] internal bitmapBefore;
+    uint256[3] internal bitmapMasks;
+
+    function _bitmapContains(bytes32 t, uint128 price) internal view returns (bool) {
+        bytes32 leaf = keccak256(abi.encode(uint256(price) >> 8, uint256(t) + 2));
+        return uint256(vm.load(address(h), leaf)) & (uint256(1) << (price & 255)) != 0;
+    }
+
+    function _snapBitmap(bytes32 t, uint128 price) internal {
+        uint256 word = uint256(price) >> 8;
+        uint256 group = word >> 8;
+        bitmapSlots[0] = keccak256(abi.encode(word, uint256(t) + 2));
+        bitmapSlots[1] = keccak256(abi.encode(group, uint256(t) + 1));
+        bitmapSlots[2] = t;
+        bitmapMasks = [uint256(1) << (price & 255), uint256(1) << (word & 255), uint256(1) << group];
+        for (uint256 i; i < 3; ++i) {
+            bitmapBefore[i] = uint256(vm.load(address(h), bitmapSlots[i]));
+        }
+    }
+
+    function _allowBitmap(bytes32 t, uint128 price) internal {
+        allowed.push(t);
+        allowed.push(keccak256(abi.encode(uint256(price) >> 16, uint256(t) + 1)));
+        allowed.push(keccak256(abi.encode(uint256(price) >> 8, uint256(t) + 2)));
+    }
+
+    function _checkBitmap(bool adding, bool changed) internal view {
+        bool propagate = changed;
+        for (uint256 i; i < 3; ++i) {
+            uint256 old = bitmapBefore[i];
+            uint256 want = !propagate ? old : (adding ? old | bitmapMasks[i] : old & ~bitmapMasks[i]);
+            assertEq(uint256(vm.load(address(h), bitmapSlots[i])), want, "bitmap word transition");
+            propagate = propagate && (adding ? old == 0 : want == 0);
+        }
+    }
+
     // ================================================================ _remove
 
     struct RmIn {
@@ -350,7 +388,7 @@ contract SpecBookFormalTest is Test {
         }
         if (count == 0) return (false, stdError.arithmeticError);
         if (_open() == 0) return (false, stdError.arithmeticError);
-        if (count == 1 && _leafOf(_sideBase(o.isBuy), o.price) == 0) {
+        if (count == 1 && !_bitmapContains(_sideBase(o.isBuy), o.price)) {
             return (false, abi.encodeWithSelector(RadixPriceTree.PriceLevelMissing.selector));
         }
         return (true, "");
@@ -382,9 +420,9 @@ contract SpecBookFormalTest is Test {
         _snapOrders(id, bytes32(0), bytes32(0));
         sKey = so.priorityKey;
         sLt = _snap(_levelTree(so.isBuy, so.price), sKey);
-        sSt = _snap(_sideBase(so.isBuy), so.price);
+        _snapBitmap(_sideBase(so.isBuy), so.price);
         _allowLevel(so.isBuy, so.price, sKey);
-        _allowTree(_sideBase(so.isBuy), so.price);
+        _allowBitmap(_sideBase(so.isBuy), so.price);
         allowed.push(h.bookSlot(PID));
 
         vm.record();
@@ -424,7 +462,7 @@ contract SpecBookFormalTest is Test {
         _checkRemoveTreeNodes(t, sLt, sKey);
         assertEq(h.priorityOrderId(PID, so.isBuy, so.price, sKey), bytes32(0));
 
-        _checkRemoveTree(_sideBase(so.isBuy), sSt, so.price);
+        _checkBitmap(false, true);
     }
 
     /// @dev A level that keeps orders: `remLevel`, side tree untouched.
@@ -435,11 +473,7 @@ contract SpecBookFormalTest is Test {
         _checkRemoveTree(_levelTree(so.isBuy, so.price), sLt, sKey);
         assertEq(h.priorityOrderId(PID, so.isBuy, so.price, sKey), bytes32(0));
 
-        bytes32 s = _sideBase(so.isBuy);
-        assertEq(_rootOf(s), sSt.root);
-        assertEq(_nextIdOf(s), sSt.next);
-        assertEq(_freeLen(s), sSt.freeLen);
-        assertEq(_leafOf(s, so.price), sSt.leaf);
+        _checkBitmap(false, false);
     }
 
     function _checkRemoveOrders(bytes32 id) internal view {
@@ -502,7 +536,7 @@ contract SpecBookFormalTest is Test {
         _build(x.seed, x.prio ? 1 : 0, 1 + x.n % 6);
         id = keccak256(abi.encode(x.seed, "new"));
         uint8 pk = x.priceKind % 4;
-        uint128 price = pk < 3 ? _priceFor(x.isBuy, pk + 1) : uint128(9e18 + x.junk % 1000);
+        uint128 price = pk < 3 ? _priceFor(x.isBuy, pk + 1) : uint128(1_700_000 + x.junk % 1000);
         h.setOrder(
             PID,
             id,
@@ -568,16 +602,15 @@ contract SpecBookFormalTest is Test {
         bytes32 lt = _levelTree(so.isBuy, so.price);
         bytes32 st = _sideBase(so.isBuy);
         sLt = _snap(lt, sKey);
-        sSt = _snap(st, so.price);
-        assertTrue(_noZeroFree(lt) && _noZeroFree(st), "no 0 on the free lists");
+        _snapBitmap(st, so.price);
+        assertTrue(_noZeroFree(lt), "no 0 on the priority free list");
         _allowOrder(id);
         _allowOrder(sTl0);
         _allowLevel(so.isBuy, so.price, sKey);
-        _allowTree(st, so.price);
+        _allowBitmap(st, so.price);
         allowed.push(h.bookSlot(PID));
         // other keys / prices whose leaves must be kept (the book's orders and one arbitrary key)
         (uint256[] memory oKeys, uint32[] memory oLeaf) = _otherLeaves(lt, false, x.junk);
-        (uint256[] memory sKeys, uint32[] memory sLeaf) = _otherLeaves(st, true, x.junk);
 
         vm.record();
         h.append(PID, id);
@@ -586,14 +619,7 @@ contract SpecBookFormalTest is Test {
         assertEq(_bookWord(), sWord0 + (uint256(1) << 64), "openOrderCount + 1, rest of the word kept");
         _checkAppendOrders(id, sKey);
         _checkAppendLevel(id, lt, oKeys, oLeaf);
-        if (sC0 == 0) {
-            _checkInserted(st, sSt, so.price, sKeys, sLeaf);
-        } else {
-            assertEq(_rootOf(st), sSt.root);
-            assertEq(_nextIdOf(st), sSt.next);
-            assertEq(_freeLen(st), sSt.freeLen);
-            assertEq(_leafOf(st, so.price), sSt.leaf);
-        }
+        _checkBitmap(true, sC0 == 0);
     }
 
     /// @dev Variants that reach `TreeInserted.present`: (1) the new order's priority key equals a

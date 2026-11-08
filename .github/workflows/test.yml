@@ -37,6 +37,9 @@ jobs:
       - name: Run Forge fmt
         run: forge fmt --check
 
+      - name: Check source-only coverage reporting
+        run: python3 -m unittest discover -s script/tests -p test_coverage_src.py
+
       # Compile everything, then enforce deployment limits for every artifact owned by src/.
       # Test harnesses and vendor fixtures (including PoolManager at our optimizer setting)
       # are not deployed protocol modules; keep their compilation without imposing our size budget.
@@ -45,7 +48,7 @@ jobs:
           forge build
           python3 script/check-contract-sizes.py
 
-      # The invariant suites run at the depth MAINNET_READINESS.md records (foundry.toml), failing on any
+      # The invariant suites run at the depth the audit scope records (foundry.toml), failing on any
       # unexpected revert.
       - name: Run Forge tests
         run: forge test -vvv

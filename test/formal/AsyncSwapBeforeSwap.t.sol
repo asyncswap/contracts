@@ -196,7 +196,10 @@ contract AsyncSwapBeforeSwapFormalTest is FormalBase, IUnlockCallback {
         if ((pf != 0 && pf < AsyncFiller.minPriorityFee(buy ? amt : aom)) || pf > type(uint64).max) {
             return (true, false);
         }
-        if (pf != 0 && PoolId.unwrap(c.key.toId()) != PoolId.unwrap(poolId)) return (true, false);
+        // Admission now reads active liquidity through the pool state's manager. A raw
+        // beforeSwap call for an uninitialized pool cannot complete, even with a zero bid.
+        // Real PoolManager.swap already rejects uninitialized pools before invoking the hook.
+        if (PoolId.unwrap(c.key.toId()) != PoolId.unwrap(poolId)) return (true, false);
         if (aom > type(uint128).max) return (false, false);
         return (true, true);
     }

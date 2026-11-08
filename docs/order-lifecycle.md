@@ -2,6 +2,8 @@
 
 Current behavior, checked against the contract source. See also [contract call sequences](contract-call-sequences.md) and the [README](../README.md).
 
+The current source includes incoming-order memory matching; deployed v1.3.0 contracts do not. When an arrival can cross and there is no active LP liquidity, it is staged in transient storage during funding, then matched in memory against the whole book. Only a remaining order is persisted. Noncrossing arrivals and active-LP pools use stored admission. If funding activates LP liquidity, the candidate is persisted before the usual venue selection. Persistent getters do not expose a staged order during its funding callback. See the [implementation, benchmarks and review](../benchmarks/incoming-memory/README.md).
+
 ## Order lifecycle
 
 These diagrams describe the current source, not a deployment or mainnet-readiness guarantee. Book matching ranks the best opposing price first; higher escrowed USDC bids break ties at that price, followed by earlier submission. Zero-bid orders are valid and keep time priority behind paid bids. Private fills and explicit LP retries target a specific order and do not enforce the book's global priority queue.
@@ -32,6 +34,8 @@ flowchart TD
     M -- "Private filler chooses order" --> O["Check live minimum against filler maxPrice"]
     O --> FF["Filler pays exactly the minimum; maker gets it less 0.02%, filler the input less 0.02%; settle bid; close order"]
     FF --> Z
+    M -- "Maker adds USDC priority fee" --> T["Fund additional bid; reset fee-tier queue age; keep price and maker age"]
+    T --> M
     M -- "Maker reprices" --> Q["Update minimum; re-enter book with fresh time priority"]
     Q --> M
     M -- "Owner or authorized cancellation" --> C["Return remaining input; settle remaining bid; close order"]
@@ -40,7 +44,15 @@ flowchart TD
 
 If no executable crossing pair exists, the initial matching pass leaves the order unchanged before the LP attempt. `Router.matchBook` accepts a bound of 1–8 pairs and does not itself retry LP liquidity. An LP retry does not require the order to be first in the book. Private fills require a maker-authorized executor (normally the Router); the filler pays exactly the live minimum in the same transaction, and the 0.02% trade fee comes out of each side's proceeds. That trade fee is separate from the LP fee on pool-liquidity fills. Book-match proceeds, and input returned below the pool minimum, are credited as PoolManager claims in every currency, redeemable through `TokenClaims` (ERC-20), `NativeClaims` (ETH) or `Router.withdrawClaims`; native fill proceeds and refunds are claims too. Filler and LP fills pay ERC-20 output directly, except a pool-first fill that stops at the best book level: the order stays open for the book, so its output is credited as claims. When the pool goes first, a remainder below the pool minimum that the book leaves is returned as claims.
 
-Sources: [Router](../src/Router.sol), [AsyncSwap](../src/AsyncSwap.sol), [AsyncMatching](../src/libraries/AsyncMatching.sol), and [AsyncFiller](../src/libraries/AsyncFiller.sol).
+Sources: [Router](../src/Router.sol), [AsyncSwap](../src/AsyncSwap.sol), [IncomingMatching](../src/libraries/IncomingMatching.sol), [AsyncMatching](../src/libraries/AsyncMatching.sol), and [AsyncFiller](../src/libraries/AsyncFiller.sol).
+
+## Fee top-ups
+
+An open order's maker can increase its remaining USDC bid through `Router.topUpPriorityFee(order, addedFee)`.
+The positive delta is funded atomically with the queue update. The resulting bid must meet the current
+remaining order's nonzero-bid minimum. A changed bid joins the back of its new fee tier; its input,
+limit price and original maker age stay unchanged. Matching is separate, optionally batched through
+`Router.multicall`. See [the API and agent example](priority-fee-top-ups.md).
 
 ## Priority-bid settlement
 
@@ -57,6 +69,7 @@ flowchart TD
     B -- "Successful LP or private fill" --> F
     B -- "Authorized cancellation" --> F
     B -- "Reprice" --> E
+    B -- "Maker funds top-up" --> E
     C --> G{"Bid amount to settle is nonzero?"}
     F --> G
     G -- "No" --> H["No bid transfer"]

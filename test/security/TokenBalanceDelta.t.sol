@@ -175,52 +175,31 @@ contract TokenBalanceDeltaTest is SetupHook {
         );
     }
 
+    function test_LP_shortOutputBubblesUnsupportedInsteadOfRestingOrder() public {
+        PoolModifyLiquidityTest lp = new PoolModifyLiquidityTest(manager);
 
-function test_LP_shortOutputBubblesUnsupportedInsteadOfRestingOrder() public {
-    PoolModifyLiquidityTest lp = new PoolModifyLiquidityTest(manager);
+        vm.startPrank(owner);
+        token0.approve(address(lp), type(uint256).max);
+        token1.approve(address(lp), type(uint256).max);
+        lp.modifyLiquidity(key, ModifyLiquidityParams(-60, 60, 1e24, 0), "");
+        vm.stopPrank();
 
-    vm.startPrank(owner);
-    token0.approve(address(lp), type(uint256).max);
-    token1.approve(address(lp), type(uint256).max);
-    lp.modifyLiquidity(key, ModifyLiquidityParams(-60, 60, 1e24, 0), "");
-    vm.stopPrank();
+        _fault(token1, 1, 0, false);
 
-    _fault(token1, 1, 0, false);
+        AsyncOrder memory o = _order(alice, true);
+        o.amountOutMin = 0.5 ether;
 
-    AsyncOrder memory o = _order(alice, true);
-    o.amountOutMin = 0.5 ether;
+        uint256 before = token0.balanceOf(alice);
 
-    uint256 before = token0.balanceOf(alice);
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(UNSUPPORTED, address(token1)));
 
-    vm.prank(alice);
-    vm.expectRevert(
-        abi.encodeWithSelector(UNSUPPORTED, address(token1))
-    );
+        router.swap(o, abi.encode(AsyncSwap.UserParams(alice, address(router), o.amountOutMin, o.priorityFee)));
 
-    router.swap(
-        o,
-        abi.encode(
-            AsyncSwap.UserParams(
-                alice,
-                address(router),
-                o.amountOutMin,
-                o.priorityFee
-            )
-        )
-    );
+        assertEq(token0.balanceOf(alice), before, "unsupported LP payout rolls back incoming funding");
 
-    assertEq(
-        token0.balanceOf(alice),
-        before,
-        "unsupported LP payout rolls back incoming funding"
-    );
-
-    assertEq(
-        manager.balanceOf(address(hook), uint160(address(token0))),
-        0,
-        "unsupported order is not left resting"
-    );
-}
+        assertEq(manager.balanceOf(address(hook), uint160(address(token0))), 0, "unsupported order is not left resting");
+    }
 
     function test_callbackWithExactDeliverySucceeds() public {
         AsyncOrder memory o = _submit(alice, true);

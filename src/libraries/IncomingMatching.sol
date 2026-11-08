@@ -15,6 +15,7 @@ import {PoolKey, PoolIdLibrary} from "v4-core/types/PoolKey.sol";
 import {PoolId} from "v4-core/types/PoolId.sol";
 import {Currency} from "v4-core/types/Currency.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {TokenTransfers} from "@async-swap/libraries/TokenTransfers.sol";
 
 /// @dev The hook's existing self-call boundary rolls back a failed LP attempt atomically.
 interface IIncomingLiquidity {
@@ -134,7 +135,10 @@ library IncomingMatching {
         (bool poolFirst, uint160 bookLimit) = _poolBeatsBook(self, book, order.key, self.orders[id].isBuy);
         for (uint256 step; step < 2 && self.orders[id].amountIn != 0; ++step) {
             if ((step == 0) == poolFirst) {
-                try IIncomingLiquidity(address(this)).fillOrderFromPoolLiquidity(order, id, bookLimit) {} catch {}
+                try IIncomingLiquidity(address(this)).fillOrderFromPoolLiquidity(order, id, bookLimit) {}
+                catch (bytes memory reason) {
+                    TokenTransfers.bubbleUnsupported(reason);
+                }
             } else {
                 matched = AsyncMatching.matchIncoming(self, book, order.key, id);
             }

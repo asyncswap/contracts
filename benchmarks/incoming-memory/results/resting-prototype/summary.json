@@ -1,0 +1,86 @@
+[
+  {
+    "suite": "crossing",
+    "workload": "buy_one_same",
+    "transactionIndex": 0,
+    "receiptGas": 550034,
+    "intrinsicGas": 24004,
+    "grossExecutionGas": 526030,
+    "appliedRefund": 0,
+    "storageWriteGas": 321700,
+    "storageReadGas": 72400,
+    "logGas": 16745,
+    "sstoreCount": 36,
+    "sloadCount": 104,
+    "sstoreCostHistogram": {
+      "2900": 4,
+      "100": 17,
+      "20000": 11,
+      "22100": 4
+    },
+    "hash": "0x5d6966cbbc03f822976d9ed1f04bb1db1aa693ecb5eae1ff87bab056ad7b7fee"
+  },
+  {
+    "suite": "crossing",
+    "workload": "buy_one_same",
+    "transactionIndex": 1,
+    "receiptGas": 536010,
+    "intrinsicGas": 24028,
+    "grossExecutionGas": 511982,
+    "appliedRefund": 0,
+    "storageWriteGas": 295300,
+    "storageReadGas": 82000,
+    "logGas": 16745,
+    "sstoreCount": 44,
+    "sloadCount": 120,
+    "sstoreCostHistogram": {
+      "2900": 7,
+      "100": 24,
+      "20000": 7,
+      "22100": 6
+    },
+    "hash": "0x1b787548357d1e17ebd44bbc363614a1bdc1216c06cf414ed038f5e9e22c2591"
+  },
+  {
+    "suite": "crossing",
+    "workload": "sell_one_same",
+    "transactionIndex": 0,
+    "receiptGas": 602965,
+    "intrinsicGas": 23980,
+    "grossExecutionGas": 578985,
+    "appliedRefund": 0,
+    "storageWriteGas": 364300,
+    "storageReadGas": 80400,
+    "logGas": 16745,
+    "sstoreCount": 36,
+    "sloadCount": 104,
+    "sstoreCostHistogram": {
+      "20000": 13,
+      "2900": 5,
+      "22100": 4,
+      "100": 14
+    },
+    "hash": "0x171a5736097775833c75b32aa656c32298034d72068fadfe585ac5a3df680e28"
+  },
+  {
+    "suite": "crossing",
+    "workload": "sell_one_same",
+    "transactionIndex": 1,
+    "receiptGas": 554761,
+    "intrinsicGas": 24004,
+    "grossExecutionGas": 530757,
+    "appliedRefund": 0,
+    "storageWriteGas": 303700,
+    "storageReadGas": 90000,
+    "logGas": 16745,
+    "sstoreCount": 44,
+    "sloadCount": 120,
+    "sstoreCostHistogram": {
+      "2900": 10,
+      "20000": 7,
+      "22100": 6,
+      "100": 21
+    },
+    "hash": "0xa88b1355c70bbd6c276e5dfb20e369c3fa5ccbbb8fdd1e8ee74c2067c776d713"
+  }
+]

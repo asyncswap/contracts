@@ -1,0 +1,20 @@
+{
+  "release": "v1.3.0",
+  "releaseCommit": "3d592f69e844182d94aca28bdb34aff01eaadb94",
+  "cast": "cast Version: 1.9.0\nCommit SHA: 6056c5845d34205a83cf7108042adb137325c9df\nBuild Timestamp: 2026-11-02T20:16:54.701302000Z (1793650614)\nBuild Profile: dist",
+  "bun": "1.4.4",
+  "python": "3.15.2",
+  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "api": "https://api.asyncswap.org",
+  "websocket": "wss://api.asyncswap.org/v1/filler/stream",
+  "chains": {
+    "1301": "https://sepolia.unichain.org",
+    "46630": "https://rpc.testnet.chain.robinhood.com"
+  },
+  "checkoutBaseCommit": "895b4d3d6c4ba736a35295e699800acca7397dfb",
+  "runnerSha256": {
+    "public_soak.py": "28ea8aa9cdffee1a3fa12d4c07976a8b6979b9a6bd83386df9f20823444aeaf2",
+    "monitor.ts": "6dd84b027d338c4bf32ed7c26f7157087ee45b2234e46f2a61cdba1183d962a0"
+  },
+  "idleSleepInhibited": true
+}

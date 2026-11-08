@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {TokenTransfers} from "./TokenTransfers.sol";
 import {AsyncFiller} from "./AsyncFiller.sol";
 import {AsyncOrder} from "../types/AsyncOrder.sol";
 import {TickPrice} from "./TickPrice.sol";
@@ -135,10 +134,7 @@ library IncomingMatching {
         (bool poolFirst, uint160 bookLimit) = _poolBeatsBook(self, book, order.key, self.orders[id].isBuy);
         for (uint256 step; step < 2 && self.orders[id].amountIn != 0; ++step) {
             if ((step == 0) == poolFirst) {
-                try IIncomingLiquidity(address(this)).fillOrderFromPoolLiquidity(order, id, bookLimit) {}
-                catch (bytes memory reason) {
-                    TokenTransfers.bubbleUnsupported(reason);
-                }
+                try IIncomingLiquidity(address(this)).fillOrderFromPoolLiquidity(order, id, bookLimit) {} catch {}
             } else {
                 matched = AsyncMatching.matchIncoming(self, book, order.key, id);
             }

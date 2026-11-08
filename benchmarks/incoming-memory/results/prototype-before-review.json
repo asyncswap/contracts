@@ -1,0 +1,220 @@
+{
+  "baselineCommit": "29b4edf20e3eec6177c40f5e643a8484bf96987a",
+  "prototypeBaseCommit": "94400ce97b3260140d5449cbd26a3e7cdd832821",
+  "prototypeBranch": "mmsaki/incoming-memory",
+  "prototypeSourceSha256": {
+    "src/AsyncSwap.sol": "ccf4bb7f079888c79d9758f737df6335e65ddcd917657711184f7259110552e5",
+    "src/BaseHook.sol": "e910e8e809f50335b1bd0da2109e417ae87213b517c0d1d8720e3bf0a1259ab9",
+    "src/FeeVault.sol": "7f8ccecc58e131b4b0712ec0721ae7042400ed7073af4017cfad08f2aa9e4bda",
+    "src/ImmutableState.sol": "81780a696bbff93efda8c21052c04b2b98cc97fb0af5ca7c23d30a37adcbfb8e",
+    "src/MatchingEngine.sol": "e6e63450d77a1af80c075eb34d113604734e35d75985b94ab177d58f6d603ddd",
+    "src/NativeClaims.sol": "b02920e5ddb1d06c862a16cf1b4f740e37d23d14159f960e7a5196833e976d7d",
+    "src/Router.sol": "40f9ace55e00be6e9b79082466ee075e56435ffeef79db1676b0bec624cc8730",
+    "src/TokenClaims.sol": "7d087a18c541658df2ebfa2af9469dbc00c1e70b8c7d9c82e58a090a8b2a59fa",
+    "src/interfaces/ISignatureTransfer.sol": "fdd4edd4221ad8df5968da0d0f8aed1127e9bfe56bcb1c8cb77ea7e66875f54b",
+    "src/libraries/AsyncFiller.sol": "9015299b187cf70ece0840490aba0c9bef9109ebef72630b9864b33c31e1cf0a",
+    "src/libraries/AsyncMatching.sol": "c9ddb72e937c7c04c13272096ed9f491f43422c7e043f961b6c7bf445c263890",
+    "src/libraries/ClaimTransfers.sol": "7e6ed08d2c629a25890dfa1f9b86a41b62d142d3d0272864c374b356ef862bdc",
+    "src/libraries/CurrencySettler.sol": "35fa91cd314c39fa825192ab2ceae2561ce14ff6b57a9be09fe4b1c3d652340d",
+    "src/libraries/DynamicFeeOrdering.sol": "14ef4bbb9831bb4ee02f9e18af58a2f712b137380d477c8c01c81ec8286edaa7",
+    "src/libraries/EligiblePrice.sol": "30b2a388afefc5a68d24afec6d2262c7f4aa7ffd570faf13460971d0dc3cd5ca",
+    "src/libraries/IncomingMatching.sol": "ac75edff5644e9d5daad2a88e9d791c2cec8074fbb29faf188b5a60b3293472d",
+    "src/libraries/OrderSignatures.sol": "61c1e4ddbe0243123b1ef29636fc88d80dda9e8a941704c4e4bb8d5f2fdd0a2d",
+    "src/libraries/PriorityFeeUpdates.sol": "5d421e14f8dc28b40eab5c71172ff887808650531a9f5030dbc49b6a23b37987",
+    "src/libraries/RadixPriceTree.sol": "b2a672b6629caf28aa30df3a727b9026ddf3271ca422623a284f459db525dc53",
+    "src/libraries/TickBitmap.sol": "81e69010c0177a50b2496488727e98febd58884461716301fd28142549e8fe29",
+    "src/libraries/TickPrice.sol": "b4ec58fa775a17534379abf2480938531997069fa4da397ece40c1e8d2f7d220",
+    "src/types/AsyncOrder.sol": "1e18d34e727f7acb42131b56e65d4d56ff58c80d814fb60da37aad45493fe2bd"
+  },
+  "bytecodeSizes": {
+    "AsyncSwap": 24550,
+    "AsyncMatching": 24514,
+    "IncomingMatching": 18804
+  },
+  "runtimeSizeLimit": 24576,
+  "blockGasLimit": 30000000,
+  "scope": "Isolated local Anvil, controlled 18/6-decimal ERC20 fixtures, no LP liquidity, no live fork or public network writes. Setup excluded; receipts include intrinsic gas and refunds. Packing is measured for the stated gas-limit policy, not a universal maximum or wall-clock TPS.",
+  "gasLimitPolicy": "120% of the first transaction estimate, rounded up to 1000; fixed per workload. Block admission also requires remaining gas to cover this limit.",
+  "measurements": [
+    {
+      "workload": "buy_eight_distinct",
+      "matchesPerTransaction": 8,
+      "baselineMeanGas": 2441438.55,
+      "prototypeMeanGas": 1080654.07,
+      "gasReductionPercent": 55.737,
+      "baselineFirstBlockTransactions": 11,
+      "prototypeFirstBlockTransactions": 27,
+      "prototypeAssertions": {
+        "priceAndFifo": true,
+        "exactMatchAmounts": true,
+        "allOrdersClosed": true,
+        "makerAndTakerNetClaims": true,
+        "exactProtocolFeesAndBids": true,
+        "zeroHookEscrow": true,
+        "emptyBook": true
+      }
+    },
+    {
+      "workload": "buy_eight_levels",
+      "matchesPerTransaction": 8,
+      "baselineMeanGas": 2648223.14,
+      "prototypeMeanGas": 1303222.56,
+      "gasReductionPercent": 50.7888,
+      "baselineFirstBlockTransactions": 10,
+      "prototypeFirstBlockTransactions": 22,
+      "prototypeAssertions": {
+        "priceAndFifo": true,
+        "exactMatchAmounts": true,
+        "allOrdersClosed": true,
+        "makerAndTakerNetClaims": true,
+        "exactProtocolFeesAndBids": true,
+        "zeroHookEscrow": true,
+        "emptyBook": true
+      }
+    },
+    {
+      "workload": "buy_eight_same",
+      "matchesPerTransaction": 8,
+      "baselineMeanGas": 2246111.21,
+      "prototypeMeanGas": 1156185.75,
+      "gasReductionPercent": 48.525,
+      "baselineFirstBlockTransactions": 12,
+      "prototypeFirstBlockTransactions": 24,
+      "prototypeAssertions": {
+        "priceAndFifo": true,
+        "exactMatchAmounts": true,
+        "allOrdersClosed": true,
+        "makerAndTakerNetClaims": true,
+        "exactProtocolFeesAndBids": true,
+        "zeroHookEscrow": true,
+        "emptyBook": true
+      }
+    },
+    {
+      "workload": "buy_one_distinct",
+      "matchesPerTransaction": 1,
+      "baselineMeanGas": 642063.66,
+      "prototypeMeanGas": 384832.12,
+      "gasReductionPercent": 40.0632,
+      "baselineFirstBlockTransactions": 46,
+      "prototypeFirstBlockTransactions": 77,
+      "prototypeAssertions": {
+        "priceAndFifo": true,
+        "exactMatchAmounts": true,
+        "allOrdersClosed": true,
+        "makerAndTakerNetClaims": true,
+        "exactProtocolFeesAndBids": true,
+        "zeroHookEscrow": true,
+        "emptyBook": true
+      }
+    },
+    {
+      "workload": "buy_one_same",
+      "matchesPerTransaction": 1,
+      "baselineMeanGas": 561756.08,
+      "prototypeMeanGas": 399108.53,
+      "gasReductionPercent": 28.9534,
+      "baselineFirstBlockTransactions": 51,
+      "prototypeFirstBlockTransactions": 73,
+      "prototypeAssertions": {
+        "priceAndFifo": true,
+        "exactMatchAmounts": true,
+        "allOrdersClosed": true,
+        "makerAndTakerNetClaims": true,
+        "exactProtocolFeesAndBids": true,
+        "zeroHookEscrow": true,
+        "emptyBook": true
+      }
+    },
+    {
+      "workload": "sell_eight_distinct",
+      "matchesPerTransaction": 8,
+      "baselineMeanGas": 2468226.87,
+      "prototypeMeanGas": 1107714.11,
+      "gasReductionPercent": 55.1211,
+      "baselineFirstBlockTransactions": 11,
+      "prototypeFirstBlockTransactions": 26,
+      "prototypeAssertions": {
+        "priceAndFifo": true,
+        "exactMatchAmounts": true,
+        "allOrdersClosed": true,
+        "makerAndTakerNetClaims": true,
+        "exactProtocolFeesAndBids": true,
+        "zeroHookEscrow": true,
+        "emptyBook": true
+      }
+    },
+    {
+      "workload": "sell_eight_levels",
+      "matchesPerTransaction": 8,
+      "baselineMeanGas": 2673893.98,
+      "prototypeMeanGas": 1316424.65,
+      "gasReductionPercent": 50.7675,
+      "baselineFirstBlockTransactions": 10,
+      "prototypeFirstBlockTransactions": 22,
+      "prototypeAssertions": {
+        "priceAndFifo": true,
+        "exactMatchAmounts": true,
+        "allOrdersClosed": true,
+        "makerAndTakerNetClaims": true,
+        "exactProtocolFeesAndBids": true,
+        "zeroHookEscrow": true,
+        "emptyBook": true
+      }
+    },
+    {
+      "workload": "sell_eight_same",
+      "matchesPerTransaction": 8,
+      "baselineMeanGas": 2272698.2,
+      "prototypeMeanGas": 1170360.44,
+      "gasReductionPercent": 48.5035,
+      "baselineFirstBlockTransactions": 12,
+      "prototypeFirstBlockTransactions": 24,
+      "prototypeAssertions": {
+        "priceAndFifo": true,
+        "exactMatchAmounts": true,
+        "allOrdersClosed": true,
+        "makerAndTakerNetClaims": true,
+        "exactProtocolFeesAndBids": true,
+        "zeroHookEscrow": true,
+        "emptyBook": true
+      }
+    },
+    {
+      "workload": "sell_one_distinct",
+      "matchesPerTransaction": 1,
+      "baselineMeanGas": 667658.75,
+      "prototypeMeanGas": 397009.23,
+      "gasReductionPercent": 40.5371,
+      "baselineFirstBlockTransactions": 44,
+      "prototypeFirstBlockTransactions": 74,
+      "prototypeAssertions": {
+        "priceAndFifo": true,
+        "exactMatchAmounts": true,
+        "allOrdersClosed": true,
+        "makerAndTakerNetClaims": true,
+        "exactProtocolFeesAndBids": true,
+        "zeroHookEscrow": true,
+        "emptyBook": true
+      }
+    },
+    {
+      "workload": "sell_one_same",
+      "matchesPerTransaction": 1,
+      "baselineMeanGas": 587303.98,
+      "prototypeMeanGas": 411186.91,
+      "gasReductionPercent": 29.9874,
+      "baselineFirstBlockTransactions": 49,
+      "prototypeFirstBlockTransactions": 71,
+      "prototypeAssertions": {
+        "priceAndFifo": true,
+        "exactMatchAmounts": true,
+        "allOrdersClosed": true,
+        "makerAndTakerNetClaims": true,
+        "exactProtocolFeesAndBids": true,
+        "zeroHookEscrow": true,
+        "emptyBook": true
+      }
+    }
+  ]
+}

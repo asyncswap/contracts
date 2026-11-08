@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
+import {TokenTransfers} from "./libraries/TokenTransfers.sol";
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {Currency} from "v4-core/types/Currency.sol";
 
@@ -38,7 +39,7 @@ contract TokenClaims {
             abi.decode(data, (address, Currency, address, uint256));
         // Burn first. A failed transfer atomically restores both claims and allowance.
         poolManager.burn(owner, currency.toId(), amount);
-        poolManager.take(currency, recipient, amount);
+        TokenTransfers.take(poolManager, currency, recipient, amount);
         emit ClaimsRedeemed(owner, recipient, currency, amount);
         return "";
     }

@@ -1,5 +1,0 @@
-2026-11-05 14:39:49 -0600 Sleep               	Entering Sleep state due to 'Clamshell Sleep':TCPKeepAlive=active Using AC (Charge:37%) 14 secs   
-2026-11-05 14:40:03 -0600 DarkWake            	DarkWake from Deep Idle [CDNP] : due to smc.sysState.Wake(0x70070000) wifibt SMC.OutboxNotEmpty/ Using AC (Charge:37%) 9 secs    
-2026-11-05 14:40:12 -0600 Sleep               	Entering Sleep state due to 'Dark Wake Thermal Emergency':TCPKeepAlive=active Using AC (Charge:37%) 24 secs   
-2026-11-05 14:40:36 -0600 DarkWake            	DarkWake from Deep Idle [CDNP] : due to smc.sysState.Wake(0x70070000) wifibt SMC.OutboxNotEmpty bluetooth-pcie/ Using AC (Charge:37%) 9 secs    
-2026-11-05 14:40:45 -0600 Sleep               	Entering Sleep state due to 'Dark Wake Thermal Emergency':TCPKeepAlive=active Using AC (Charge:38%) 538 secs  

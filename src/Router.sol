@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
+import {TokenTransfers} from "./libraries/TokenTransfers.sol";
 import {ISignatureTransfer} from "@async-swap/interfaces/ISignatureTransfer.sol";
 import {OrderSignatures} from "@async-swap/libraries/OrderSignatures.sol";
 import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
@@ -415,7 +416,7 @@ contract Router is EIP712, Multicall {
             // forwarded in fillOrder() above.
             if (!output.isAddressZero()) {
                 POOLMANAGER.sync(output);
-                IERC20(Currency.unwrap(output)).safeTransferFrom(user, address(POOLMANAGER), gross);
+                TokenTransfers.transferFrom(Currency.unwrap(output), user, address(POOLMANAGER), gross);
                 POOLMANAGER.settleFor(address(HOOK));
                 // The pull ran the token's code: fill only the order as it was checked above.
                 _requireUnchanged(orderData.order, id, liveAmountIn, livePrice);
@@ -456,7 +457,7 @@ contract Router is EIP712, Multicall {
 
     function _withdrawClaim(address owner, Currency currency, uint256 amount) private {
         POOLMANAGER.burn(owner, currency.toId(), amount);
-        POOLMANAGER.take(currency, owner, amount);
+        TokenTransfers.take(POOLMANAGER, currency, owner, amount);
         emit ClaimWithdrawn(owner, currency, amount);
     }
 
@@ -473,6 +474,7 @@ contract Router is EIP712, Multicall {
     ///      signature over the transfer AND the order witness, so a relayer cannot alter the order.
     function _settleWithPermit(Currency input, AsyncOrder memory order, PermitData memory permit) private {
         POOLMANAGER.sync(input);
+        uint256 beforeBalance = IERC20(Currency.unwrap(input)).balanceOf(order.owner);
         PERMIT2.permitWitnessTransferFrom(
             ISignatureTransfer.PermitTransferFrom({
                 permitted: ISignatureTransfer.TokenPermissions({token: Currency.unwrap(input), amount: order.amountIn}),
@@ -485,6 +487,7 @@ contract Router is EIP712, Multicall {
             OrderSignatures.PERMIT2_WITNESS_TYPE,
             permit.signature
         );
+        TokenTransfers.verifyDebit(Currency.unwrap(input), order.owner, order.amountIn, beforeBalance);
         POOLMANAGER.settle();
     }
 
@@ -494,7 +497,7 @@ contract Router is EIP712, Multicall {
         if (amount == 0) return;
         Currency numeraire = HOOK.numeraire();
         POOLMANAGER.sync(numeraire);
-        IERC20(Currency.unwrap(numeraire)).safeTransferFrom(owner, address(POOLMANAGER), amount);
+        TokenTransfers.transferFrom(Currency.unwrap(numeraire), owner, address(POOLMANAGER), amount);
         POOLMANAGER.settleFor(address(HOOK));
     }
 

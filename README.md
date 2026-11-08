@@ -31,7 +31,7 @@ Install dependencies and run the contract suite with:
 
 ```sh
 forge soldeer install
-FOUNDRY_INVARIANT_RUNS=64 FOUNDRY_INVARIANT_DEPTH=64 forge test
+forge test --use solar
 ```
 
 ## Benchmarks

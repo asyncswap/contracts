@@ -60,6 +60,85 @@ Swap escrow, proceeds and fees are already claims.
 
 ## 4. Approaches
 
+Approach E (multi-pool swap orders) is the current lead: it needs the least new machinery and only
+uses what the hook already has. A to D are kept for comparison.
+
+### E. Multi-pool swap orders (leading approach)
+
+A multi-pool swap order is an **ordinary order on the input token's numeraire book** with one extra
+piece of hook data: the token the maker actually wants. Everything about the order is unchanged: it
+rests in the ETH/USDG book at its USDG limit, and matches, fills, reprices and cancels through the
+existing paths. Only the payout changes.
+
+**Order data.** `UserParams` gains two fields, set only for these orders:
+
+```solidity
+Currency outputToken;  // token B the maker wants; must have a B/numeraire pool on this hook
+uint256 minOutputB;    // least B the maker accepts for the order's numeraire proceeds
+```
+
+**Storage.** A flag on the stored order and a side mapping, so ordinary orders pay nothing extra:
+
+```solidity
+struct OrderInfo {
+    // ... existing fields ...
+    bool isMultiPoolSwap;  // fits the 2 free bytes after `reprices`: no extra storage slot
+}
+
+struct MultiPoolSwap {
+    Currency outputToken;
+    uint256 minOutputB;
+}
+mapping(bytes32 orderId => MultiPoolSwap) multiPoolSwaps;  // written only when the flag is set
+
+event AsyncOrderMultiPoolSwap(PoolId indexed poolId, bytes32 indexed orderId, Currency outputToken, uint256 minOutputB);
+```
+
+**Lifecycle.**
+
+1. **Place.** An ETH/USDG order with `outputToken = B` and `minOutputB`. The hook checks that a
+   B/numeraire pool exists on this hook (a book lives in a pool, and the hook cannot initialize one
+   at fill time with no starting price) and that `minOutputB` is set. The interface creates the B
+   market first when it is missing, through the existing pool-creation flow.
+2. **Fill.** At any time, through any existing path. `isMultiPoolSwap == false` pays USDG exactly as
+   today; `true` holds the maker's USDG proceeds in the hook (as ERC-6909 claims, earmarked for the
+   order) instead of paying them out.
+3. **Convert, in the same transaction.** With custom accounting, the hook buys B with the proceeds:
+   first from B's book (resting asks selling B for USDG), then from the B/USDG pool's LP liquidity,
+   never worse than `minOutputB` pro rata. The USDG nets to zero inside the PoolManager; the maker
+   receives B (`take`, or claims).
+4. **Rest the remainder.** Whatever cannot be bought now becomes a **resting B/USDG buy order** owned
+   by the maker, funded from the earmarked claims (no second deposit or transaction), priced at
+   proceeds / `minOutputB`. It inherits the maker's existing Router executor grant, so it fills,
+   reprices and cancels like any other order with no new approval.
+5. **Dust.** A remainder below B's book minimum is paid to the maker as USDG claims instead, the same
+   rule `closeBelowMinimum` applies today.
+
+**Where conversion runs.** Not inside the matching loops: every maker payout (`fill`, book matches,
+pool fills) would otherwise detour into a second book mid-match, in the most size-constrained and
+invariant-tested code. The fill earmarks the proceeds; a conversion routine in a linked library then
+runs in the same transaction (driven by the Router after the fill, or a permissionless `convert` for
+fills that happen elsewhere).
+
+**What falls out.**
+
+- **Cross-pair limit orders** with no new books: ETH rests against USDG as today and B arrives on fill.
+- **Coincidences of wants through the books**: conversion buys B from resting B/USDG sellers, so an
+  ETH → B order and ordinary B sellers fill each other with no pool touched.
+- **Opposite routes meet in the numeraire books**: a resting B/USDG remainder is exactly the bid a
+  later B → ETH multi-pool swap order sells into, so pairwise and ring flows clear through the books.
+- **Instant cross-pair swaps**: an order that fills on placement converts in the same transaction.
+
+**Limits.** No baskets (one input, one output). Each leg pays the 0.02% trade fee. No per-batch
+uniform prices, so ordering still matters as it does today. The maker's limit is in the numeraire
+(plus the `minOutputB` guard), not a single cross price; a limit expressed only in B has no stable
+place in the input book and belongs to approaches C or D.
+
+**Contract changes.** Two `UserParams` fields and the matching Router change, the
+`isMultiPoolSwap` flag and side mapping, the earmark on fill, and the conversion routine in a linked
+library (the hook is near EIP-170). The Router address is immutable in the hook, so this ships with
+the next hook and Router deployment, and the new path needs an audit pass.
+
 ### A. Route through the numeraire in the interface
 
 X → numeraire → Y as two ordinary orders. Leg 1 fills now at market (through the Async Swap pool, or
@@ -151,20 +230,31 @@ and section 7 there computes it as a convex program.
 
 ## 5. Comparison
 
-| | A. Interface route | B. Instant via custom accounting | C. Intents + ledger | D. Uniform batches |
-|---|---|---|---|---|
-| Instant X → Y | Two steps | Yes, one transaction | Yes | Per batch |
-| Limit X → Y | Yes (leg 2 rests) | No | Yes | Yes |
-| Baskets | No | No | Yes | Yes |
-| CoWs | No | No | Yes | Yes, automatic |
-| Reachable by external routers | No | Yes | No | No |
-| Contract change | None | Hook | Settlement library + Router | C plus solver rules |
+| | E. Multi-pool swap orders | A. Interface route | B. Instant via custom accounting | C. Intents + ledger | D. Uniform batches |
+|---|---|---|---|---|---|
+| Instant X → Y | Yes, one transaction | Two steps | Yes, one transaction | Yes | Per batch |
+| Limit X → Y | Yes (numeraire limit + `minOutputB`) | Yes (leg 2 rests) | No | Yes | Yes |
+| Baskets | No | No | No | Yes | Yes |
+| CoWs | Through the books | No | No | Yes | Yes, automatic |
+| Reachable by external routers | No | No | Yes | No | No |
+| Contract change | Hook data, flag, conversion library | None | Hook | Settlement library + Router | C plus solver rules |
 
-The approaches stack rather than compete. A works today. B makes instant multi-asset swaps native and
+E is the lead: cross-pair limit and instant swaps, and CoWs through the books, with the least new
+machinery. The others stack around it. A works today. B makes instant multi-asset swaps native and
 opens Async Swap liquidity to the rest of Uniswap v4. C adds limit intents, baskets and CoWs on top of
 B's instant fills. D tightens C's acceptance rule into uniform prices.
 
 ## 6. Open questions
+
+For E:
+
+- Should conversion try B's LP liquidity at all, or only B's book (keeping the remainder resting
+  until a B seller appears)?
+- When an earmark is left for `convert` by fills outside the Router, who calls it, and is a small
+  keeper reward needed?
+- Should the resting B/USDG remainder keep the original order's priority bid, or start with none?
+
+For the other approaches:
 
 1. Is instant mode (B) safe to expose to every router, or only to an allowlist at first?
 2. Should B fill from the book only, LP liquidity only, or both (book first, as today's pool-first

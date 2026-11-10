@@ -1,7 +1,7 @@
 # Multi-asset swaps: an open problem
 
 Status: **v1 proposed, matching an open problem.** Placing and filling any-asset orders has a simple
-first answer (section 4E: non-numeraire pools, filled by fillers). **Matching those orders
+first answer (section 4E: non-numeraire pools, filled from their own LP liquidity or by fillers). **Matching those orders
 automatically across different order books** is the open problem this page is mostly about. Nothing
 here is implemented, and proposals are welcome.
 
@@ -12,8 +12,9 @@ ETH/USDG, AMD/USDG, TSLA/USDG. That keeps liquidity in one place per asset, but 
 **ETH → AMD** has no book and no pool for that pair. Today the interface says "No pool for this pair
 yet".
 
-Version 1 (section 4E) lets that maker place the order anyway, on an order-only ETH/AMD pool, and
-lets any filler fill it by paying AMD. What v1 does **not** do is match it automatically.
+Version 1 (section 4E) lets that maker place the order anyway, on an ETH/AMD pool, and fills it from
+that pool's own LP liquidity when there is any, or by any filler paying AMD. What v1 does **not** do is
+match it automatically against other books.
 
 ### The open problem: automatic matching across order books
 
@@ -48,9 +49,10 @@ What we want, in order of ambition:
 And what must stay true:
 
 - A maker never receives less than the minimum they signed.
-- No non-numeraire pools that hold LP liquidity (ETH/AMD, AMD/TSLA, … with their own LP positions): the
-  number of liquidity pools would grow with the square of the number of assets and liquidity would
-  fragment. (Non-numeraire pools that only hold orders are a different thing; see approach E.)
+- Liquidity should stay concentrated in the numeraire pools. Non-numeraire pools may hold LP
+  liquidity (approach E), but the protocol does not depend on it: an asset pair with no LPs still
+  works through fillers, and the number of pools that need LPs does not grow with the square of the
+  number of assets.
 - Orders are good till cancelled (no expiry), as decided for single-pair orders.
 
 ## 2. Constraints in today's contracts
@@ -97,30 +99,40 @@ numeraire` and today reverts with `NumeraireRequired` otherwise. That check is a
 | | Numeraire pool (ETH/USDG) | Non-numeraire pool (ETH/AMD) |
 |---|---|---|
 | Recognised by | One currency is the numeraire | Neither currency is the numeraire |
-| Liquidity | Book, matching engine and LP positions, as today | **Orders only**: no book, no LP positions |
+| Liquidity | Book, matching engine and LP positions, as today | LP positions if anyone provides them; **no book** in v1 |
 | An order's limit | In the other currency, as today | In the other currency: an ETH → AMD order sets its minimum in AMD |
-| Fills | As today | A filler pays AMD |
+| Fills | As today | The pool's own LP liquidity, or a filler paying AMD |
 
-**v1 is as simple as possible: a filler fills the order as asked.** No matching, no routing.
+**v1 is as simple as possible: the pool's liquidity first, then fillers.** No book, no matching, no
+routing.
 
-1. **Create.** Anyone initializes an ETH/AMD pool with the Async Swap hook. It holds no LP liquidity.
+1. **Create.** Anyone initializes an ETH/AMD pool with the Async Swap hook. LPs may add liquidity to it
+   like any v4 pool; it works without them.
 2. **Place.** The maker swaps ETH into it through the Router, as for any order. The ETH is escrowed as
    claims and the order records its minimum in AMD. It is not inserted into a book.
-3. **Fill.** A filler calls `Router.fillOrder` and pays AMD, sourced however it likes: inventory, any
-   Uniswap v4 pool, our numeraire books, other venues. The existing `executeOrder` → `AsyncFiller.fill`
-   already pays the pool's output currency, so the maker receives AMD (less 0.02%) and the filler the
-   ETH (less 0.02%). The PoolManager only requires every currency's delta to net to zero.
-4. **Reprice and cancel** work as today.
+3. **Fill from pool liquidity.** In the same transaction, `matchNewOrder` tries the pool's own LP
+   liquidity, as numeraire pools already do when the pool beats the book (here there is no book, so
+   the pool always goes first). The existing `fillOrderFromPoolLiquidity` path swaps the order against
+   the LP positions and fills it only if the output meets the maker's AMD minimum; otherwise the order
+   rests. Anyone can retry later, as LPs add liquidity or prices move, through the existing
+   `Router.fillFromPoolLiquidity`. This path has no numeraire dependency: the 0.01% protocol fee and
+   the dynamic fee are taken in the order's own input and output currencies.
+4. **Fill by a filler.** For orders the pool cannot fill, a filler calls `Router.fillOrder` and pays
+   AMD, sourced however it likes: inventory, any Uniswap v4 pool, our numeraire books, other venues.
+   The existing `executeOrder` → `AsyncFiller.fill` already pays the pool's output currency, so the
+   maker receives AMD (less 0.02%) and the filler the ETH (less 0.02%).
+5. **Reprice and cancel** work as today.
 
 **Contract changes for v1.** The order code assumes every pool has a numeraire side, so a few places
 need a non-numeraire guard. None of them touch the matching engine.
 
 1. `_beforeInitialize`: allow non-numeraire pools instead of reverting with `NumeraireRequired`.
-2. `_beforeAddLiquidity`: reject LP positions on non-numeraire pools.
-3. Order creation: do not insert the order into a book, and make `matchNewOrder` a no-op for these
-   pools (there is no book to match and no pool liquidity to try).
+   `_beforeAddLiquidity` keeps allowing LP positions, as for any pool.
+2. Order creation: do not insert the order into a book.
+3. `matchNewOrder`: for these pools, skip the book and try only the pool's LP liquidity (the pool goes
+   first unconditionally; `_poolBeatsBook` compares against a book that does not exist).
 4. Minimum order size: today's check is in numeraire units, which these pools do not have. In v1,
-   either skip it or use a per-pool or per-asset minimum.
+   either skip it or use a per-pool or per-asset minimum. `closeBelowMinimum` likewise skips them.
 5. Priority bids: their minimum is computed from the numeraire side, and without a book they decide
    nothing. Require zero on non-numeraire pools in v1.
 6. Fill and cancel: both remove the order from its book first; that removal must accept orders that
@@ -129,14 +141,13 @@ need a non-numeraire guard. None of them touch the matching engine.
 This ships with the next hook and Router deployment (the Router address is immutable in the hook) and
 needs a review pass.
 
-**What it gives.** Any-asset limit orders with no new order type, no new storage and no change to how
-orders fill.
+**What it gives.** Any-asset limit orders, and instant fills on placement wherever a non-numeraire
+pool has LP liquidity, with no new order type, no new storage and no change to how orders fill.
 
-**What it does not give.** Fills depend on fillers showing up: an order rests until someone fills it.
-The simplest help is an off-chain filler run by the team that watches non-numeraire orders, buys the
+**What it does not give.** Where a pool has no LP liquidity, fills depend on fillers showing up. The
+simplest help is an off-chain filler run by the team that watches non-numeraire orders, buys the
 output token (Uniswap, or our numeraire books) and fills when the maker's limit leaves a margin. There
-are no instant fills on placement, no baskets, and no automatic matching (the open problem in
-section 1).
+are no baskets, and no automatic matching against other books (the open problem in section 1).
 
 **Later steps toward automatic matching.**
 
@@ -235,8 +246,9 @@ and section 7 there computes it as a convex program.
 
 ### Ruled out
 
-- **Non-numeraire pools with LP liquidity:** quadratic pool count and fragmented liquidity. (Order-only cross
-  pools are approach E.)
+- **Depending on LP liquidity for every pair:** the number of pools that need LPs would grow with the
+  square of the number of assets and liquidity would fragment. Approach E allows LP liquidity on
+  non-numeraire pools but never depends on it.
 - **Linked orders inside the matching engine** (an ETH → AMD order held as an ask in one book and a bid
   in another): the most delicate change to the most size-constrained, invariant-tested code.
 
@@ -244,7 +256,7 @@ and section 7 there computes it as a convex program.
 
 | | E. Non-numeraire pools | A. Interface route | B. Instant via custom accounting | C. Intents + ledger | D. Uniform batches |
 |---|---|---|---|---|---|
-| Instant X → Y | No (v1); yes with `fillFromNumeraire` | Two steps | Yes, one transaction | Yes | Per batch |
+| Instant X → Y | Where the pool has LP liquidity (v1); yes with `fillFromNumeraire` | Two steps | Yes, one transaction | Yes | Per batch |
 | Limit X → Y | Yes, limit in the output token | Yes (leg 2 rests) | No | Yes | Yes |
 | Baskets | No | No | No | Yes | Yes |
 | Automatic matching across books | No (v1); two books with `fillFromNumeraire` | No | No | Yes | Yes |

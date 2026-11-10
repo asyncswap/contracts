@@ -89,7 +89,7 @@ Approach E (non-numeraire pools, filled by fillers) is the proposed v1: it reuse
 and fill paths and needs only a few guards in the hook. It does not solve automatic matching; its
 later steps and approaches B to D are the candidates for that.
 
-### E. Non-numeraire pools (v1: filled by fillers)
+### E. Non-numeraire pools (v1: pool liquidity, then fillers)
 
 **Two pool types, told apart by the pool key.** The hook already decides whether a pool pairs a token
 with the numeraire: `_beforeInitialize` checks `key.currency0 == numeraire || key.currency1 ==
@@ -131,8 +131,13 @@ need a non-numeraire guard. None of them touch the matching engine.
 2. Order creation: do not insert the order into a book.
 3. `matchNewOrder`: for these pools, skip the book and try only the pool's LP liquidity (the pool goes
    first unconditionally; `_poolBeatsBook` compares against a book that does not exist).
-4. Minimum order size: today's check is in numeraire units, which these pools do not have. In v1,
-   either skip it or use a per-pool or per-asset minimum. `closeBelowMinimum` likewise skips them.
+4. Minimum order size: use the decimals floor on both tokens. Today `checkMinimum` checks a dollar
+   minimum (`minOrder`, which deployments set to 0, i.e. off: `DEPLOY_MIN_ORDER_USD` defaults to 0) and
+   an asset floor (`minAssetAmount = 10^(decimals - assetPrecision)`, at least 0.0001 of a whole token
+   with `assetPrecision = 4`). The asset floor is the real minimum and depends only on decimals, so a
+   non-numeraire pool computes it for both currencies at initialize and checks the order's input and
+   output against their own floors. No valuation or oracle is needed; the dollar minimum does not
+   apply (there is no dollar side). `closeBelowMinimum` uses the same floors.
 5. Priority bids: their minimum is computed from the numeraire side, and without a book they decide
    nothing. Require zero on non-numeraire pools in v1.
 6. Fill and cancel: both remove the order from its book first; that removal must accept orders that
@@ -157,9 +162,48 @@ are no baskets, and no automatic matching against other books (the open problem 
   liquidity), charge the fee once, and give the maker everything bought if it meets the minimum.
   Using the books means filling resting orders partially at their limits, which the matching code
   already does for book matches. This is matching across two books, done by the protocol.
-- **Matching inside non-numeraire pools.** Direct ETH ⇄ AMD matches, by picking one currency as the
-  pool's quote side for price keys and minimums so the existing matching engine can run there.
+- **Matching inside non-numeraire pools (v2).** Direct ETH ⇄ AMD matches by running the existing
+  matching engine on a non-numeraire pool; see the plan below.
 - **Rings and batches.** Matching across many books at once is approaches C and D.
+
+#### v2 plan: matching inside a non-numeraire pool
+
+The matching itself does not depend on the numeraire. Crossing, match amounts and partial fills
+(`_crosses`, `_matchAmounts`, `EligiblePrice`) are pure price ratios, and trade fees are taken in each
+side's own currency. What depends on the numeraire is a thin layer of units around it:
+
+| Piece | Today | On a non-numeraire pool |
+|---|---|---|
+| Buy or sell (`isBuy`) | Set when the input is the numeraire (`_beforeSwap`) | Set when the input is the pool's **quote currency** |
+| Price keys (`_priceKey`, `TickPrice`) | Ordered as numeraire per asset, with a flag for whether the numeraire is `currency1` | The same code, oriented to the quote currency |
+| Pool before book (`_poolBeatsBook`) | Uses the same orientation flag | Generalizes with the price keys |
+| Minimum order size | Decimals floor on the asset (dollar minimum off by default) | Decimals floor on both currencies (v1 already does this) |
+| Priority bids | Paid in the numeraire; minimum is 0.1% of the order's numeraire value, capped at $0.10 | Still paid in the numeraire; the minimum uses the flat $0.10 cap, since the order has no numeraire value |
+
+**The change is to give every pool a quote currency.** Numeraire pools keep the numeraire. A
+non-numeraire pool takes one of its two currencies, fixed at initialize: `currency1` is the simplest
+rule, or the currency with the deeper numeraire market so prices read naturally. With that, the
+existing engine runs on non-numeraire pools unchanged, and two opposite ETH ⇄ AMD orders match each
+other directly.
+
+**What is special about the numeraire, and why numeraire pools stay the hub.**
+
+1. **One unit of account.** Priority bids and the fee vault use one currency on every pool.
+2. **One book per asset.** Liquidity concentrates in each asset's numeraire book, and any cross price
+   can be derived through it. Non-numeraire books are optional extras; nothing should depend on them.
+3. **A stable midpoint.** Routes through the numeraire leave makers holding a stablecoin between legs.
+
+**How sensitive it is.** The matching math is the same audited, invariant-tested engine on both kinds
+of pool. The extra risk is all in the units layer:
+
+- every place that assumes "numeraire = quote" must be generalized, and the property, invariant and
+  adversarial tests re-run for both orientations (quote as `currency0` and as `currency1`);
+- decimal combinations numeraire pairs never hit (for example 18 against 18, or 6 against 0), and very
+  large or very small price ratios, since neither side is a stablecoin;
+- the priority-bid minimum on non-numeraire pools, which no longer scales with the order.
+
+Matching **across** books (an ETH → AMD order against the ETH/USDG and AMD/USDG books together) is not
+solved by this; it stays the open problem.
 
 ### A. Route through the numeraire in the interface
 
@@ -272,7 +316,6 @@ B's instant fills. D tightens C's acceptance rule into uniform prices.
 
 For E (v1):
 
-- Minimum order size on non-numeraire pools: skip it, or a per-pool or per-asset minimum?
 - Should the price passed when creating a non-numeraire pool be ignored, or kept as a reference price
   for the interface?
 - Who runs the first filler, and how much margin should it require before filling?
@@ -282,7 +325,9 @@ For automatic matching across books:
 - Should `fillFromNumeraire` use the numeraire books (partial fills of resting orders) or only LP
   liquidity at first?
 - Who calls it, and does surplus above the maker's minimum go to the maker or partly to the caller?
-- Which currency is a non-numeraire pool's quote side once matching runs inside it?
+- Which currency is a non-numeraire pool's quote side in v2: `currency1`, or the one with the deeper
+  numeraire market?
+- Should priority bids be allowed on non-numeraire pools in v2 with the flat $0.10 minimum, or stay off?
 
 For the other approaches:
 

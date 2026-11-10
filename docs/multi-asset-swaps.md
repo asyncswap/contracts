@@ -26,9 +26,9 @@ What we want, in order of ambition:
 And what must stay true:
 
 - A maker never receives less than the minimum they signed.
-- No cross pools that hold LP liquidity (ETH/AMD, AMD/TSLA, … with their own LP positions): the
+- No non-numeraire pools that hold LP liquidity (ETH/AMD, AMD/TSLA, … with their own LP positions): the
   number of liquidity pools would grow with the square of the number of assets and liquidity would
-  fragment. (Cross pools that only hold orders are a different thing; see approach E.)
+  fragment. (Non-numeraire pools that only hold orders are a different thing; see approach E.)
 - Orders are good till cancelled (no expiry), as decided for single-pair orders.
 
 ## 2. Constraints in today's contracts
@@ -61,36 +61,36 @@ Swap escrow, proceeds and fees are already claims.
 
 ## 4. Approaches
 
-Approach E (cross pools) is the current lead: it needs the least new machinery and reuses the
+Approach E (non-numeraire pools) is the current lead: it needs the least new machinery and reuses the
 existing order and fill paths almost unchanged. A to D are kept for comparison.
 
-### E. Cross pools (leading approach)
+### E. Non-numeraire pools (leading approach)
 
 **Two pool types, told apart by the pool key.** The hook already decides whether a pool pairs a token
 with the numeraire: `_beforeInitialize` checks `key.currency0 == numeraire || key.currency1 ==
 numeraire` and today reverts with `NumeraireRequired` otherwise. That check is a pure function of the
 `PoolKey`, so a pool's type needs no storage, no order-id bits and no extra hook data.
 
-| | Numeraire pool (ETH/USDG) | Cross pool (ETH/AMD) |
+| | Numeraire pool (ETH/USDG) | Non-numeraire pool (ETH/AMD) |
 |---|---|---|
 | Recognised by | One currency is the numeraire | Neither currency is the numeraire |
 | Liquidity | Book, matching engine and LP positions, as today | **Orders only**: no LP positions, so no liquidity fragmentation |
 | An order's limit | In the other currency, as today | In the other currency: an ETH → AMD order sets its minimum in AMD |
 | Fills | As today | A filler pays AMD, or `fillFromNumeraire` (below) |
 
-**An ETH → AMD order is just an order on the ETH/AMD cross pool.** Swapping ETH into that pool escrows
+**An ETH → AMD order is just an order on the ETH/AMD non-numeraire pool.** Swapping ETH into that pool escrows
 the ETH exactly as today, with `amountOutMin` in AMD. The output token is the pool's other currency,
 so there is nothing new to declare.
 
 **The existing fill path already handles it.** A fill pays the pool's output currency to the maker and
-the input to the filler. On a cross pool that means a filler pays AMD, sourced however it likes
+the input to the filler. On a non-numeraire pool that means a filler pays AMD, sourced however it likes
 (inventory, any Uniswap v4 pool, other venues): the PoolManager only requires every currency's delta
 to net to zero by the end of the unlock. `executeOrder` and `AsyncFiller.fill` run unchanged, as do
 `updatePrice`, `cancelOrder`, priority bids (paid in the global numeraire, which works on any pool),
 the indexer and the interface.
 
 **`fillFromNumeraire`: the best output through the numeraire pools.** A permissionless fill, in a
-linked library, that anyone may call on a cross-pool order:
+linked library, that anyone may call on a non-numeraire-pool order:
 
 1. Sell the order's ETH for as much USDG as possible: the ETH/USDG book first, then its LP liquidity.
 2. Spend **all** of that USDG on as much AMD as possible: the AMD/USDG book first, then its LP
@@ -107,11 +107,11 @@ their limits and no pool is touched.
 
 **Contract changes.**
 
-1. `_beforeInitialize`: allow cross pools instead of reverting with `NumeraireRequired`.
-2. `_beforeAddLiquidity`: reject LP positions on cross pools.
-3. Cross pools skip the book in v1: their orders are escrowed but not inserted into a price book, and
+1. `_beforeInitialize`: allow non-numeraire pools instead of reverting with `NumeraireRequired`.
+2. `_beforeAddLiquidity`: reject LP positions on non-numeraire pools.
+3. Non-numeraire pools skip the book in v1: their orders are escrowed but not inserted into a price book, and
    matching does not run. Minimum order sizes and price keys are defined in numeraire units, which a
-   cross pool does not have; minimums for cross-pool orders can be checked by valuing the input
+   non-numeraire pool does not have; minimums for non-numeraire-pool orders can be checked by valuing the input
    through its numeraire pool, or set per asset.
 4. `fillFromNumeraire` in a linked library (the hook is near EIP-170).
 
@@ -121,13 +121,13 @@ immutable in the hook) and needs an audit pass.
 **What it gives.** Cross-pair limit orders and instant cross-pair swaps (an order filled in the
 transaction that places it), with no new order type, no new storage and no change to how orders fill.
 
-**Limits.** No baskets (one input, one output). Orders on cross pools do not match each other in v1, so
+**Limits.** No baskets (one input, one output). Orders on non-numeraire pools do not match each other in v1, so
 two opposite ETH ⇄ AMD orders meet only through fillers or through the numeraire books. Each numeraire
 leg of `fillFromNumeraire` crosses the spread of that book.
 
-**Later (v2): matching inside cross pools.** Direct ETH ⇄ AMD coincidences of wants, by picking one
+**Later (v2): matching inside non-numeraire pools.** Direct ETH ⇄ AMD coincidences of wants, by picking one
 currency as the pool's quote side for price keys and minimums so the existing matching engine can run
-on a cross pool.
+on a non-numeraire pool.
 
 ### A. Route through the numeraire in the interface
 
@@ -214,14 +214,14 @@ and section 7 there computes it as a convex program.
 
 ### Ruled out
 
-- **Cross pools with LP liquidity:** quadratic pool count and fragmented liquidity. (Order-only cross
+- **Non-numeraire pools with LP liquidity:** quadratic pool count and fragmented liquidity. (Order-only cross
   pools are approach E.)
 - **Linked orders inside the matching engine** (an ETH → AMD order held as an ask in one book and a bid
   in another): the most delicate change to the most size-constrained, invariant-tested code.
 
 ## 5. Comparison
 
-| | E. Cross pools | A. Interface route | B. Instant via custom accounting | C. Intents + ledger | D. Uniform batches |
+| | E. Non-numeraire pools | A. Interface route | B. Instant via custom accounting | C. Intents + ledger | D. Uniform batches |
 |---|---|---|---|---|---|
 | Instant X → Y | Yes, one transaction | Two steps | Yes, one transaction | Yes | Per batch |
 | Limit X → Y | Yes, limit in the output token | Yes (leg 2 rests) | No | Yes | Yes |
@@ -239,12 +239,12 @@ B's instant fills. D tightens C's acceptance rule into uniform prices.
 
 For E:
 
-- How are minimum order sizes checked on cross pools: by valuing the input through its numeraire pool,
+- How are minimum order sizes checked on non-numeraire pools: by valuing the input through its numeraire pool,
   or with a per-asset minimum?
 - Should `fillFromNumeraire` use LP liquidity on both legs, or only the books?
-- Should the initial price passed when creating a cross pool be ignored (cross pools hold no LP
+- Should the initial price passed when creating a non-numeraire pool be ignored (non-numeraire pools hold no LP
   liquidity), or recorded as a reference price for the interface?
-- In v2, which currency is a cross pool's quote side for matching (currency1, or the one with the
+- In v2, which currency is a non-numeraire pool's quote side for matching (currency1, or the one with the
   deeper numeraire market)?
 
 For the other approaches:

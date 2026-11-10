@@ -32,6 +32,8 @@ library UniswapAddresses {
     uint256 internal constant CHAIN_ID_INTEROP_ALPHA_0 = 420120000;
     uint256 internal constant CHAIN_ID_INTEROP_ALPHA_1 = 420120001;
     uint256 internal constant CHAIN_ID_ANVIL = 31337;
+    uint256 internal constant CHAIN_ID_ELYSIUM = 99901;
+    uint256 internal constant CHAIN_ID_ELYSIUM_TESTNET = 99801;
 
     /// @notice Canonical Uniswap v4 PoolManager address for a chain, or zero if unsupported.
     /// @dev Addresses follow Uniswap's active v4 deployment feed and deployment documentation.
@@ -47,6 +49,9 @@ library UniswapAddresses {
         if (chainId == CHAIN_ID_X_LAYER) return 0x360E68faCcca8cA495c1B759Fd9EEe466db9FB32;
         if (chainId == CHAIN_ID_WORLD_CHAIN) return 0xb1860D529182ac3BC1F51Fa2ABd56662b7D13f33;
         if (chainId == CHAIN_ID_HYPEREVM) return 0x12D4Fd9C5DeDd00ab8a0bCe2CF0167bbf94b6B1F;
+        if (chainId == CHAIN_ID_ELYSIUM) return 0xE2e105d3F7209A9DA11f83cCf3E7398a753823F1;
+        // Elysium testnet has no canonical Uniswap v4 PoolManager. Scripts deploy an AsyncSwap-owned
+        // instance and resolve it from deployments/99801/99801.json instead of this mapping.
         if (chainId == CHAIN_ID_UNICHAIN_SEPOLIA) return 0x00B036B58a818B1BC34d502D3fE730Db729e62AC;
         if (chainId == CHAIN_ID_SONEIUM) return 0x360E68faCcca8cA495c1B759Fd9EEe466db9FB32;
         if (chainId == CHAIN_ID_TEMPO) return 0x33620f62C5b9B2086dD6b62F4A297A9f30347029;
@@ -88,6 +93,8 @@ library UniswapAddresses {
         if (chainId == CHAIN_ID_X_LAYER) return 46_460_144;
         if (chainId == CHAIN_ID_WORLD_CHAIN) return 9_111_872;
         if (chainId == CHAIN_ID_HYPEREVM) return 45_998_366;
+        // CREATE2 deploy of the Elysium PoolManager (tx 0x30fc8b36...b08e).
+        if (chainId == CHAIN_ID_ELYSIUM) return 256_083;
         if (chainId == CHAIN_ID_UNICHAIN_SEPOLIA) return 7_092_034;
         if (chainId == CHAIN_ID_SONEIUM) return 2_473_300;
         if (chainId == CHAIN_ID_TEMPO) return 6_606_180;

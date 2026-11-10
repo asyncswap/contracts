@@ -1,8 +1,9 @@
 # Multi-asset swaps: an open problem
 
-Status: **open problem.** This page states the problem, the constraints the current contracts put on
-any answer, and the approaches we see, with their trade-offs. Nothing here is implemented, and
-proposals are welcome.
+Status: **v1 proposed, matching an open problem.** Placing and filling any-asset orders has a simple
+first answer (section 4E: non-numeraire pools, filled by fillers). **Matching those orders
+automatically across different order books** is the open problem this page is mostly about. Nothing
+here is implemented, and proposals are welcome.
 
 ## 1. The problem
 
@@ -10,6 +11,27 @@ Every Async Swap market is an asset against its chain's numeraire (USDC, or USDG
 ETH/USDG, AMD/USDG, TSLA/USDG. That keeps liquidity in one place per asset, but a maker who wants
 **ETH → AMD** has no book and no pool for that pair. Today the interface says "No pool for this pair
 yet".
+
+Version 1 (section 4E) lets that maker place the order anyway, on an order-only ETH/AMD pool, and
+lets any filler fill it by paying AMD. What v1 does **not** do is match it automatically.
+
+### The open problem: automatic matching across order books
+
+A non-numeraire order (ETH → AMD) could be filled from liquidity that already sits in the protocol,
+spread across several books:
+
+- resting ETH/USDG bids (buyers of the maker's ETH) together with resting AMD/USDG asks (sellers of
+  the AMD the maker wants), with the USDG netting out in between;
+- opposite non-numeraire orders (AMD → ETH) on the same ETH/AMD pool;
+- longer rings across several non-numeraire pools (ETH → AMD, AMD → TSLA, TSLA → ETH);
+- the numeraire pools' LP liquidity for whatever the books cannot cover.
+
+Matching automatically means the protocol, not an outside filler, finds these combinations and
+settles them atomically, with every maker getting at least their limit, in a way that stays fair,
+bounded in gas, and inside a matching engine that is already at the contract size limit. The order
+books are separate data structures, each with its own price keys in numeraire units, so a match that
+spans two or more of them has no single place to happen today. Sections 2 to 4 describe the
+constraints and the approaches (B to D, and the later steps of E) that attack this.
 
 What we want, in order of ambition:
 
@@ -61,10 +83,11 @@ Swap escrow, proceeds and fees are already claims.
 
 ## 4. Approaches
 
-Approach E (non-numeraire pools) is the current lead: it needs the least new machinery and reuses the
-existing order and fill paths almost unchanged. A to D are kept for comparison.
+Approach E (non-numeraire pools, filled by fillers) is the proposed v1: it reuses the existing order
+and fill paths and needs only a few guards in the hook. It does not solve automatic matching; its
+later steps and approaches B to D are the candidates for that.
 
-### E. Non-numeraire pools (leading approach)
+### E. Non-numeraire pools (v1: filled by fillers)
 
 **Two pool types, told apart by the pool key.** The hook already decides whether a pool pairs a token
 with the numeraire: `_beforeInitialize` checks `key.currency0 == numeraire || key.currency1 ==
@@ -74,60 +97,58 @@ numeraire` and today reverts with `NumeraireRequired` otherwise. That check is a
 | | Numeraire pool (ETH/USDG) | Non-numeraire pool (ETH/AMD) |
 |---|---|---|
 | Recognised by | One currency is the numeraire | Neither currency is the numeraire |
-| Liquidity | Book, matching engine and LP positions, as today | **Orders only**: no LP positions, so no liquidity fragmentation |
+| Liquidity | Book, matching engine and LP positions, as today | **Orders only**: no book, no LP positions |
 | An order's limit | In the other currency, as today | In the other currency: an ETH → AMD order sets its minimum in AMD |
-| Fills | As today | A filler pays AMD, or `fillFromNumeraire` (below) |
+| Fills | As today | A filler pays AMD |
 
-**An ETH → AMD order is just an order on the ETH/AMD non-numeraire pool.** Swapping ETH into that pool escrows
-the ETH exactly as today, with `amountOutMin` in AMD. The output token is the pool's other currency,
-so there is nothing new to declare.
+**v1 is as simple as possible: a filler fills the order as asked.** No matching, no routing.
 
-**The existing fill path already handles it.** A fill pays the pool's output currency to the maker and
-the input to the filler. On a non-numeraire pool that means a filler pays AMD, sourced however it likes
-(inventory, any Uniswap v4 pool, other venues): the PoolManager only requires every currency's delta
-to net to zero by the end of the unlock. `executeOrder` and `AsyncFiller.fill` run unchanged, as do
-`updatePrice`, `cancelOrder`, priority bids (paid in the global numeraire, which works on any pool),
-the indexer and the interface.
+1. **Create.** Anyone initializes an ETH/AMD pool with the Async Swap hook. It holds no LP liquidity.
+2. **Place.** The maker swaps ETH into it through the Router, as for any order. The ETH is escrowed as
+   claims and the order records its minimum in AMD. It is not inserted into a book.
+3. **Fill.** A filler calls `Router.fillOrder` and pays AMD, sourced however it likes: inventory, any
+   Uniswap v4 pool, our numeraire books, other venues. The existing `executeOrder` → `AsyncFiller.fill`
+   already pays the pool's output currency, so the maker receives AMD (less 0.02%) and the filler the
+   ETH (less 0.02%). The PoolManager only requires every currency's delta to net to zero.
+4. **Reprice and cancel** work as today.
 
-**`fillFromNumeraire`: the best output through the numeraire pools.** A permissionless fill, in a
-linked library, that anyone may call on a non-numeraire-pool order:
-
-1. Sell the order's ETH for as much USDG as possible: the ETH/USDG book first, then its LP liquidity.
-2. Spend **all** of that USDG on as much AMD as possible: the AMD/USDG book first, then its LP
-   liquidity.
-3. Charge the 0.02% trade fee once, on the final AMD (no fee on the USDG in between, which never leaves
-   the PoolManager).
-4. Require at least `amountOutMin` (pro rata for a partial fill) and give the maker everything bought.
-   Otherwise revert; the order stays open for fillers.
-
-The maker therefore gets the better of what fillers offer and the most AMD the numeraire books and
-pools can deliver at that moment. Buying from resting AMD/USDG sellers in step 2 (and selling into
-resting ETH/USDG bids in step 1) is a coincidence of wants through the books: those makers fill at
-their limits and no pool is touched.
-
-**Contract changes.**
+**Contract changes for v1.** The order code assumes every pool has a numeraire side, so a few places
+need a non-numeraire guard. None of them touch the matching engine.
 
 1. `_beforeInitialize`: allow non-numeraire pools instead of reverting with `NumeraireRequired`.
 2. `_beforeAddLiquidity`: reject LP positions on non-numeraire pools.
-3. Non-numeraire pools skip the book in v1: their orders are escrowed but not inserted into a price book, and
-   matching does not run. Minimum order sizes and price keys are defined in numeraire units, which a
-   non-numeraire pool does not have; minimums for non-numeraire-pool orders can be checked by valuing the input
-   through its numeraire pool, or set per asset.
-4. `fillFromNumeraire` in a linked library (the hook is near EIP-170).
+3. Order creation: do not insert the order into a book, and make `matchNewOrder` a no-op for these
+   pools (there is no book to match and no pool liquidity to try).
+4. Minimum order size: today's check is in numeraire units, which these pools do not have. In v1,
+   either skip it or use a per-pool or per-asset minimum.
+5. Priority bids: their minimum is computed from the numeraire side, and without a book they decide
+   nothing. Require zero on non-numeraire pools in v1.
+6. Fill and cancel: both remove the order from its book first; that removal must accept orders that
+   were never in one.
 
-Like any hook change this ships with the next hook and Router deployment (the Router address is
-immutable in the hook) and needs an audit pass.
+This ships with the next hook and Router deployment (the Router address is immutable in the hook) and
+needs a review pass.
 
-**What it gives.** Cross-pair limit orders and instant cross-pair swaps (an order filled in the
-transaction that places it), with no new order type, no new storage and no change to how orders fill.
+**What it gives.** Any-asset limit orders with no new order type, no new storage and no change to how
+orders fill.
 
-**Limits.** No baskets (one input, one output). Orders on non-numeraire pools do not match each other in v1, so
-two opposite ETH ⇄ AMD orders meet only through fillers or through the numeraire books. Each numeraire
-leg of `fillFromNumeraire` crosses the spread of that book.
+**What it does not give.** Fills depend on fillers showing up: an order rests until someone fills it.
+The simplest help is an off-chain filler run by the team that watches non-numeraire orders, buys the
+output token (Uniswap, or our numeraire books) and fills when the maker's limit leaves a margin. There
+are no instant fills on placement, no baskets, and no automatic matching (the open problem in
+section 1).
 
-**Later (v2): matching inside non-numeraire pools.** Direct ETH ⇄ AMD coincidences of wants, by picking one
-currency as the pool's quote side for price keys and minimums so the existing matching engine can run
-on a non-numeraire pool.
+**Later steps toward automatic matching.**
+
+- **`fillFromNumeraire`.** A permissionless fill that routes an order's ETH → USDG → AMD through the
+  numeraire pools in one transaction: sell the ETH for as much USDG as possible (the ETH/USDG book,
+  then its LP liquidity), spend all of it on as much AMD as possible (the AMD/USDG book, then its LP
+  liquidity), charge the fee once, and give the maker everything bought if it meets the minimum.
+  Using the books means filling resting orders partially at their limits, which the matching code
+  already does for book matches. This is matching across two books, done by the protocol.
+- **Matching inside non-numeraire pools.** Direct ETH ⇄ AMD matches, by picking one currency as the
+  pool's quote side for price keys and minimums so the existing matching engine can run there.
+- **Rings and batches.** Matching across many books at once is approaches C and D.
 
 ### A. Route through the numeraire in the interface
 
@@ -223,29 +244,33 @@ and section 7 there computes it as a convex program.
 
 | | E. Non-numeraire pools | A. Interface route | B. Instant via custom accounting | C. Intents + ledger | D. Uniform batches |
 |---|---|---|---|---|---|
-| Instant X → Y | Yes, one transaction | Two steps | Yes, one transaction | Yes | Per batch |
+| Instant X → Y | No (v1); yes with `fillFromNumeraire` | Two steps | Yes, one transaction | Yes | Per batch |
 | Limit X → Y | Yes, limit in the output token | Yes (leg 2 rests) | No | Yes | Yes |
 | Baskets | No | No | No | Yes | Yes |
-| CoWs | Through the numeraire books (v1); direct in v2 | No | No | Yes | Yes, automatic |
+| Automatic matching across books | No (v1); two books with `fillFromNumeraire` | No | No | Yes | Yes |
 | Reachable by external routers | No | No | Yes | No | No |
-| Contract change | Pool-type rules + `fillFromNumeraire` library | None | Hook | Settlement library + Router | C plus solver rules |
+| Contract change | A few hook guards (v1) | None | Hook | Settlement library + Router | C plus solver rules |
 
-E is the lead: cross-pair limit and instant swaps, and CoWs through the numeraire books, with no new
-order type or storage and the existing fill path unchanged. The others stack around it. A works today. B makes instant multi-asset swaps native and
+E is the v1: any-asset limit orders, filled by fillers, with a few hook guards and the existing fill
+path unchanged. Automatic matching across books comes from E's later steps or from C and D. The others stack around it. A works today. B makes instant multi-asset swaps native and
 opens Async Swap liquidity to the rest of Uniswap v4. C adds limit intents, baskets and CoWs on top of
 B's instant fills. D tightens C's acceptance rule into uniform prices.
 
 ## 6. Open questions
 
-For E:
+For E (v1):
 
-- How are minimum order sizes checked on non-numeraire pools: by valuing the input through its numeraire pool,
-  or with a per-asset minimum?
-- Should `fillFromNumeraire` use LP liquidity on both legs, or only the books?
-- Should the initial price passed when creating a non-numeraire pool be ignored (non-numeraire pools hold no LP
-  liquidity), or recorded as a reference price for the interface?
-- In v2, which currency is a non-numeraire pool's quote side for matching (currency1, or the one with the
-  deeper numeraire market)?
+- Minimum order size on non-numeraire pools: skip it, or a per-pool or per-asset minimum?
+- Should the price passed when creating a non-numeraire pool be ignored, or kept as a reference price
+  for the interface?
+- Who runs the first filler, and how much margin should it require before filling?
+
+For automatic matching across books:
+
+- Should `fillFromNumeraire` use the numeraire books (partial fills of resting orders) or only LP
+  liquidity at first?
+- Who calls it, and does surplus above the maker's minimum go to the maker or partly to the caller?
+- Which currency is a non-numeraire pool's quote side once matching runs inside it?
 
 For the other approaches:
 

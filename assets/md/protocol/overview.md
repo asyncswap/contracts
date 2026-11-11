@@ -2,7 +2,8 @@
 
 Async Swap is a Uniswap v4 hook that turns exact-input swaps into resting limit orders. This page
 describes the whole protocol in diagrams: which contracts exist, where funds sit, how an order is
-created, matched, filled, repriced and cancelled, and who is allowed to do what. Every box names a
+created, matched, filled, repriced and cancelled, and who is allowed to do what. Orders are good
+till cancelled (GTC): there is no expiry, so an order rests until it fills or the maker cancels it. Every box names a
 contract, library or function in `src/`, so the diagrams can be checked against the code.
 
 ## 1. Components

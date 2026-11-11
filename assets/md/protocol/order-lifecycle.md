@@ -6,6 +6,13 @@ The current source includes incoming-order memory matching; deployed v1.3.0 cont
 
 ## Order lifecycle
 
+Orders are good till cancelled (GTC). The order struct has no expiry or deadline field, and nothing
+closes an order on a timer: it rests on the book until it is fully filled (by a later crossing
+order, pool liquidity or a filler) or the maker cancels it. Repricing changes the minimum output
+without changing the order's lifetime. Signed messages (`swapWithSig`, `updatePriceWithSig`,
+`cancelWithSig`) carry a `deadline`, but it only limits when that signature can be submitted; it does
+not expire the order.
+
 These diagrams describe the current source, not a deployment or mainnet-readiness guarantee. Book matching ranks the best opposing price first; higher escrowed USDC bids break ties at that price, followed by earlier submission. Zero-bid orders are valid and keep time priority behind paid bids. Private fills and explicit LP retries target a specific order and do not enforce the book's global priority queue.
 
 ```mermaid

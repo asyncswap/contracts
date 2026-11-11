@@ -138,5 +138,75 @@
         "txHash": "0x5b7afc9f6b5a6f1d6a712cf3250d2ca9e67484daa121a66d34215f8598cce14e"
       }
     }
+  },
+  {
+    "chainId": 99801,
+    "name": "Elysium Testnet",
+    "network": "testnet",
+    "explorerUrl": "https://testnet.elysium.kinetiq.xyz",
+    "numeraire": "0x7d29d8047b905000459c0e80c34a26ceedcb47b2",
+    "release": null,
+    "sourceCommit": "3eccc848fb2ed4965776861e965d1c0288a3377f",
+    "features": {
+      "priorityFeeTopUps": true,
+      "tickBitmap": true
+    },
+    "contracts": {
+      "PoolManager": {
+        "address": "0x67E44b69D10737dF41f5a98078072B817016B871",
+        "startBlock": 26822575,
+        "txHash": "0x0b2a82fa9ddfbe637a0d7daa5611a84c4148fb2e0936c0e138a3887988e09203"
+      },
+      "TickPrice": {
+        "address": "0x9c5B3e4cB505412E7A0017695D00a4A7453f57cB",
+        "startBlock": 26824054,
+        "txHash": "0xa401429c8b8e7f9c6e63b69e8d04b277e4d3ec01f70074a7cad23ee27829b5f8"
+      },
+      "DynamicFeeOrdering": {
+        "address": "0x2f43586f3b729d45dbCd07CA645e66Aef933C61D",
+        "startBlock": 26824136,
+        "txHash": "0xda3b365ab8d833ad89dd0625068597c209ea8b8bcbd32162ef491c0365586b5e"
+      },
+      "TickBitmap": {
+        "address": "0x977Aee08690CB39A5dab41937eCdbD70e1Bf4a21",
+        "startBlock": 26824213,
+        "txHash": "0xdad3ac8b5416f9e4c9c1f926035f0ec8acc83345c7c9a72b95eac51767cd033a"
+      },
+      "EligiblePrice": {
+        "address": "0x5C51B17E1b1D842C168aeDcF001014Fe55b60f8e",
+        "startBlock": 26824340,
+        "txHash": "0x4db3bc0dd95d5e2a424036388c32840ebeda464f63bb504adc4e415cdb8e8be0"
+      },
+      "PriorityFeeUpdates": {
+        "address": "0xbBb97F9A1655814f1c6C62bDD1Fe26092a0a9D7B",
+        "startBlock": 26824410,
+        "txHash": "0xfe3ae5daf2130492918455b3704891061f6427c510c898b4f666e5584a528ce8"
+      },
+      "AsyncMatching": {
+        "address": "0xA05Dd653264A724df5A4A9e54759c3CEbaFa14b7",
+        "startBlock": 26824488,
+        "txHash": "0xd3582560a98361c1422de3945bd5d09a48bf47d44091d08fb23ee8488ac69678"
+      },
+      "IncomingMatching": {
+        "address": "0x57510fc2402Ba4346f38085b963d3429FBdf6131",
+        "startBlock": 26824572,
+        "txHash": "0x888179118e99f4f29a6843800870a2f46d715bef907351263b7f3ced0e547156"
+      },
+      "AsyncSwap": {
+        "address": "0x91bb44fDEfdec74aaCbe7EE92A51C2eA427E6888",
+        "startBlock": 26826205,
+        "txHash": "0x53e56049c2817f733956676af30f100d19caf3565cd4587af51c63507d31df62"
+      },
+      "Router": {
+        "address": "0x4f3aBD7F7afe42BdF3c6E187323d9CbD1271b588",
+        "startBlock": 26826205,
+        "txHash": "0xe086993dce79339f9ac5c477e6f97190be35112ec6c490791b541953bcf08679"
+      },
+      "FeeVault": {
+        "address": "0xDeEdAe80F60d1c0B0B4Ac28bdF1BBD219c91d079",
+        "startBlock": 26826205,
+        "txHash": "0x53e56049c2817f733956676af30f100d19caf3565cd4587af51c63507d31df62"
+      }
+    }
   }
 ]

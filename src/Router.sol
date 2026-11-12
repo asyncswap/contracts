@@ -373,7 +373,11 @@ contract Router is EIP712, Multicall {
     /// @dev `maxPrice` caps the output owed, as in `fillOrder`, and `order.amountIn` is the least input accepted.
     ///      `msg.value` is the MEV tax only. The order is closed for the whole callback, so it cannot be repriced,
     ///      cancelled, topped up, matched or filled again; every normal Router entry point refuses reentry.
-    function flashFill(AsyncOrder calldata order, uint256 maxPrice, bytes calldata data) external payable noFlashFill {
+    function fillOrderWithCallback(AsyncOrder calldata order, uint256 maxPrice, bytes calldata data)
+        external
+        payable
+        noFlashFill
+    {
         _chargeMevTax(0);
         assembly ("memory-safe") {
             tstore(USER_LOCATION, caller())
@@ -407,7 +411,7 @@ contract Router is EIP712, Multicall {
         require(gross <= maxPrice, "Price exceeds maxPrice");
     }
 
-    /// @dev Body of `flashFill` inside the unlock: input first, callback, then the output check and payout.
+    /// @dev Body of `fillOrderWithCallback` inside the unlock: input first, callback, then the output check and payout.
     function _flashFill(AsyncOrder memory order, address filler, bytes memory data) private {
         uint256 maxPrice;
         assembly ("memory-safe") {

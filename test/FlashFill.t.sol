@@ -70,7 +70,7 @@ contract MockFlashFiller is IAsyncSwapFlashFiller {
     }
 
     function run(AsyncOrder calldata order, uint256 maxPrice, Step[] calldata steps, uint256 shortBy) external payable {
-        router.flashFill{value: msg.value}(order, maxPrice, abi.encode(steps, shortBy));
+        router.fillOrderWithCallback{value: msg.value}(order, maxPrice, abi.encode(steps, shortBy));
     }
 
     /// @dev Lets a test act as this contract outside a flash fill (setup, or calls that must fail).
@@ -510,7 +510,7 @@ contract FlashFillTest is Test {
     function test_reentrancy_normalEntryPointsRefused() public {
         AsyncOrder memory a = _alicesOrder();
         _expectStepRevert(
-            _call(address(router), abi.encodeCall(Router.flashFill, (a, 90 ether, ""))),
+            _call(address(router), abi.encodeCall(Router.fillOrderWithCallback, (a, 90 ether, ""))),
             abi.encodeWithSelector(Router.FlashFillActive.selector)
         );
         _expectStepRevert(

@@ -10,7 +10,7 @@ it controls.
 
 ## Flow
 
-1. The filler contract calls `Router.flashFill(order, maxPrice, data)`. `msg.value` is the MEV tax only.
+1. The filler contract calls `Router.fillOrderWithCallback(order, maxPrice, data)`. `msg.value` is the MEV tax only.
 2. The Router opens one `unlock`, checks the live order against `maxPrice` and `order.amountIn` (as `fillOrder`
    does), and calls `AsyncSwap.beginFlashFill`. The hook closes the order (removes it from the book, deletes it,
    settles its priority bid to the vault) and credits its input, less the 0.02% trade fee, to the filler as
@@ -47,7 +47,7 @@ claims). Native ETH is claim id 0 and needs no `msg.value`.
 | Rule | Enforcement |
 |---|---|
 | The flash-filled order cannot be repriced, cancelled, topped up, matched or filled again during the callback. | `beginFlashFill` closes and deletes the order before the callback. Every later action on it finds no order (`OrderNotFound`), and it is no longer in the book for `matchBook`. |
-| Normal Router entry points refuse reentry. | `noFlashFill` on `swap`, `swapWithSig`, `fillOrder`, `cancelOrder`, `cancelWithSig`, `cancelAndWithdraw`, `withdrawClaims`, `topUpPriorityFee`, `matchBook`, `fillFromPoolLiquidity` and `flashFill` (no nesting). These also open their own unlock, which v4 refuses. |
+| Normal Router entry points refuse reentry. | `noFlashFill` on `swap`, `swapWithSig`, `fillOrder`, `cancelOrder`, `cancelWithSig`, `cancelAndWithdraw`, `withdrawClaims`, `topUpPriorityFee`, `matchBook`, `fillFromPoolLiquidity` and `fillOrderWithCallback` (no nesting). These also open their own unlock, which v4 refuses. |
 | Only the active filler may use the in-unlock entry points, only while active. | `onlyFlashFiller` compares `msg.sender` with the transient filler slot; the slot is cleared before the output is collected and before the unlock returns. |
 | The maker check is on the final amount only. | The owed output is pulled once, after the callback returns. |
 | Resting orders filled inside a flash fill are never worse off. | `fillOrderInFlash` applies the same live minimum, `maxPrice`, `order.amountIn` bound and 0.02% fees as `fillOrder`. |
@@ -74,6 +74,6 @@ These are directions, not part of this change.
 
 - Input is credited as ERC-6909 claims the filler burns or trades, not as an open delta: deltas belong to the
   address that creates them, and claims also let book-to-book routes run with no delta at all.
-- One order per `flashFill` call. A filler can still fill any number of other orders inside the callback.
-- In-unlock fills pay no further MEV tax; the outer `flashFill` pays it once.
+- One order per `fillOrderWithCallback` call. A filler can still fill any number of other orders inside the callback.
+- In-unlock fills pay no further MEV tax; the outer `fillOrderWithCallback` pays it once.
 - Surplus above the maker's minimum stays with the filler, as in a plain fill.

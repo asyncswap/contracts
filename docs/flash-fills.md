@@ -31,7 +31,7 @@ A filler integrates against these two interfaces only.
 
 ## Flow
 
-1. The filler contract calls `Router.fillOrderWithCallback(order, maxPrice, data)`. `msg.value` is the MEV tax only.
+1. The filler contract calls `Router.fillOrderWithCallback(order, maxPrice, data)`. `msg.value` is an optional prepayment toward the MEV tax (see below).
 2. The Router opens one `unlock`, checks the live order against `maxPrice` and `order.amountIn` (as `fillOrder`
    does), and calls `AsyncSwap.flashFill` (op 0). The hook closes the order (removes it from the book, deletes it,
    settles its priority bid to the vault) and credits its input, less the 0.02% trade fee, to the filler as
@@ -96,5 +96,9 @@ These are directions, not part of this change.
 - Input is credited as ERC-6909 claims the filler burns or trades, not as an open delta: deltas belong to the
   address that creates them, and claims also let book-to-book routes run with no delta at all.
 - One order per `fillOrderWithCallback` call. A filler can still fill any number of other orders inside the callback.
-- In-unlock fills pay no further MEV tax; the outer `fillOrderWithCallback` pays it once.
+- Every fill pays the MEV tax: the outer fill and each `fillOrderInCallback`. The Router pays the FeeVault when the
+  fill runs and owes that ETH to the PoolManager until the unlock ends. The filler covers it with `msg.value`, or inside
+  its callback with `PoolManager.settleFor(router)` (for example from ETH its route earned). A surplus comes back to
+  the filler in ETH. A shortfall reverts `MevTaxUnpaid(owed)`. With no priority fee the tax is zero.
+- `matchBookInCallback` pays no tax: `matchBook` is open to anyone outside a flash fill too.
 - Surplus above the maker's minimum stays with the filler, as in a plain fill.

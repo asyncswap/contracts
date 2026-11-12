@@ -5,6 +5,7 @@ import {IAsyncSwapCallback} from "@async-swap/interfaces/IAsyncSwapCallback.sol"
 import {IAsyncSwapFlashFiller} from "@async-swap/interfaces/IAsyncSwapFlashFiller.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
+import {TransientStateLibrary} from "v4-core/libraries/TransientStateLibrary.sol";
 import {Currency, CurrencyLibrary} from "v4-core/types/Currency.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 import {AsyncSwap} from "src/AsyncSwap.sol";
@@ -24,8 +25,7 @@ contract RouterFlashFills is IAsyncSwapCallback {
     AsyncSwap immutable HOOK;
     uint256 immutable MEV_TAX_GAS;
 
-    /// @dev Router transient slots this module shares (see Router). keccak256("Router.MevTax") - 1.
-    bytes32 constant MEV_TAX_LOCATION = 0xe6251c15e22bdb44d13d4efeec6855e57f2b38fe36310ce3c709991726ed21da;
+    /// @dev Router transient slot this module shares (see Router).
     /// keccak256("Router.FlashFiller") - 1: the filler of the flash fill in progress, zero otherwise.
     bytes32 constant FLASH_FILLER_LOCATION = 0x8a32db0797977fc7694da75ada74debc8ae08fbf3557ccd5133e780e8ba11369;
     /// @dev First word of the Router's unlock data for a flash fill: `Router.ActionType.FlashFill`.
@@ -42,6 +42,9 @@ contract RouterFlashFills is IAsyncSwapCallback {
 
     event MevTaxPaid(address indexed payer, uint256 amount);
 
+    /// @notice The filler left `owed` of the MEV tax of its fills unpaid.
+    error MevTaxUnpaid(uint256 owed);
+
     constructor(IPoolManager _poolManager, AsyncSwap _hook, uint256 _mevTaxGas) {
         POOLMANAGER = _poolManager;
         HOOK = _hook;
@@ -51,24 +54,17 @@ contract RouterFlashFills is IAsyncSwapCallback {
     /// @inheritdoc IAsyncSwapCallback
     function fillOrderWithCallback(AsyncOrder calldata order, uint256 maxPrice, bytes calldata data) external payable {
         if (_flashFiller() != address(0)) revert FlashFillActive();
-        uint256 tax = tx.gasprice > block.basefee ? (tx.gasprice - block.basefee) * MEV_TAX_GAS : 0;
-        require(msg.value == tax, "msg.value != deposit + mevTax");
-        if (tax != 0) {
-            assembly ("memory-safe") {
-                tstore(MEV_TAX_LOCATION, tax)
-            }
-            emit MevTaxPaid(msg.sender, tax);
-        }
-        POOLMANAGER.unlock(abi.encode(FLASH_FILL_ACTION, order, msg.sender, maxPrice, data));
+        POOLMANAGER.unlock(abi.encode(FLASH_FILL_ACTION, order, msg.sender, maxPrice, data, msg.value));
     }
 
     /// @notice Body of a flash fill: the Router's `unlockCallback` forwards its calldata here (running as the Router)
     ///         when the action is a flash fill. Input first, callback, then the output check and payout.
     function unlockCallback(bytes calldata data) external returns (bytes memory) {
         require(msg.sender == address(POOLMANAGER), "Caller is not PoolManager");
-        (, AsyncOrder memory order, address filler, uint256 maxPrice, bytes memory fillerData) =
-            abi.decode(data, (uint8, AsyncOrder, address, uint256, bytes));
+        (, AsyncOrder memory order, address filler, uint256 maxPrice, bytes memory fillerData, uint256 prepaid) =
+            abi.decode(data, (uint8, AsyncOrder, address, uint256, bytes, uint256));
         _checkFill(order, maxPrice);
+        _chargeMevTax(filler);
         (uint256 amountIn, uint256 amountOwed) = _hookCall(BEGIN, order, filler);
         assembly ("memory-safe") {
             tstore(FLASH_FILLER_LOCATION, filler)
@@ -80,6 +76,7 @@ contract RouterFlashFills is IAsyncSwapCallback {
         // The maker check is on what the filler holds at the end, whatever route it took.
         POOLMANAGER.transferFrom(filler, address(HOOK), _output(order).toId(), amountOwed);
         _hookCall(SETTLE, order, filler);
+        _settleMevTax(filler, prepaid);
         return "";
     }
 
@@ -87,6 +84,7 @@ contract RouterFlashFills is IAsyncSwapCallback {
     function fillOrderInCallback(AsyncOrder calldata order, uint256 maxPrice) external {
         _onlyFlashFiller();
         uint256 owed = _checkFill(order, maxPrice);
+        _chargeMevTax(msg.sender);
         POOLMANAGER.transferFrom(msg.sender, address(HOOK), _output(order).toId(), owed);
         _hookCall(FILL, order, msg.sender);
     }
@@ -95,6 +93,27 @@ contract RouterFlashFills is IAsyncSwapCallback {
     function matchBookInCallback(PoolKey calldata key, uint8 maxMatches) external returns (uint8) {
         _onlyFlashFiller();
         return HOOK.matchBook(key, maxMatches);
+    }
+
+    /// @dev Pays one fill's MEV tax to the FeeVault as native claims now; the Router owes it to the PoolManager
+    ///      until `_settleMevTax`.
+    function _chargeMevTax(address filler) private {
+        uint256 tax = tx.gasprice > block.basefee ? (tx.gasprice - block.basefee) * MEV_TAX_GAS : 0;
+        if (tax == 0) return;
+        POOLMANAGER.mint(address(HOOK.feeVault()), 0, tax);
+        emit MevTaxPaid(filler, tax);
+    }
+
+    /// @dev Settles the prepayment, then requires the Router's native delta to be covered: the filler may have paid
+    ///      with `settleFor(router)` in its callback. A surplus goes back to the filler.
+    function _settleMevTax(address filler, uint256 prepaid) private {
+        if (prepaid != 0) {
+            POOLMANAGER.sync(CurrencyLibrary.ADDRESS_ZERO);
+            POOLMANAGER.settle{value: prepaid}();
+        }
+        int256 delta = TransientStateLibrary.currencyDelta(POOLMANAGER, address(this), CurrencyLibrary.ADDRESS_ZERO);
+        if (delta < 0) revert MevTaxUnpaid(uint256(-delta));
+        if (delta > 0) POOLMANAGER.take(CurrencyLibrary.ADDRESS_ZERO, filler, uint256(delta));
     }
 
     function _hookCall(uint8 op, AsyncOrder memory order, address filler) private returns (uint256, uint256) {

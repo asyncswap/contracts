@@ -332,7 +332,7 @@ library IncomingMatching {
         info.priorityFee -= uint64(spent);
         info.amountIn = oldInput - consumed;
         info.amountOutMin = Math.mulDiv(info.amountOutMin, info.amountIn, oldInput, Math.Rounding.Ceil);
-        if (info.amountIn == 0 || (info.isBuy ? info.amountIn : info.amountOutMin) < book.minOrder) {
+        if (info.amountIn == 0 || AsyncFiller.belowMinimum(book, info.isBuy, info.amountIn, info.amountOutMin)) {
             AsyncMatching._creditPriorityFee(self, key, id, info.owner, info.priorityFee, batch);
             refund = info.amountIn;
             info.amountIn = 0;

@@ -220,7 +220,7 @@ library AsyncMatching {
     ) public {
         AsyncFiller.OrderInfo storage info = self.orders[id];
         uint256 amountIn = info.amountIn;
-        if (amountIn == 0 || (info.isBuy ? amountIn : info.amountOutMin) >= book.minOrder) return;
+        if (amountIn == 0 || !AsyncFiller.belowMinimum(book, info.isBuy, amountIn, info.amountOutMin)) return;
         address maker = info.owner;
         Currency input = info.zeroForOne ? key.currency0 : key.currency1;
         ClaimTransfers.Batch memory batch;
@@ -451,7 +451,10 @@ library AsyncMatching {
         // The order closes when its input is used up, or when what is left is worth less than the
         // pool minimum by the order's own terms (no pool price involved); the caller then returns
         // the remaining input after both reductions. Settling the unfilled bid calls no maker code.
-        if (remainingInput == 0 || (closeDust && (info.isBuy ? remainingInput : remainingMinimum) < book.minOrder)) {
+        if (
+            remainingInput == 0
+                || (closeDust && AsyncFiller.belowMinimum(book, info.isBuy, remainingInput, remainingMinimum))
+        ) {
             _creditPriorityFee(self, key, params.id, info.owner, unfilledPriorityFee, batch);
             AsyncFiller._remove(self, book, params.id);
             delete self.orders[params.id];

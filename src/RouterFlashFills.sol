@@ -86,8 +86,8 @@ contract RouterFlashFills is IAsyncSwapCallback {
     /// @inheritdoc IAsyncSwapCallback
     function fillOrderInCallback(AsyncOrder calldata order, uint256 maxPrice) external {
         _onlyFlashFiller();
-        uint256 gross = _checkFill(order, maxPrice);
-        POOLMANAGER.transferFrom(msg.sender, address(HOOK), _output(order).toId(), gross);
+        uint256 owed = _checkFill(order, maxPrice);
+        POOLMANAGER.transferFrom(msg.sender, address(HOOK), _output(order).toId(), owed);
         _hookCall(FILL, order, msg.sender);
     }
 
@@ -117,11 +117,12 @@ contract RouterFlashFills is IAsyncSwapCallback {
 
     /// @dev Checks the live order against the filler's bounds and returns the output owed: the live minimum, at most
     ///      `maxPrice`, for a live input of at least `order.amountIn`. A missing order is left for the hook to reject.
-    function _checkFill(AsyncOrder memory order, uint256 maxPrice) private view returns (uint256 gross) {
+    ///      The flash path charges no pool fee, so the hook burns exactly the live minimum it returns.
+    function _checkFill(AsyncOrder memory order, uint256 maxPrice) private view returns (uint256 livePrice) {
         bytes32 id = keccak256(abi.encode(block.chainid, order.key.toId(), order.owner, order.zeroForOne, order.salt));
-        (uint256 liveAmountIn, uint256 livePrice) = HOOK.asyncOrderInfo(order.key.toId(), id);
+        uint256 liveAmountIn;
+        (liveAmountIn, livePrice) = HOOK.asyncOrderInfo(order.key.toId(), id);
         require(liveAmountIn == 0 || liveAmountIn >= order.amountIn, "Input below order.amountIn");
-        gross = livePrice + HOOK.calculatePoolFee(order.key.fee, livePrice);
-        require(gross <= maxPrice, "Price exceeds maxPrice");
+        require(livePrice <= maxPrice, "Price exceeds maxPrice");
     }
 }

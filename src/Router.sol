@@ -7,6 +7,7 @@ import {OrderSignatures} from "@async-swap/libraries/OrderSignatures.sol";
 import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {IAsyncSwapFlashFiller} from "@async-swap/interfaces/IAsyncSwapFlashFiller.sol";
+import {IAsyncSwapCallback} from "@async-swap/interfaces/IAsyncSwapCallback.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
@@ -42,7 +43,7 @@ import {AsyncSwap} from "src/AsyncSwap.sol";
 ///         that orders by priority fee, searchers racing for the same position bid it up, so most of what they race
 ///         for goes to the protocol; a transaction with no priority pays nothing. Inside `multicall`, which is not
 ///         payable, a taxed action needs a transaction with no priority.
-contract Router is EIP712, Multicall {
+contract Router is IAsyncSwapCallback, EIP712, Multicall {
     using CurrencySettler for Currency;
     using CurrencyLibrary for Currency;
     using SafeCast for *;

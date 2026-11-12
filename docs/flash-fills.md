@@ -8,6 +8,14 @@ input first, calls the filler back inside its own PoolManager unlock, and only t
 Inside the callback the filler can route through any Uniswap v4 pool and fill other Async Swap orders, in a loop
 it controls.
 
+## Interfaces
+
+- `IAsyncSwapCallback` (implemented by the Router): `fillOrderWithCallback` opens a fill; `fillOrderInCallback` and
+  `matchBookInCallback` are the only Router calls accepted while the callback runs, and only from its filler.
+- `IAsyncSwapFlashFiller` (implemented by the filler): `asyncSwapFlashFill`, the callback.
+
+A filler integrates against these two interfaces only.
+
 ## Flow
 
 1. The filler contract calls `Router.fillOrderWithCallback(order, maxPrice, data)`. `msg.value` is the MEV tax only.

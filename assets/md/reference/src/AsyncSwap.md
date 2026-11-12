@@ -1,6 +1,6 @@
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -656,6 +656,92 @@ function executeOrder(AsyncOrder calldata order, bytes calldata data) external;
 | ---- | ---- | ----------- |
 | order | `AsyncOrder` |  |
 | data | `bytes` | abi.encode(filler) — the address that should receive the maker's input. |
+
+<a id="beginflashfill-asyncorder-address" />
+
+### beginFlashFill
+
+Input-first half of a Router flash fill: closes `order` and credits its input, less the trade fee,
+to `filler` as ERC-6909 claims. The Router must call `settleFlashFill` in the same unlock.
+
+```solidity
+function beginFlashFill(AsyncOrder calldata order, address filler)
+        external
+        returns (uint256 amountIn, uint256 amountOwed);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| filler | `address` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| amountIn | `uint256` | The input credited to the filler. |
+| amountOwed | `uint256` | The output the Router must transfer to this hook as claims before `settleFlashFill`. |
+
+<a id="settleflashfill-asyncorder-address" />
+
+### settleFlashFill
+
+Pays the maker of the open flash fill out of the output claims the Router has just transferred here.
+
+```solidity
+function settleFlashFill(AsyncOrder calldata order, address filler) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| filler | `address` |  |
+
+<a id="executeorderwithclaims-asyncorder-address" />
+
+### executeOrderWithClaims
+
+Full fill paid in claims, for fills inside a flash fill: the Router has already transferred the
+order's live minimum (plus pool fee) to this hook as claims; `filler` receives the input as claims.
+
+```solidity
+function executeOrderWithClaims(AsyncOrder calldata order, address filler) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| filler | `address` |  |
+
+<a id="_claimsfill-asyncorder-address" />
+
+### \_claimsFill
+
+```solidity
+function _claimsFill(AsyncOrder calldata order, address filler)
+        private
+        view
+        returns (AsyncMatching.FillParams memory);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| filler | `address` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `AsyncMatching.FillParams` |  |
 
 <a id="matchneworder-asyncorder" />
 

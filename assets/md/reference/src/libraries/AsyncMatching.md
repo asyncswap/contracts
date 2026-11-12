@@ -1,6 +1,6 @@
 # AsyncMatching
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/libraries/AsyncMatching.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/libraries/AsyncMatching.sol)
 
 Linked matching module operating on the hook's order and radix-book storage.
 
@@ -24,6 +24,35 @@ uint8 public constant MAX_MATCHES_PER_CALL = 8;
 
 ```solidity
 uint24 private constant POOL_LIQUIDITY_FILL_FEE = 200;
+```
+
+### FLASH_ORDER_SLOT
+
+<i>
+  Transient record of the order a flash fill has opened, in the hook's context: its id, then the input,
+  minimum output and pool fee it was opened at. Each slot is keccak256("asyncswap.flashFill.\<name>") - 1.
+</i>
+
+```solidity
+bytes32 private constant FLASH_ORDER_SLOT = 0xadcc9340e9b9520481a90c5e1cb2c7bb827085ef7c7b209a028db0fe766510cd;
+```
+
+### FLASH_AMOUNT_IN_SLOT
+
+```solidity
+bytes32 private constant FLASH_AMOUNT_IN_SLOT = 0xa948fdbbf716a51dd3ab76f9643ccf5ff5ac531fed11e84d483629e540b40220;
+```
+
+### FLASH_AMOUNT_OUT_SLOT
+
+```solidity
+bytes32 private constant FLASH_AMOUNT_OUT_SLOT = 0x4af24310f6994917e24875d474455b553ed83a7345f90cd7dd124597d7de6b85;
+```
+
+### FLASH_FEE_SLOT
+
+```solidity
+bytes32 private constant FLASH_FEE_SLOT = 0xc91f6e2fe0f89d4ebceb2171c6e3e27ff5e6f3bf09bead6f1947891e5664a2d1;
 ```
 
 ## Functions
@@ -62,6 +91,70 @@ function bestOrder(AsyncFiller.State storage self, AsyncFiller.Book storage book
 
 ```solidity
 function fill(AsyncFiller.State storage self, AsyncFiller.Book storage book, FillParams memory params) public;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| book | `AsyncFiller.Book` |  |
+| params | `FillParams` |  |
+
+<a id="beginflashfill-asyncfiller-state-asyncfiller-book-fillparams" />
+
+### beginFlashFill
+
+Input-first fill: close the order and credit its input, less the trade fee, to the filler as claims.
+
+```solidity
+function beginFlashFill(AsyncFiller.State storage self, AsyncFiller.Book storage book, FillParams memory params)
+        public
+        returns (uint256 amountIn, uint256 amountOwed);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| book | `AsyncFiller.Book` |  |
+| params | `FillParams` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| amountIn | `uint256` | The input credited to the filler (after the trade fee). |
+| amountOwed | `uint256` | The output the hook must hold as claims when `settleFlashFill` runs. |
+
+<a id="settleflashfill-asyncfiller-state-fillparams" />
+
+### settleFlashFill
+
+Close the flash fill `beginFlashFill` opened: pay the maker out of the output claims the hook holds.
+
+```solidity
+function settleFlashFill(AsyncFiller.State storage self, FillParams memory params) public;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| params | `FillParams` |  |
+
+<a id="fillwithclaims-asyncfiller-state-asyncfiller-book-fillparams" />
+
+### fillWithClaims
+
+A full fill paid in claims, for fills inside a flash fill: the hook already holds the gross output
+as claims; the filler receives the input, less the trade fee, as claims.
+
+```solidity
+function fillWithClaims(AsyncFiller.State storage self, AsyncFiller.Book storage book, FillParams memory params)
+        public;
 ```
 
 **Parameters**
@@ -755,6 +848,18 @@ error LimitPriceNotMet();
 
 ```solidity
 error NoActiveLiquidity();
+```
+
+### FlashFillActive
+
+```solidity
+error FlashFillActive();
+```
+
+### NoFlashFill
+
+```solidity
+error NoFlashFill();
 ```
 
 ## Structs

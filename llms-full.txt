@@ -23,6 +23,8 @@ Sitemap:
 - [TokenClaims](/reference/src/TokenClaims): Redeems the caller's PoolManager currency claims to a chosen recipient.
 - [BaseHook](/reference/src/BaseHook): abstract contract for hook implementations
 - [IFeeOwner](/reference/src/IFeeOwner)
+- [IAsyncSwapCallback](/reference/src/interfaces/IAsyncSwapCallback): The Router's callback fill surface: `fillOrderWithCallback` opens a fill and calls the filler back (`IAsyncSwapFlashFiller.asyncSwapFlashFill`); the `...InCallback` functions are the only Router calls accepted while that callback runs, and only from its filler. Every other Router entry point reverts `FlashFillActive` until the callback returns.
+- [IAsyncSwapFlashFiller](/reference/src/interfaces/IAsyncSwapFlashFiller): Callback a filler contract implements to use `Router.flashFill`.
 - [ISignatureTransfer](/reference/src/interfaces/ISignatureTransfer): Minimal subset of Uniswap Permit2's SignatureTransfer interface used by the Router. Canonical Permit2 lives at 0x000000000022D473030F116dDEE9F6B43aC78BA3 on every chain.
 - [IIncomingLiquidity](/reference/src/libraries/IIncomingLiquidity)
 - [AsyncFiller](/reference/src/libraries/AsyncFiller): Stores open async orders and settles fills against them.
@@ -1569,7 +1571,7 @@ match the code on `main`. Each page links to its source file.
 
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -2225,6 +2227,92 @@ function executeOrder(AsyncOrder calldata order, bytes calldata data) external;
 | ---- | ---- | ----------- |
 | order | `AsyncOrder` |  |
 | data | `bytes` | abi.encode(filler) — the address that should receive the maker's input. |
+
+<a id="beginflashfill-asyncorder-address" />
+
+### beginFlashFill
+
+Input-first half of a Router flash fill: closes `order` and credits its input, less the trade fee,
+to `filler` as ERC-6909 claims. The Router must call `settleFlashFill` in the same unlock.
+
+```solidity
+function beginFlashFill(AsyncOrder calldata order, address filler)
+        external
+        returns (uint256 amountIn, uint256 amountOwed);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| filler | `address` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| amountIn | `uint256` | The input credited to the filler. |
+| amountOwed | `uint256` | The output the Router must transfer to this hook as claims before `settleFlashFill`. |
+
+<a id="settleflashfill-asyncorder-address" />
+
+### settleFlashFill
+
+Pays the maker of the open flash fill out of the output claims the Router has just transferred here.
+
+```solidity
+function settleFlashFill(AsyncOrder calldata order, address filler) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| filler | `address` |  |
+
+<a id="executeorderwithclaims-asyncorder-address" />
+
+### executeOrderWithClaims
+
+Full fill paid in claims, for fills inside a flash fill: the Router has already transferred the
+order's live minimum (plus pool fee) to this hook as claims; `filler` receives the input as claims.
+
+```solidity
+function executeOrderWithClaims(AsyncOrder calldata order, address filler) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| filler | `address` |  |
+
+<a id="_claimsfill-asyncorder-address" />
+
+### \_claimsFill
+
+```solidity
+function _claimsFill(AsyncOrder calldata order, address filler)
+        private
+        view
+        returns (AsyncMatching.FillParams memory);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| filler | `address` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `AsyncMatching.FillParams` |  |
 
 <a id="matchneworder-asyncorder" />
 
@@ -3023,7 +3111,7 @@ struct UserParams {
 
 # FeeVault
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/FeeVault.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/FeeVault.sol)
 
 Holds and redeems protocol fee claims, never maker escrow.
 
@@ -3130,7 +3218,7 @@ error ZeroAddress();
 
 # ImmutableState
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/ImmutableState.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/ImmutableState.sol)
 
 **Title:** Immutable State
 
@@ -3182,7 +3270,7 @@ error NotPoolManager();
 
 # MatchingEngine
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/MatchingEngine.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/MatchingEngine.sol)
 
 **Title:** MatchingEngine
 
@@ -3655,7 +3743,7 @@ struct Book {
 
 # NativeClaims
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/NativeClaims.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/NativeClaims.sol)
 
 Redeems the caller's PoolManager native ETH claims to a chosen recipient.
 
@@ -3777,9 +3865,9 @@ error ReentrantRedemption();
 
 # Router
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/Router.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/Router.sol)
 
-**Inherits:** EIP712, Multicall
+**Inherits:** [IAsyncSwapCallback](/reference/src/interfaces/IAsyncSwapCallback), EIP712, Multicall
 
 **Title:** Router
 
@@ -3878,6 +3966,14 @@ keccak256("Router.MevTax") - 1
 bytes32 constant MEV_TAX_LOCATION = 0xe6251c15e22bdb44d13d4efeec6855e57f2b38fe36310ce3c709991726ed21da;
 ```
 
+### FLASH_FILLER_LOCATION
+
+keccak256("Router.FlashFiller") - 1: the filler of the flash fill in progress, zero otherwise.
+
+```solidity
+bytes32 constant FLASH_FILLER_LOCATION = 0x8a32db0797977fc7694da75ada74debc8ae08fbf3557ccd5133e780e8ba11369;
+```
+
 ## Functions
 
 <a id="constructor-ipoolmanager-asyncswap-isignaturetransfer-uint256" />
@@ -3934,6 +4030,44 @@ function _chargeMevTax(uint256 deposit) private;
 | ---- | ---- | ----------- |
 | deposit | `uint256` |  |
 
+<a id="noflashfill" />
+
+### noFlashFill
+
+<i>
+  Refuses reentry from a flash-fill callback into an entry point that opens its own unlock.
+</i>
+
+```solidity
+modifier noFlashFill();
+```
+
+<a id="onlyflashfiller" />
+
+### onlyFlashFiller
+
+<i>
+  Only the filler of the running flash fill may use the in-unlock entry points.
+</i>
+
+```solidity
+modifier onlyFlashFiller();
+```
+
+<a id="_flashfiller" />
+
+### \_flashFiller
+
+```solidity
+function _flashFiller() private view returns (address filler);
+```
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| filler | `address` |  |
+
 <a id="onlypoolmanager" />
 
 ### onlyPoolManager
@@ -3964,7 +4098,7 @@ the maker must approve the router for `amountIn` of the input token. Either way 
 also carries the MEV tax (`mevTax()`, zero without a priority fee).
 
 ```solidity
-function swap(AsyncOrder calldata order, bytes memory userData) external payable;
+function swap(AsyncOrder calldata order, bytes memory userData) external payable noFlashFill;
 ```
 
 **Parameters**
@@ -3993,7 +4127,7 @@ bump the order's stored price. Pass `type(uint256).max` to disable the check.
 order's live input has dropped below it (e.g. after a partial match).
 
 ```solidity
-function fillOrder(AsyncOrder calldata order, uint256 maxPrice, bytes calldata) external payable;
+function fillOrder(AsyncOrder calldata order, uint256 maxPrice, bytes calldata) external payable noFlashFill;
 ```
 
 **Parameters**
@@ -4018,7 +4152,8 @@ supported (use `swap`). The relayer pays the MEV tax for its transaction's prior
 ```solidity
 function swapWithSig(AsyncOrder calldata order, PermitData calldata permit, ExecutorGrant calldata grant)
         external
-        payable;
+        payable
+        noFlashFill;
 ```
 
 **Parameters**
@@ -4038,7 +4173,8 @@ The nonce is burnt in the hook's store, so `AsyncSwap.invalidateNonce` revokes i
 
 ```solidity
 function cancelWithSig(AsyncOrder calldata order, uint256 nonce, uint256 deadline, bytes calldata signature)
-        external;
+        external
+        noFlashFill;
 ```
 
 **Parameters**
@@ -4073,7 +4209,7 @@ function DOMAIN_SEPARATOR() external view returns (bytes32);
 Maker cancels an unfilled order and reclaims their reserved input.
 
 ```solidity
-function cancelOrder(AsyncOrder calldata order) external;
+function cancelOrder(AsyncOrder calldata order) external noFlashFill;
 ```
 
 **Parameters**
@@ -4094,7 +4230,7 @@ Cancel an owned order and return its remaining input to the owner's wallet.
 </i>
 
 ```solidity
-function cancelAndWithdraw(AsyncOrder calldata order) external;
+function cancelAndWithdraw(AsyncOrder calldata order) external noFlashFill;
 ```
 
 **Parameters**
@@ -4114,7 +4250,7 @@ Withdraw the caller's approved ERC-6909 claims directly to their wallet.
 </i>
 
 ```solidity
-function withdrawClaims(Currency[] calldata currencies, uint256[] calldata amounts) external;
+function withdrawClaims(Currency[] calldata currencies, uint256[] calldata amounts) external noFlashFill;
 ```
 
 **Parameters**
@@ -4137,7 +4273,7 @@ Add `addedFee` numeraire units to the caller's remaining priority bid.
 </i>
 
 ```solidity
-function topUpPriorityFee(AsyncOrder calldata order, uint256 addedFee) external;
+function topUpPriorityFee(AsyncOrder calldata order, uint256 addedFee) external noFlashFill;
 ```
 
 **Parameters**
@@ -4158,7 +4294,7 @@ Anyone can continue a crossed book after a transaction hits the automatic match 
 </i>
 
 ```solidity
-function matchBook(PoolKey calldata key, uint8 maxMatches) external;
+function matchBook(PoolKey calldata key, uint8 maxMatches) external noFlashFill;
 ```
 
 **Parameters**
@@ -4180,7 +4316,7 @@ Retry a resting order against the pool's active Uniswap v4 LP positions.
 </i>
 
 ```solidity
-function fillFromPoolLiquidity(AsyncOrder calldata order) external payable;
+function fillFromPoolLiquidity(AsyncOrder calldata order) external payable noFlashFill;
 ```
 
 **Parameters**
@@ -4188,6 +4324,128 @@ function fillFromPoolLiquidity(AsyncOrder calldata order) external payable;
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | order | `AsyncOrder` |  |
+
+<a id="fillorderwithcallback-asyncorder-uint256-bytes" />
+
+### fillOrderWithCallback
+
+Fill `order` with no inventory. Inside one PoolManager unlock the hook closes the order and credits its
+input, less the 0.02% trade fee, to the caller as ERC-6909 claims; the Router then calls
+`IAsyncSwapFlashFiller(msg.sender).asyncSwapFlashFill(order, amountIn, amountOwed, data)`. Inside the
+callback the filler may route through any v4 pool and fill other Async Swap orders with
+`fillOrderInCallback` / `matchBookInCallback`. Afterwards the Router transfers `amountOwed` output claims
+from the filler to the hook (approve the Router on the PoolManager for them), and the hook pays the
+maker its live minimum less the trade fee. Any surplus stays with the filler.
+
+<i>
+  `maxPrice` caps the output owed, as in `fillOrder`, and `order.amountIn` is the least input accepted.
+  `msg.value` is the MEV tax only. The order is closed for the whole callback, so it cannot be repriced,
+  cancelled, topped up, matched or filled again; every normal Router entry point refuses reentry.
+</i>
+
+```solidity
+function fillOrderWithCallback(AsyncOrder calldata order, uint256 maxPrice, bytes calldata data)
+        external
+        payable
+        noFlashFill;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| maxPrice | `uint256` |  |
+| data | `bytes` |  |
+
+<a id="fillorderincallback-asyncorder-uint256" />
+
+### fillOrderInCallback
+
+Fill another open order from inside a flash-fill callback, paying in claims: the Router transfers
+the order's live minimum (plus pool fee) of output claims from the filler to the hook, and the filler
+receives the order's input, less the trade fee, as claims. No unlock and no MEV tax. Only the filler
+of the running flash fill may call.
+
+```solidity
+function fillOrderInCallback(AsyncOrder calldata order, uint256 maxPrice) external onlyFlashFiller;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| maxPrice | `uint256` |  |
+
+<a id="matchbookincallback-poolkey-uint8" />
+
+### matchBookInCallback
+
+Continue a crossed book from inside a flash-fill callback. Only the filler of the running flash fill.
+
+```solidity
+function matchBookInCallback(PoolKey calldata key, uint8 maxMatches) external onlyFlashFiller returns (uint8);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| key | `PoolKey` |  |
+| maxMatches | `uint8` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint8` |  |
+
+<a id="_checkfill-asyncorder-uint256" />
+
+### \_checkFill
+
+<i>
+  Checks the live order against the filler's bounds and returns the gross output owed: the live minimum
+  plus the pool fee, at most `maxPrice`, for a live input of at least `order.amountIn`.
+</i>
+
+```solidity
+function _checkFill(AsyncOrder memory order, uint256 maxPrice) private view returns (uint256 gross);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| maxPrice | `uint256` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| gross | `uint256` |  |
+
+<a id="_flashfill-asyncorder-address-bytes" />
+
+### \_flashFill
+
+<i>
+  Body of `fillOrderWithCallback` inside the unlock: input first, callback, then the output check and payout.
+</i>
+
+```solidity
+function _flashFill(AsyncOrder memory order, address filler, bytes memory data) private;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| filler | `address` |  |
+| data | `bytes` |  |
 
 <a id="unlockcallback-bytes" />
 
@@ -4373,6 +4631,22 @@ error SignatureExpired();
 error InvalidSignature();
 ```
 
+### FlashFillActive
+
+A normal entry point was called while a flash fill is running.
+
+```solidity
+error FlashFillActive();
+```
+
+### NotFlashFiller
+
+An in-unlock entry point was called by anyone but the filler of the running flash fill.
+
+```solidity
+error NotFlashFiller();
+```
+
 ## Structs
 
 ### SwapCallback
@@ -4449,7 +4723,8 @@ enum ActionType {
         PoolLiquidityFill,
         CancelAndWithdraw,
         WithdrawClaims,
-        TopUpPriorityFee
+        TopUpPriorityFee,
+        FlashFill
     }
 ```
 
@@ -4466,10 +4741,11 @@ enum ActionType {
 | CancelAndWithdraw |  |
 | WithdrawClaims |  |
 | TopUpPriorityFee |  |
+| FlashFill |  |
 
 # TokenClaims
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/TokenClaims.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/TokenClaims.sol)
 
 Redeems the caller's PoolManager currency claims to a chosen recipient.
 
@@ -4593,7 +4869,7 @@ error ReentrantRedemption();
 
 # BaseHook
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/BaseHook.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/BaseHook.sol)
 
 **Inherits:** IHooks, [ImmutableState](/reference/src/ImmutableState)
 
@@ -5253,7 +5529,7 @@ error HookNotImplemented();
 
 # IFeeOwner
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/FeeVault.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/FeeVault.sol)
 
 ## Functions
 
@@ -5271,9 +5547,120 @@ function owner() external view returns (address);
 | ---- | ---- | ----------- |
 | \<none> | `address` |  |
 
+# IAsyncSwapCallback
+
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/interfaces/IAsyncSwapCallback.sol)
+
+**Title:** IAsyncSwapCallback
+
+The Router's callback fill surface: `fillOrderWithCallback` opens a fill and calls the filler back
+(`IAsyncSwapFlashFiller.asyncSwapFlashFill`); the `...InCallback` functions are the only Router calls
+accepted while that callback runs, and only from its filler. Every other Router entry point reverts
+`FlashFillActive` until the callback returns.
+
+## Functions
+
+<a id="fillorderwithcallback-asyncorder-uint256-bytes" />
+
+### fillOrderWithCallback
+
+Fill `order` with no inventory: input first as claims, callback, then the owed output as claims.
+
+```solidity
+function fillOrderWithCallback(AsyncOrder calldata order, uint256 maxPrice, bytes calldata data) external payable;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| maxPrice | `uint256` |  |
+| data | `bytes` |  |
+
+<a id="fillorderincallback-asyncorder-uint256" />
+
+### fillOrderInCallback
+
+Inside the callback: fill another open order, paying its output and receiving its input as claims.
+
+```solidity
+function fillOrderInCallback(AsyncOrder calldata order, uint256 maxPrice) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| maxPrice | `uint256` |  |
+
+<a id="matchbookincallback-poolkey-uint8" />
+
+### matchBookInCallback
+
+Inside the callback: continue a crossed book.
+
+```solidity
+function matchBookInCallback(PoolKey calldata key, uint8 maxMatches) external returns (uint8);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| key | `PoolKey` |  |
+| maxMatches | `uint8` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint8` |  |
+
+# IAsyncSwapFlashFiller
+
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/interfaces/IAsyncSwapFlashFiller.sol)
+
+**Title:** IAsyncSwapFlashFiller
+
+Callback a filler contract implements to use `Router.flashFill`.
+
+## Functions
+
+<a id="asyncswapflashfill-asyncorder-uint256-uint256-bytes" />
+
+### asyncSwapFlashFill
+
+Called by the Router inside its PoolManager unlock, after the order was closed and its input,
+less the 0.02% trade fee, credited to the filler as ERC-6909 claims (`amountIn` of the input
+currency, id 0 for native ETH).
+
+<i>
+  Before returning, the filler must hold `amountOwed` claims of the order's output currency and allow
+  the Router to transfer them (`PoolManager.approve(router, id, amountOwed)` or an operator grant). Inside
+  the callback it may swap on any v4 pool, `burn`/`mint`/`take`/`settle`, and fill other Async Swap orders
+  through `IAsyncSwapCallback.fillOrderInCallback` and `matchBookInCallback`. Every delta it opens must be zero
+  when the Router's unlock ends.
+</i>
+
+```solidity
+function asyncSwapFlashFill(AsyncOrder calldata order, uint256 amountIn, uint256 amountOwed, bytes calldata data)
+        external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| amountIn | `uint256` |  |
+| amountOwed | `uint256` |  |
+| data | `bytes` |  |
+
 # ISignatureTransfer
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/interfaces/ISignatureTransfer.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/interfaces/ISignatureTransfer.sol)
 
 **Title:** ISignatureTransfer
 
@@ -5366,7 +5753,7 @@ struct SignatureTransferDetails {
 
 # IIncomingLiquidity
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/libraries/IncomingMatching.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/libraries/IncomingMatching.sol)
 
 <i>
   The hook's existing self-call boundary rolls back a failed LP attempt atomically.
@@ -5392,7 +5779,7 @@ function fillOrderFromPoolLiquidity(AsyncOrder calldata order, bytes32 id, uint1
 
 # AsyncFiller
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/libraries/AsyncFiller.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/libraries/AsyncFiller.sol)
 
 **Title:** AsyncFiller
 
@@ -5742,7 +6129,89 @@ function fill(
 | feeVault | `address` |  |
 | fee | `uint256` |  |
 
-<a id="_payfiller-state-currency-address-address-address-uint256" />
+<a id="beginflashfill-state-book-asyncorder-bytes32-address-address-address-address" />
+
+### beginFlashFill
+
+Input-first half of a flash fill. Closes the order (so it cannot be repriced, cancelled, topped
+up, matched or filled again) and credits its escrowed input, less the trade fee, to `filler` as
+ERC-6909 claims. Returns the order's input and minimum output as they were at the start.
+
+<i>
+  The caller must then call `settleFlashOutput` in the same unlock, after the hook has received the
+  output as claims; otherwise the order is gone and its input paid out without the maker being paid.
+</i>
+
+```solidity
+function beginFlashFill(
+        State storage self,
+        Book storage book,
+        AsyncOrder memory order,
+        bytes32 id,
+        address hook,
+        address executor,
+        address filler,
+        address feeVault
+    ) internal returns (uint256 amountIn, uint256 amountOutMin);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `State` |  |
+| book | `Book` |  |
+| order | `AsyncOrder` |  |
+| id | `bytes32` |  |
+| hook | `address` |  |
+| executor | `address` |  |
+| filler | `address` |  |
+| feeVault | `address` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| amountIn | `uint256` |  |
+| amountOutMin | `uint256` |  |
+
+<a id="settleclaimsoutput-state-asyncorder-bytes32-address-address-address-uint256-uint256-uint256" />
+
+### settleClaimsOutput
+
+Output half of a fill paid in claims: burns `amountOutMin + fee` of the hook's output claims
+(which the executor has just transferred to the hook), pays the maker the minimum less the trade
+fee and the vault the fees. The order must already be closed.
+
+```solidity
+function settleClaimsOutput(
+        State storage self,
+        AsyncOrder memory order,
+        bytes32 id,
+        address hook,
+        address filler,
+        address feeVault,
+        uint256 amountIn,
+        uint256 amountOutMin,
+        uint256 fee
+    ) internal;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `State` |  |
+| order | `AsyncOrder` |  |
+| id | `bytes32` |  |
+| hook | `address` |  |
+| filler | `address` |  |
+| feeVault | `address` |  |
+| amountIn | `uint256` |  |
+| amountOutMin | `uint256` |  |
+| fee | `uint256` |  |
+
+<a id="_payfiller-state-currency-address-address-address-uint256-bool" />
 
 ### \_payFiller
 
@@ -5757,7 +6226,8 @@ function _payFiller(
         address hook,
         address filler,
         address feeVault,
-        uint256 amountIn
+        uint256 amountIn,
+        bool claims
     ) private returns (uint256 tradeFeeIn);
 ```
 
@@ -5771,6 +6241,7 @@ function _payFiller(
 | filler | `address` |  |
 | feeVault | `address` |  |
 | amountIn | `uint256` |  |
+| claims | `bool` |  |
 
 **Returns**
 
@@ -6374,7 +6845,7 @@ struct Book {
 
 # AsyncMatching
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/libraries/AsyncMatching.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/libraries/AsyncMatching.sol)
 
 Linked matching module operating on the hook's order and radix-book storage.
 
@@ -6398,6 +6869,35 @@ uint8 public constant MAX_MATCHES_PER_CALL = 8;
 
 ```solidity
 uint24 private constant POOL_LIQUIDITY_FILL_FEE = 200;
+```
+
+### FLASH_ORDER_SLOT
+
+<i>
+  Transient record of the order a flash fill has opened, in the hook's context: its id, then the input,
+  minimum output and pool fee it was opened at. Each slot is keccak256("asyncswap.flashFill.\<name>") - 1.
+</i>
+
+```solidity
+bytes32 private constant FLASH_ORDER_SLOT = 0xadcc9340e9b9520481a90c5e1cb2c7bb827085ef7c7b209a028db0fe766510cd;
+```
+
+### FLASH_AMOUNT_IN_SLOT
+
+```solidity
+bytes32 private constant FLASH_AMOUNT_IN_SLOT = 0xa948fdbbf716a51dd3ab76f9643ccf5ff5ac531fed11e84d483629e540b40220;
+```
+
+### FLASH_AMOUNT_OUT_SLOT
+
+```solidity
+bytes32 private constant FLASH_AMOUNT_OUT_SLOT = 0x4af24310f6994917e24875d474455b553ed83a7345f90cd7dd124597d7de6b85;
+```
+
+### FLASH_FEE_SLOT
+
+```solidity
+bytes32 private constant FLASH_FEE_SLOT = 0xc91f6e2fe0f89d4ebceb2171c6e3e27ff5e6f3bf09bead6f1947891e5664a2d1;
 ```
 
 ## Functions
@@ -6436,6 +6936,70 @@ function bestOrder(AsyncFiller.State storage self, AsyncFiller.Book storage book
 
 ```solidity
 function fill(AsyncFiller.State storage self, AsyncFiller.Book storage book, FillParams memory params) public;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| book | `AsyncFiller.Book` |  |
+| params | `FillParams` |  |
+
+<a id="beginflashfill-asyncfiller-state-asyncfiller-book-fillparams" />
+
+### beginFlashFill
+
+Input-first fill: close the order and credit its input, less the trade fee, to the filler as claims.
+
+```solidity
+function beginFlashFill(AsyncFiller.State storage self, AsyncFiller.Book storage book, FillParams memory params)
+        public
+        returns (uint256 amountIn, uint256 amountOwed);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| book | `AsyncFiller.Book` |  |
+| params | `FillParams` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| amountIn | `uint256` | The input credited to the filler (after the trade fee). |
+| amountOwed | `uint256` | The output the hook must hold as claims when `settleFlashFill` runs. |
+
+<a id="settleflashfill-asyncfiller-state-fillparams" />
+
+### settleFlashFill
+
+Close the flash fill `beginFlashFill` opened: pay the maker out of the output claims the hook holds.
+
+```solidity
+function settleFlashFill(AsyncFiller.State storage self, FillParams memory params) public;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `AsyncFiller.State` |  |
+| params | `FillParams` |  |
+
+<a id="fillwithclaims-asyncfiller-state-asyncfiller-book-fillparams" />
+
+### fillWithClaims
+
+A full fill paid in claims, for fills inside a flash fill: the hook already holds the gross output
+as claims; the filler receives the input, less the trade fee, as claims.
+
+```solidity
+function fillWithClaims(AsyncFiller.State storage self, AsyncFiller.Book storage book, FillParams memory params)
+        public;
 ```
 
 **Parameters**
@@ -7131,6 +7695,18 @@ error LimitPriceNotMet();
 error NoActiveLiquidity();
 ```
 
+### FlashFillActive
+
+```solidity
+error FlashFillActive();
+```
+
+### NoFlashFill
+
+```solidity
+error NoFlashFill();
+```
+
 ## Structs
 
 ### ReductionParams
@@ -7247,7 +7823,7 @@ struct UpdateParams {
 
 # ClaimTransfers
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/libraries/ClaimTransfers.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/libraries/ClaimTransfers.sol)
 
 <i>
   At most 16 makers and the FeeVault can each receive two currencies in eight matches.
@@ -7327,7 +7903,7 @@ struct Batch {
 
 # CurrencySettler
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/libraries/CurrencySettler.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/libraries/CurrencySettler.sol)
 
 **Title:** CurrencySettler
 
@@ -7378,7 +7954,7 @@ function take(Currency currency, IPoolManager manager, address recipient, uint25
 
 # DynamicFeeOrdering
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/libraries/DynamicFeeOrdering.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/libraries/DynamicFeeOrdering.sol)
 
 **Title:** Dynamic fee ordering on pool-liquidity fills
 
@@ -7526,7 +8102,7 @@ event PoolPriceObserved(
 
 # EligiblePrice
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/libraries/EligiblePrice.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/libraries/EligiblePrice.sol)
 
 Exact-price summaries on a priority-key radix tree.
 
@@ -7705,7 +8281,7 @@ struct Ratio {
 
 # IncomingMatching
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/libraries/IncomingMatching.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/libraries/IncomingMatching.sol)
 
 Fund a crossing arrival, match it in memory, then index only its remainder.
 
@@ -8093,7 +8669,7 @@ function _reduce(
 
 # OrderSignatures
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/libraries/OrderSignatures.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/libraries/OrderSignatures.sol)
 
 **Title:** OrderSignatures
 
@@ -8348,7 +8924,7 @@ function hashCancel(
 
 # PriorityFeeUpdates
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/libraries/PriorityFeeUpdates.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/libraries/PriorityFeeUpdates.sol)
 
 Funded priority amendments, linked separately to keep the hook within EIP-170.
 
@@ -8403,7 +8979,7 @@ event AsyncOrderPriorityFeeUpdated(
 
 # RadixPriceTree
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/libraries/RadixPriceTree.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/libraries/RadixPriceTree.sol)
 
 Patricia radix index for uint128 price levels. Inserts and removals
 traverse at most 128 branch bits; each distinct price creates one
@@ -8619,7 +9195,7 @@ struct Tree {
 
 # TickBitmap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/libraries/TickBitmap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/libraries/TickBitmap.sol)
 
 Three-level occupancy bitmap for the bounded tick-key domain.
 
@@ -8753,7 +9329,7 @@ struct Tree {
 
 # TickPrice
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/libraries/TickPrice.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/libraries/TickPrice.sol)
 
 Book levels on Uniswap v4 ticks: an order sits at the floor tick (spacing 1, 0.01% steps)
 of its exact currency1/currency0 limit. Levels are a fixed relative width at any price and
@@ -8862,7 +9438,7 @@ function floorTick(uint256 num, uint256 den) internal pure returns (int24);
 
 # TokenTransfers
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/libraries/TokenTransfers.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/libraries/TokenTransfers.sol)
 
 Require full ERC-20 delivery without charging extra to the sender; token-reported success is insufficient.
 
@@ -9031,7 +9607,7 @@ struct Balances {
 
 # AsyncOrderLibrary
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/types/AsyncOrder.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/types/AsyncOrder.sol)
 
 **Title:** AsyncOrderLibrary
 
@@ -9073,7 +9649,7 @@ function orderId(AsyncOrder calldata order) internal view returns (bytes32);
 
 # AsyncOrder
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/types/AsyncOrder.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/types/AsyncOrder.sol)
 
 Represents an async order for a swap in the Uniswap V4 pool.
 

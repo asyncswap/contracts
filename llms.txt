@@ -21,6 +21,8 @@ An MEV-capturing DEX built as a Uniswap v4 hook: an on-chain order book and matc
 - [TokenClaims](/reference/src/TokenClaims): Redeems the caller's PoolManager currency claims to a chosen recipient.
 - [BaseHook](/reference/src/BaseHook): abstract contract for hook implementations
 - [IFeeOwner](/reference/src/IFeeOwner)
+- [IAsyncSwapCallback](/reference/src/interfaces/IAsyncSwapCallback): The Router's callback fill surface: `fillOrderWithCallback` opens a fill and calls the filler back (`IAsyncSwapFlashFiller.asyncSwapFlashFill`); the `...InCallback` functions are the only Router calls accepted while that callback runs, and only from its filler. Every other Router entry point reverts `FlashFillActive` until the callback returns.
+- [IAsyncSwapFlashFiller](/reference/src/interfaces/IAsyncSwapFlashFiller): Callback a filler contract implements to use `Router.flashFill`.
 - [ISignatureTransfer](/reference/src/interfaces/ISignatureTransfer): Minimal subset of Uniswap Permit2's SignatureTransfer interface used by the Router. Canonical Permit2 lives at 0x000000000022D473030F116dDEE9F6B43aC78BA3 on every chain.
 - [IIncomingLiquidity](/reference/src/libraries/IIncomingLiquidity)
 - [AsyncFiller](/reference/src/libraries/AsyncFiller): Stores open async orders and settles fills against them.

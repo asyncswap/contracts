@@ -61,6 +61,14 @@
     <lastmod>2026-11-12</lastmod>
   </url>
   <url>
+    <loc>https://docs.asyncswap.org/reference/src/interfaces/IAsyncSwapCallback</loc>
+    <lastmod>2026-11-12</lastmod>
+  </url>
+  <url>
+    <loc>https://docs.asyncswap.org/reference/src/interfaces/IAsyncSwapFlashFiller</loc>
+    <lastmod>2026-11-12</lastmod>
+  </url>
+  <url>
     <loc>https://docs.asyncswap.org/reference/src/interfaces/ISignatureTransfer</loc>
     <lastmod>2026-11-12</lastmod>
   </url>

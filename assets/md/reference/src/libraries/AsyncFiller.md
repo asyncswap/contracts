@@ -1,6 +1,6 @@
 # AsyncFiller
 
-[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/libraries/AsyncFiller.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/libraries/AsyncFiller.sol)
 
 **Title:** AsyncFiller
 
@@ -350,7 +350,89 @@ function fill(
 | feeVault | `address` |  |
 | fee | `uint256` |  |
 
-<a id="_payfiller-state-currency-address-address-address-uint256" />
+<a id="beginflashfill-state-book-asyncorder-bytes32-address-address-address-address" />
+
+### beginFlashFill
+
+Input-first half of a flash fill. Closes the order (so it cannot be repriced, cancelled, topped
+up, matched or filled again) and credits its escrowed input, less the trade fee, to `filler` as
+ERC-6909 claims. Returns the order's input and minimum output as they were at the start.
+
+<i>
+  The caller must then call `settleFlashOutput` in the same unlock, after the hook has received the
+  output as claims; otherwise the order is gone and its input paid out without the maker being paid.
+</i>
+
+```solidity
+function beginFlashFill(
+        State storage self,
+        Book storage book,
+        AsyncOrder memory order,
+        bytes32 id,
+        address hook,
+        address executor,
+        address filler,
+        address feeVault
+    ) internal returns (uint256 amountIn, uint256 amountOutMin);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `State` |  |
+| book | `Book` |  |
+| order | `AsyncOrder` |  |
+| id | `bytes32` |  |
+| hook | `address` |  |
+| executor | `address` |  |
+| filler | `address` |  |
+| feeVault | `address` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| amountIn | `uint256` |  |
+| amountOutMin | `uint256` |  |
+
+<a id="settleclaimsoutput-state-asyncorder-bytes32-address-address-address-uint256-uint256-uint256" />
+
+### settleClaimsOutput
+
+Output half of a fill paid in claims: burns `amountOutMin + fee` of the hook's output claims
+(which the executor has just transferred to the hook), pays the maker the minimum less the trade
+fee and the vault the fees. The order must already be closed.
+
+```solidity
+function settleClaimsOutput(
+        State storage self,
+        AsyncOrder memory order,
+        bytes32 id,
+        address hook,
+        address filler,
+        address feeVault,
+        uint256 amountIn,
+        uint256 amountOutMin,
+        uint256 fee
+    ) internal;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | `State` |  |
+| order | `AsyncOrder` |  |
+| id | `bytes32` |  |
+| hook | `address` |  |
+| filler | `address` |  |
+| feeVault | `address` |  |
+| amountIn | `uint256` |  |
+| amountOutMin | `uint256` |  |
+| fee | `uint256` |  |
+
+<a id="_payfiller-state-currency-address-address-address-uint256-bool" />
 
 ### \_payFiller
 
@@ -365,7 +447,8 @@ function _payFiller(
         address hook,
         address filler,
         address feeVault,
-        uint256 amountIn
+        uint256 amountIn,
+        bool claims
     ) private returns (uint256 tradeFeeIn);
 ```
 
@@ -379,6 +462,7 @@ function _payFiller(
 | filler | `address` |  |
 | feeVault | `address` |  |
 | amountIn | `uint256` |  |
+| claims | `bool` |  |
 
 **Returns**
 

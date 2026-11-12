@@ -1,6 +1,6 @@
 # IIncomingLiquidity
 
-[Git Source](https://github.com/asyncswap/contracts/blob/5fbc524fca6d4ec32ea339a0be4f078e4566935e/src/libraries/IncomingMatching.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/d2dedce1007d645b3f34f1db1ddd883a354ea298/src/libraries/IncomingMatching.sol)
 
 <i>
   The hook's existing self-call boundary rolls back a failed LP attempt atomically.

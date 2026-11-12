@@ -1,6 +1,6 @@
 # Router
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e42e857aad90dc619990dcc9f6a57d13a5ff4af9/src/Router.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/Router.sol)
 
 **Inherits:** EIP712, Multicall
 
@@ -93,12 +93,10 @@ bytes32 constant ASYNC_FILLER_LOCATION = 0xd972a937b59dc5cb8c692dd9f211e85afa8de
 
 ### MAX_PRICE_LOCATION
 
-<i>
-  keccak256("asyncswap.router.maxPrice") - 1
-</i>
+keccak256("Router.MaxPrice") - 1
 
 ```solidity
-bytes32 constant MAX_PRICE_LOCATION = 0x6b4f8e2c9d5a0b7e1f3c2a8d4e9f0b6c5a1d8e7f2b3c4d5e6a7f8b9c0d1e2f30;
+bytes32 constant MAX_PRICE_LOCATION = 0x4c55dc387a28e25c0f47e7e08b319d1d04ef81ac7445de4167af1f6918ac94f4;
 ```
 
 ### MEV_TAX_LOCATION

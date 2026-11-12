@@ -1,6 +1,6 @@
 # TickBitmap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e42e857aad90dc619990dcc9f6a57d13a5ff4af9/src/libraries/TickBitmap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/libraries/TickBitmap.sol)
 
 Three-level occupancy bitmap for the bounded tick-key domain.
 

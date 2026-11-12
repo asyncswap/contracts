@@ -1,6 +1,6 @@
 # IncomingMatching
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e42e857aad90dc619990dcc9f6a57d13a5ff4af9/src/libraries/IncomingMatching.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/libraries/IncomingMatching.sol)
 
 Fund a crossing arrival, match it in memory, then index only its remainder.
 

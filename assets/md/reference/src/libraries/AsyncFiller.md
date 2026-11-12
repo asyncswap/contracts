@@ -1,6 +1,6 @@
 # AsyncFiller
 
-[Git Source](https://github.com/asyncswap/contracts/blob/e42e857aad90dc619990dcc9f6a57d13a5ff4af9/src/libraries/AsyncFiller.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/libraries/AsyncFiller.sol)
 
 **Title:** AsyncFiller
 
@@ -185,6 +185,37 @@ function checkMinimum(Book storage book, bool isBuy, uint256 amountIn, uint256 a
 | isBuy | `bool` |  |
 | amountIn | `uint256` |  |
 | amountOutMin | `uint256` |  |
+
+<a id="belowminimum-book-bool-uint256-uint256" />
+
+### belowMinimum
+
+<i>
+  True when either leg of a resting order is below the pool's floors, the same floors
+  `checkMinimum` enforces when the order is created.
+</i>
+
+```solidity
+function belowMinimum(Book storage book, bool isBuy, uint256 amountIn, uint256 amountOutMin)
+        internal
+        view
+        returns (bool);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| book | `Book` |  |
+| isBuy | `bool` |  |
+| amountIn | `uint256` |  |
+| amountOutMin | `uint256` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bool` |  |
 
 <a id="settlepriorityfee-state-poolkey-bytes32-address-uint256-address" />
 

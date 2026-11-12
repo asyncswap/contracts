@@ -1,5 +1,5 @@
 // Assemble the site's generated pages from the repository before `vocs dev` / `vocs build`:
-//   - docs/*.md                          -> src/pages/protocol/
+//   - docs/*.md                          -> generated src/pages/protocol/
 //   - audit/AUDIT_SCOPE_11_05_26.md       -> src/pages/audit/scope.md
 //   - `forge doc` (NatSpec in src/)       -> src/pages/reference/src/ + src/generated/reference-sidebar.ts
 // docs/ and audit/ stay the source of truth; everything written here is git-ignored.

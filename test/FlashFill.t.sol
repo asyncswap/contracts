@@ -243,7 +243,7 @@ contract FlashFillTest is Test {
             payCurrency: _output(order),
             payAmount: order.amountOutMin,
             target: address(0), // set by caller
-            callData: abi.encodeCall(Router.fillOrderInFlash, (order, order.amountOutMin))
+            callData: abi.encodeCall(Router.fillOrderInCallback, (order, order.amountOutMin))
         });
     }
 
@@ -540,11 +540,11 @@ contract FlashFillTest is Test {
     function test_inFlash_refusedWithoutActiveFlashFill() public {
         (, AsyncOrder memory b,) = _crossBook();
         vm.expectRevert(Router.NotFlashFiller.selector);
-        router.fillOrderInFlash(b, type(uint256).max);
+        router.fillOrderInCallback(b, type(uint256).max);
         vm.expectRevert(Router.NotFlashFiller.selector);
-        router.matchBookInFlash(ethUsdc, 1);
+        router.matchBookInCallback(ethUsdc, 1);
         vm.expectRevert(Router.NotFlashFiller.selector);
-        filler.exec(address(router), abi.encodeCall(Router.fillOrderInFlash, (b, type(uint256).max)));
+        filler.exec(address(router), abi.encodeCall(Router.fillOrderInCallback, (b, type(uint256).max)));
     }
 
     /// @notice During a flash fill only its own filler may use them, not another contract it calls.
@@ -557,7 +557,7 @@ contract FlashFillTest is Test {
             _call(
                 address(other),
                 abi.encodeCall(
-                    Bystander.call, (address(router), abi.encodeCall(Router.fillOrderInFlash, (b, 0.99 ether)))
+                    Bystander.call, (address(router), abi.encodeCall(Router.fillOrderInCallback, (b, 0.99 ether)))
                 )
             )
         );
@@ -571,16 +571,16 @@ contract FlashFillTest is Test {
         AsyncOrder memory spare = _place(bob, ethUsdc, USDC, 2970 ether, 0.98 ether);
         filler.run(a, 90 ether, _steps2(_fillStep(b), _fillStep(c)), 0);
         vm.expectRevert(Router.NotFlashFiller.selector);
-        filler.exec(address(router), abi.encodeCall(Router.fillOrderInFlash, (spare, type(uint256).max)));
+        filler.exec(address(router), abi.encodeCall(Router.fillOrderInCallback, (spare, type(uint256).max)));
         // Normal entry points work again.
         router.matchBook(ethUsdc, 1);
     }
 
-    /// @notice `matchBookInFlash` runs the book matcher from inside the callback.
+    /// @notice `matchBookInCallback` runs the book matcher from inside the callback.
     function test_inFlash_matchBook() public {
         (AsyncOrder memory a, AsyncOrder memory b, AsyncOrder memory c) = _crossBook();
         MockFlashFiller.Step[] memory steps = new MockFlashFiller.Step[](3);
-        steps[0] = _call(address(router), abi.encodeCall(Router.matchBookInFlash, (ethUsdc, 1)));
+        steps[0] = _call(address(router), abi.encodeCall(Router.matchBookInCallback, (ethUsdc, 1)));
         steps[1] = _fillStep(b);
         steps[1].target = address(router);
         steps[2] = _fillStep(c);
@@ -593,7 +593,7 @@ contract FlashFillTest is Test {
     function test_inFlash_fillRespectsMaxPrice() public {
         (AsyncOrder memory a, AsyncOrder memory b,) = _crossBook();
         MockFlashFiller.Step memory step = _fillStep(b);
-        step.callData = abi.encodeCall(Router.fillOrderInFlash, (b, 0.99 ether - 1));
+        step.callData = abi.encodeCall(Router.fillOrderInCallback, (b, 0.99 ether - 1));
         step.target = address(router);
         vm.expectRevert("Price exceeds maxPrice");
         filler.run(a, 90 ether, _steps1(step), 0);

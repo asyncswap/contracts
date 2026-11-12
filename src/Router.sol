@@ -367,7 +367,7 @@ contract Router is EIP712, Multicall {
     ///         input, less the 0.02% trade fee, to the caller as ERC-6909 claims; the Router then calls
     ///         `IAsyncSwapFlashFiller(msg.sender).asyncSwapFlashFill(order, amountIn, amountOwed, data)`. Inside the
     ///         callback the filler may route through any v4 pool and fill other Async Swap orders with
-    ///         `fillOrderInFlash` / `matchBookInFlash`. Afterwards the Router transfers `amountOwed` output claims
+    ///         `fillOrderInCallback` / `matchBookInCallback`. Afterwards the Router transfers `amountOwed` output claims
     ///         from the filler to the hook (approve the Router on the PoolManager for them), and the hook pays the
     ///         maker its live minimum less the trade fee. Any surplus stays with the filler.
     /// @dev `maxPrice` caps the output owed, as in `fillOrder`, and `order.amountIn` is the least input accepted.
@@ -390,7 +390,7 @@ contract Router is EIP712, Multicall {
     ///         the order's live minimum (plus pool fee) of output claims from the filler to the hook, and the filler
     ///         receives the order's input, less the trade fee, as claims. No unlock and no MEV tax. Only the filler
     ///         of the running flash fill may call.
-    function fillOrderInFlash(AsyncOrder calldata order, uint256 maxPrice) external onlyFlashFiller {
+    function fillOrderInCallback(AsyncOrder calldata order, uint256 maxPrice) external onlyFlashFiller {
         uint256 gross = _checkFill(order, maxPrice);
         Currency output = order.zeroForOne ? order.key.currency1 : order.key.currency0;
         POOLMANAGER.transferFrom(msg.sender, address(HOOK), output.toId(), gross);
@@ -398,7 +398,7 @@ contract Router is EIP712, Multicall {
     }
 
     /// @notice Continue a crossed book from inside a flash-fill callback. Only the filler of the running flash fill.
-    function matchBookInFlash(PoolKey calldata key, uint8 maxMatches) external onlyFlashFiller returns (uint8) {
+    function matchBookInCallback(PoolKey calldata key, uint8 maxMatches) external onlyFlashFiller returns (uint8) {
         return HOOK.matchBook(key, maxMatches);
     }
 

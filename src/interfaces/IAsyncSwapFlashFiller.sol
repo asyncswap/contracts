@@ -12,7 +12,7 @@ interface IAsyncSwapFlashFiller {
     /// @dev Before returning, the filler must hold `amountOwed` claims of the order's output currency and allow
     ///      the Router to transfer them (`PoolManager.approve(router, id, amountOwed)` or an operator grant). Inside
     ///      the callback it may swap on any v4 pool, `burn`/`mint`/`take`/`settle`, and fill other Async Swap orders
-    ///      through `Router.fillOrderInFlash` and `Router.matchBookInFlash`. Every delta it opens must be zero
+    ///      through `Router.fillOrderInCallback` and `Router.matchBookInCallback`. Every delta it opens must be zero
     ///      when the Router's unlock ends.
     function asyncSwapFlashFill(AsyncOrder calldata order, uint256 amountIn, uint256 amountOwed, bytes calldata data)
         external;

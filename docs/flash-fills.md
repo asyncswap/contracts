@@ -18,9 +18,9 @@ it controls.
 3. The Router records the filler in a transient slot and calls
    `IAsyncSwapFlashFiller(filler).asyncSwapFlashFill(order, amountIn, amountOwed, data)`.
 4. In the callback the filler may:
-   - fill other orders with `Router.fillOrderInFlash(order, maxPrice)`, paying their output in claims and
+   - fill other orders with `Router.fillOrderInCallback(order, maxPrice)`, paying their output in claims and
      receiving their input in claims;
-   - run the matcher with `Router.matchBookInFlash(key, maxMatches)`;
+   - run the matcher with `Router.matchBookInCallback(key, maxMatches)`;
    - `burn` claims and swap on any v4 pool, `take`, `settle`, `mint`.
    Before returning, it must hold `amountOwed` claims of the order's output and approve the Router for them on the
    PoolManager.
@@ -34,7 +34,7 @@ it controls.
 Every payment inside a flash fill is an ERC-6909 claim, not a token transfer and not an open delta:
 
 - the order's input is credited to the filler as claims;
-- `fillOrderInFlash` pulls the resting maker's output from the filler as claims (`transferFrom`, so the filler
+- `fillOrderInCallback` pulls the resting maker's output from the filler as claims (`transferFrom`, so the filler
   approves the Router per currency) and credits the order's input to the filler as claims;
 - the final maker check pulls the owed output as claims.
 
@@ -50,7 +50,7 @@ claims). Native ETH is claim id 0 and needs no `msg.value`.
 | Normal Router entry points refuse reentry. | `noFlashFill` on `swap`, `swapWithSig`, `fillOrder`, `cancelOrder`, `cancelWithSig`, `cancelAndWithdraw`, `withdrawClaims`, `topUpPriorityFee`, `matchBook`, `fillFromPoolLiquidity` and `fillOrderWithCallback` (no nesting). These also open their own unlock, which v4 refuses. |
 | Only the active filler may use the in-unlock entry points, only while active. | `onlyFlashFiller` compares `msg.sender` with the transient filler slot; the slot is cleared before the output is collected and before the unlock returns. |
 | The maker check is on the final amount only. | The owed output is pulled once, after the callback returns. |
-| Resting orders filled inside a flash fill are never worse off. | `fillOrderInFlash` applies the same live minimum, `maxPrice`, `order.amountIn` bound and 0.02% fees as `fillOrder`. |
+| Resting orders filled inside a flash fill are never worse off. | `fillOrderInCallback` applies the same live minimum, `maxPrice`, `order.amountIn` bound and 0.02% fees as `fillOrder`. |
 | Only the Router can drive the hook side. | `beginFlashFill`, `settleFlashFill` and `executeOrderWithClaims` revert `NotTrustedRouter` for any other caller, and check the maker's executor grant. `settleFlashFill` only settles the order `beginFlashFill` opened in the same transaction (transient record in the hook). |
 
 ## Toward claims-based settlement of the numeraire

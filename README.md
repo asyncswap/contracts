@@ -6,25 +6,11 @@ Async Swap is a continuous on-chain order book and matching engine built as a Un
 
 ## Forward mission: large swaps and MEV capture
 
-Large swaps in volatile pairs can pay high costs when they execute immediately through AMM liquidity. Our research found substantial opposite-direction flow arriving later:
+Large swaps in volatile pairs can pay high AMM price impact even when opposite-direction flow arrives minutes later. In one Uniswap v3 ETH/USDC pool, $100,000–$1 million swaps averaged 26.5 bps versus 5.5 bps for trades under $10,000; opposite flow covered 82% of large-swap volume within five minutes and 99% within an hour. Across eight major v3 pools, the study estimated $22.7–$40.7 million in potential savings from matching. Uniswap v4 research found specialized hooks made some markets cheap, while no-hook ETH pools still cost 24.0–38.7 bps. ([Part 1](https://x.com/asyncswap/article/2120701882377060839), [Part 2](https://x.com/asyncswap/article/2120704799087714634), [Part 3](https://x.com/asyncswap/article/2120713673639436417))
 
-- **One Uniswap v3 ETH/USDC pool in October 2026:** $100,000–$1 million swaps averaged 26.5 bps in fees and price impact, versus 5.5 bps for swaps under $10,000. Opposite flow covered 82% of large-swap volume within five minutes and 99% within an hour. ([Part 1](https://x.com/asyncswap/article/2120701882377060839))
-- **Eight major Uniswap v3 pools over one year:** $100,000–$1 million swaps incurred $59.7 million in fees and price impact. Matching opposite flow was estimated to avoid $22.7–$40.7 million of that cost. ([Part 2](https://x.com/asyncswap/article/2120704799087714634))
-- **Uniswap v4:** Specialized hooks made some targeted markets cheap at 1.3–2.2 bps, while large swaps in no-hook ETH pools cost 24.0–38.7 bps. Opposite flow covered 49–67% of large-swap volume in five minutes and 85–88% in an hour in those ETH pools. ([Part 3](https://x.com/asyncswap/article/2120713673639436417))
+Async Swap targets that timing gap: makers leave a limit order on-chain, where opposite orders can match over time; pool liquidity can fill it when better. The estimated savings are historical upper bounds, not realized Async Swap results, and fills are not guaranteed.
 
-The problem is timing: large trades can pay to move the AMM price now even when opposite-direction flow appears later. Specialized hooks already make some markets cheap; the remaining gap is large swaps in volatile pairs without a hook built for that market. Async Swap lets a maker name a price and leave a good-till-cancelled order on-chain. Opposing orders can meet at the resting price as they arrive, while pool liquidity can fill the order when it offers better value. The goal is to let large orders meet over time instead of requiring every trade to sweep the curve immediately.
-
-The estimated avoided costs are upper bounds from historical flow, not realized Async Swap savings. They assume opposite-direction trades wait and match at the pre-swap pool price; actual execution depends on order behavior, counterparties, market movement, and fees. Orders can remain unfilled, and the protocol does not guarantee savings or completion.
-
-### How Async Swap captures MEV
-
-MEV is value available from transaction ordering, such as jumping ahead of other orders or trading after a pool price moves. Async Swap directs some of that value to the protocol and liquidity providers:
-
-- At the same limit price, makers can escrow USDC priority bids to improve queue position; bids are spent on fills or transferred to the FeeVault when an order closes.
-- If a pool fill later moves the price back toward where it stood before that pool's first fill in a two-block window, a dynamic fee is designed to capture about half of the backrun profit and split it between LPs and the protocol.
-- Order creation and fills also pay a tax on the transaction's gas priority fee, credited to the protocol.
-
-These rules redirect some ordering and backrun value when those events occur. They do not eliminate MEV or guarantee fills, profit, or fee revenue.
+MEV is value earned through transaction ordering and backruns. Async Swap redirects some of it: USDC priority bids pay the FeeVault, a dynamic fee on qualifying pool backruns is split between LPs and the protocol, and a tax on gas priority fees goes to the protocol. These mechanisms do not eliminate MEV or guarantee revenue.
 
 ## How it works
 
@@ -82,7 +68,7 @@ Priority bids, including top-ups, are non-refundable: they are spent proportiona
 
 ### Application-specific sequencing
 
-Applications can choose when to submit, cancel, or top up their orders, and can bundle a top-up with matching through `Router.multicall`. Once orders enter the shared book, the protocol ranks them by price, then escrowed USDC priority bid, then arrival time. Application-side scheduling does not create a private queue or guarantee execution.
+Applications can schedule their own submissions, cancellations, and top-ups, but the shared book still ranks by price, USDC priority bid, then arrival time. `Router.multicall` can bundle actions; application-side scheduling does not guarantee execution.
 
 ## Documentation
 

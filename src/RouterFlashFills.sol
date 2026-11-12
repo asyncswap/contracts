@@ -95,10 +95,25 @@ contract RouterFlashFills is IAsyncSwapCallback {
         return HOOK.matchBook(key, maxMatches);
     }
 
+    /// @inheritdoc IAsyncSwapCallback
+    function mevTaxFor(uint256 fills) external view returns (uint256) {
+        return _mevTax() * fills;
+    }
+
+    /// @inheritdoc IAsyncSwapCallback
+    function mevTaxOwed() external view returns (uint256) {
+        int256 delta = TransientStateLibrary.currencyDelta(POOLMANAGER, address(this), CurrencyLibrary.ADDRESS_ZERO);
+        return delta < 0 ? uint256(-delta) : 0;
+    }
+
+    function _mevTax() private view returns (uint256) {
+        return tx.gasprice > block.basefee ? (tx.gasprice - block.basefee) * MEV_TAX_GAS : 0;
+    }
+
     /// @dev Pays one fill's MEV tax to the FeeVault as native claims now; the Router owes it to the PoolManager
     ///      until `_settleMevTax`.
     function _chargeMevTax(address filler) private {
-        uint256 tax = tx.gasprice > block.basefee ? (tx.gasprice - block.basefee) * MEV_TAX_GAS : 0;
+        uint256 tax = _mevTax();
         if (tax == 0) return;
         POOLMANAGER.mint(address(HOOK.feeVault()), 0, tax);
         emit MevTaxPaid(filler, tax);

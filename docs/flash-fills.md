@@ -8,6 +8,19 @@ input first, calls the filler back inside its own PoolManager unlock, and only t
 Inside the callback the filler can route through any Uniswap v4 pool and fill other Async Swap orders, in a loop
 it controls.
 
+## Layout
+
+Measured with solc (what CI and deployment use), the hook and Router were already within a few hundred bytes of
+EIP-170 before this feature, so neither carries the flash-fill logic:
+
+- **Router:** the callback surface lives in `RouterFlashFills`, a module the Router creates in its constructor. The
+  Router's `fallback` runs it by DELEGATECALL, so it executes as the Router (the hook sees the Router as caller), and
+  the Router's `unlockCallback` forwards a flash-fill unlock to it the same way. Its code counts toward the Router's
+  initcode, not its runtime.
+- **Hook:** one Router-only entry point, `AsyncSwap.flashFill(bytes args)`, with `args` =
+  `abi.encode(uint8 op, AsyncOrder order, address filler)`; ops 0 (begin), 1 (settle) and 2 (fill paid in claims)
+  run in the linked `MultiAsset` library. The flash path charges no pool fee (`calculatePoolFee` is zero).
+
 ## Interfaces
 
 - `IAsyncSwapCallback` (implemented by the Router): `fillOrderWithCallback` opens a fill; `fillOrderInCallback` and
@@ -20,7 +33,7 @@ A filler integrates against these two interfaces only.
 
 1. The filler contract calls `Router.fillOrderWithCallback(order, maxPrice, data)`. `msg.value` is the MEV tax only.
 2. The Router opens one `unlock`, checks the live order against `maxPrice` and `order.amountIn` (as `fillOrder`
-   does), and calls `AsyncSwap.beginFlashFill`. The hook closes the order (removes it from the book, deletes it,
+   does), and calls `AsyncSwap.flashFill` (op 0). The hook closes the order (removes it from the book, deletes it,
    settles its priority bid to the vault) and credits its input, less the 0.02% trade fee, to the filler as
    ERC-6909 claims. The fee goes to the vault.
 3. The Router records the filler in a transient slot and calls
@@ -33,7 +46,7 @@ A filler integrates against these two interfaces only.
    Before returning, it must hold `amountOwed` claims of the order's output and approve the Router for them on the
    PoolManager.
 5. The Router clears the slot, transfers `amountOwed` output claims from the filler to the hook, and calls
-   `AsyncSwap.settleFlashFill`, which burns them and pays the maker its minimum less the trade fee (ERC20 as
+   `AsyncSwap.flashFill` (op 1), which burns them and pays the maker its minimum less the trade fee (ERC20 as
    tokens, native ETH as claims, as in a plain fill). Any surplus stays with the filler. The unlock closes only if
    every delta, the filler's included, is zero.
 
@@ -54,12 +67,12 @@ claims). Native ETH is claim id 0 and needs no `msg.value`.
 
 | Rule | Enforcement |
 |---|---|
-| The flash-filled order cannot be repriced, cancelled, topped up, matched or filled again during the callback. | `beginFlashFill` closes and deletes the order before the callback. Every later action on it finds no order (`OrderNotFound`), and it is no longer in the book for `matchBook`. |
-| Normal Router entry points refuse reentry. | `noFlashFill` on `swap`, `swapWithSig`, `fillOrder`, `cancelOrder`, `cancelWithSig`, `cancelAndWithdraw`, `withdrawClaims`, `topUpPriorityFee`, `matchBook`, `fillFromPoolLiquidity` and `fillOrderWithCallback` (no nesting). These also open their own unlock, which v4 refuses. |
+| The flash-filled order cannot be repriced, cancelled, topped up, matched or filled again during the callback. | Begin (op 0) closes and deletes the order before the callback. Every later action on it finds no order (`OrderNotFound`), and it is no longer in the book for `matchBook`. |
+| Normal Router entry points refuse reentry. | Each opens its own `PoolManager.unlock`, which v4 refuses while the flash fill holds it (`AlreadyUnlocked`). A nested `fillOrderWithCallback` reverts `FlashFillActive`. |
 | Only the active filler may use the in-unlock entry points, only while active. | `onlyFlashFiller` compares `msg.sender` with the transient filler slot; the slot is cleared before the output is collected and before the unlock returns. |
 | The maker check is on the final amount only. | The owed output is pulled once, after the callback returns. |
 | Resting orders filled inside a flash fill are never worse off. | `fillOrderInCallback` applies the same live minimum, `maxPrice`, `order.amountIn` bound and 0.02% fees as `fillOrder`. |
-| Only the Router can drive the hook side. | `beginFlashFill`, `settleFlashFill` and `executeOrderWithClaims` revert `NotTrustedRouter` for any other caller, and check the maker's executor grant. `settleFlashFill` only settles the order `beginFlashFill` opened in the same transaction (transient record in the hook). |
+| Only the Router can drive the hook side. | `AsyncSwap.flashFill` reverts `NotTrustedRouter` for any other caller and checks the maker's executor grant. Settle (op 1) only settles the order begin (op 0) opened in the same transaction (transient record in the hook). `RouterFlashFills` called directly reaches the hook as itself, not the Router, and is refused. |
 
 ## Toward claims-based settlement of the numeraire
 
@@ -70,7 +83,7 @@ the numeraire leg settles generally:
   a flash fill the numeraire is only ever a claim balance that rises on one book and falls on the next, and it nets
   to zero inside the PoolManager. Nothing leaves it.
 - That generalises: a settlement pass that takes a list of fills across books (approach C in the design doc) can
-  use the same three hooks (`beginFlashFill`, `executeOrderWithClaims`, `settleFlashFill`) and check only the final
+  use the same hook ops (begin, fill paid in claims, settle) and check only the final
   claim balances, so the numeraire becomes a netting unit between books rather than a transferred asset.
 - Makers already receive native payouts as claims. Offering claims for numeraire payouts too (with
   `withdrawClaims` to exit) would let resting liquidity stay inside the PoolManager between trades, which is what

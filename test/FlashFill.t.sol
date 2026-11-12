@@ -9,6 +9,8 @@ import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 import {AsyncMatching} from "@async-swap/libraries/AsyncMatching.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {Router} from "@async-swap/Router.sol";
+import {RouterFlashFills} from "@async-swap/RouterFlashFills.sol";
+import {IAsyncSwapCallback} from "@async-swap/interfaces/IAsyncSwapCallback.sol";
 import {MockERC20} from "./utils/MockERC20.sol";
 import {Test, Vm} from "forge-std/Test.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -19,36 +21,6 @@ import {LPFeeLibrary} from "v4-core/libraries/LPFeeLibrary.sol";
 import {Currency} from "v4-core/types/Currency.sol";
 import {PoolId} from "v4-core/types/PoolId.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
-
-/// @notice Test-only stand-in for approach E (non-numeraire pools, not part of this change): the hook also accepts
-///         a pool that does not pair the numeraire, so a maker can place an ETH -> TOKEN order for a flash fill to
-///         route across the ETH/USDC and TOKEN/USDC books. Everything else is the production hook.
-contract NonNumeraireTestHook is AsyncSwap {
-    using PoolIdLibrary for PoolKey;
-
-    constructor(
-        IPoolManager _poolManager,
-        Currency _numeraire,
-        address _owner,
-        address _router,
-        uint256 _minOrderUsd,
-        uint8 _assetPrecision
-    ) AsyncSwap(_poolManager, _numeraire, _owner, _router, _minOrderUsd, _assetPrecision) {}
-
-    function _beforeInitialize(address sender, PoolKey calldata key, uint160 sqrtPriceX96)
-        internal
-        override
-        returns (bytes4)
-    {
-        if (key.currency0 == numeraire || key.currency1 == numeraire) {
-            return super._beforeInitialize(sender, key, sqrtPriceX96);
-        }
-        asyncOrders[key.toId()].poolManager = poolManager;
-        asyncOrders[key.toId()].numeraire = numeraire;
-        asyncOrders[key.toId()].feeVault = address(feeVault);
-        return this.beforeInitialize.selector;
-    }
-}
 
 /// @notice A flash filler that holds nothing: inside the callback it runs a list of steps (each optionally approving
 ///         the Router for some claims first), then approves the Router for the output it owes the maker.
@@ -70,7 +42,9 @@ contract MockFlashFiller is IAsyncSwapFlashFiller {
     }
 
     function run(AsyncOrder calldata order, uint256 maxPrice, Step[] calldata steps, uint256 shortBy) external payable {
-        router.fillOrderWithCallback{value: msg.value}(order, maxPrice, abi.encode(steps, shortBy));
+        IAsyncSwapCallback(address(router)).fillOrderWithCallback{value: msg.value}(
+            order, maxPrice, abi.encode(steps, shortBy)
+        );
     }
 
     /// @dev Lets a test act as this contract outside a flash fill (setup, or calls that must fail).
@@ -156,7 +130,7 @@ contract FlashFillTest is Test {
         );
         router = new Router(manager, AsyncSwap(payable(hookAddress)), ISignatureTransfer(Permit2Bytecode.PERMIT2), 0);
         deployCodeTo(
-            "FlashFill.t.sol:NonNumeraireTestHook",
+            "AsyncSwap.sol",
             abi.encode(manager, USDC, address(this), address(router), uint256(0), type(uint8).max),
             hookAddress
         );
@@ -243,7 +217,7 @@ contract FlashFillTest is Test {
             payCurrency: _output(order),
             payAmount: order.amountOutMin,
             target: address(0), // set by caller
-            callData: abi.encodeCall(Router.fillOrderInCallback, (order, order.amountOutMin))
+            callData: abi.encodeCall(IAsyncSwapCallback.fillOrderInCallback, (order, order.amountOutMin))
         });
     }
 
@@ -452,10 +426,14 @@ contract FlashFillTest is Test {
 
     /// @notice ...nor cancelled through the Router, which refuses every normal entry point during a flash fill.
     function test_lockedOrder_cannotBeCancelledThroughRouter() public {
-        _expectStepRevert(
-            _call(address(router), abi.encodeCall(Router.cancelOrder, (_alicesOrder()))),
-            abi.encodeWithSelector(Router.FlashFillActive.selector)
-        );
+        // The filler is the maker here, so the Router's owner check passes and the unlock refusal is what stops it.
+        vm.deal(address(filler), 1 ether);
+        filler.exec(address(hook), abi.encodeCall(AsyncSwap.setExecutor, (ethToken.toId(), address(router), true)));
+        AsyncOrder memory own = _placeAsFiller(1 ether, 90 ether);
+        MockFlashFiller.Step[] memory steps = _steps1(_call(address(router), abi.encodeCall(Router.cancelOrder, (own))));
+        vm.expectRevert(abi.encodeWithSelector(IPoolManager.AlreadyUnlocked.selector));
+        filler.run(own, 90 ether, steps, 0);
+        assertEq(_live(own), 1 ether);
     }
 
     /// @notice ...nor repriced: the order is closed for the whole callback.
@@ -500,38 +478,41 @@ contract FlashFillTest is Test {
 
     /// @notice ...nor topped up.
     function test_lockedOrder_cannotBeToppedUp() public {
-        _expectStepRevert(
-            _call(address(router), abi.encodeCall(Router.topUpPriorityFee, (_alicesOrder(), 1))),
-            abi.encodeWithSelector(Router.FlashFillActive.selector)
-        );
+        // The filler is the maker here, so the Router's owner check passes and the unlock refusal is what stops it.
+        vm.deal(address(filler), 1 ether);
+        filler.exec(address(hook), abi.encodeCall(AsyncSwap.setExecutor, (ethToken.toId(), address(router), true)));
+        AsyncOrder memory own = _placeAsFiller(1 ether, 90 ether);
+        MockFlashFiller.Step[] memory steps =
+            _steps1(_call(address(router), abi.encodeCall(Router.topUpPriorityFee, (own, 1))));
+        vm.expectRevert(abi.encodeWithSelector(IPoolManager.AlreadyUnlocked.selector));
+        filler.run(own, 90 ether, steps, 0);
+        assertEq(_live(own), 1 ether);
     }
 
     /// @notice Flash fills do not nest, and the normal fill path is closed during one.
     function test_reentrancy_normalEntryPointsRefused() public {
         AsyncOrder memory a = _alicesOrder();
         _expectStepRevert(
-            _call(address(router), abi.encodeCall(Router.fillOrderWithCallback, (a, 90 ether, ""))),
-            abi.encodeWithSelector(Router.FlashFillActive.selector)
+            _call(address(router), abi.encodeCall(IAsyncSwapCallback.fillOrderWithCallback, (a, 90 ether, ""))),
+            abi.encodeWithSelector(RouterFlashFills.FlashFillActive.selector)
         );
         _expectStepRevert(
             _call(address(router), abi.encodeCall(Router.fillOrder, (a, 90 ether, ""))),
-            abi.encodeWithSelector(Router.FlashFillActive.selector)
+            abi.encodeWithSelector(IPoolManager.AlreadyUnlocked.selector)
         );
         _expectStepRevert(
             _call(address(router), abi.encodeCall(Router.matchBook, (ethUsdc, 1))),
-            abi.encodeWithSelector(Router.FlashFillActive.selector)
+            abi.encodeWithSelector(IPoolManager.AlreadyUnlocked.selector)
         );
     }
 
     /// @notice The hook's flash-fill and claims-fill entry points take only the Router.
     function test_hookEntryPoints_routerOnly() public {
         AsyncOrder memory a = _alicesOrder();
-        vm.expectRevert(AsyncSwap.NotTrustedRouter.selector);
-        hook.beginFlashFill(a, address(this));
-        vm.expectRevert(AsyncSwap.NotTrustedRouter.selector);
-        hook.settleFlashFill(a, address(this));
-        vm.expectRevert(AsyncSwap.NotTrustedRouter.selector);
-        hook.executeOrderWithClaims(a, address(this));
+        for (uint8 op; op < 3; ++op) {
+            vm.expectRevert(AsyncSwap.NotTrustedRouter.selector);
+            hook.flashFill(abi.encode(op, a, address(this)));
+        }
     }
 
     /* ------------------------------------------------------------------ in-unlock entry points */
@@ -539,12 +520,12 @@ contract FlashFillTest is Test {
     /// @notice Outside a flash fill nobody may use the in-unlock entry points.
     function test_inFlash_refusedWithoutActiveFlashFill() public {
         (, AsyncOrder memory b,) = _crossBook();
-        vm.expectRevert(Router.NotFlashFiller.selector);
-        router.fillOrderInCallback(b, type(uint256).max);
-        vm.expectRevert(Router.NotFlashFiller.selector);
-        router.matchBookInCallback(ethUsdc, 1);
-        vm.expectRevert(Router.NotFlashFiller.selector);
-        filler.exec(address(router), abi.encodeCall(Router.fillOrderInCallback, (b, type(uint256).max)));
+        vm.expectRevert(RouterFlashFills.NotFlashFiller.selector);
+        IAsyncSwapCallback(address(router)).fillOrderInCallback(b, type(uint256).max);
+        vm.expectRevert(RouterFlashFills.NotFlashFiller.selector);
+        IAsyncSwapCallback(address(router)).matchBookInCallback(ethUsdc, 1);
+        vm.expectRevert(RouterFlashFills.NotFlashFiller.selector);
+        filler.exec(address(router), abi.encodeCall(IAsyncSwapCallback.fillOrderInCallback, (b, type(uint256).max)));
     }
 
     /// @notice During a flash fill only its own filler may use them, not another contract it calls.
@@ -557,11 +538,12 @@ contract FlashFillTest is Test {
             _call(
                 address(other),
                 abi.encodeCall(
-                    Bystander.call, (address(router), abi.encodeCall(Router.fillOrderInCallback, (b, 0.99 ether)))
+                    Bystander.call,
+                    (address(router), abi.encodeCall(IAsyncSwapCallback.fillOrderInCallback, (b, 0.99 ether)))
                 )
             )
         );
-        vm.expectRevert(Router.NotFlashFiller.selector);
+        vm.expectRevert(RouterFlashFills.NotFlashFiller.selector);
         filler.run(a, 90 ether, steps, 0);
     }
 
@@ -570,8 +552,8 @@ contract FlashFillTest is Test {
         (AsyncOrder memory a, AsyncOrder memory b, AsyncOrder memory c) = _crossBook();
         AsyncOrder memory spare = _place(bob, ethUsdc, USDC, 2970 ether, 0.98 ether);
         filler.run(a, 90 ether, _steps2(_fillStep(b), _fillStep(c)), 0);
-        vm.expectRevert(Router.NotFlashFiller.selector);
-        filler.exec(address(router), abi.encodeCall(Router.fillOrderInCallback, (spare, type(uint256).max)));
+        vm.expectRevert(RouterFlashFills.NotFlashFiller.selector);
+        filler.exec(address(router), abi.encodeCall(IAsyncSwapCallback.fillOrderInCallback, (spare, type(uint256).max)));
         // Normal entry points work again.
         router.matchBook(ethUsdc, 1);
     }
@@ -580,7 +562,7 @@ contract FlashFillTest is Test {
     function test_inFlash_matchBook() public {
         (AsyncOrder memory a, AsyncOrder memory b, AsyncOrder memory c) = _crossBook();
         MockFlashFiller.Step[] memory steps = new MockFlashFiller.Step[](3);
-        steps[0] = _call(address(router), abi.encodeCall(Router.matchBookInCallback, (ethUsdc, 1)));
+        steps[0] = _call(address(router), abi.encodeCall(IAsyncSwapCallback.matchBookInCallback, (ethUsdc, 1)));
         steps[1] = _fillStep(b);
         steps[1].target = address(router);
         steps[2] = _fillStep(c);
@@ -593,7 +575,7 @@ contract FlashFillTest is Test {
     function test_inFlash_fillRespectsMaxPrice() public {
         (AsyncOrder memory a, AsyncOrder memory b,) = _crossBook();
         MockFlashFiller.Step memory step = _fillStep(b);
-        step.callData = abi.encodeCall(Router.fillOrderInCallback, (b, 0.99 ether - 1));
+        step.callData = abi.encodeCall(IAsyncSwapCallback.fillOrderInCallback, (b, 0.99 ether - 1));
         step.target = address(router);
         vm.expectRevert("Price exceeds maxPrice");
         filler.run(a, 90 ether, _steps1(step), 0);

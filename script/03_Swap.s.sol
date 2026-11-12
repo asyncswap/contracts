@@ -26,7 +26,7 @@ contract SwapScript is FFIHelper {
 
     function setUp() public {
         (, address r) = _getDeployedHook();
-        router = Router(r);
+        router = Router(payable(r));
         key = _loadPoolKey();
     }
 

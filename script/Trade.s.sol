@@ -44,7 +44,7 @@ contract TradeScript is FFIHelper {
     function setUp() public {
         (address h, address r) = _getDeployedHook();
         hook = AsyncSwap(payable(h));
-        router = Router(r);
+        router = Router(payable(r));
         manager = IPoolManager(_getDeployedPoolManager());
     }
 

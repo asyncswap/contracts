@@ -81,7 +81,7 @@ contract RouterConstructorFormalTest is FormalImmutablesC {
     function testFuzz_CtorSpec(address pm, address hk, address p2, uint64 chainId) public {
         address a = _deployed(pm, hk, p2, chainId);
         assertEq(address(Router(payable(a)).PERMIT2()), p2, "PERMIT2");
-        bytes32[] memory expected = new bytes32[](10);
+        bytes32[] memory expected = new bytes32[](11);
         expected[0] = _word(pm);
         expected[1] = _word(hk);
         expected[2] = _word(p2);
@@ -92,6 +92,8 @@ contract RouterConstructorFormalTest is FormalImmutablesC {
         expected[7] = bytes32(uint256(chainId));
         expected[8] = _word(a);
         expected[9] = _sep(chainId, a);
+        // The flash-fill module the constructor creates (not yet in the Lean `CtorSpec`).
+        expected[10] = _word(Router(payable(a)).FLASH_FILLS());
         _assertImmutables(_immutables(ARTIFACT, a), expected);
         assertEq(RouterCtorHarness(payable(a)).domainSeparatorV4(), _sep(chainId, a), "cached separator");
     }

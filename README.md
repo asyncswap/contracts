@@ -73,7 +73,7 @@ every push to `main` that touches them; preview it locally with `cd site && bun 
 - [Priority-fee top-ups](docs/priority-fee-top-ups.md): maker authorization, funding, queue updates, and agent calls.
 - [Contract call sequences](docs/contract-call-sequences.md): calls, callbacks, responses, and withdrawals.
 - [Price-key crossing](docs/price-key-crossing.md): price comparisons and rounding.
-- [Large-swap research](docs/large-swap-research.md): the price-impact problem, later opposite-side flow, and limits of the savings estimates.
+- [Large-swap research series](https://x.com/asyncswap/article/2120701882377060839): three articles on large-swap costs, opposite-side flow, and Uniswap v4 hooks.
 - [Dynamic fee ordering](docs/dynamic-fee-ordering.md): how pool-fill backruns pay LPs and the protocol.
 
 ## Build and deployment

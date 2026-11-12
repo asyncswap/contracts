@@ -1,9 +1,17 @@
-# Multi-asset swaps: an open problem
+# Multi-asset swaps: flash fills across order books
 
-Status: **v1 proposed, matching an open problem.** Placing and filling any-asset orders has a simple
-first answer (section 4E: non-numeraire pools, filled from their own LP liquidity or by fillers). **Matching those orders
-automatically across different order books** is the open problem this page is mostly about. Nothing
-here is implemented, and proposals are welcome.
+Status: **proposed, not implemented.** The plan has two parts:
+
+- **Where any-asset orders live (section 4E):** non-numeraire pools such as ETH/AMD, with orders placed
+  exactly like today's.
+- **How they fill (section 4F): flash fills.** The Router hands a filler the order's escrowed input
+  inside its own PoolManager unlock and calls the filler back. Using flash accounting, the filler
+  routes through any Uniswap v4 pool and any Async Swap book, in a loop it controls, until the maker's
+  minimum is paid. Nothing has to be pre-funded, and USDC in the middle of a route nets to zero.
+
+Flash fills also answer most of the earlier open problem, matching an order across several books:
+a filler can fill resting ETH/USDC bids and AMD/USDC asks inside one unlock to deliver an ETH to AMD
+order. Proposals and reviews are welcome.
 
 ## 1. The problem
 
@@ -12,11 +20,11 @@ ETH/USDG, AMD/USDG, TSLA/USDG. That keeps liquidity in one place per asset, but 
 **ETH → AMD** has no book and no pool for that pair. Today the interface says "No pool for this pair
 yet".
 
-Version 1 (section 4E) lets that maker place the order anyway, on an ETH/AMD pool, and fills it from
-that pool's own LP liquidity when there is any, or by any filler paying AMD. What v1 does **not** do is
-match it automatically against other books.
+The plan lets that maker place the order anyway, on an ETH/AMD pool (section 4E), and fills it with a
+flash fill (section 4F): from that pool's own LP liquidity when there is any, or by a filler who turns
+the maker's ETH into AMD inside the same unlock, through whatever pools and books it chooses.
 
-### The open problem: automatic matching across order books
+### Matching across order books
 
 A non-numeraire order (ETH → AMD) could be filled from liquidity that already sits in the protocol,
 spread across several books:
@@ -31,8 +39,11 @@ Matching automatically means the protocol, not an outside filler, finds these co
 settles them atomically, with every maker getting at least their limit, in a way that stays fair,
 bounded in gas, and inside a matching engine that is already at the contract size limit. The order
 books are separate data structures, each with its own price keys in numeraire units, so a match that
-spans two or more of them has no single place to happen today. Sections 2 to 4 describe the
-constraints and the approaches (B to D, and the later steps of E) that attack this.
+spans two or more of them has no single place to happen inside the matching engine. Flash fills (4F)
+move that work out of the engine and into the filler's callback: the filler fills each book's resting
+orders in turn inside one unlock, and flash accounting nets the USDC in between. The engine itself does
+not change. Rings and uniform prices across many orders at once (approaches C and D) build on the
+same callback.
 
 What we want, in order of ambition:
 
@@ -64,7 +75,8 @@ These come straight from `src/` and decide where any answer can live.
 | Only the trusted Router may swap through an Async Swap pool. | `AsyncSwap._beforeSwap`: `if (sender != router) revert NotTrustedRouter()` | Standard v4 routers and aggregators cannot route through our pools. |
 | Every swap becomes an order: the hook escrows the whole input and returns no output. | `_beforeSwap` takes `amountSpecified` and returns a `BeforeSwapDelta` for the input only | A swap never hands output back in the same call, so two pools cannot be chained in one swap path. |
 | The Router address is fixed at hook deployment. | `address public immutable router` | A new routing entry point means a new Router and a new hook deployment. |
-| `PoolManager.unlock` cannot be nested. | v4-core `unlock`: `AlreadyUnlocked` | A separate contract cannot fill Async Swap orders inside its own unlock; that has to happen in the Router's. |
+| `PoolManager.unlock` cannot be nested. | v4-core `unlock`: `AlreadyUnlocked` | A separate contract cannot fill Async Swap orders inside its own unlock; that has to happen in the Router's. Flash fills (4F) solve this by having the Router call the filler back from inside its unlock. |
+| Fills pay the maker before releasing the input. | `Router.fillOrder` → `AsyncSwap.executeOrder` → `AsyncFiller.fill`: the filler settles the output, then receives the input | A filler must already hold the output token. A flash fill reverses the order: input first, callback, then the output check. |
 | The hook, Router and matching libraries are within a few hundred bytes of EIP-170. | `forge build --sizes` | New logic belongs in a linked library, not in the hook or Router. |
 
 ## 3. Tools Uniswap v4 gives us
@@ -83,11 +95,18 @@ Async Swap already uses this, but only to take the input (and turn it into an or
 **ERC-6909 claims.** Balances held inside the PoolManager, transferable without moving tokens. Async
 Swap escrow, proceeds and fees are already claims.
 
+**Callbacks inside an unlock.** While the PoolManager is unlocked, any contract can call `swap`,
+`take`, `settle`, `mint` and `burn`; each caller builds up its own deltas, and all of them must be
+zero when `unlock` returns. So the contract that opened the unlock (our Router) can call out to a
+filler's contract, let it trade on any pool, and check the result afterwards. This is the same shape
+as a flash loan or a Uniswap swap callback, and it is what flash fills use.
+
 ## 4. Approaches
 
-Approach E (non-numeraire pools, filled by fillers) is the proposed v1: it reuses the existing order
-and fill paths and needs only a few guards in the hook. It does not solve automatic matching; its
-later steps and approaches B to D are the candidates for that.
+The proposed plan combines two approaches. **E** decides where any-asset orders live (non-numeraire
+pools, a few hook guards). **F** decides how they fill (a flash-fill callback on the Router). F works for
+every order, numeraire pairs included, and is what makes matching across books possible. A to D remain
+alternatives or later layers on top.
 
 ### E. Non-numeraire pools (v1: pool liquidity, then fillers)
 
@@ -118,9 +137,9 @@ routing.
    `Router.fillFromPoolLiquidity`. This path has no numeraire dependency: the 0.01% protocol fee and
    the dynamic fee are taken in the order's own input and output currencies.
 4. **Fill by a filler.** For orders the pool cannot fill, a filler calls `Router.fillOrder` and pays
-   AMD, sourced however it likes: inventory, any Uniswap v4 pool, our numeraire books, other venues.
-   The existing `executeOrder` → `AsyncFiller.fill` already pays the pool's output currency, so the
-   maker receives AMD (less 0.02%) and the filler the ETH (less 0.02%).
+   AMD from inventory, as today, or uses a **flash fill** (4F): it receives the maker's ETH first and
+   turns it into AMD inside the same unlock, through any Uniswap v4 pool or our numeraire books. Either
+   way the maker receives AMD (less 0.02%) and the filler keeps the ETH it did not need (less 0.02%).
 5. **Reprice and cancel** work as today.
 
 **Contract changes for v1.** The order code assumes every pool has a numeraire side, so a few places
@@ -149,19 +168,17 @@ needs a review pass.
 **What it gives.** Any-asset limit orders, and instant fills on placement wherever a non-numeraire
 pool has LP liquidity, with no new order type, no new storage and no change to how orders fill.
 
-**What it does not give.** Where a pool has no LP liquidity, fills depend on fillers showing up. The
-simplest help is an off-chain filler run by the team that watches non-numeraire orders, buys the
-output token (Uniswap, or our numeraire books) and fills when the maker's limit leaves a margin. There
-are no baskets, and no automatic matching against other books (the open problem in section 1).
+**What it does not give on its own.** Where a pool has no LP liquidity, fills depend on fillers, and
+without flash fills a filler must already hold the output token. With 4F, a filler needs no inventory:
+the team can run a reference filler that watches non-numeraire orders and flash-fills them whenever the
+route through the numeraire books and pools beats the maker's limit.
 
 **Later steps toward automatic matching.**
 
-- **`fillFromNumeraire`.** A permissionless fill that routes an order's ETH → USDG → AMD through the
-  numeraire pools in one transaction: sell the ETH for as much USDG as possible (the ETH/USDG book,
-  then its LP liquidity), spend all of it on as much AMD as possible (the AMD/USDG book, then its LP
-  liquidity), charge the fee once, and give the maker everything bought if it meets the minimum.
-  Using the books means filling resting orders partially at their limits, which the matching code
-  already does for book matches. This is matching across two books, done by the protocol.
+- **`fillFromNumeraire`, now a reference flash filler.** The ETH → USDG → AMD route (the ETH/USDG book,
+  then its LP liquidity; then the AMD/USDG book, then its LP liquidity) no longer needs to live in the
+  hook. It becomes a small, permissionless filler contract built on 4F that anyone can call. Matching
+  across two books, done atomically, without growing the size-limited hook.
 - **Matching inside non-numeraire pools (v2).** Direct ETH ⇄ AMD matches by running the existing
   matching engine on a non-numeraire pool; see the plan below.
 - **Rings and batches.** Matching across many books at once is approaches C and D.
@@ -204,6 +221,72 @@ of pool. The extra risk is all in the units layer:
 
 Matching **across** books (an ETH → AMD order against the ETH/USDG and AMD/USDG books together) is not
 solved by this; it stays the open problem.
+
+### F. Flash fills: a filler callback inside the Router's unlock
+
+**The idea.** Today a filler must hold the output token before filling. A flash fill reverses that: the
+Router releases the maker's escrowed input to the filler first, calls the filler's contract back while
+the PoolManager is still unlocked, and only then checks that the maker was paid. Inside the callback the
+filler has full flash accounting: it can swap on any Uniswap v4 pool, fill other Async Swap orders, take
+and settle, in a loop it controls, until it owes the maker the right amount. Every delta must net to
+zero before the unlock closes, or the whole transaction reverts.
+
+**Flow of one flash fill (ETH → AMD order, on an ETH/AMD pool).**
+
+1. The filler calls `Router.flashFill(order, maxPrice, data)`. The Router opens one `unlock`.
+2. The hook marks the order as being filled (no reprice, cancel or second fill until the end) and
+   credits the order's escrowed ETH, less 0.02%, to the filler as a positive delta.
+3. The Router calls `IAsyncSwapFlashFiller(msg.sender).asyncSwapFlashFill(order, amountIn, amountOwed, data)`.
+4. Inside the callback the filler routes as it likes, for example:
+   - fill a resting ETH/USDC bid with the ETH (receives USDC);
+   - fill a resting AMD/USDC ask with the USDC (receives AMD);
+   - swap any remainder through an ETH/USDC or AMD/USDC Uniswap v4 pool;
+   - settle the AMD owed to the maker.
+5. The Router checks the maker's AMD (the minimum plus the 0.02% fee) is settled, pays the maker,
+   closes the order and returns. The filler keeps any surplus. The unlock closes only if every delta,
+   the filler's included, is zero.
+
+**Filling other Async Swap orders from inside the callback.** Each resting order is filled through the
+Router, but the Router cannot open a second unlock. The Router therefore exposes **in-unlock entry
+points** (`fillOrderInFlash`, `matchBookInFlash`) that run the same fill code without calling `unlock`,
+and are accepted only while a flash fill is active and only from that flash fill's filler (recorded in
+transient storage). A filler can chain any number of them, across any books, within one transaction.
+
+**Why this is matching across books.** An ETH → AMD order can now be filled entirely from liquidity
+already in the protocol: resting ETH/USDC bids buy the maker's ETH and resting AMD/USDC asks supply the
+AMD, with the USDC netting to zero in between. Every resting maker fills at or above its own limit,
+exactly as in a normal fill. The matching engine is unchanged; the filler is the router between books.
+
+**Contract changes.**
+
+| Piece | Change |
+|---|---|
+| Router | `flashFill` (opens the unlock, credits the input, calls back, checks the output) and the in-unlock entry points, gated by a transient "active flash fill" slot holding the filler's address. |
+| Hook (`AsyncFiller.fill`) | An input-first variant: lock the order, credit the input, and after the callback verify and pay the output. The existing output-first `fill` stays for plain fills. |
+| Interface | `IAsyncSwapFlashFiller.asyncSwapFlashFill(order, amountIn, amountOwed, data)`. |
+| Fees | Unchanged: 0.02% on each side, the MEV tax on the outer transaction. |
+| Code size | New logic goes in a linked library; the hook and Router are near EIP-170. |
+
+The Router address is immutable in the hook and makers authorize the Router as their executor, so this
+ships with a new hook and Router deployment, alongside E.
+
+**Safety rules.**
+
+- The order being flash-filled is locked for the whole callback: no reprice, cancel, top-up or second
+  fill of it, and `matchBook` skips it.
+- Only the filler that started the flash fill may use the in-unlock entry points, and only while it is
+  active; the slot is cleared before the unlock returns.
+- The maker's check is on the final settled amount, never on intermediate balances, so any route the
+  filler takes is fine as long as the maker gets at least its minimum.
+- Reentrancy into the Router's normal entry points is refused while a flash fill is active.
+- Each in-unlock fill of another order applies that order's own minimum and fees, so resting makers are
+  never worse off than in a normal fill.
+
+- **Good:** no filler inventory needed; any route, through any v4 pool and any Async Swap book;
+  matching across books without touching the matching engine; works for numeraire pairs too.
+  This is the custom-accounting loop the filler controls itself.
+- **Bad:** a new Router and hook deployment, and a new trust boundary (the callback) to audit. Fill
+  quality still depends on fillers competing; a reference filler helps.
 
 ### A. Route through the numeraire in the interface
 
@@ -250,8 +333,9 @@ struct Intent {
 }
 ```
 
-A filler settles intents inside one unlock, using a **ledger** of per-token credits and debits on top of
-flash accounting:
+C generalizes F from one order to many: a filler settles a list of intents inside one unlock, using a
+**ledger** of per-token credits and debits on top of flash accounting. F's callback is the ledger's
+step 2:
 
 1. Release each intent's escrowed inputs into the ledger (credit).
 2. The filler's callback does whatever it likes: fill resting Async Swap orders on any book, use Async
@@ -298,19 +382,21 @@ and section 7 there computes it as a convex program.
 
 ## 5. Comparison
 
-| | E. Non-numeraire pools | A. Interface route | B. Instant via custom accounting | C. Intents + ledger | D. Uniform batches |
-|---|---|---|---|---|---|
-| Instant X → Y | Where the pool has LP liquidity (v1); yes with `fillFromNumeraire` | Two steps | Yes, one transaction | Yes | Per batch |
-| Limit X → Y | Yes, limit in the output token | Yes (leg 2 rests) | No | Yes | Yes |
-| Baskets | No | No | No | Yes | Yes |
-| Automatic matching across books | No (v1); two books with `fillFromNumeraire` | No | No | Yes | Yes |
-| Reachable by external routers | No | No | Yes | No | No |
-| Contract change | A few hook guards (v1) | None | Hook | Settlement library + Router | C plus solver rules |
+| | E. Non-numeraire pools | F. Flash fills | A. Interface route | B. Instant via custom accounting | C. Intents + ledger | D. Uniform batches |
+|---|---|---|---|---|---|---|
+| Instant X → Y | Where the pool has LP liquidity | Yes, by any filler, no inventory | Two steps | Yes, one transaction | Yes | Per batch |
+| Limit X → Y | Yes, limit in the output token | Yes (fills E's orders) | Yes (leg 2 rests) | No | Yes | Yes |
+| Baskets | No | No | No | No | Yes | Yes |
+| Matching across books | No | Yes, by the filler, one order at a time | No | No | Yes | Yes |
+| Filler needs inventory | Yes | No | n/a | n/a | No | No |
+| Reachable by external routers | No | No | No | Yes | No | No |
+| Contract change | A few hook guards | Router callback + input-first fill | None | Hook | Settlement library + Router | C plus solver rules |
 
-E is the v1: any-asset limit orders, filled by fillers, with a few hook guards and the existing fill
-path unchanged. Automatic matching across books comes from E's later steps or from C and D. The others stack around it. A works today. B makes instant multi-asset swaps native and
-opens Async Swap liquidity to the rest of Uniswap v4. C adds limit intents, baskets and CoWs on top of
-B's instant fills. D tightens C's acceptance rule into uniform prices.
+**Plan: E + F.** E gives any-asset limit orders with a few hook guards; F gives every order (any-asset
+or numeraire) an inventory-free fill path and matching across books, without touching the matching
+engine. Both ship in the next hook and Router deployment. A works today. B would additionally open Async
+Swap liquidity to external v4 routers. C extends F to many orders and baskets at once, and D tightens C
+into uniform prices.
 
 ## 6. Open questions
 
@@ -319,6 +405,16 @@ For E (v1):
 - Should the price passed when creating a non-numeraire pool be ignored, or kept as a reference price
   for the interface?
 - Who runs the first filler, and how much margin should it require before filling?
+
+For F (flash fills):
+
+- Credit the input as a delta to `take`, or as ERC-6909 claims the filler burns?
+- Should a single flash fill be able to fill several of the filler's own orders (a list), or one order
+  per call at first?
+- Do in-unlock fills of other orders charge the MEV tax again, or only the outer transaction?
+- Should surplus above the maker's minimum stay with the filler, or be shared with the maker (the
+  price-improvement fee idea)?
+- Do we ship a reference flash filler (the numeraire route) at launch, and who runs it?
 
 For automatic matching across books:
 

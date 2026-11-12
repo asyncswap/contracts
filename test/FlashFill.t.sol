@@ -81,6 +81,16 @@ contract MockFlashFiller is IAsyncSwapFlashFiller {
     receive() external payable {}
 }
 
+/// @notice Pays a debt in native ETH for someone else, as a flash filler's helper would inside its callback.
+contract NativePayer {
+    function pay(IPoolManager manager, address debtor, uint256 amount) external {
+        manager.sync(Currency.wrap(address(0)));
+        manager.settleFor{value: amount}(debtor);
+    }
+
+    receive() external payable {}
+}
+
 /// @notice Calls an in-unlock entry point from an address that is not the active flash filler.
 contract Bystander {
     function call(address target, bytes calldata callData) external {
@@ -128,7 +138,9 @@ contract FlashFillTest is Test {
                     | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
             )
         );
-        router = new Router(manager, AsyncSwap(payable(hookAddress)), ISignatureTransfer(Permit2Bytecode.PERMIT2), 0);
+        router = new Router(
+            manager, AsyncSwap(payable(hookAddress)), ISignatureTransfer(Permit2Bytecode.PERMIT2), _mevTaxGas()
+        );
         deployCodeTo(
             "AsyncSwap.sol",
             abi.encode(manager, USDC, address(this), address(router), uint256(0), type(uint8).max),
@@ -161,6 +173,11 @@ contract FlashFillTest is Test {
     }
 
     /* ------------------------------------------------------------------ helpers */
+
+    /// @dev MEV tax gas for the Router under test; zero here, so these tests pay no tax at any gas price.
+    function _mevTaxGas() internal pure virtual returns (uint256) {
+        return 0;
+    }
 
     function _key(Currency a, Currency b) internal view returns (PoolKey memory) {
         (Currency c0, Currency c1) = Currency.unwrap(a) < Currency.unwrap(b) ? (a, b) : (b, a);
@@ -579,5 +596,88 @@ contract FlashFillTest is Test {
         step.target = address(router);
         vm.expectRevert("Price exceeds maxPrice");
         filler.run(a, 90 ether, _steps1(step), 0);
+    }
+}
+
+/// @notice The flash path charges the MEV tax per fill, as a PoolManager debt the filler covers by the end of the
+///         unlock: prepaid in `msg.value`, or paid inside the callback with `settleFor(router)`.
+contract FlashFillMevTaxTest is FlashFillTest {
+    uint256 constant TAX_GAS = 100_000;
+    uint256 constant PRIORITY = 2 gwei;
+    uint256 constant TAX = TAX_GAS * PRIORITY;
+
+    function _mevTaxGas() internal pure override returns (uint256) {
+        return TAX_GAS;
+    }
+
+    function _priority() internal {
+        vm.fee(1 gwei);
+        vm.txGasPrice(1 gwei + PRIORITY);
+    }
+
+    function _vaultEth() internal view returns (uint256) {
+        return manager.balanceOf(address(hook.feeVault()), ETH.toId());
+    }
+
+    /// @notice Three fills in one callback (the flash fill and two in-callback fills) pay the tax three times.
+    function test_mevTax_chargedPerFill() public {
+        (AsyncOrder memory a, AsyncOrder memory b, AsyncOrder memory c) = _crossBook();
+        _priority();
+        filler.run{value: 3 * TAX}(a, 90 ether, _steps2(_fillStep(b), _fillStep(c)), 0);
+        assertEq(_vaultEth(), _fee(1 ether) + _fee(0.99 ether) + 3 * TAX);
+        assertEq(address(router).balance, 0);
+        assertEq(address(filler).balance, 0);
+    }
+
+    function test_mevTax_underpaidReverts() public {
+        (AsyncOrder memory a, AsyncOrder memory b, AsyncOrder memory c) = _crossBook();
+        _priority();
+        vm.expectRevert(abi.encodeWithSelector(RouterFlashFills.MevTaxUnpaid.selector, 1));
+        filler.run{value: 3 * TAX - 1}(a, 90 ether, _steps2(_fillStep(b), _fillStep(c)), 0);
+    }
+
+    function test_mevTax_unpaidReverts() public {
+        (AsyncOrder memory a, AsyncOrder memory b, AsyncOrder memory c) = _crossBook();
+        _priority();
+        vm.expectRevert(abi.encodeWithSelector(RouterFlashFills.MevTaxUnpaid.selector, 3 * TAX));
+        filler.run(a, 90 ether, _steps2(_fillStep(b), _fillStep(c)), 0);
+    }
+
+    function test_mevTax_surplusReturned() public {
+        (AsyncOrder memory a, AsyncOrder memory b, AsyncOrder memory c) = _crossBook();
+        _priority();
+        filler.run{value: 3 * TAX + 5}(a, 90 ether, _steps2(_fillStep(b), _fillStep(c)), 0);
+        assertEq(address(filler).balance, 5, "surplus back to filler");
+        assertEq(_vaultEth(), _fee(1 ether) + _fee(0.99 ether) + 3 * TAX);
+    }
+
+    /// @notice The filler pays inside its callback, with nothing sent upfront.
+    function test_mevTax_paidInCallback() public {
+        (AsyncOrder memory a, AsyncOrder memory b, AsyncOrder memory c) = _crossBook();
+        NativePayer payer = new NativePayer();
+        vm.deal(address(payer), 3 * TAX);
+        _priority();
+        MockFlashFiller.Step memory pay = MockFlashFiller.Step({
+            payCurrency: ETH,
+            payAmount: 0,
+            target: address(payer),
+            callData: abi.encodeCall(NativePayer.pay, (manager, address(router), 3 * TAX))
+        });
+        MockFlashFiller.Step[] memory steps = new MockFlashFiller.Step[](3);
+        steps[0] = _fillStep(b);
+        steps[1] = _fillStep(c);
+        steps[0].target = address(router);
+        steps[1].target = address(router);
+        steps[2] = pay;
+        filler.run(a, 90 ether, steps, 0);
+        assertEq(_vaultEth(), _fee(1 ether) + _fee(0.99 ether) + 3 * TAX);
+        assertEq(address(payer).balance, 0);
+    }
+
+    /// @notice Without a priority fee there is no tax and nothing to send.
+    function test_mevTax_zeroWithoutPriority() public {
+        (AsyncOrder memory a, AsyncOrder memory b, AsyncOrder memory c) = _crossBook();
+        filler.run(a, 90 ether, _steps2(_fillStep(b), _fillStep(c)), 0);
+        assertEq(_vaultEth(), _fee(1 ether) + _fee(0.99 ether));
     }
 }

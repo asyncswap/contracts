@@ -430,6 +430,52 @@ contract AsyncSwap is BaseHook, EIP712 {
         );
     }
 
+    /// @notice Input-first half of a Router flash fill: closes `order` and credits its input, less the trade fee,
+    ///         to `filler` as ERC-6909 claims. The Router must call `settleFlashFill` in the same unlock.
+    /// @return amountIn The input credited to the filler.
+    /// @return amountOwed The output the Router must transfer to this hook as claims before `settleFlashFill`.
+    function beginFlashFill(AsyncOrder calldata order, address filler)
+        external
+        returns (uint256 amountIn, uint256 amountOwed)
+    {
+        if (msg.sender != router) revert NotTrustedRouter();
+        return AsyncMatching.beginFlashFill(
+            asyncOrders[order.key.toId()], priceBooks[order.key.toId()], _claimsFill(order, filler)
+        );
+    }
+
+    /// @notice Pays the maker of the open flash fill out of the output claims the Router has just transferred here.
+    function settleFlashFill(AsyncOrder calldata order, address filler) external {
+        if (msg.sender != router) revert NotTrustedRouter();
+        AsyncMatching.settleFlashFill(asyncOrders[order.key.toId()], _claimsFill(order, filler));
+    }
+
+    /// @notice Full fill paid in claims, for fills inside a flash fill: the Router has already transferred the
+    ///         order's live minimum (plus pool fee) to this hook as claims; `filler` receives the input as claims.
+    function executeOrderWithClaims(AsyncOrder calldata order, address filler) external {
+        if (msg.sender != router) revert NotTrustedRouter();
+        AsyncMatching.fillWithClaims(
+            asyncOrders[order.key.toId()], priceBooks[order.key.toId()], _claimsFill(order, filler)
+        );
+    }
+
+    function _claimsFill(AsyncOrder calldata order, address filler)
+        private
+        view
+        returns (AsyncMatching.FillParams memory)
+    {
+        bytes32 id = order.orderId();
+        return AsyncMatching.FillParams({
+            order: order,
+            id: id,
+            hook: address(this),
+            executor: msg.sender,
+            filler: filler,
+            feeVault: address(feeVault),
+            fee: calculatePoolFee(order.key.fee, asyncOrders[order.key.toId()].orders[id].amountOutMin)
+        });
+    }
+
     /// @notice Match the order just created by the current Router unlock callback.
     /// @dev The Router calls this only after settling the maker's input. The transient hand-off
     ///      prevents stale order ids or a different executor from triggering a match.

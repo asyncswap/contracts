@@ -1,6 +1,6 @@
 # RouterFlashFills
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/RouterFlashFills.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/RouterFlashFills.sol)
 
 **Inherits:** [IAsyncSwapCallback](/reference/src/interfaces/IAsyncSwapCallback)
 
@@ -37,19 +37,12 @@ AsyncSwap immutable HOOK;
 uint256 immutable MEV_TAX_GAS;
 ```
 
-### MEV_TAX_LOCATION
-
-<i>
-  Router transient slots this module shares (see Router). keccak256("Router.MevTax") - 1.
-</i>
-
-```solidity
-bytes32 constant MEV_TAX_LOCATION = 0xe6251c15e22bdb44d13d4efeec6855e57f2b38fe36310ce3c709991726ed21da;
-```
-
 ### FLASH_FILLER_LOCATION
 
-keccak256("Router.FlashFiller") - 1: the filler of the flash fill in progress, zero otherwise.
+<i>
+  Router transient slot this module shares (see Router).
+  keccak256("Router.FlashFiller") - 1: the filler of the flash fill in progress, zero otherwise.
+</i>
 
 ```solidity
 bytes32 constant FLASH_FILLER_LOCATION = 0x8a32db0797977fc7694da75ada74debc8ae08fbf3557ccd5133e780e8ba11369;
@@ -106,6 +99,10 @@ constructor(IPoolManager _poolManager, AsyncSwap _hook, uint256 _mevTaxGas);
 ### fillOrderWithCallback
 
 Fill `order` with no inventory: input first as claims, callback, then the owed output as claims.
+Every fill in the callback (this one and each `fillOrderInCallback`) owes the MEV tax, paid to the
+FeeVault when the fill runs. `msg.value` prepays it, any amount; the filler may also pay inside its
+callback with `PoolManager.settleFor(router)`. A surplus is returned to the filler in ETH and a
+shortfall reverts `MevTaxUnpaid`.
 
 ```solidity
 function fillOrderWithCallback(AsyncOrder calldata order, uint256 maxPrice, bytes calldata data) external payable;
@@ -181,6 +178,99 @@ function matchBookInCallback(PoolKey calldata key, uint8 maxMatches) external re
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | \<none> | `uint8` |  |
+
+<a id="mevtaxfor-uint256" />
+
+### mevTaxFor
+
+MEV tax for `fills` fills at this transaction's priority fee. Off chain, simulate with the gas price
+you will send (`eth_call` with `gasPrice`); on chain it is exact for the running transaction.
+
+```solidity
+function mevTaxFor(uint256 fills) external view returns (uint256);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| fills | `uint256` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint256` |  |
+
+<a id="mevtaxowed" />
+
+### mevTaxOwed
+
+Inside the callback: the MEV tax the Router still owes for this flash fill, every fill charged so far
+less what was paid. Settle exactly this with `PoolManager.settleFor(router)` before returning.
+
+```solidity
+function mevTaxOwed() external view returns (uint256);
+```
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint256` |  |
+
+<a id="_mevtax" />
+
+### \_mevTax
+
+```solidity
+function _mevTax() private view returns (uint256);
+```
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint256` |  |
+
+<a id="_chargemevtax-address" />
+
+### \_chargeMevTax
+
+<i>
+  Pays one fill's MEV tax to the FeeVault as native claims now; the Router owes it to the PoolManager
+  until `_settleMevTax`.
+</i>
+
+```solidity
+function _chargeMevTax(address filler) private;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| filler | `address` |  |
+
+<a id="_settlemevtax-address-uint256" />
+
+### \_settleMevTax
+
+<i>
+  Settles the prepayment, then requires the Router's native delta to be covered: the filler may have paid
+  with `settleFor(router)` in its callback. A surplus goes back to the filler.
+</i>
+
+```solidity
+function _settleMevTax(address filler, uint256 prepaid) private;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| filler | `address` |  |
+| prepaid | `uint256` |  |
 
 <a id="_hookcall-uint8-asyncorder-address" />
 
@@ -306,3 +396,17 @@ An in-callback entry point was called by anyone but the filler of the running fl
 ```solidity
 error NotFlashFiller();
 ```
+
+### MevTaxUnpaid
+
+The filler left `owed` of the MEV tax of its fills unpaid.
+
+```solidity
+error MevTaxUnpaid(uint256 owed);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| owed | `uint256` |  |

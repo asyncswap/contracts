@@ -1,6 +1,6 @@
 # Router
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/Router.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/Router.sol)
 
 **Inherits:** EIP712, Multicall
 
@@ -29,6 +29,8 @@ Order creation and fills (`swap`, `swapWithSig`, `fillOrder`, `fillFromPoolLiqui
 that orders by priority fee, searchers racing for the same position bid it up, so most of what they race
 for goes to the protocol; a transaction with no priority pays nothing. Inside `multicall`, which is not
 payable, a taxed action needs a transaction with no priority.
+Flash fills (`fillOrderWithCallback`) charge the tax per fill as a PoolManager debt instead; see
+`IAsyncSwapCallback`.
 
 ## Constants
 

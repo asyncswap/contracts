@@ -1,6 +1,6 @@
 # IAsyncSwapCallback
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/interfaces/IAsyncSwapCallback.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/interfaces/IAsyncSwapCallback.sol)
 
 **Title:** IAsyncSwapCallback
 
@@ -16,6 +16,10 @@ accepted while that callback runs, and only from its filler. Every other Router 
 ### fillOrderWithCallback
 
 Fill `order` with no inventory: input first as claims, callback, then the owed output as claims.
+Every fill in the callback (this one and each `fillOrderInCallback`) owes the MEV tax, paid to the
+FeeVault when the fill runs. `msg.value` prepays it, any amount; the filler may also pay inside its
+callback with `PoolManager.settleFor(router)`. A surplus is returned to the filler in ETH and a
+shortfall reverts `MevTaxUnpaid`.
 
 ```solidity
 function fillOrderWithCallback(AsyncOrder calldata order, uint256 maxPrice, bytes calldata data) external payable;
@@ -68,3 +72,43 @@ function matchBookInCallback(PoolKey calldata key, uint8 maxMatches) external re
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | \<none> | `uint8` |  |
+
+<a id="mevtaxfor-uint256" />
+
+### mevTaxFor
+
+MEV tax for `fills` fills at this transaction's priority fee. Off chain, simulate with the gas price
+you will send (`eth_call` with `gasPrice`); on chain it is exact for the running transaction.
+
+```solidity
+function mevTaxFor(uint256 fills) external view returns (uint256);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| fills | `uint256` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint256` |  |
+
+<a id="mevtaxowed" />
+
+### mevTaxOwed
+
+Inside the callback: the MEV tax the Router still owes for this flash fill, every fill charged so far
+less what was paid. Settle exactly this with `PoolManager.settleFor(router)` before returning.
+
+```solidity
+function mevTaxOwed() external view returns (uint256);
+```
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint256` |  |

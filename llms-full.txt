@@ -42,6 +42,7 @@ Sitemap:
 - [TickBitmap](/reference/src/libraries/TickBitmap): Three-level occupancy bitmap for the bounded tick-key domain.
 - [TickPrice](/reference/src/libraries/TickPrice): Book levels on Uniswap v4 ticks: an order sits at the floor tick (spacing 1, 0.01% steps) of its exact currency1/currency0 limit. Levels are a fixed relative width at any price and for any token decimals; the exact limit still decides crossing within a level.
 - [TokenTransfers](/reference/src/libraries/TokenTransfers): Require full ERC-20 delivery without charging extra to the sender; token-reported success is insufficient.
+- [AsyncSwapFlashFiller](/reference/src/periphery/AsyncSwapFlashFiller): Base for flash fillers. Write `_route`; this contract handles the rest: - only the Router may call the callback, and only for a fill this contract started; - it approves the Router for the output owed to the maker; - it pays the exact MEV tax owed, from its ETH balance, so `fill` needs no `msg.value`. Keep enough ETH in the contract for the tax (send it with `fill`, or fund it beforehand). Surplus and refunds stay in the contract; `withdraw` sends them to the owner.
 - [AsyncOrderLibrary](/reference/src/types/AsyncOrderLibrary): Helpers attached to AsyncOrder for identity and pricing.
 - [AsyncOrder](/reference/src/types/AsyncOrder): Represents an async order for a swap in the Uniswap V4 pool.
 -->
@@ -1573,7 +1574,7 @@ match the code on `main`. Each page links to its source file.
 
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -3059,7 +3060,7 @@ struct UserParams {
 
 # FeeVault
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/FeeVault.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/FeeVault.sol)
 
 Holds and redeems protocol fee claims, never maker escrow.
 
@@ -3166,7 +3167,7 @@ error ZeroAddress();
 
 # ImmutableState
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/ImmutableState.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/ImmutableState.sol)
 
 **Title:** Immutable State
 
@@ -3218,7 +3219,7 @@ error NotPoolManager();
 
 # MatchingEngine
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/MatchingEngine.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/MatchingEngine.sol)
 
 **Title:** MatchingEngine
 
@@ -3691,7 +3692,7 @@ struct Book {
 
 # NativeClaims
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/NativeClaims.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/NativeClaims.sol)
 
 Redeems the caller's PoolManager native ETH claims to a chosen recipient.
 
@@ -3813,7 +3814,7 @@ error ReentrantRedemption();
 
 # Router
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/Router.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/Router.sol)
 
 **Inherits:** EIP712, Multicall
 
@@ -3842,6 +3843,8 @@ Order creation and fills (`swap`, `swapWithSig`, `fillOrder`, `fillFromPoolLiqui
 that orders by priority fee, searchers racing for the same position bid it up, so most of what they race
 for goes to the protocol; a transaction with no priority pays nothing. Inside `multicall`, which is not
 payable, a taxed action needs a transaction with no priority.
+Flash fills (`fillOrderWithCallback`) charge the tax per fill as a PoolManager debt instead; see
+`IAsyncSwapCallback`.
 
 ## Constants
 
@@ -4536,7 +4539,7 @@ enum ActionType {
 
 # RouterFlashFills
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/RouterFlashFills.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/RouterFlashFills.sol)
 
 **Inherits:** [IAsyncSwapCallback](/reference/src/interfaces/IAsyncSwapCallback)
 
@@ -4573,19 +4576,12 @@ AsyncSwap immutable HOOK;
 uint256 immutable MEV_TAX_GAS;
 ```
 
-### MEV_TAX_LOCATION
-
-<i>
-  Router transient slots this module shares (see Router). keccak256("Router.MevTax") - 1.
-</i>
-
-```solidity
-bytes32 constant MEV_TAX_LOCATION = 0xe6251c15e22bdb44d13d4efeec6855e57f2b38fe36310ce3c709991726ed21da;
-```
-
 ### FLASH_FILLER_LOCATION
 
-keccak256("Router.FlashFiller") - 1: the filler of the flash fill in progress, zero otherwise.
+<i>
+  Router transient slot this module shares (see Router).
+  keccak256("Router.FlashFiller") - 1: the filler of the flash fill in progress, zero otherwise.
+</i>
 
 ```solidity
 bytes32 constant FLASH_FILLER_LOCATION = 0x8a32db0797977fc7694da75ada74debc8ae08fbf3557ccd5133e780e8ba11369;
@@ -4642,6 +4638,10 @@ constructor(IPoolManager _poolManager, AsyncSwap _hook, uint256 _mevTaxGas);
 ### fillOrderWithCallback
 
 Fill `order` with no inventory: input first as claims, callback, then the owed output as claims.
+Every fill in the callback (this one and each `fillOrderInCallback`) owes the MEV tax, paid to the
+FeeVault when the fill runs. `msg.value` prepays it, any amount; the filler may also pay inside its
+callback with `PoolManager.settleFor(router)`. A surplus is returned to the filler in ETH and a
+shortfall reverts `MevTaxUnpaid`.
 
 ```solidity
 function fillOrderWithCallback(AsyncOrder calldata order, uint256 maxPrice, bytes calldata data) external payable;
@@ -4717,6 +4717,99 @@ function matchBookInCallback(PoolKey calldata key, uint8 maxMatches) external re
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | \<none> | `uint8` |  |
+
+<a id="mevtaxfor-uint256" />
+
+### mevTaxFor
+
+MEV tax for `fills` fills at this transaction's priority fee. Off chain, simulate with the gas price
+you will send (`eth_call` with `gasPrice`); on chain it is exact for the running transaction.
+
+```solidity
+function mevTaxFor(uint256 fills) external view returns (uint256);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| fills | `uint256` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint256` |  |
+
+<a id="mevtaxowed" />
+
+### mevTaxOwed
+
+Inside the callback: the MEV tax the Router still owes for this flash fill, every fill charged so far
+less what was paid. Settle exactly this with `PoolManager.settleFor(router)` before returning.
+
+```solidity
+function mevTaxOwed() external view returns (uint256);
+```
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint256` |  |
+
+<a id="_mevtax" />
+
+### \_mevTax
+
+```solidity
+function _mevTax() private view returns (uint256);
+```
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint256` |  |
+
+<a id="_chargemevtax-address" />
+
+### \_chargeMevTax
+
+<i>
+  Pays one fill's MEV tax to the FeeVault as native claims now; the Router owes it to the PoolManager
+  until `_settleMevTax`.
+</i>
+
+```solidity
+function _chargeMevTax(address filler) private;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| filler | `address` |  |
+
+<a id="_settlemevtax-address-uint256" />
+
+### \_settleMevTax
+
+<i>
+  Settles the prepayment, then requires the Router's native delta to be covered: the filler may have paid
+  with `settleFor(router)` in its callback. A surplus goes back to the filler.
+</i>
+
+```solidity
+function _settleMevTax(address filler, uint256 prepaid) private;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| filler | `address` |  |
+| prepaid | `uint256` |  |
 
 <a id="_hookcall-uint8-asyncorder-address" />
 
@@ -4843,9 +4936,23 @@ An in-callback entry point was called by anyone but the filler of the running fl
 error NotFlashFiller();
 ```
 
+### MevTaxUnpaid
+
+The filler left `owed` of the MEV tax of its fills unpaid.
+
+```solidity
+error MevTaxUnpaid(uint256 owed);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| owed | `uint256` |  |
+
 # TokenClaims
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/TokenClaims.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/TokenClaims.sol)
 
 Redeems the caller's PoolManager currency claims to a chosen recipient.
 
@@ -4969,7 +5076,7 @@ error ReentrantRedemption();
 
 # BaseHook
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/BaseHook.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/BaseHook.sol)
 
 **Inherits:** IHooks, [ImmutableState](/reference/src/ImmutableState)
 
@@ -5629,7 +5736,7 @@ error HookNotImplemented();
 
 # IFeeOwner
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/FeeVault.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/FeeVault.sol)
 
 ## Functions
 
@@ -5649,7 +5756,7 @@ function owner() external view returns (address);
 
 # IAsyncSwapCallback
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/interfaces/IAsyncSwapCallback.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/interfaces/IAsyncSwapCallback.sol)
 
 **Title:** IAsyncSwapCallback
 
@@ -5665,6 +5772,10 @@ accepted while that callback runs, and only from its filler. Every other Router 
 ### fillOrderWithCallback
 
 Fill `order` with no inventory: input first as claims, callback, then the owed output as claims.
+Every fill in the callback (this one and each `fillOrderInCallback`) owes the MEV tax, paid to the
+FeeVault when the fill runs. `msg.value` prepays it, any amount; the filler may also pay inside its
+callback with `PoolManager.settleFor(router)`. A surplus is returned to the filler in ETH and a
+shortfall reverts `MevTaxUnpaid`.
 
 ```solidity
 function fillOrderWithCallback(AsyncOrder calldata order, uint256 maxPrice, bytes calldata data) external payable;
@@ -5718,9 +5829,49 @@ function matchBookInCallback(PoolKey calldata key, uint8 maxMatches) external re
 | ---- | ---- | ----------- |
 | \<none> | `uint8` |  |
 
+<a id="mevtaxfor-uint256" />
+
+### mevTaxFor
+
+MEV tax for `fills` fills at this transaction's priority fee. Off chain, simulate with the gas price
+you will send (`eth_call` with `gasPrice`); on chain it is exact for the running transaction.
+
+```solidity
+function mevTaxFor(uint256 fills) external view returns (uint256);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| fills | `uint256` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint256` |  |
+
+<a id="mevtaxowed" />
+
+### mevTaxOwed
+
+Inside the callback: the MEV tax the Router still owes for this flash fill, every fill charged so far
+less what was paid. Settle exactly this with `PoolManager.settleFor(router)` before returning.
+
+```solidity
+function mevTaxOwed() external view returns (uint256);
+```
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint256` |  |
+
 # IAsyncSwapFlashFiller
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/interfaces/IAsyncSwapFlashFiller.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/interfaces/IAsyncSwapFlashFiller.sol)
 
 **Title:** IAsyncSwapFlashFiller
 
@@ -5760,7 +5911,7 @@ function asyncSwapFlashFill(AsyncOrder calldata order, uint256 amountIn, uint256
 
 # ISignatureTransfer
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/interfaces/ISignatureTransfer.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/interfaces/ISignatureTransfer.sol)
 
 **Title:** ISignatureTransfer
 
@@ -5853,7 +6004,7 @@ struct SignatureTransferDetails {
 
 # IIncomingLiquidity
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/libraries/IncomingMatching.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/libraries/IncomingMatching.sol)
 
 <i>
   The hook's existing self-call boundary rolls back a failed LP attempt atomically.
@@ -5879,7 +6030,7 @@ function fillOrderFromPoolLiquidity(AsyncOrder calldata order, bytes32 id, uint1
 
 # AsyncFiller
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/libraries/AsyncFiller.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/libraries/AsyncFiller.sol)
 
 **Title:** AsyncFiller
 
@@ -6982,7 +7133,7 @@ struct Book {
 
 # AsyncMatching
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/libraries/AsyncMatching.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/libraries/AsyncMatching.sol)
 
 Linked matching module operating on the hook's order and radix-book storage.
 
@@ -7855,7 +8006,7 @@ struct UpdateParams {
 
 # ClaimTransfers
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/libraries/ClaimTransfers.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/libraries/ClaimTransfers.sol)
 
 <i>
   At most 16 makers and the FeeVault can each receive two currencies in eight matches.
@@ -7935,7 +8086,7 @@ struct Batch {
 
 # CurrencySettler
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/libraries/CurrencySettler.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/libraries/CurrencySettler.sol)
 
 **Title:** CurrencySettler
 
@@ -7986,7 +8137,7 @@ function take(Currency currency, IPoolManager manager, address recipient, uint25
 
 # DynamicFeeOrdering
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/libraries/DynamicFeeOrdering.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/libraries/DynamicFeeOrdering.sol)
 
 **Title:** Dynamic fee ordering on pool-liquidity fills
 
@@ -8134,7 +8285,7 @@ event PoolPriceObserved(
 
 # EligiblePrice
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/libraries/EligiblePrice.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/libraries/EligiblePrice.sol)
 
 Exact-price summaries on a priority-key radix tree.
 
@@ -8313,7 +8464,7 @@ struct Ratio {
 
 # IncomingMatching
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/libraries/IncomingMatching.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/libraries/IncomingMatching.sol)
 
 Fund a crossing arrival, match it in memory, then index only its remainder.
 
@@ -8701,7 +8852,7 @@ function _reduce(
 
 # MultiAsset
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/libraries/MultiAsset.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/libraries/MultiAsset.sol)
 
 **Title:** MultiAsset
 
@@ -9048,7 +9199,7 @@ struct PoolConfig {
 
 # OrderSignatures
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/libraries/OrderSignatures.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/libraries/OrderSignatures.sol)
 
 **Title:** OrderSignatures
 
@@ -9303,7 +9454,7 @@ function hashCancel(
 
 # PriorityFeeUpdates
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/libraries/PriorityFeeUpdates.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/libraries/PriorityFeeUpdates.sol)
 
 Funded priority amendments, linked separately to keep the hook within EIP-170.
 
@@ -9358,7 +9509,7 @@ event AsyncOrderPriorityFeeUpdated(
 
 # RadixPriceTree
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/libraries/RadixPriceTree.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/libraries/RadixPriceTree.sol)
 
 Patricia radix index for uint128 price levels. Inserts and removals
 traverse at most 128 branch bits; each distinct price creates one
@@ -9574,7 +9725,7 @@ struct Tree {
 
 # TickBitmap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/libraries/TickBitmap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/libraries/TickBitmap.sol)
 
 Three-level occupancy bitmap for the bounded tick-key domain.
 
@@ -9708,7 +9859,7 @@ struct Tree {
 
 # TickPrice
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/libraries/TickPrice.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/libraries/TickPrice.sol)
 
 Book levels on Uniswap v4 ticks: an order sits at the floor tick (spacing 1, 0.01% steps)
 of its exact currency1/currency0 limit. Levels are a fixed relative width at any price and
@@ -9817,7 +9968,7 @@ function floorTick(uint256 num, uint256 den) internal pure returns (int24);
 
 # TokenTransfers
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/libraries/TokenTransfers.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/libraries/TokenTransfers.sol)
 
 Require full ERC-20 delivery without charging extra to the sender; token-reported success is insufficient.
 
@@ -9984,9 +10135,221 @@ struct Balances {
 | from | `uint256` |  |
 | to | `uint256` |  |
 
+# AsyncSwapFlashFiller
+
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/periphery/AsyncSwapFlashFiller.sol)
+
+**Inherits:** [IAsyncSwapFlashFiller](/reference/src/interfaces/IAsyncSwapFlashFiller)
+
+**Title:** AsyncSwapFlashFiller
+
+Base for flash fillers. Write `_route`; this contract handles the rest:
+
+* only the Router may call the callback, and only for a fill this contract started;
+* it approves the Router for the output owed to the maker;
+* it pays the exact MEV tax owed, from its ETH balance, so `fill` needs no `msg.value`.
+  Keep enough ETH in the contract for the tax (send it with `fill`, or fund it beforehand).
+  Surplus and refunds stay in the contract; `withdraw` sends them to the owner.
+
+## Constants
+
+### POOLMANAGER
+
+```solidity
+IPoolManager public immutable POOLMANAGER;
+```
+
+### ROUTER
+
+```solidity
+IAsyncSwapCallback public immutable ROUTER;
+```
+
+### OWNER
+
+```solidity
+address public immutable OWNER;
+```
+
+## Functions
+
+<a id="constructor-ipoolmanager-iasyncswapcallback-address" />
+
+### constructor
+
+```solidity
+constructor(IPoolManager poolManager, IAsyncSwapCallback router, address owner);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| poolManager | `IPoolManager` |  |
+| router | `IAsyncSwapCallback` |  |
+| owner | `address` |  |
+
+<a id="fill-asyncorder-uint256-bytes" />
+
+### fill
+
+Starts a flash fill of `order`. Any ETH sent stays here to pay the MEV tax.
+
+```solidity
+function fill(AsyncOrder calldata order, uint256 maxPrice, bytes calldata data) external payable;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| maxPrice | `uint256` |  |
+| data | `bytes` |  |
+
+<a id="ethneeded-uint256" />
+
+### ethNeeded
+
+The ETH `fill` needs for the MEV tax of `fills` fills at this gas price, less what the contract holds.
+
+```solidity
+function ethNeeded(uint256 fills) external view returns (uint256);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| fills | `uint256` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint256` |  |
+
+<a id="asyncswapflashfill-asyncorder-uint256-uint256-bytes" />
+
+### asyncSwapFlashFill
+
+Called by the Router inside its PoolManager unlock, after the order was closed and its input,
+less the 0.02% trade fee, credited to the filler as ERC-6909 claims (`amountIn` of the input
+currency, id 0 for native ETH).
+
+<i>
+  Before returning, the filler must hold `amountOwed` claims of the order's output currency and allow
+  the Router to transfer them (`PoolManager.approve(router, id, amountOwed)` or an operator grant). Inside
+  the callback it may swap on any v4 pool, `burn`/`mint`/`take`/`settle`, and fill other Async Swap orders
+  through `IAsyncSwapCallback.fillOrderInCallback` and `matchBookInCallback`. Every delta it opens must be zero
+  when the Router's unlock ends.
+</i>
+
+```solidity
+function asyncSwapFlashFill(AsyncOrder calldata order, uint256 amountIn, uint256 amountOwed, bytes calldata data)
+        external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| amountIn | `uint256` |  |
+| amountOwed | `uint256` |  |
+| data | `bytes` |  |
+
+<a id="withdraw-uint256-uint256-uint256" />
+
+### withdraw
+
+Sends `amount` ETH and ERC-6909 claims of `ids` held here to the owner.
+
+```solidity
+function withdraw(uint256 amount, uint256[] calldata ids, uint256[] calldata amounts) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| amount | `uint256` |  |
+| ids | `uint256[]` |  |
+| amounts | `uint256[]` |  |
+
+<a id="_route-asyncorder-uint256-uint256-bytes" />
+
+### \_route
+
+<i>
+  Turn `amountIn` input claims into at least `amountOwed` output claims held by this contract. Runs inside
+  the PoolManager unlock: swap on v4 pools, call `ROUTER.fillOrderInCallback` or `matchBookInCallback`.
+  Every delta this contract opens must be zero when it returns.
+</i>
+
+```solidity
+function _route(AsyncOrder calldata order, uint256 amountIn, uint256 amountOwed, bytes calldata data)
+        internal
+        virtual;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| amountIn | `uint256` |  |
+| amountOwed | `uint256` |  |
+| data | `bytes` |  |
+
+<a id="_paymevtax" />
+
+### \_payMevTax
+
+```solidity
+function _payMevTax() private;
+```
+
+<a id="receive" />
+
+### receive
+
+```solidity
+receive() external payable;
+```
+
+## Errors
+
+### MevTaxBalanceTooLow
+
+The contract holds less ETH than the MEV tax it owes.
+
+```solidity
+error MevTaxBalanceTooLow(uint256 owed, uint256 balance);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| owed | `uint256` |  |
+| balance | `uint256` |  |
+
+### NotRouter
+
+```solidity
+error NotRouter();
+```
+
+### NotOwner
+
+```solidity
+error NotOwner();
+```
+
 # AsyncOrderLibrary
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/types/AsyncOrder.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/types/AsyncOrder.sol)
 
 **Title:** AsyncOrderLibrary
 
@@ -10028,7 +10391,7 @@ function orderId(AsyncOrder calldata order) internal view returns (bytes32);
 
 # AsyncOrder
 
-[Git Source](https://github.com/asyncswap/contracts/blob/cc20ad373bc4ca8ed8dd664a6393434575cb1bd8/src/types/AsyncOrder.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/types/AsyncOrder.sol)
 
 Represents an async order for a swap in the Uniswap V4 pool.
 

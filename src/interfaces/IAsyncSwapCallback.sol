@@ -11,6 +11,10 @@ import {PoolKey} from "v4-core/types/PoolKey.sol";
 ///         `FlashFillActive` until the callback returns.
 interface IAsyncSwapCallback {
     /// @notice Fill `order` with no inventory: input first as claims, callback, then the owed output as claims.
+    ///         Every fill in the callback (this one and each `fillOrderInCallback`) owes the MEV tax, paid to the
+    ///         FeeVault when the fill runs. `msg.value` prepays it, any amount; the filler may also pay inside its
+    ///         callback with `PoolManager.settleFor(router)`. A surplus is returned to the filler in ETH and a
+    ///         shortfall reverts `MevTaxUnpaid`.
     function fillOrderWithCallback(AsyncOrder calldata order, uint256 maxPrice, bytes calldata data) external payable;
 
     /// @notice Inside the callback: fill another open order, paying its output and receiving its input as claims.

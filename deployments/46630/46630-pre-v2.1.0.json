@@ -1,0 +1,77 @@
+{
+  "chainId": 46630,
+  "contracts": {
+    "TickPrice": {
+      "address": "0xbE2Fa7A018460DA69591da49563bbF20f6F110E9",
+      "startBlock": 12120150,
+      "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "DynamicFeeOrdering": {
+      "address": "0x3b726a7Ff6F720f735Cea0008A6517eFDA30881A",
+      "startBlock": 12120152,
+      "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "AsyncMatching": {
+      "address": "0x54C582136983c904932f830c0A3a112490A9Bf2b",
+      "startBlock": 12120155,
+      "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "PoolManager": {
+      "address": "0x8366a39CC670B4001A1121B8F6A443A643e40951",
+      "startBlock": 89068706,
+      "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "AsyncSwap": {
+      "address": "0x91c8C21285a3e247bf72b395D568488aa8132888",
+      "startBlock": 152404779,
+      "txHash": "0xba958e3239fcc6c4daad24a75e57aaf6e5c8285b2686e1f1a34ccc2ffec23f36"
+    },
+    "Router": {
+      "address": "0x5D2100D5583D3Ce50f5b57b92d7fc4d4c531baf0",
+      "startBlock": 152404761,
+      "txHash": "0xf33e865318afc3f8a721eab8da153f7c8c8c6ae73271865881179c3fa3d2b8cb"
+    },
+    "FeeVault": {
+      "address": "0xa2de89a7BF0265FD82F6cF4bF60747e493Bd99d1",
+      "startBlock": 152404779,
+      "txHash": "0xba958e3239fcc6c4daad24a75e57aaf6e5c8285b2686e1f1a34ccc2ffec23f36"
+    },
+    "WithdrawalRouter": {
+      "address": "0x78d2178052c9d07fef1ffae1c70252119d2de987",
+      "startBlock": 145836237,
+      "txHash": "0x9d36a714a5586b7e1d37ef858caabd2b68591fb5d86d58da066ffd23710f8c9c"
+    },
+    "TickBitmap": {
+      "address": "0x977Aee08690CB39A5dab41937eCdbD70e1Bf4a21",
+      "startBlock": 149102341,
+      "txHash": "0xb2dde014211ab6e085564cd9878abdeee39be56c0f557f378621fa158f002a53"
+    },
+    "EligiblePrice": {
+      "address": "0x5C51B17E1b1D842C168aeDcF001014Fe55b60f8e",
+      "startBlock": 149102394,
+      "txHash": "0x179a90a27aba9daf45696ffa2266d6671145351a47688fb36185cad6238324b3"
+    },
+    "PriorityFeeUpdates": {
+      "address": "0x4014D2067acF6EE1F3dD4376Ad9CeD4d8CCb82BD",
+      "startBlock": 12120154,
+      "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "MultiAsset": {
+      "address": "0xA706e93Cbfe71AA126629B3a214A1De33015ad38",
+      "startBlock": 12120154,
+      "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "IncomingMatching": {
+      "address": "0x925eE4ac4C8f79178B52e61620889DBb33B7c73c",
+      "startBlock": 12120156,
+      "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  },
+  "updatedAt": 1794502620,
+  "release": "v1.3.0",
+  "sourceCommit": "c9372ff9577ba3950fa321090a7bfb559fc964a4",
+  "features": {
+    "priorityFeeTopUps": true,
+    "tickBitmap": true
+  }
+}

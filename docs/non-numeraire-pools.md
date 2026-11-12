@@ -14,10 +14,14 @@ like any order, and flash fills let them route it through the numeraire books wi
 | Fee | Dynamic fee, as for every pool. |
 | Quote side | `currency1`. Orders paying `currency1` are bids and orders paying `currency0` are asks, so opposite orders on the pool cross and match like any book. |
 | Minimum order | Each side's decimal floor: `10^(decimals - assetPrecision)` of that token, at least 1 unit. With precision 4, at least 0.0001 of each token. `minOrder` holds the `currency1` floor and `minAssetAmount` the `currency0` floor. There is no dollar minimum on these pools. |
-| Priority bids | Not allowed: a bid is paid in the numeraire. A nonzero `priorityFee` reverts `PriorityFeeNeedsNumeraire`, and so does `topUpPriorityFee`. |
+| Priority bids | Not allowed: a bid is paid in the numeraire. The pool's book gets the `NO_PRIORITY_BIDS` cap, so a nonzero `priorityFee` or a `topUpPriorityFee` reverts `PriorityFeeNeedsNumeraire`. |
 
 Numeraire pools keep their rules unchanged: the dollar minimum on the numeraire side, the asset floor on the other,
 and priority bids.
+
+## Where it lives
+
+Pool setup (both kinds of pool) runs in `MultiAsset.initialize`, a linked library, to keep the hook under EIP-170.
 
 ## Notes
 

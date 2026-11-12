@@ -6,6 +6,7 @@ import {ISignatureTransfer} from "@async-swap/interfaces/ISignatureTransfer.sol"
 import {OrderSignatures} from "@async-swap/libraries/OrderSignatures.sol";
 import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
+import {IAsyncSwapFlashFiller} from "@async-swap/interfaces/IAsyncSwapFlashFiller.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
@@ -65,6 +66,8 @@ contract Router is EIP712, Multicall {
     bytes32 constant MAX_PRICE_LOCATION = 0x6b4f8e2c9d5a0b7e1f3c2a8d4e9f0b6c5a1d8e7f2b3c4d5e6a7f8b9c0d1e2f30;
     /// keccak256("Router.MevTax") - 1
     bytes32 constant MEV_TAX_LOCATION = 0xe6251c15e22bdb44d13d4efeec6855e57f2b38fe36310ce3c709991726ed21da;
+    /// keccak256("Router.FlashFiller") - 1: the filler of the flash fill in progress, zero otherwise.
+    bytes32 constant FLASH_FILLER_LOCATION = 0x8a32db0797977fc7694da75ada74debc8ae08fbf3557ccd5133e780e8ba11369;
 
     enum ActionType {
         Swap,
@@ -75,7 +78,8 @@ contract Router is EIP712, Multicall {
         PoolLiquidityFill,
         CancelAndWithdraw,
         WithdrawClaims,
-        TopUpPriorityFee
+        TopUpPriorityFee,
+        FlashFill
     }
 
     struct SwapCallback {
@@ -102,6 +106,10 @@ contract Router is EIP712, Multicall {
 
     error SignatureExpired();
     error InvalidSignature();
+    /// @notice A normal entry point was called while a flash fill is running.
+    error FlashFillActive();
+    /// @notice An in-unlock entry point was called by anyone but the filler of the running flash fill.
+    error NotFlashFiller();
 
     /// @notice A taxed action paid `amount` wei of MEV tax, credited to the FeeVault as native claims.
     event MevTaxPaid(address indexed payer, uint256 amount);
@@ -133,6 +141,24 @@ contract Router is EIP712, Multicall {
         emit MevTaxPaid(msg.sender, tax);
     }
 
+    /// @dev Refuses reentry from a flash-fill callback into an entry point that opens its own unlock.
+    modifier noFlashFill() {
+        if (_flashFiller() != address(0)) revert FlashFillActive();
+        _;
+    }
+
+    /// @dev Only the filler of the running flash fill may use the in-unlock entry points.
+    modifier onlyFlashFiller() {
+        if (msg.sender != _flashFiller() || msg.sender == address(0)) revert NotFlashFiller();
+        _;
+    }
+
+    function _flashFiller() private view returns (address filler) {
+        assembly ("memory-safe") {
+            filler := tload(FLASH_FILLER_LOCATION)
+        }
+    }
+
     modifier onlyPoolManager() {
         require(msg.sender == address(POOLMANAGER), "Caller is not PoolManager");
         _;
@@ -154,7 +180,7 @@ contract Router is EIP712, Multicall {
     ///         the router holds the ETH and settles it to PM during unlock. For ERC20 input
     ///         the maker must approve the router for `amountIn` of the input token. Either way `msg.value`
     ///         also carries the MEV tax (`mevTax()`, zero without a priority fee).
-    function swap(AsyncOrder calldata order, bytes memory userData) external payable {
+    function swap(AsyncOrder calldata order, bytes memory userData) external payable noFlashFill {
         require(order.owner == msg.sender, "Only owner can swap");
         address onBehalf = address(this);
         AsyncSwap.UserParams memory userParams = abi.decode(userData, (AsyncSwap.UserParams));
@@ -187,7 +213,7 @@ contract Router is EIP712, Multicall {
     ///         bump the order's stored price. Pass `type(uint256).max` to disable the check.
     ///         `order.amountIn` is the least input the filler accepts: the fill reverts if the
     ///         order's live input has dropped below it (e.g. after a partial match).
-    function fillOrder(AsyncOrder calldata order, uint256 maxPrice, bytes calldata) external payable {
+    function fillOrder(AsyncOrder calldata order, uint256 maxPrice, bytes calldata) external payable noFlashFill {
         address onBehalf = address(this);
         assembly ("memory-safe") {
             tstore(USER_LOCATION, caller())
@@ -222,6 +248,7 @@ contract Router is EIP712, Multicall {
     function swapWithSig(AsyncOrder calldata order, PermitData calldata permit, ExecutorGrant calldata grant)
         external
         payable
+        noFlashFill
     {
         Currency input = order.zeroForOne ? order.key.currency0 : order.key.currency1;
         require(!input.isAddressZero(), "Native input needs swap()");
@@ -249,6 +276,7 @@ contract Router is EIP712, Multicall {
     ///         The nonce is burnt in the hook's store, so `AsyncSwap.invalidateNonce` revokes it.
     function cancelWithSig(AsyncOrder calldata order, uint256 nonce, uint256 deadline, bytes calldata signature)
         external
+        noFlashFill
     {
         if (block.timestamp > deadline) revert SignatureExpired();
         HOOK.useNonce(order.owner, nonce);
@@ -267,7 +295,7 @@ contract Router is EIP712, Multicall {
     }
 
     /// @notice Maker cancels an unfilled order and reclaims their reserved input.
-    function cancelOrder(AsyncOrder calldata order) external {
+    function cancelOrder(AsyncOrder calldata order) external noFlashFill {
         require(msg.sender == order.owner, "Only owner can cancel");
         assembly ("memory-safe") {
             tstore(USER_LOCATION, caller())
@@ -278,7 +306,7 @@ contract Router is EIP712, Multicall {
     /// @notice Cancel an owned order and return its remaining input to the owner's wallet.
     /// @dev Native refunds are redeemed atomically. Approve this Router for claim ID 0 first.
     ///      Existing claims are untouched; a failed redemption rolls back the cancellation.
-    function cancelAndWithdraw(AsyncOrder calldata order) external {
+    function cancelAndWithdraw(AsyncOrder calldata order) external noFlashFill {
         require(msg.sender == order.owner, "Only owner can cancel");
         POOLMANAGER.unlock(
             abi.encode(SwapCallback({action: ActionType.CancelAndWithdraw, order: order, maxMatches: 0}))
@@ -287,7 +315,7 @@ contract Router is EIP712, Multicall {
 
     /// @notice Withdraw the caller's approved ERC-6909 claims directly to their wallet.
     /// @dev Approve exact currency claim allowances on PoolManager first. No operator grant is needed.
-    function withdrawClaims(Currency[] calldata currencies, uint256[] calldata amounts) external {
+    function withdrawClaims(Currency[] calldata currencies, uint256[] calldata amounts) external noFlashFill {
         uint256 length = currencies.length;
         require(length != 0 && length <= 16 && length == amounts.length, "Invalid claims");
         for (uint256 i; i < length; ++i) {
@@ -303,7 +331,7 @@ contract Router is EIP712, Multicall {
     /// @dev Requires an ERC20 approval to this Router. Leaves amount and price unchanged and resets
     ///      fee-tier FIFO age. No matching or MEV tax; use multicall with matchBook to attempt matching.
     ///      Only the order's identity fields are used; addedFee is a delta, not a target total.
-    function topUpPriorityFee(AsyncOrder calldata order, uint256 addedFee) external {
+    function topUpPriorityFee(AsyncOrder calldata order, uint256 addedFee) external noFlashFill {
         require(msg.sender == order.owner, "Only owner can top up");
         if (addedFee == 0) revert AsyncFiller.ZeroAmount();
         if (addedFee > type(uint64).max) revert AsyncFiller.PriorityFeeTooLarge();
@@ -312,7 +340,7 @@ contract Router is EIP712, Multicall {
 
     /// @notice Anyone can continue a crossed book after a transaction hits the automatic match cap.
     /// @dev Work is capped at eight matched pairs per unlock to keep gas predictable.
-    function matchBook(PoolKey calldata key, uint8 maxMatches) external {
+    function matchBook(PoolKey calldata key, uint8 maxMatches) external noFlashFill {
         AsyncOrder memory placeholder;
         placeholder.key = key;
         POOLMANAGER.unlock(
@@ -323,7 +351,7 @@ contract Router is EIP712, Multicall {
     /// @notice Retry a resting order against the pool's active Uniswap v4 LP positions.
     /// @dev The order is left untouched when the pool cannot fully fill it at its minimum output. `msg.value` is
     ///      the MEV tax.
-    function fillFromPoolLiquidity(AsyncOrder calldata order) external payable {
+    function fillFromPoolLiquidity(AsyncOrder calldata order) external payable noFlashFill {
         _chargeMevTax(0);
         address onBehalf = address(this);
         assembly ("memory-safe") {
@@ -333,6 +361,71 @@ contract Router is EIP712, Multicall {
         POOLMANAGER.unlock(
             abi.encode(SwapCallback({action: ActionType.PoolLiquidityFill, order: order, maxMatches: 0}))
         );
+    }
+
+    /// @notice Fill `order` with no inventory. Inside one PoolManager unlock the hook closes the order and credits its
+    ///         input, less the 0.02% trade fee, to the caller as ERC-6909 claims; the Router then calls
+    ///         `IAsyncSwapFlashFiller(msg.sender).asyncSwapFlashFill(order, amountIn, amountOwed, data)`. Inside the
+    ///         callback the filler may route through any v4 pool and fill other Async Swap orders with
+    ///         `fillOrderInFlash` / `matchBookInFlash`. Afterwards the Router transfers `amountOwed` output claims
+    ///         from the filler to the hook (approve the Router on the PoolManager for them), and the hook pays the
+    ///         maker its live minimum less the trade fee. Any surplus stays with the filler.
+    /// @dev `maxPrice` caps the output owed, as in `fillOrder`, and `order.amountIn` is the least input accepted.
+    ///      `msg.value` is the MEV tax only. The order is closed for the whole callback, so it cannot be repriced,
+    ///      cancelled, topped up, matched or filled again; every normal Router entry point refuses reentry.
+    function flashFill(AsyncOrder calldata order, uint256 maxPrice, bytes calldata data) external payable noFlashFill {
+        _chargeMevTax(0);
+        assembly ("memory-safe") {
+            tstore(USER_LOCATION, caller())
+            tstore(MAX_PRICE_LOCATION, maxPrice)
+        }
+        POOLMANAGER.unlock(abi.encode(SwapCallback({action: ActionType.FlashFill, order: order, maxMatches: 0}), data));
+    }
+
+    /// @notice Fill another open order from inside a flash-fill callback, paying in claims: the Router transfers
+    ///         the order's live minimum (plus pool fee) of output claims from the filler to the hook, and the filler
+    ///         receives the order's input, less the trade fee, as claims. No unlock and no MEV tax. Only the filler
+    ///         of the running flash fill may call.
+    function fillOrderInFlash(AsyncOrder calldata order, uint256 maxPrice) external onlyFlashFiller {
+        uint256 gross = _checkFill(order, maxPrice);
+        Currency output = order.zeroForOne ? order.key.currency1 : order.key.currency0;
+        POOLMANAGER.transferFrom(msg.sender, address(HOOK), output.toId(), gross);
+        HOOK.executeOrderWithClaims(order, msg.sender);
+    }
+
+    /// @notice Continue a crossed book from inside a flash-fill callback. Only the filler of the running flash fill.
+    function matchBookInFlash(PoolKey calldata key, uint8 maxMatches) external onlyFlashFiller returns (uint8) {
+        return HOOK.matchBook(key, maxMatches);
+    }
+
+    /// @dev Checks the live order against the filler's bounds and returns the gross output owed: the live minimum
+    ///      plus the pool fee, at most `maxPrice`, for a live input of at least `order.amountIn`.
+    function _checkFill(AsyncOrder memory order, uint256 maxPrice) private view returns (uint256 gross) {
+        (uint256 liveAmountIn, uint256 livePrice) = HOOK.asyncOrderInfo(order.key.toId(), _orderId(order));
+        require(liveAmountIn == 0 || liveAmountIn >= order.amountIn, "Input below order.amountIn");
+        gross = livePrice + HOOK.calculatePoolFee(order.key.fee, livePrice);
+        require(gross <= maxPrice, "Price exceeds maxPrice");
+    }
+
+    /// @dev Body of `flashFill` inside the unlock: input first, callback, then the output check and payout.
+    function _flashFill(AsyncOrder memory order, address filler, bytes memory data) private {
+        uint256 maxPrice;
+        assembly ("memory-safe") {
+            maxPrice := tload(MAX_PRICE_LOCATION)
+        }
+        _checkFill(order, maxPrice);
+        (uint256 amountIn, uint256 amountOwed) = HOOK.beginFlashFill(order, filler);
+        assembly ("memory-safe") {
+            tstore(FLASH_FILLER_LOCATION, filler)
+        }
+        IAsyncSwapFlashFiller(filler).asyncSwapFlashFill(order, amountIn, amountOwed, data);
+        assembly ("memory-safe") {
+            tstore(FLASH_FILLER_LOCATION, 0)
+        }
+        // The maker check is on what the filler holds at the end, whatever route it took.
+        Currency output = order.zeroForOne ? order.key.currency1 : order.key.currency0;
+        POOLMANAGER.transferFrom(filler, address(HOOK), output.toId(), amountOwed);
+        HOOK.settleFlashFill(order, filler);
     }
 
     /// @notice PM unlock-callback dispatcher. The action enum is read from transient storage, set
@@ -365,6 +458,11 @@ contract Router is EIP712, Multicall {
             return "";
         }
         SwapCallback memory orderData = abi.decode(data, (SwapCallback));
+        if (action == uint8(ActionType.FlashFill)) {
+            (, bytes memory fillerData) = abi.decode(data, (SwapCallback, bytes));
+            _flashFill(orderData.order, user, fillerData);
+            return "";
+        }
 
         if (action == uint8(ActionType.Swap) || action == uint8(ActionType.SwapWithSig)) {
             // Trigger the hook via PM.swap; hook.beforeSwap pulls the maker's input as 6909.

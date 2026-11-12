@@ -108,6 +108,79 @@ library AsyncMatching {
         );
     }
 
+    /// @dev Transient record of the order a flash fill has opened, in the hook's context: its id, then the input,
+    ///      minimum output and pool fee it was opened at. Each slot is keccak256("asyncswap.flashFill.<name>") - 1.
+    bytes32 private constant FLASH_ORDER_SLOT = 0xadcc9340e9b9520481a90c5e1cb2c7bb827085ef7c7b209a028db0fe766510cd;
+    bytes32 private constant FLASH_AMOUNT_IN_SLOT = 0xa948fdbbf716a51dd3ab76f9643ccf5ff5ac531fed11e84d483629e540b40220;
+    bytes32 private constant FLASH_AMOUNT_OUT_SLOT = 0x4af24310f6994917e24875d474455b553ed83a7345f90cd7dd124597d7de6b85;
+    bytes32 private constant FLASH_FEE_SLOT = 0xc91f6e2fe0f89d4ebceb2171c6e3e27ff5e6f3bf09bead6f1947891e5664a2d1;
+
+    error FlashFillActive();
+    error NoFlashFill();
+
+    /// @notice Input-first fill: close the order and credit its input, less the trade fee, to the filler as claims.
+    /// @return amountIn The input credited to the filler (after the trade fee).
+    /// @return amountOwed The output the hook must hold as claims when `settleFlashFill` runs.
+    function beginFlashFill(AsyncFiller.State storage self, AsyncFiller.Book storage book, FillParams memory params)
+        public
+        returns (uint256 amountIn, uint256 amountOwed)
+    {
+        bytes32 active;
+        assembly ("memory-safe") {
+            active := tload(FLASH_ORDER_SLOT)
+        }
+        if (active != bytes32(0)) revert FlashFillActive();
+        uint256 amountOutMin;
+        (amountIn, amountOutMin) = self.beginFlashFill(
+            book, params.order, params.id, params.hook, params.executor, params.filler, params.feeVault
+        );
+        bytes32 id = params.id;
+        uint256 fee = params.fee;
+        assembly ("memory-safe") {
+            tstore(FLASH_ORDER_SLOT, id)
+            tstore(FLASH_AMOUNT_IN_SLOT, amountIn)
+            tstore(FLASH_AMOUNT_OUT_SLOT, amountOutMin)
+            tstore(FLASH_FEE_SLOT, fee)
+        }
+        amountOwed = amountOutMin + fee;
+        amountIn -= AsyncFiller.tradeFee(amountIn);
+    }
+
+    /// @notice Close the flash fill `beginFlashFill` opened: pay the maker out of the output claims the hook holds.
+    function settleFlashFill(AsyncFiller.State storage self, FillParams memory params) public {
+        bytes32 active;
+        uint256 amountIn;
+        uint256 amountOutMin;
+        uint256 fee;
+        assembly ("memory-safe") {
+            active := tload(FLASH_ORDER_SLOT)
+            amountIn := tload(FLASH_AMOUNT_IN_SLOT)
+            amountOutMin := tload(FLASH_AMOUNT_OUT_SLOT)
+            fee := tload(FLASH_FEE_SLOT)
+            tstore(FLASH_ORDER_SLOT, 0)
+            tstore(FLASH_AMOUNT_IN_SLOT, 0)
+            tstore(FLASH_AMOUNT_OUT_SLOT, 0)
+            tstore(FLASH_FEE_SLOT, 0)
+        }
+        if (active == bytes32(0) || active != params.id) revert NoFlashFill();
+        self.settleClaimsOutput(
+            params.order, params.id, params.hook, params.filler, params.feeVault, amountIn, amountOutMin, fee
+        );
+    }
+
+    /// @notice A full fill paid in claims, for fills inside a flash fill: the hook already holds the gross output
+    ///         as claims; the filler receives the input, less the trade fee, as claims.
+    function fillWithClaims(AsyncFiller.State storage self, AsyncFiller.Book storage book, FillParams memory params)
+        public
+    {
+        (uint256 amountIn, uint256 amountOutMin) = self.beginFlashFill(
+            book, params.order, params.id, params.hook, params.executor, params.filler, params.feeVault
+        );
+        self.settleClaimsOutput(
+            params.order, params.id, params.hook, params.filler, params.feeVault, amountIn, amountOutMin, params.fee
+        );
+    }
+
     function cancel(AsyncFiller.State storage self, AsyncFiller.Book storage book, CancelParams memory params) public {
         self.cancel(book, params.order, params.id, params.hook, params.executor);
     }

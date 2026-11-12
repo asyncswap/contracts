@@ -4,7 +4,7 @@
 
 Async Swap is a continuous on-chain order book and matching engine built as a Uniswap v4 hook. Traders set a limit price for assets paired with USDC, and orders are good till cancelled (GTC): there is no expiry, so an order rests until it fills or the maker cancels it. Anyone can permissionlessly fill orders, and anyone can open a USDC pool on the hook.
 
-## Forward mission: large swaps and MEV capture
+## Large swaps and MEV capture
 
 Large swaps in volatile pairs can pay high AMM price impact even when opposite-direction flow arrives minutes later. In one Uniswap v3 ETH/USDC pool, $100,000–$1 million swaps averaged 26.5 bps versus 5.5 bps for trades under $10,000; opposite flow covered 82% of large-swap volume within five minutes and 99% within an hour. Across eight major v3 pools, the study estimated $22.7–$40.7 million in potential savings from matching. Uniswap v4 research found specialized hooks made some markets cheap, while no-hook ETH pools still cost 24.0–38.7 bps. ([Part 1](https://x.com/asyncswap/article/2120701882377060839), [Part 2](https://x.com/asyncswap/article/2120704799087714634), [Part 3](https://x.com/asyncswap/article/2120713673639436417))
 

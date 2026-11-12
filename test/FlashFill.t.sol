@@ -20,36 +20,6 @@ import {Currency} from "v4-core/types/Currency.sol";
 import {PoolId} from "v4-core/types/PoolId.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 
-/// @notice Test-only stand-in for approach E (non-numeraire pools, not part of this change): the hook also accepts
-///         a pool that does not pair the numeraire, so a maker can place an ETH -> TOKEN order for a flash fill to
-///         route across the ETH/USDC and TOKEN/USDC books. Everything else is the production hook.
-contract NonNumeraireTestHook is AsyncSwap {
-    using PoolIdLibrary for PoolKey;
-
-    constructor(
-        IPoolManager _poolManager,
-        Currency _numeraire,
-        address _owner,
-        address _router,
-        uint256 _minOrderUsd,
-        uint8 _assetPrecision
-    ) AsyncSwap(_poolManager, _numeraire, _owner, _router, _minOrderUsd, _assetPrecision) {}
-
-    function _beforeInitialize(address sender, PoolKey calldata key, uint160 sqrtPriceX96)
-        internal
-        override
-        returns (bytes4)
-    {
-        if (key.currency0 == numeraire || key.currency1 == numeraire) {
-            return super._beforeInitialize(sender, key, sqrtPriceX96);
-        }
-        asyncOrders[key.toId()].poolManager = poolManager;
-        asyncOrders[key.toId()].numeraire = numeraire;
-        asyncOrders[key.toId()].feeVault = address(feeVault);
-        return this.beforeInitialize.selector;
-    }
-}
-
 /// @notice A flash filler that holds nothing: inside the callback it runs a list of steps (each optionally approving
 ///         the Router for some claims first), then approves the Router for the output it owes the maker.
 contract MockFlashFiller is IAsyncSwapFlashFiller {
@@ -156,7 +126,7 @@ contract FlashFillTest is Test {
         );
         router = new Router(manager, AsyncSwap(payable(hookAddress)), ISignatureTransfer(Permit2Bytecode.PERMIT2), 0);
         deployCodeTo(
-            "FlashFill.t.sol:NonNumeraireTestHook",
+            "AsyncSwap.sol",
             abi.encode(manager, USDC, address(this), address(router), uint256(0), type(uint8).max),
             hookAddress
         );

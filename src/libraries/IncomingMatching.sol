@@ -157,7 +157,13 @@ library IncomingMatching {
         (bool found, uint128 bookKey) = TickBitmap.best(isBuy ? book.asks : book.bids, !isBuy);
         if (!found) return (false, 0);
         return TickPrice.poolBeatsLevel(
-            self.poolManager, key.toId(), key.currency1 == self.numeraire, isBuy, bookKey, self.refTick, self.refBlock
+            self.poolManager,
+            key.toId(),
+            !(key.currency0 == self.numeraire),
+            isBuy,
+            bookKey,
+            self.refTick,
+            self.refBlock
         );
     }
 

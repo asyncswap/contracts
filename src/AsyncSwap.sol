@@ -14,6 +14,7 @@ import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/Signa
 import {CurrencySettler} from "@async-swap/libraries/CurrencySettler.sol";
 import {IPoolManager, ModifyLiquidityParams, SwapParams} from "v4-core/interfaces/IPoolManager.sol";
 import {Hooks} from "v4-core/libraries/Hooks.sol";
+import {IHooks} from "v4-core/interfaces/IHooks.sol";
 import {LPFeeLibrary} from "v4-core/libraries/LPFeeLibrary.sol";
 import {TickMath} from "v4-core/libraries/TickMath.sol";
 import {SafeCast} from "v4-core/libraries/SafeCast.sol";
@@ -100,6 +101,8 @@ contract AsyncSwap is BaseHook, EIP712 {
     error DynamicFeeRequired();
     error NotSelf();
     error NotTrustedRouter();
+    /// @notice Priority bids are paid in the numeraire, so orders on a pool without it take no bid.
+    error PriorityFeeNeedsNumeraire();
 
     /// @notice Emitted when ownership is transferred.
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
@@ -242,19 +245,46 @@ contract AsyncSwap is BaseHook, EIP712 {
     }
 
     /// @inheritdoc BaseHook
-    /// @dev Anyone may open a pool that pairs the numeraire with a dynamic fee. No order check reads the
-    ///      pool price, so the initializer's choice of price cannot block orders.
+    /// @dev Anyone may open a pool that pairs the numeraire with a dynamic fee. A pool without the numeraire (for
+    ///      example ETH/TOKEN) may be opened only once both of its tokens have a numeraire pool on this hook with the
+    ///      same tick spacing, so every such order has a numeraire route for fillers. On it `currency1` is the quote
+    ///      side, and the minimum order is each token's decimal floor (`_minAssetAmount`), with no dollar minimum.
+    ///      No order check reads the pool price, so the initializer's choice of price cannot block orders.
     function _beforeInitialize(address, PoolKey calldata key, uint160) internal virtual override returns (bytes4) {
-        if (!(key.currency0 == numeraire || key.currency1 == numeraire)) revert NumeraireRequired();
+        bool hasNumeraire = key.currency0 == numeraire || key.currency1 == numeraire;
+        if (!hasNumeraire) {
+            _requireNumerairePool(key.currency0, key.tickSpacing);
+            _requireNumerairePool(key.currency1, key.tickSpacing);
+        }
         if (key.fee != LPFeeLibrary.DYNAMIC_FEE_FLAG) revert DynamicFeeRequired();
         asyncOrders[key.toId()].poolManager = poolManager;
         asyncOrders[key.toId()].numeraire = numeraire;
         asyncOrders[key.toId()].feeVault = address(feeVault);
-        priceBooks[key.toId()].minOrder = minOrder;
+        priceBooks[key.toId()].minOrder = hasNumeraire ? minOrder : _minAssetAmount(key.currency1);
         priceBooks[key.toId()].priorityFeeCap = priorityFeeCap;
+        // The asset side: the non-numeraire token, or `currency0` on a pool without the numeraire.
         priceBooks[key.toId()].minAssetAmount =
             _minAssetAmount(key.currency0 == numeraire ? key.currency1 : key.currency0);
         return this.beforeInitialize.selector;
+    }
+
+    /// @dev Reverts `NumeraireRequired` unless `currency` already has a numeraire pool on this hook with `tickSpacing`.
+    function _requireNumerairePool(Currency currency, int24 tickSpacing) private view {
+        (Currency c0, Currency c1) =
+            Currency.unwrap(currency) < Currency.unwrap(numeraire) ? (currency, numeraire) : (numeraire, currency);
+        PoolKey memory numeraireKey = PoolKey({
+            currency0: c0,
+            currency1: c1,
+            fee: LPFeeLibrary.DYNAMIC_FEE_FLAG,
+            tickSpacing: tickSpacing,
+            hooks: IHooks(address(this))
+        });
+        if (address(asyncOrders[numeraireKey.toId()].poolManager) == address(0)) revert NumeraireRequired();
+    }
+
+    /// @dev The quote side of a pool: the numeraire, or `currency1` on a pool without it.
+    function _quote(PoolKey calldata key) private view returns (Currency) {
+        return key.currency0 == numeraire ? key.currency0 : key.currency1;
     }
 
     /// @inheritdoc BaseHook
@@ -556,6 +586,7 @@ contract AsyncSwap is BaseHook, EIP712 {
     /// @dev The Router must settle the additional numeraire debt before the unlock ends.
     function topUpPriorityFee(AsyncOrder calldata order, uint256 addedFee) external {
         if (msg.sender != router) revert NotTrustedRouter();
+        if (!(_quote(order.key) == numeraire)) revert PriorityFeeNeedsNumeraire();
         PoolId poolId = order.key.toId();
         PriorityFeeUpdates.topUp(asyncOrders[poolId], priceBooks[poolId], poolId, order.orderId(), addedFee);
     }
@@ -596,7 +627,9 @@ contract AsyncSwap is BaseHook, EIP712 {
 
         // Escrow the entire deposit; fees are earned only on successful fill.
         specified.take(poolManager, address(this), amountTaken, true);
-        _createOrder(poolId, params.zeroForOne, amountTaken, hookData, specified == numeraire);
+        Currency quote = _quote(key);
+        if (!(quote == numeraire) && hookData.priorityFee != 0) revert PriorityFeeNeedsNumeraire();
+        _createOrder(poolId, params.zeroForOne, amountTaken, hookData, specified == quote);
 
         if (specified == key.currency0) {
             emit HookSwap(PoolId.unwrap(poolId), sender, amountTaken.toInt128(), 0, 0, 0);

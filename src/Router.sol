@@ -42,6 +42,8 @@ import {RouterFlashFills} from "src/RouterFlashFills.sol";
 ///         that orders by priority fee, searchers racing for the same position bid it up, so most of what they race
 ///         for goes to the protocol; a transaction with no priority pays nothing. Inside `multicall`, which is not
 ///         payable, a taxed action needs a transaction with no priority.
+///         Flash fills (`fillOrderWithCallback`) charge the tax per fill as a PoolManager debt instead; see
+///         `IAsyncSwapCallback`.
 contract Router is EIP712, Multicall {
     using CurrencySettler for Currency;
     using CurrencyLibrary for Currency;

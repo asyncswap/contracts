@@ -570,9 +570,7 @@ contract AsyncSwap is BaseHook, EIP712 {
     }
 
     /// @dev Extracted to keep `_beforeSwap` stack-shallow.
-    function _createOrder(PoolKey calldata key, bool zeroForOne, uint256 amountIn, UserParams memory hookData)
-        private
-    {
+    function _createOrder(PoolKey calldata key, bool zeroForOne, uint256 amountIn, UserParams memory hookData) private {
         PoolId poolId = key.toId();
         AsyncFiller.State storage state = asyncOrders[poolId];
 

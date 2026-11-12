@@ -42,7 +42,9 @@ contract MockFlashFiller is IAsyncSwapFlashFiller {
     }
 
     function run(AsyncOrder calldata order, uint256 maxPrice, Step[] calldata steps, uint256 shortBy) external payable {
-        IAsyncSwapCallback(address(router)).fillOrderWithCallback{value: msg.value}(order, maxPrice, abi.encode(steps, shortBy));
+        IAsyncSwapCallback(address(router)).fillOrderWithCallback{value: msg.value}(
+            order, maxPrice, abi.encode(steps, shortBy)
+        );
     }
 
     /// @dev Lets a test act as this contract outside a flash fill (setup, or calls that must fail).
@@ -428,8 +430,7 @@ contract FlashFillTest is Test {
         vm.deal(address(filler), 1 ether);
         filler.exec(address(hook), abi.encodeCall(AsyncSwap.setExecutor, (ethToken.toId(), address(router), true)));
         AsyncOrder memory own = _placeAsFiller(1 ether, 90 ether);
-        MockFlashFiller.Step[] memory steps =
-            _steps1(_call(address(router), abi.encodeCall(Router.cancelOrder, (own))));
+        MockFlashFiller.Step[] memory steps = _steps1(_call(address(router), abi.encodeCall(Router.cancelOrder, (own))));
         vm.expectRevert(abi.encodeWithSelector(IPoolManager.AlreadyUnlocked.selector));
         filler.run(own, 90 ether, steps, 0);
         assertEq(_live(own), 1 ether);
@@ -537,7 +538,8 @@ contract FlashFillTest is Test {
             _call(
                 address(other),
                 abi.encodeCall(
-                    Bystander.call, (address(router), abi.encodeCall(IAsyncSwapCallback.fillOrderInCallback, (b, 0.99 ether)))
+                    Bystander.call,
+                    (address(router), abi.encodeCall(IAsyncSwapCallback.fillOrderInCallback, (b, 0.99 ether)))
                 )
             )
         );

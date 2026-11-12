@@ -41,8 +41,7 @@ contract DeployMultiAsset is FFIHelper {
 
         if (!vm.envOr("DEPLOY_DRY_RUN", false)) {
             _upsertEntry(
-                block.chainid,
-                Entry({name: "MultiAsset", addr: target, startBlock: block.number, txHash: bytes32(0)})
+                block.chainid, Entry({name: "MultiAsset", addr: target, startBlock: block.number, txHash: bytes32(0)})
             );
         }
     }

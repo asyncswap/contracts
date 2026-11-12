@@ -1,6 +1,6 @@
 # AsyncFiller
 
-[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/libraries/AsyncFiller.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/d4dd306239445175911ee1e7a9b5f0cf55ee69df/src/libraries/AsyncFiller.sol)
 
 **Title:** AsyncFiller
 
@@ -52,6 +52,16 @@ uint256 internal constant PRIORITY_FEE_BPS = 10;
 
 ```solidity
 uint256 internal constant TRADE_FEE_BPS = 2;
+```
+
+### NO_PRIORITY_BIDS
+
+<i>
+  `Book.priorityFeeCap` of a pool without the numeraire: bids are paid in the numeraire, so it takes none.
+</i>
+
+```solidity
+uint64 internal constant NO_PRIORITY_BIDS = type(uint64).max;
 ```
 
 ## Functions
@@ -350,17 +360,17 @@ function fill(
 | feeVault | `address` |  |
 | fee | `uint256` |  |
 
-<a id="beginflashfill-state-book-asyncorder-bytes32-address-address-address-address" />
+<a id="beginflashfill-state-book-asyncorder-bytes32-address-address" />
 
 ### beginFlashFill
 
-Input-first half of a flash fill. Closes the order (so it cannot be repriced, cancelled, topped
-up, matched or filled again) and credits its escrowed input, less the trade fee, to `filler` as
-ERC-6909 claims. Returns the order's input and minimum output as they were at the start.
+Input-first half of a flash fill, run in the hook's context. Closes the order (so it cannot be
+repriced, cancelled, topped up, matched or filled again) and credits its escrowed input, less the trade
+fee, to `filler` as ERC-6909 claims. Returns the order's input and minimum output as they were.
 
 <i>
-  The caller must then call `settleFlashOutput` in the same unlock, after the hook has received the
-  output as claims; otherwise the order is gone and its input paid out without the maker being paid.
+  The caller must then call `settleClaimsOutput` in the same unlock, after the hook has received the output
+  as claims; otherwise the unlock cannot close and the whole fill reverts.
 </i>
 
 ```solidity
@@ -369,10 +379,8 @@ function beginFlashFill(
         Book storage book,
         AsyncOrder memory order,
         bytes32 id,
-        address hook,
         address executor,
-        address filler,
-        address feeVault
+        address filler
     ) internal returns (uint256 amountIn, uint256 amountOutMin);
 ```
 
@@ -384,10 +392,8 @@ function beginFlashFill(
 | book | `Book` |  |
 | order | `AsyncOrder` |  |
 | id | `bytes32` |  |
-| hook | `address` |  |
 | executor | `address` |  |
 | filler | `address` |  |
-| feeVault | `address` |  |
 
 **Returns**
 
@@ -396,25 +402,22 @@ function beginFlashFill(
 | amountIn | `uint256` |  |
 | amountOutMin | `uint256` |  |
 
-<a id="settleclaimsoutput-state-asyncorder-bytes32-address-address-address-uint256-uint256-uint256" />
+<a id="settleclaimsoutput-state-asyncorder-bytes32-address-uint256-uint256" />
 
 ### settleClaimsOutput
 
-Output half of a fill paid in claims: burns `amountOutMin + fee` of the hook's output claims
-(which the executor has just transferred to the hook), pays the maker the minimum less the trade
-fee and the vault the fees. The order must already be closed.
+Output half of a fill paid in claims, run in the hook's context: burns `amountOutMin` of the hook's
+output claims (which the Router has just transferred to it), pays the maker the minimum less the trade
+fee and the vault the fee. The order must already be closed.
 
 ```solidity
 function settleClaimsOutput(
         State storage self,
         AsyncOrder memory order,
         bytes32 id,
-        address hook,
         address filler,
-        address feeVault,
         uint256 amountIn,
-        uint256 amountOutMin,
-        uint256 fee
+        uint256 amountOutMin
     ) internal;
 ```
 
@@ -425,12 +428,9 @@ function settleClaimsOutput(
 | self | `State` |  |
 | order | `AsyncOrder` |  |
 | id | `bytes32` |  |
-| hook | `address` |  |
 | filler | `address` |  |
-| feeVault | `address` |  |
 | amountIn | `uint256` |  |
 | amountOutMin | `uint256` |  |
-| fee | `uint256` |  |
 
 <a id="_payfiller-state-currency-address-address-address-uint256-bool" />
 
@@ -892,6 +892,12 @@ error BelowMinimumOrder();
 
 ```solidity
 error BelowMinimumAssetAmount();
+```
+
+### PriorityFeeNeedsNumeraire
+
+```solidity
+error PriorityFeeNeedsNumeraire();
 ```
 
 ## Structs

@@ -105,6 +105,10 @@
     <lastmod>2026-11-12</lastmod>
   </url>
   <url>
+    <loc>https://docs.asyncswap.org/reference/src/libraries/MultiAsset</loc>
+    <lastmod>2026-11-12</lastmod>
+  </url>
+  <url>
     <loc>https://docs.asyncswap.org/reference/src/libraries/OrderSignatures</loc>
     <lastmod>2026-11-12</lastmod>
   </url>
@@ -138,6 +142,10 @@
   </url>
   <url>
     <loc>https://docs.asyncswap.org/reference/src/Router</loc>
+    <lastmod>2026-11-12</lastmod>
+  </url>
+  <url>
+    <loc>https://docs.asyncswap.org/reference/src/RouterFlashFills</loc>
     <lastmod>2026-11-12</lastmod>
   </url>
   <url>

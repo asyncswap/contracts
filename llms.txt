@@ -18,6 +18,7 @@ An MEV-capturing DEX built as a Uniswap v4 hook: an on-chain order book and matc
 - [MatchingEngine](/reference/src/MatchingEngine): Standalone price-time matching harness. It maintains a radix-indexed limit book and emits deterministic fill instructions.
 - [NativeClaims](/reference/src/NativeClaims): Redeems the caller's PoolManager native ETH claims to a chosen recipient.
 - [Router](/reference/src/Router): Thin entrypoint for makers (`swap`, `topUpPriorityFee`, `cancelOrder`, `cancelAndWithdraw`, `withdrawClaims`), fillers (`fillOrder`) and keepers (`matchBook`, `fillFromPoolLiquidity`), batched with `multicall`. Each action goes through `IPoolManager.unlock` so the hook can operate on PM debts. Native payouts/refunds are PoolManager claims (ID 0), redeemable through NativeClaims or `withdrawClaims`; ERC20 payouts remain direct.
+- [RouterFlashFills](/reference/src/RouterFlashFills): The Router's flash-fill surface (`IAsyncSwapCallback`). The Router creates this module in its constructor and runs it by DELEGATECALL from its `fallback`, so every call executes as the Router: the hook sees the Router as caller, and the transient filler slot lives in the Router's context. Kept out of the Router so its runtime stays under EIP-170.
 - [TokenClaims](/reference/src/TokenClaims): Redeems the caller's PoolManager currency claims to a chosen recipient.
 - [BaseHook](/reference/src/BaseHook): abstract contract for hook implementations
 - [IFeeOwner](/reference/src/IFeeOwner)
@@ -32,6 +33,7 @@ An MEV-capturing DEX built as a Uniswap v4 hook: an on-chain order book and matc
 - [DynamicFeeOrdering](/reference/src/libraries/DynamicFeeOrdering): Linked library called by `AsyncMatching` in the hook's context.
 - [EligiblePrice](/reference/src/libraries/EligiblePrice): Exact-price summaries on a priority-key radix tree.
 - [IncomingMatching](/reference/src/libraries/IncomingMatching): Fund a crossing arrival, match it in memory, then index only its remainder.
+- [MultiAsset](/reference/src/libraries/MultiAsset): Linked module for multi-asset trading: pool setup (including pools without the numeraire) and the hook's side of flash fills and of fills paid in ERC-6909 claims. Public library calls use DELEGATECALL, so escrow, books and the transient flash record stay in the hook.
 - [OrderSignatures](/reference/src/libraries/OrderSignatures): EIP-712 types for signed AsyncSwap actions. Every type spells out the maker, both tokens and the amounts so wallets render a readable message instead of opaque calldata.
 - [PriorityFeeUpdates](/reference/src/libraries/PriorityFeeUpdates): Funded priority amendments, linked separately to keep the hook within EIP-170.
 - [RadixPriceTree](/reference/src/libraries/RadixPriceTree): Patricia radix index for uint128 price levels. Inserts and removals traverse at most 128 branch bits; each distinct price creates one leaf and at most one branch node. Node ids released by `remove` are recycled by later inserts, so the id counter only grows with the peak number of simultaneously stored prices and can never be exhausted in practice (2^31 simultaneous levels).

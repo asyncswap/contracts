@@ -1,6 +1,6 @@
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/b65c72c74975e7f1c34ca1bdf6510693738b495d/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/d4dd306239445175911ee1e7a9b5f0cf55ee69df/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -235,8 +235,8 @@ function sweep(Currency currency, address to) external onlyOwner;
 ### \_beforeInitialize
 
 <i>
-  Anyone may open a pool that pairs the numeraire with a dynamic fee. No order check reads the
-  pool price, so the initializer's choice of price cannot block orders.
+  Pool rules live in `MultiAsset.initialize`: a pool pairs the numeraire, or both its tokens already have a
+  numeraire pool here. No order check reads the pool price, so the initializer's price cannot block orders.
 </i>
 
 ```solidity
@@ -303,32 +303,6 @@ function _beforeAddLiquidity(address, PoolKey calldata, ModifyLiquidityParams ca
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | \<none> | `bytes4` |  |
-
-<a id="_minassetamount-currency" />
-
-### \_minAssetAmount
-
-<i>
-  10^(decimals - assetPrecision) base units of `asset`, at least 1. Native ETH has 18 decimals. A token
-  without a readable `decimals()` gets the 1-unit floor, and reported decimals are capped at 36. An asset
-  with no code reverts: a pool opened before its token is deployed would otherwise keep a 1-unit floor.
-</i>
-
-```solidity
-function _minAssetAmount(Currency asset) private view returns (uint256);
-```
-
-**Parameters**
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| asset | `Currency` |  |
-
-**Returns**
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| \<none> | `uint256` |  |
 
 <a id="asyncorder-poolid-bytes32" />
 
@@ -657,91 +631,31 @@ function executeOrder(AsyncOrder calldata order, bytes calldata data) external;
 | order | `AsyncOrder` |  |
 | data | `bytes` | abi.encode(filler) — the address that should receive the maker's input. |
 
-<a id="beginflashfill-asyncorder-address" />
+<a id="flashfill-bytes" />
 
-### beginFlashFill
+### flashFill
 
-Input-first half of a Router flash fill: closes `order` and credits its input, less the trade fee,
-to `filler` as ERC-6909 claims. The Router must call `settleFlashFill` in the same unlock.
+The hook's side of a Router flash fill, run by `MultiAsset.run`. `args` is
+`abi.encode(uint8 op, AsyncOrder order, address filler)`: op 0 closes the order and credits its input,
+less the trade fee, to `filler` as claims; 1 pays the maker of that open flash fill from the output claims
+the Router has transferred here; 2 is a full fill paid in claims. Router only.
 
 ```solidity
-function beginFlashFill(AsyncOrder calldata order, address filler)
-        external
-        returns (uint256 amountIn, uint256 amountOwed);
+function flashFill(bytes calldata args) external returns (uint256, uint256);
 ```
 
 **Parameters**
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| order | `AsyncOrder` |  |
-| filler | `address` |  |
+| args | `bytes` |  |
 
 **Returns**
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| amountIn | `uint256` | The input credited to the filler. |
-| amountOwed | `uint256` | The output the Router must transfer to this hook as claims before `settleFlashFill`. |
-
-<a id="settleflashfill-asyncorder-address" />
-
-### settleFlashFill
-
-Pays the maker of the open flash fill out of the output claims the Router has just transferred here.
-
-```solidity
-function settleFlashFill(AsyncOrder calldata order, address filler) external;
-```
-
-**Parameters**
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| order | `AsyncOrder` |  |
-| filler | `address` |  |
-
-<a id="executeorderwithclaims-asyncorder-address" />
-
-### executeOrderWithClaims
-
-Full fill paid in claims, for fills inside a flash fill: the Router has already transferred the
-order's live minimum (plus pool fee) to this hook as claims; `filler` receives the input as claims.
-
-```solidity
-function executeOrderWithClaims(AsyncOrder calldata order, address filler) external;
-```
-
-**Parameters**
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| order | `AsyncOrder` |  |
-| filler | `address` |  |
-
-<a id="_claimsfill-asyncorder-address" />
-
-### \_claimsFill
-
-```solidity
-function _claimsFill(AsyncOrder calldata order, address filler)
-        private
-        view
-        returns (AsyncMatching.FillParams memory);
-```
-
-**Parameters**
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| order | `AsyncOrder` |  |
-| filler | `address` |  |
-
-**Returns**
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| \<none> | `AsyncMatching.FillParams` |  |
+| \<none> | `uint256` |  |
+| \<none> | `uint256` |  |
 
 <a id="matchneworder-asyncorder" />
 
@@ -936,7 +850,33 @@ function _beforeSwap(address sender, PoolKey calldata key, SwapParams calldata p
 | \<none> | `BeforeSwapDelta` |  |
 | \<none> | `uint24` |  |
 
-<a id="_createorder-poolid-bool-uint256-userparams-bool" />
+<a id="_paysquote-poolkey-bool" />
+
+### \_paysQuote
+
+<i>
+  Whether `input` is the pool's quote side: the numeraire, or `currency1` on a pool without it
+  (`MultiAsset.initialize`). An order paying the quote side is a bid.
+</i>
+
+```solidity
+function _paysQuote(PoolKey calldata key, bool zeroForOne) private view returns (bool);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| key | `PoolKey` |  |
+| zeroForOne | `bool` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `bool` |  |
+
+<a id="_createorder-poolkey-bool-uint256-userparams" />
 
 ### \_createOrder
 
@@ -945,19 +885,17 @@ function _beforeSwap(address sender, PoolKey calldata key, SwapParams calldata p
 </i>
 
 ```solidity
-function _createOrder(PoolId poolId, bool zeroForOne, uint256 amountIn, UserParams memory hookData, bool isBuy)
-        private;
+function _createOrder(PoolKey calldata key, bool zeroForOne, uint256 amountIn, UserParams memory hookData) private;
 ```
 
 **Parameters**
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| poolId | `PoolId` |  |
+| key | `PoolKey` |  |
 | zeroForOne | `bool` |  |
 | amountIn | `uint256` |  |
 | hookData | `UserParams` |  |
-| isBuy | `bool` |  |
 
 <a id="setexecutor-poolid-address-bool" />
 
@@ -1496,6 +1434,14 @@ error NotSelf();
 
 ```solidity
 error NotTrustedRouter();
+```
+
+### PriorityFeeNeedsNumeraire
+
+Priority bids are paid in the numeraire, so orders on a pool without it take no bid.
+
+```solidity
+error PriorityFeeNeedsNumeraire();
 ```
 
 ### CannotRevokeTrustedRouter

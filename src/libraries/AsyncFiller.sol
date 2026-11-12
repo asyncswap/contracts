@@ -35,6 +35,8 @@ library AsyncFiller {
     uint256 internal constant PRIORITY_FEE_BPS = 10;
     /// @dev Protocol fee on what each side of a book match or filler fill receives: 0.02%.
     uint256 internal constant TRADE_FEE_BPS = 2;
+    /// @dev `Book.priorityFeeCap` of a pool without the numeraire: bids are paid in the numeraire, so it takes none.
+    uint64 internal constant NO_PRIORITY_BIDS = type(uint64).max;
 
     /// @notice Open-order record. Filler fills are full-order; direct matches can reduce it
     ///         partially while keeping the remaining input in escrow.
@@ -138,6 +140,7 @@ library AsyncFiller {
     error PriorityFeeTooSmall();
     error BelowMinimumOrder();
     error BelowMinimumAssetAmount();
+    error PriorityFeeNeedsNumeraire();
 
     function addOrder(
         State storage self,
@@ -193,6 +196,7 @@ library AsyncFiller {
     }
 
     function minPriorityFee(uint256 notional, uint64 cap) internal pure returns (uint256) {
+        if (cap == NO_PRIORITY_BIDS) revert PriorityFeeNeedsNumeraire();
         // 10 bps is exactly 1/1000; integer division preserves the existing rounding down.
         uint256 tiered = notional / (10_000 / PRIORITY_FEE_BPS);
         uint256 effectiveCap = cap == 0 ? MIN_PRIORITY_FEE : cap;
@@ -329,8 +333,54 @@ library AsyncFiller {
         }
 
         // `fee` now holds the filler's trade fee on the input (reused to keep the stack shallow).
-        fee = _payFiller(self, input, hook, filler, feeVault, amountIn);
+        fee = _payFiller(self, input, hook, filler, feeVault, amountIn, input.isAddressZero());
         if (fee != 0) emit OrderFeeAccrued(order.key.toId(), id, input, fee);
+        emit AsyncOrderFilled(order.key.toId(), id, filler, amountIn, amountOutMin);
+    }
+
+    /// @notice Input-first half of a flash fill, run in the hook's context. Closes the order (so it cannot be
+    ///         repriced, cancelled, topped up, matched or filled again) and credits its escrowed input, less the trade
+    ///         fee, to `filler` as ERC-6909 claims. Returns the order's input and minimum output as they were.
+    /// @dev The caller must then call `settleClaimsOutput` in the same unlock, after the hook has received the output
+    ///      as claims; otherwise the unlock cannot close and the whole fill reverts.
+    function beginFlashFill(
+        State storage self,
+        Book storage book,
+        AsyncOrder memory order,
+        bytes32 id,
+        address executor,
+        address filler
+    ) internal returns (uint256 amountIn, uint256 amountOutMin) {
+        if (!self.isExecutor[order.owner][executor]) revert NotAuthorizedExecutor();
+        OrderInfo storage info = self.orders[id];
+        amountIn = info.amountIn;
+        amountOutMin = info.amountOutMin;
+        if (amountIn == 0) revert OrderNotFound();
+        _closeOrder(self, book, order.key, id, address(this));
+        Currency input = order.zeroForOne ? order.key.currency0 : order.key.currency1;
+        uint256 tradeFeeIn = _payFiller(self, input, address(this), filler, self.feeVault, amountIn, true);
+        if (tradeFeeIn != 0) emit OrderFeeAccrued(order.key.toId(), id, input, tradeFeeIn);
+    }
+
+    /// @notice Output half of a fill paid in claims, run in the hook's context: burns `amountOutMin` of the hook's
+    ///         output claims (which the Router has just transferred to it), pays the maker the minimum less the trade
+    ///         fee and the vault the fee. The order must already be closed.
+    function settleClaimsOutput(
+        State storage self,
+        AsyncOrder memory order,
+        bytes32 id,
+        address filler,
+        uint256 amountIn,
+        uint256 amountOutMin
+    ) internal {
+        Currency output = order.zeroForOne ? order.key.currency1 : order.key.currency0;
+        output.settle(self.poolManager, address(this), amountOutMin, true);
+        uint256 tradeFeeOut = tradeFee(amountOutMin);
+        output.take(self.poolManager, order.owner, amountOutMin - tradeFeeOut, output.isAddressZero());
+        if (tradeFeeOut != 0) {
+            output.take(self.poolManager, self.feeVault, tradeFeeOut, true);
+            emit OrderFeeAccrued(order.key.toId(), id, output, tradeFeeOut);
+        }
         emit AsyncOrderFilled(order.key.toId(), id, filler, amountIn, amountOutMin);
     }
 
@@ -341,11 +391,12 @@ library AsyncFiller {
         address hook,
         address filler,
         address feeVault,
-        uint256 amountIn
+        uint256 amountIn,
+        bool claims
     ) private returns (uint256 tradeFeeIn) {
         tradeFeeIn = tradeFee(amountIn);
         input.settle(self.poolManager, hook, amountIn, true);
-        input.take(self.poolManager, filler, amountIn - tradeFeeIn, input.isAddressZero());
+        input.take(self.poolManager, filler, amountIn - tradeFeeIn, claims);
         if (tradeFeeIn != 0) input.take(self.poolManager, feeVault, tradeFeeIn, true);
     }
 

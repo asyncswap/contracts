@@ -2,9 +2,65 @@
 
 # Async Swap
 
-Async Swap is an on-chain order book and matching engine built as a Uniswap v4 hook. Traders set a limit price for assets paired with USDC. Orders can match with other traders or available pool liquidity. Anyone can permissionlessly fill orders, and anyone can open a USDC pool on the hook. The minimum order, the cap on the required nonzero priority bid, and the asset floor are fixed when the hook is deployed, so the owner cannot change pool rules under live orders.
+Async Swap is a continuous on-chain order book and matching engine built as a Uniswap v4 hook focused on large swaps in volatile pairs, where AMM price impact can be high. Traders set a limit price for assets paired with USDC, and orders are good till cancelled (GTC): there is no expiry, so an order rests until it fills or the maker cancels it. Anyone can permissionlessly fill orders, and anyone can open a USDC pool on the hook.
 
-Book matching prioritizes price, with higher escrowed USDC bids breaking same-price ties and earlier submissions breaking equal-bid ties. Each side of a book match or filler fill receives its proceeds less a 0.02% protocol fee, so a maker receives at least its minimum output minus 0.02%; fills against pool liquidity pay active LPs 0.02% and the protocol 0.01%, and a pool fill that moves the price back toward where it stood before that pool's first fill of a 2-block window pays a dynamic fee of about half the backrun's profit, split between LPs and the protocol (dynamic fee ordering; tracked per pool). Order creation and fills also pay an MEV tax on the transaction's priority fee, credited to the protocol, so a transaction sent with no priority fee pays nothing and searchers racing for position pay most of their bids to the protocol. Unfilled amounts remain open for later execution, repricing, or cancellation; fills depend on available liquidity and counterparties.
+## How it works
+
+1. A maker swaps through the Router with an exact input and a minimum output. The hook takes the swap off the pool's curve and records it as an order.
+2. The order is matched immediately against the best opposite orders on the book, at the resting order's price.
+3. Any remainder rests on the book. It can later match a new order, fill from the pool's own liquidity when that beats the book, be taken by any filler who pays the maker's price, be repriced, or be cancelled.
+
+Fills depend on available liquidity and counterparties. The minimum order, the cap on the required nonzero priority bid, and the asset floor are fixed when the hook is deployed, so the owner cannot change pool rules under live orders.
+
+## Built on Uniswap v4 accounting
+
+Async Swap uses v4's two accounting primitives together: custom accounting decides how an order executes, and flash accounting makes every step of its life settle as net deltas inside one PoolManager unlock.
+
+### Custom accounting
+
+The hook enables `beforeSwapReturnDelta`. In `beforeSwap` it takes the full exact input as ERC-6909 claims and returns `toBeforeSwapDelta(-amountSpecified, 0)`, so the PoolManager treats the whole swap as consumed by the hook. The pool's curve is never touched by order creation. The hook, not the AMM, decides execution: the order rests on the book, matches opposite orders, fills from pool liquidity through a guarded self-call, or is taken by a filler. `afterSwapReturnDelta` is not used.
+
+### Flash accounting
+
+Every Router action runs inside a single `PoolManager.unlock`: `swap`, `swapWithSig`, `fillOrder`, `matchBook`, `fillFromPoolLiquidity`, `cancelOrder`, `cancelWithSig`, `cancelAndWithdraw`, `withdrawClaims` and `topUpPriorityFee`. Within the unlock, balances are running deltas. Escrow, matching of up to eight pairs, protocol fees, LP donations and maker payouts move through `take`, `settle`, `mint`, `burn` and `donate`, and only net amounts settle when the unlock closes. If any operation leaves a nonzero delta, the whole transaction reverts.
+
+### Custody and claims
+
+Maker escrow stays in the PoolManager as ERC-6909 claims owned by the hook, and protocol fees are claims owned by the FeeVault. Matched makers receive ERC-20 output directly or native output as claims they redeem through `NativeClaims`, `TokenClaims` or `Router.withdrawClaims`. There is no separate vault or custody contract.
+
+### Hook permissions
+
+| Permission | Use |
+| --- | --- |
+| `beforeInitialize` | Requires a USDC (numeraire) side and the dynamic-fee flag, and seeds the pool's book settings. |
+| `beforeAddLiquidity` | Allows LP positions, which supply the inventory for pool fills. |
+| `beforeSwap` | Validates the order and the Router's executor authorization, and records the order. |
+| `beforeSwapReturnDelta` | Custom accounting: hands the full input to the hook instead of the curve. |
+
+No after-hooks are used.
+
+## Matching engine
+
+Book matching prioritizes price, with higher escrowed USDC bids breaking same-price ties and earlier submissions breaking equal-bid ties. Price levels sit on Uniswap v4 ticks and are found through a three-level occupancy bitmap; within a level, a radix tree ranks orders by priority bid and arrival, with exact-limit summaries so the best crossing order is found in one walk. Matching processes up to eight pairs per call and combines claim transfers; `matchBook(key, maxMatches)` lets anyone continue it.
+
+## Fees
+
+- Each side of a book match or filler fill receives its proceeds less a 0.02% protocol fee, so a maker receives at least its minimum output minus 0.02%.
+- Fills against pool liquidity pay active LPs 0.02% and the protocol 0.01%.
+- Dynamic fee ordering: a pool fill that moves the price back toward where it stood before that pool's first fill of a 2-block window pays a dynamic fee of about half the backrun's profit, split between LPs and the protocol (tracked per pool).
+- MEV tax: order creation and fills pay a tax on the transaction's priority fee, credited to the protocol, so a transaction sent with no priority fee pays nothing and searchers racing for position pay most of their bids to the protocol.
+
+## Priority fees
+
+An order's USDC priority bid breaks ties between equal exact limit prices. This is separate from the transaction's gas priority fee. Zero bids are allowed; for a nonzero bid, the required minimum is 0.1% of the order's USDC notional, rounded down and capped at $0.10 with the default six-decimal numeraire configuration. Users may bid more than that minimum.
+
+Makers can call `Router.topUpPriorityFee(order, addedFee)` to escrow additional USDC on an open order. The Router requires the maker's approval and caller identity; the amount is added to the **remaining** bid without changing the order's input budget or limit price. The resulting bid must meet the minimum for the remaining order. A top-up resets time priority within its new fee tier and preserves the original maker age used for settlement pricing. It does not trigger matching; an agent can combine it with `matchBook(key, maxMatches)` through `Router.multicall` in one atomic transaction. See [the top-up API and agent example](docs/priority-fee-top-ups.md).
+
+Priority bids, including top-ups, are non-refundable: they are spent proportionally on fills, with the remainder transferred to the FeeVault on cancellation or dust closure. They improve priority among equal exact-price orders without creating liquidity or guaranteeing execution. They are not direct keeper rewards. This feature is available on the v1.3.0 testnet hooks and Routers. Earlier deployments do not acquire it automatically; existing orders stay on their original hook.
+
+### Application-specific sequencing
+
+Applications can schedule their own submissions, cancellations, and top-ups, but the shared book still ranks by price, USDC priority bid, then arrival time. `Router.multicall` can bundle actions; application-side scheduling does not guarantee execution.
 
 ## Documentation
 
@@ -17,11 +73,12 @@ every push to `main` that touches them; preview it locally with `cd site && bun 
 - [Priority-fee top-ups](docs/priority-fee-top-ups.md): maker authorization, funding, queue updates, and agent calls.
 - [Contract call sequences](docs/contract-call-sequences.md): calls, callbacks, responses, and withdrawals.
 - [Price-key crossing](docs/price-key-crossing.md): price comparisons and rounding.
-- [Dynamic fee ordering](docs/dynamic-fee-ordering.md): the dynamic fee on pool fills that backrun a price move, and who receives it. Open question: does charging half the price gap capture enough of a backrun's MEV for LPs and the protocol, or should the right to backrun a pool fill be auctioned through USDC priority bids, the way book matching already auctions ordering?
+- [Large-swap research series](https://x.com/asyncswap/article/2120701882377060839): three articles on large-swap costs, opposite-side flow, and Uniswap v4 hooks.
+- [Dynamic fee ordering](docs/dynamic-fee-ordering.md): how pool-fill backruns pay LPs and the protocol.
 
 ## Build and deployment
 
-v1.3.0 is deployed on **Unichain Sepolia** (test USDC) and **Robinhood Chain testnet** (test USDG). See [addresses and previous deployments](docs/deployments.md) and [live top-up validation](benchmarks/releases/README.md). All nine release modules on each network have exact source matches on Sourcify. Mainnet remains subject to [audit and readiness checks](MAINNET_READINESS.md).
+v1.3.0 is deployed on **Unichain Sepolia** (test USDC) and **Robinhood Chain testnet** (test USDG). **Elysium testnet** (test USDC, native HYPE) runs a later build of the same protocol. See [addresses and previous deployments](docs/deployments.md). All nine release modules on each network have exact source matches on Sourcify. Mainnet remains subject to [audit and readiness checks](MAINNET_READINESS.md).
 
 `AsyncMatching` is an external Solidity library linked into the hook. The deployment wrapper deploys and links `TickPrice`, `DynamicFeeOrdering`, `TickBitmap`, `EligiblePrice`, and `PriorityFeeUpdates` first. The fee-amendment library links to `EligiblePrice`. `script/deploy.sh <chain-key> [dry-run|broadcast|verify]` deploys the libraries through the shared CREATE2 deployer, links the hook bytecode, mines the hook salt, deploys the hook and Router, and records the addresses under `deployments/<chainId>/`. `verify` publishes sources through Sourcify, tries Blockscout, and writes standard JSON inputs for manual upload. An `ASYNC_MATCHING_LIBRARY_ADDRESS` override must match this build's predicted address. Foundry links the libraries automatically in tests.
 
@@ -33,64 +90,3 @@ Install dependencies and run the contract suite with:
 forge soldeer install
 FOUNDRY_INVARIANT_RUNS=64 FOUNDRY_INVARIANT_DEPTH=64 forge test --use solar
 ```
-
-## Benchmarks
-
-Measured on 2026-11-05 through the actual Router/hook settlement path, comparing the radix baseline with the bitmap implementation at `1389863`, before the fee top-up endpoint. The fixture has 256 distinct resting ask levels and distinct owners, with no LP liquidity. Each operation starts from the same committed state on local Anvil using Cancun rules and a 30M gas block limit.
-
-| Operation | Radix baseline gas | Bitmap gas | Reduction |
-| --- | ---: | ---: | ---: |
-| Place at a new price level | 584,885 | 486,702 | 16.79% |
-| Cancel | 246,336 | 191,955 | 22.08% |
-| Reprice to a new level | 377,954 | 309,336 | 18.16% |
-| Incoming order filling eight makers | 2,962,260 | 2,793,022 | 5.71% |
-
-Transaction receipts include intrinsic gas and applied refunds; setup and approvals are excluded. All 38 public-API state comparisons matched across different book sizes, both trading directions, crowded ticks and LP-routing fixtures. Savings depend on the workload: crowded-tick operations used approximately 0.5–2.1% more gas in the separate gross-call measurements. These are local gas measurements, not production throughput guarantees.
-
-Reproduce the comparison with Python 3.12+, Foundry/Anvil and the repository dependencies installed. Choose a new output directory outside the checkout:
-
-```sh
-python3 benchmarks/orderbook/run.py --output /tmp/async-swap-book-benchmark
-```
-
-See [methodology and validation](benchmarks/orderbook/README.md), [receipt data](benchmarks/orderbook/results/receipts.json), and [all workload results](benchmarks/orderbook/results/coverage.csv). The earlier standalone matching-harness block-packing numbers are not used to describe the Router/hook's performance.
-
-Fee top-ups measured separately use **186,710–235,267 gas** across four local fixtures, including an initially zero-bid order and a crowded price level. See [the top-up receipt benchmark](benchmarks/topups/README.md) for per-case results and reproduction instructions.
-
-[Local stress validation](benchmarks/stress/README.md) covers matching, liquidity fills,
-claim withdrawals and sustained API reads. The [public-testnet ingestion/read soak](benchmarks/soak/README.md)
-passed a 10-minute 26-second run on both testnets: 98 transactions, all 96 lifecycle
-events reconciled through REST/WebSocket, and 10,016 reads with zero failures
-(p95 76.69 ms). This bounded run does not establish maximum capacity or multi-hour resilience.
-
-[Crossing-heavy block tests](benchmarks/crossing/README.md) settled all 1,000
-transactions and 5,200 matched pairs correctly. Under a 30-million-gas local
-block budget, the first blocks held 44–51 single-fill transactions or 10–12
-eight-fill transactions with the documented gas limits. The target of 100
-crossing transactions in one block was not met.
-
-The current-source [incoming-memory implementation](benchmarks/incoming-memory/README.md)
-reduces mean gas by **28.9–55.7%** on the same ten crossing workloads. All 1,000
-transactions and 5,200 pairs pass accounting checks; first blocks now hold 71–77
-single-fill or 22–27 eight-fill transactions. Four noncrossing controls cost
-2.86–3.21% more. The hook and matcher have about 1.5 KB of runtime-size headroom
-each. This change requires new deployments and is not included in deployed v1.3.0.
-
-For context, a [plain Uniswap v4 comparison](benchmarks/uniswap-v4/README.md)
-fit 250–288 single-hop swaps in the first block under the same budget and gas-limit
-policy. This uses official core test adapters, deep liquidity and no hook or
-initialized-tick crossings; it is not Universal Router or live-network throughput.
-The subsequent [Universal Router and periphery benchmark](benchmarks/universal-router/README.md)
-fit 244–250 swaps in the first block through released router 2.2.0 and Permit2,
-with deadline/minimum-output checks and standing token allowances. Approval
-setup and permit signatures are excluded; the route remains single-hop with no hook.
-
-## Priority fees and future matching work
-
-An order's USDC priority bid breaks ties between equal exact limit prices. This is separate from the transaction's gas priority fee. Zero bids are allowed; for a nonzero bid, the required minimum is 0.1% of the order's USDC notional, rounded down and capped at $0.10 with the default six-decimal numeraire configuration. Users may bid more than that minimum.
-
-Makers can call `Router.topUpPriorityFee(order, addedFee)` to escrow additional USDC on an open order. The Router requires the maker's approval and caller identity; the amount is added to the **remaining** bid without changing the order's input budget or limit price. The resulting bid must meet the minimum for the remaining order. A top-up resets time priority within its new fee tier and preserves the original maker age used for settlement pricing. It does not trigger matching; an agent can combine it with `matchBook(key, maxMatches)` through `Router.multicall` in one atomic transaction. See [the top-up API and agent example](docs/priority-fee-top-ups.md).
-
-Priority bids, including top-ups, are non-refundable: they are spent proportionally on fills, with the remainder transferred to the FeeVault on cancellation or dust closure. They improve priority among equal exact-price orders without creating liquidity or guaranteeing execution. They are not direct keeper rewards. This feature is available on the v1.3.0 testnet hooks and Routers. Earlier deployments do not acquire it automatically; existing orders stay on their original hook.
-
-The current matcher already processes up to eight pairs per call and combines claim transfers. A uniform-price batch auction would additionally change when orders clear and which price they receive. It remains a separate research direction; no batch-auction gas or execution-quality improvement has been demonstrated for these contracts. See [the research notes](benchmarks/orderbook/research.md).

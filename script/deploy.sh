@@ -151,16 +151,16 @@ registry="$ROOT_DIR/deployments/$chain_id/$chain_id.json"
 # ---- verify mode ----------------------------------------------------------------------------
 if [[ "$mode" == "verify" ]]; then
   [[ -f "$registry" ]] || { echo "No registry at $registry; broadcast first." >&2; exit 1; }
-  read -r lib_addr hook_addr router_addr vault_addr tick_addr ordering_addr bitmap_addr eligible_addr topup_addr incoming_addr <<< "$(python3 - "$registry" <<'PY'
+  read -r lib_addr hook_addr router_addr vault_addr tick_addr ordering_addr bitmap_addr eligible_addr topup_addr incoming_addr multiasset_addr <<< "$(python3 - "$registry" <<'PY'
 import json, sys
 c = json.load(open(sys.argv[1]))["contracts"]
 def a(n):
     e = c.get(n)
     return e["address"] if e else "-"
-print(a("AsyncMatching"), a("AsyncSwap"), a("Router"), a("FeeVault"), a("TickPrice"), a("DynamicFeeOrdering"), a("TickBitmap"), a("EligiblePrice"), a("PriorityFeeUpdates"), a("IncomingMatching"))
+print(a("AsyncMatching"), a("AsyncSwap"), a("Router"), a("FeeVault"), a("TickPrice"), a("DynamicFeeOrdering"), a("TickBitmap"), a("EligiblePrice"), a("PriorityFeeUpdates"), a("IncomingMatching"), a("MultiAsset"))
 PY
 )"
-  for pair in "AsyncMatching:$lib_addr" "AsyncSwap:$hook_addr" "Router:$router_addr" "FeeVault:$vault_addr" "TickPrice:$tick_addr" "DynamicFeeOrdering:$ordering_addr" "TickBitmap:$bitmap_addr" "EligiblePrice:$eligible_addr" "PriorityFeeUpdates:$topup_addr" "IncomingMatching:$incoming_addr"; do
+  for pair in "AsyncMatching:$lib_addr" "AsyncSwap:$hook_addr" "Router:$router_addr" "FeeVault:$vault_addr" "TickPrice:$tick_addr" "DynamicFeeOrdering:$ordering_addr" "TickBitmap:$bitmap_addr" "EligiblePrice:$eligible_addr" "PriorityFeeUpdates:$topup_addr" "IncomingMatching:$incoming_addr" "MultiAsset:$multiasset_addr"; do
     [[ "${pair#*:}" != "-" ]] || { echo "Registry is missing ${pair%%:*}." >&2; exit 1; }
   done
   # Constructor arguments are read from the deployment transactions themselves, so verification uses
@@ -189,6 +189,7 @@ PY
   eligible_flag="src/libraries/EligiblePrice.sol:EligiblePrice:$eligible_addr"
   topup_flag="src/libraries/PriorityFeeUpdates.sol:PriorityFeeUpdates:$topup_addr"
   incoming_flag="src/libraries/IncomingMatching.sol:IncomingMatching:$incoming_addr"
+  multiasset_flag="src/libraries/MultiAsset.sol:MultiAsset:$multiasset_addr"
   out_dir="$ROOT_DIR/deployments/$chain_id/verify"
   mkdir -p "$out_dir"
 
@@ -196,7 +197,7 @@ PY
     local name="$1" addr="$2" target="$3" args="$4"
     local extra=()
     [[ -n "$args" ]] && extra+=(--constructor-args "$args")
-    [[ "$name" == "AsyncSwap" ]] && extra+=(--libraries "$incoming_flag" --libraries "$topup_flag" --libraries "$lib_flag" --libraries "$tick_flag" --libraries "$ordering_flag" --libraries "$bitmap_flag" --libraries "$eligible_flag")
+    [[ "$name" == "AsyncSwap" ]] && extra+=(--libraries "$incoming_flag" --libraries "$topup_flag" --libraries "$multiasset_flag" --libraries "$lib_flag" --libraries "$tick_flag" --libraries "$ordering_flag" --libraries "$bitmap_flag" --libraries "$eligible_flag")
     [[ "$name" == "IncomingMatching" ]] && extra+=(--libraries "$lib_flag" --libraries "$tick_flag" --libraries "$bitmap_flag" --libraries "$eligible_flag" --libraries "$ordering_flag")
     [[ "$name" == "AsyncMatching" ]] && extra+=(--libraries "$tick_flag" --libraries "$ordering_flag" --libraries "$bitmap_flag" --libraries "$eligible_flag")
     [[ "$name" == "PriorityFeeUpdates" ]] && extra+=(--libraries "$eligible_flag")
@@ -214,6 +215,7 @@ PY
   verify_one TickBitmap "$bitmap_addr" src/libraries/TickBitmap.sol:TickBitmap ""
   verify_one EligiblePrice "$eligible_addr" src/libraries/EligiblePrice.sol:EligiblePrice ""
   verify_one PriorityFeeUpdates "$topup_addr" src/libraries/PriorityFeeUpdates.sol:PriorityFeeUpdates ""
+  verify_one MultiAsset "$multiasset_addr" src/libraries/MultiAsset.sol:MultiAsset ""
   verify_one AsyncMatching "$lib_addr" src/libraries/AsyncMatching.sol:AsyncMatching ""
   verify_one IncomingMatching "$incoming_addr" src/libraries/IncomingMatching.sol:IncomingMatching ""
   verify_one AsyncSwap "$hook_addr" src/AsyncSwap.sol:AsyncSwap "$hook_args"
@@ -295,6 +297,22 @@ if ! has_code "$topup_addr"; then
   fi
 fi
 
+# ---- Multi-asset module: pool setup and flash fills (linked to EligiblePrice) ---------------
+multiasset_init_code="$(forge inspect src/libraries/MultiAsset.sol:MultiAsset bytecode --libraries "$eligible_flag")"
+multiasset_salt="$(cast keccak "asyncswap.v2.MultiAsset")"
+multiasset_addr="$(cast create2 --deployer "$CREATE2_DEPLOYER" --salt "$multiasset_salt" --init-code-hash "$(cast keccak "$multiasset_init_code")" | awk '/Address:/ {print $2} /^0x/ {print $1}' | tail -1)"
+multiasset_flag="src/libraries/MultiAsset.sol:MultiAsset:$multiasset_addr"
+if ! has_code "$multiasset_addr"; then
+  if [[ "$mode" == "broadcast" ]]; then
+    : "${DEPLOYER_ACCOUNT:?Set DEPLOYER_ACCOUNT to a Foundry keystore in .env.deploy}"
+    DEPLOY_DRY_RUN=false forge script "$ROOT_DIR/script/00_DeployMultiAsset.s.sol" --libraries "$eligible_flag" \
+      --rpc-url "$RPC_URL" --sender "$OWNER" --broadcast --account "$DEPLOYER_ACCOUNT" ${gas_flags[@]+"${gas_flags[@]}"}
+    wait_for_code "$multiasset_addr" || { echo "MultiAsset deployment missing" >&2; exit 1; }
+  else
+    DEPLOY_DRY_RUN=true forge script "$ROOT_DIR/script/00_DeployMultiAsset.s.sol" --libraries "$eligible_flag" --rpc-url "$RPC_URL" --sender "$OWNER"
+  fi
+fi
+
 # ---- AsyncMatching library ------------------------------------------------------------------
 # Deterministic address: CREATE2 via the shared deployer with the salt in 00_DeployMatchingLibrary.
 lib_init_code="$(forge inspect src/libraries/AsyncMatching.sol:AsyncMatching bytecode --libraries "$tick_flag" --libraries "$ordering_flag" --libraries "$bitmap_flag" --libraries "$eligible_flag")"
@@ -351,6 +369,7 @@ forge_args=(
   --libraries "$bitmap_flag"
   --libraries "$eligible_flag"
   --libraries "$topup_flag"
+  --libraries "$multiasset_flag"
   --libraries "$incoming_flag"
 )
 if [[ "$mode" == "broadcast" ]]; then

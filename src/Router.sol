@@ -17,6 +17,7 @@ import {SafeCast} from "v4-core/libraries/SafeCast.sol";
 import {Currency, CurrencyLibrary} from "v4-core/types/Currency.sol";
 import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 import {AsyncSwap} from "src/AsyncSwap.sol";
+import {RouterFlashFills} from "src/RouterFlashFills.sol";
 
 /// @title Router
 /// @author @msakiart
@@ -54,6 +55,8 @@ contract Router is EIP712, Multicall {
     /// @notice Gas units the MEV tax charges per unit of priority fee: the tax on a transaction is its priority fee
     ///         per gas times this. Fixed at deployment.
     uint256 public immutable MEV_TAX_GAS;
+    /// @notice Flash-fill module (`IAsyncSwapCallback`), created here and run by DELEGATECALL from `fallback`.
+    address public immutable FLASH_FILLS;
 
     /// keccak256("Router.ActionType") - 1
     bytes32 constant ACTION_LOCATION = 0xf3b150ebf41dad0872df6788629edb438733cb4a5c9ea779b1b1f3614faffc69;
@@ -75,7 +78,8 @@ contract Router is EIP712, Multicall {
         PoolLiquidityFill,
         CancelAndWithdraw,
         WithdrawClaims,
-        TopUpPriorityFee
+        TopUpPriorityFee,
+        FlashFill
     }
 
     struct SwapCallback {
@@ -113,6 +117,7 @@ contract Router is EIP712, Multicall {
         HOOK = _hook;
         PERMIT2 = _permit2;
         MEV_TAX_GAS = _mevTaxGas;
+        FLASH_FILLS = address(new RouterFlashFills(_poolManager, _hook, _mevTaxGas));
     }
 
     /// @notice The MEV tax this transaction pays per taxed action, in wei: its priority fee per gas times
@@ -348,6 +353,7 @@ contract Router is EIP712, Multicall {
             asyncFiller := tload(ASYNC_FILLER_LOCATION)
         }
         _payMevTax();
+        if (action == uint8(ActionType.FlashFill)) _delegateFlashFills();
 
         if (action == uint8(ActionType.WithdrawClaims)) {
             (, address owner, Currency[] memory currencies, uint256[] memory amounts) =
@@ -439,6 +445,24 @@ contract Router is EIP712, Multicall {
         }
 
         return "";
+    }
+
+    /// @notice The flash-fill surface (`fillOrderWithCallback`, `fillOrderInCallback`, `matchBookInCallback`), served
+    ///         by `FLASH_FILLS` in this contract's context.
+    fallback() external payable {
+        _delegateFlashFills();
+    }
+
+    /// @dev Runs this call's calldata in `FLASH_FILLS` as this contract and returns or reverts with its result.
+    function _delegateFlashFills() private {
+        address module = FLASH_FILLS;
+        assembly ("memory-safe") {
+            calldatacopy(0, 0, calldatasize())
+            let ok := delegatecall(gas(), module, 0, calldatasize(), 0, 0)
+            returndatacopy(0, 0, returndatasize())
+            if iszero(ok) { revert(0, returndatasize()) }
+            return(0, returndatasize())
+        }
     }
 
     /// @dev Credits a recorded MEV tax, held by the Router since the entry call, to the FeeVault as native claims.

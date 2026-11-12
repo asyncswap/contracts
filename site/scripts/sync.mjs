@@ -1,5 +1,5 @@
 // Assemble the site's generated pages from the repository before `vocs dev` / `vocs build`:
-//   - docs/*.md                          -> src/pages/protocol/
+//   - docs/*.md                          -> generated src/pages/protocol/
 //   - audit/AUDIT_SCOPE_11_05_26.md       -> src/pages/audit/scope.md
 //   - `forge doc` (NatSpec in src/)       -> src/pages/reference/src/ + src/generated/reference-sidebar.ts
 // docs/ and audit/ stay the source of truth; everything written here is git-ignored.
@@ -34,7 +34,7 @@ const descriptions = {
   '/protocol/contract-call-sequences': 'Step-by-step contract calls for opening pools and placing, matching, filling, cancelling (alone or batched) and redeeming orders.',
   '/protocol/price-key-crossing': 'How limit prices map to price keys and when two orders cross.',
   '/protocol/dynamic-fee-ordering': 'How Async Swap captures backrun MEV with a dynamic fee on pool fills that move the price back, split between LPs and the protocol.',
-  '/deployments': 'Contract addresses on the two testnets (Unichain Sepolia, Robinhood Chain testnet); no mainnet yet. Also at /deployments.json.',
+  '/deployments': 'Contract addresses and faucets for the three testnets (Unichain Sepolia, Robinhood Chain testnet, Elysium testnet); no mainnet yet. Also at /deployments.json.',
   '/audit/scope': 'Audit scope: frozen commit, files in scope, trust assumptions, known issues and the status of every previous finding.',
 }
 

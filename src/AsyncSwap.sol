@@ -5,6 +5,7 @@ import {TokenTransfers} from "./libraries/TokenTransfers.sol";
 import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 import {IncomingMatching} from "@async-swap/libraries/IncomingMatching.sol";
 import {AsyncMatching} from "@async-swap/libraries/AsyncMatching.sol";
+import {MultiAsset} from "@async-swap/libraries/MultiAsset.sol";
 import {PriorityFeeUpdates} from "@async-swap/libraries/PriorityFeeUpdates.sol";
 import {OrderSignatures} from "@async-swap/libraries/OrderSignatures.sol";
 import {AsyncOrder, AsyncOrderLibrary} from "@async-swap/types/AsyncOrder.sol";
@@ -100,6 +101,8 @@ contract AsyncSwap is BaseHook, EIP712 {
     error DynamicFeeRequired();
     error NotSelf();
     error NotTrustedRouter();
+    /// @notice Priority bids are paid in the numeraire, so orders on a pool without it take no bid.
+    error PriorityFeeNeedsNumeraire();
 
     /// @notice Emitted when ownership is transferred.
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
@@ -242,18 +245,15 @@ contract AsyncSwap is BaseHook, EIP712 {
     }
 
     /// @inheritdoc BaseHook
-    /// @dev Anyone may open a pool that pairs the numeraire with a dynamic fee. No order check reads the
-    ///      pool price, so the initializer's choice of price cannot block orders.
+    /// @dev Pool rules live in `MultiAsset.initialize`: a pool pairs the numeraire, or both its tokens already have a
+    ///      numeraire pool here. No order check reads the pool price, so the initializer's price cannot block orders.
     function _beforeInitialize(address, PoolKey calldata key, uint160) internal virtual override returns (bytes4) {
-        if (!(key.currency0 == numeraire || key.currency1 == numeraire)) revert NumeraireRequired();
-        if (key.fee != LPFeeLibrary.DYNAMIC_FEE_FLAG) revert DynamicFeeRequired();
-        asyncOrders[key.toId()].poolManager = poolManager;
-        asyncOrders[key.toId()].numeraire = numeraire;
-        asyncOrders[key.toId()].feeVault = address(feeVault);
-        priceBooks[key.toId()].minOrder = minOrder;
-        priceBooks[key.toId()].priorityFeeCap = priorityFeeCap;
-        priceBooks[key.toId()].minAssetAmount =
-            _minAssetAmount(key.currency0 == numeraire ? key.currency1 : key.currency0);
+        MultiAsset.initialize(
+            asyncOrders,
+            priceBooks[key.toId()],
+            key,
+            MultiAsset.PoolConfig(poolManager, numeraire, address(feeVault), minOrder, priorityFeeCap, assetPrecision)
+        );
         return this.beforeInitialize.selector;
     }
 
@@ -286,21 +286,6 @@ contract AsyncSwap is BaseHook, EIP712 {
     {
         // LP positions supply the inventory used by the guarded order-fill path below.
         return this.beforeAddLiquidity.selector;
-    }
-
-    /// @dev 10^(decimals - assetPrecision) base units of `asset`, at least 1. Native ETH has 18 decimals. A token
-    ///      without a readable `decimals()` gets the 1-unit floor, and reported decimals are capped at 36. An asset
-    ///      with no code reverts: a pool opened before its token is deployed would otherwise keep a 1-unit floor.
-    function _minAssetAmount(Currency asset) private view returns (uint256) {
-        uint256 decimals = 18;
-        if (!asset.isAddressZero()) {
-            if (Currency.unwrap(asset).code.length == 0) revert AssetHasNoCode();
-            (bool ok, bytes memory ret) = Currency.unwrap(asset).staticcall(abi.encodeWithSignature("decimals()"));
-            if (!ok || ret.length < 32) return 1;
-            decimals = abi.decode(ret, (uint256));
-            if (decimals > 36) decimals = 36;
-        }
-        return decimals > assetPrecision ? 10 ** (decimals - assetPrecision) : 1;
     }
 
     /// @notice Read an order's currently-open input amount. Returns 0 if the order does not exist.
@@ -430,6 +415,22 @@ contract AsyncSwap is BaseHook, EIP712 {
         );
     }
 
+    /// @notice The hook's side of a Router flash fill, run by `MultiAsset.run`. `args` is
+    ///         `abi.encode(uint8 op, AsyncOrder order, address filler)`: op 0 closes the order and credits its input,
+    ///         less the trade fee, to `filler` as claims; 1 pays the maker of that open flash fill from the output claims
+    ///         the Router has transferred here; 2 is a full fill paid in claims. Router only.
+    function flashFill(bytes calldata args) external returns (uint256, uint256) {
+        if (msg.sender != router) revert NotTrustedRouter();
+        PoolId poolId;
+        assembly ("memory-safe") {
+            // `order.key` is the five words after `op`; a PoolId is keccak256 of the encoded key.
+            let ptr := mload(0x40)
+            calldatacopy(ptr, add(args.offset, 0x20), 0xa0)
+            poolId := keccak256(ptr, 0xa0)
+        }
+        return MultiAsset.run(asyncOrders[poolId], priceBooks[poolId], args, msg.sender);
+    }
+
     /// @notice Match the order just created by the current Router unlock callback.
     /// @dev The Router calls this only after settling the maker's input. The transient hand-off
     ///      prevents stale order ids or a different executor from triggering a match.
@@ -550,7 +551,7 @@ contract AsyncSwap is BaseHook, EIP712 {
 
         // Escrow the entire deposit; fees are earned only on successful fill.
         specified.take(poolManager, address(this), amountTaken, true);
-        _createOrder(poolId, params.zeroForOne, amountTaken, hookData, specified == numeraire);
+        _createOrder(key, params.zeroForOne, amountTaken, hookData);
 
         if (specified == key.currency0) {
             emit HookSwap(PoolId.unwrap(poolId), sender, amountTaken.toInt128(), 0, 0, 0);
@@ -562,10 +563,15 @@ contract AsyncSwap is BaseHook, EIP712 {
         return (BaseHook.beforeSwap.selector, beforeSwapDelta, 0);
     }
 
+    /// @dev Whether `input` is the pool's quote side: the numeraire, or `currency1` on a pool without it
+    ///      (`MultiAsset.initialize`). An order paying the quote side is a bid.
+    function _paysQuote(PoolKey calldata key, bool zeroForOne) private view returns (bool) {
+        return zeroForOne == (key.currency0 == numeraire);
+    }
+
     /// @dev Extracted to keep `_beforeSwap` stack-shallow.
-    function _createOrder(PoolId poolId, bool zeroForOne, uint256 amountIn, UserParams memory hookData, bool isBuy)
-        private
-    {
+    function _createOrder(PoolKey calldata key, bool zeroForOne, uint256 amountIn, UserParams memory hookData) private {
+        PoolId poolId = key.toId();
         AsyncFiller.State storage state = asyncOrders[poolId];
 
         // executor must already be authorised by the user — no implicit grant via hookData.
@@ -604,7 +610,7 @@ contract AsyncSwap is BaseHook, EIP712 {
                 owner: hookData.user,
                 amountIn: amountIn,
                 amountOutMin: hookData.amountOutMin,
-                isBuy: isBuy,
+                isBuy: _paysQuote(key, zeroForOne),
                 zeroForOne: zeroForOne,
                 priorityFee: hookData.priorityFee,
                 poolId: poolId

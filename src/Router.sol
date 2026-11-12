@@ -64,8 +64,8 @@ contract Router is EIP712, Multicall {
     bytes32 constant USER_LOCATION = 0x3dde20d9bf5cc25a9f487c6d6b54d3c19e3fa4738b91a7a509d4fc4180a72356;
     /// keccak256("Router.AsyncFiller") - 1
     bytes32 constant ASYNC_FILLER_LOCATION = 0xd972a937b59dc5cb8c692dd9f211e85afa8def4caee6e05b31db0f53e16d02e0;
-    /// @dev keccak256("asyncswap.router.maxPrice") - 1
-    bytes32 constant MAX_PRICE_LOCATION = 0x6b4f8e2c9d5a0b7e1f3c2a8d4e9f0b6c5a1d8e7f2b3c4d5e6a7f8b9c0d1e2f30;
+    /// keccak256("Router.MaxPrice") - 1
+    bytes32 constant MAX_PRICE_LOCATION = 0x4c55dc387a28e25c0f47e7e08b319d1d04ef81ac7445de4167af1f6918ac94f4;
     /// keccak256("Router.MevTax") - 1
     bytes32 constant MEV_TAX_LOCATION = 0xe6251c15e22bdb44d13d4efeec6855e57f2b38fe36310ce3c709991726ed21da;
 

@@ -211,6 +211,17 @@ library AsyncFiller {
         if ((isBuy ? amountOutMin : amountIn) < book.minAssetAmount) revert BelowMinimumAssetAmount();
     }
 
+    /// @dev True when either leg of a resting order is below the pool's floors, the same floors
+    ///      `checkMinimum` enforces when the order is created.
+    function belowMinimum(Book storage book, bool isBuy, uint256 amountIn, uint256 amountOutMin)
+        internal
+        view
+        returns (bool)
+    {
+        return (isBuy ? amountIn : amountOutMin) < book.minOrder
+            || (isBuy ? amountOutMin : amountIn) < book.minAssetAmount;
+    }
+
     function settlePriorityFee(
         State storage self,
         PoolKey memory key,

@@ -1,5 +1,5 @@
 // Assemble the site's generated pages from the repository before `vocs dev` / `vocs build`:
-//   - docs/*.md                          -> src/pages/protocol/
+//   - docs/*.md                          -> generated src/pages routes (protocol/, research/, etc.)
 //   - audit/AUDIT_SCOPE_11_05_26.md       -> src/pages/audit/scope.md
 //   - `forge doc` (NatSpec in src/)       -> src/pages/reference/src/ + src/generated/reference-sidebar.ts
 // docs/ and audit/ stay the source of truth; everything written here is git-ignored.
@@ -23,6 +23,7 @@ const routes = {
   'docs/contract-call-sequences.md': '/protocol/contract-call-sequences',
   'docs/price-key-crossing.md': '/protocol/price-key-crossing',
   'docs/dynamic-fee-ordering.md': '/protocol/dynamic-fee-ordering',
+  'docs/large-swap-research.md': '/research/large-swaps',
   'docs/deployments.md': '/deployments',
   'audit/AUDIT_SCOPE_11_05_26.md': '/audit/scope',
 }
@@ -34,6 +35,7 @@ const descriptions = {
   '/protocol/contract-call-sequences': 'Step-by-step contract calls for opening pools and placing, matching, filling, cancelling (alone or batched) and redeeming orders.',
   '/protocol/price-key-crossing': 'How limit prices map to price keys and when two orders cross.',
   '/protocol/dynamic-fee-ordering': 'How Async Swap captures backrun MEV with a dynamic fee on pool fills that move the price back, split between LPs and the protocol.',
+  '/research/large-swaps': 'Research on large-swap price impact, later opposite-side flow, and the limits of potential savings estimates.',
   '/deployments': 'Contract addresses and faucets for the three testnets (Unichain Sepolia, Robinhood Chain testnet, Elysium testnet); no mainnet yet. Also at /deployments.json.',
   '/audit/scope': 'Audit scope: frozen commit, files in scope, trust assumptions, known issues and the status of every previous finding.',
 }
@@ -83,6 +85,7 @@ function deployments() {
 
 function syncGuides() {
   reset(join(pages, 'protocol'))
+  reset(join(pages, 'research'))
   reset(join(pages, 'audit'))
   for (const [file, route] of Object.entries(routes)) {
     if (route === '/') continue // the home page is written by hand

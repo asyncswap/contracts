@@ -11,6 +11,7 @@ import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
 import {Router} from "@async-swap/Router.sol";
 import {RouterFlashFills} from "@async-swap/RouterFlashFills.sol";
 import {IAsyncSwapCallback} from "@async-swap/interfaces/IAsyncSwapCallback.sol";
+import {AsyncSwapFlashFiller} from "@async-swap/periphery/AsyncSwapFlashFiller.sol";
 import {MockERC20} from "./utils/MockERC20.sol";
 import {Test, Vm} from "forge-std/Test.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -680,4 +681,91 @@ contract FlashFillMevTaxTest is FlashFillTest {
         filler.run(a, 90 ether, _steps2(_fillStep(b), _fillStep(c)), 0);
         assertEq(_vaultEth(), _fee(1 ether) + _fee(0.99 ether));
     }
+}
+
+/// @notice A filler on the base contract: its route fills the orders listed in `data` inside the callback.
+contract BookFiller is AsyncSwapFlashFiller {
+    constructor(IPoolManager manager, IAsyncSwapCallback router) AsyncSwapFlashFiller(manager, router, msg.sender) {}
+
+    function _route(AsyncOrder calldata, uint256, uint256, bytes calldata data) internal override {
+        AsyncOrder[] memory orders = abi.decode(data, (AsyncOrder[]));
+        for (uint256 i; i < orders.length; ++i) {
+            Currency output = orders[i].zeroForOne ? orders[i].key.currency1 : orders[i].key.currency0;
+            POOLMANAGER.approve(address(ROUTER), output.toId(), orders[i].amountOutMin);
+            ROUTER.fillOrderInCallback(orders[i], orders[i].amountOutMin);
+        }
+    }
+}
+
+/// @notice The base filler pays the exact MEV tax owed, read from the Router inside the callback.
+contract FlashFillerBaseTest is FlashFillMevTaxTest {
+    BookFiller base;
+
+    function _deployBase() internal {
+        base = new BookFiller(manager, IAsyncSwapCallback(address(router)));
+    }
+
+    function _route2(AsyncOrder memory b, AsyncOrder memory c) internal pure returns (bytes memory) {
+        AsyncOrder[] memory orders = new AsyncOrder[](2);
+        orders[0] = b;
+        orders[1] = c;
+        return abi.encode(orders);
+    }
+
+    function test_base_paysExactTax() public {
+        _deployBase();
+        (AsyncOrder memory a, AsyncOrder memory b, AsyncOrder memory c) = _crossBook();
+        _priority();
+        assertEq(base.ethNeeded(3), 3 * TAX, "quote");
+        base.fill{value: 3 * TAX + 7}(a, 90 ether, _route2(b, c));
+        assertEq(_vaultEth(), _fee(1 ether) + _fee(0.99 ether) + 3 * TAX);
+        assertEq(address(base).balance, 7, "only the tax was spent");
+        assertEq(base.ethNeeded(3), 3 * TAX - 7);
+        assertEq(_live(a), 0);
+    }
+
+    function test_base_paysFromBalance() public {
+        _deployBase();
+        (AsyncOrder memory a, AsyncOrder memory b, AsyncOrder memory c) = _crossBook();
+        vm.deal(address(base), 3 * TAX);
+        _priority();
+        base.fill(a, 90 ether, _route2(b, c));
+        assertEq(address(base).balance, 0);
+        assertEq(_vaultEth(), _fee(1 ether) + _fee(0.99 ether) + 3 * TAX);
+    }
+
+    function test_base_balanceTooLowReverts() public {
+        _deployBase();
+        (AsyncOrder memory a, AsyncOrder memory b, AsyncOrder memory c) = _crossBook();
+        _priority();
+        vm.expectRevert(abi.encodeWithSelector(AsyncSwapFlashFiller.MevTaxBalanceTooLow.selector, 3 * TAX, 3 * TAX - 1));
+        base.fill{value: 3 * TAX - 1}(a, 90 ether, _route2(b, c));
+    }
+
+    function test_base_onlyRouterAndOwner() public {
+        _deployBase();
+        (AsyncOrder memory a,,) = _crossBook();
+        vm.expectRevert(AsyncSwapFlashFiller.NotRouter.selector);
+        base.asyncSwapFlashFill(a, 0, 0, "");
+        vm.prank(alice);
+        vm.expectRevert(AsyncSwapFlashFiller.NotOwner.selector);
+        base.fill(a, 90 ether, "");
+    }
+
+    function test_base_withdraw() public {
+        _deployBase();
+        (AsyncOrder memory a, AsyncOrder memory b, AsyncOrder memory c) = _crossBook();
+        base.fill{value: 1}(a, 90 ether, _route2(b, c));
+        uint256 ethClaims = manager.balanceOf(address(base), ETH.toId());
+        uint256[] memory ids = new uint256[](1);
+        ids[0] = ETH.toId();
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = ethClaims;
+        uint256 before = address(this).balance;
+        base.withdraw(1, ids, amounts);
+        assertEq(manager.balanceOf(address(this), ETH.toId()), ethClaims);
+        assertEq(address(this).balance, before + 1);
+    }
+
+    receive() external payable {}
 }

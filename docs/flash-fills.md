@@ -101,4 +101,17 @@ These are directions, not part of this change.
   its callback with `PoolManager.settleFor(router)` (for example from ETH its route earned). A surplus comes back to
   the filler in ETH. A shortfall reverts `MevTaxUnpaid(owed)`. With no priority fee the tax is zero.
 - `matchBookInCallback` pays no tax: `matchBook` is open to anyone outside a flash fill too.
+
+### Paying the exact tax
+
+You never guess the amount:
+
+- Off chain, `IAsyncSwapCallback(router).mevTaxFor(fills)` quotes the tax for `fills` fills. Call it with the gas price
+  you will send (`eth_call` with `gasPrice`, or `forge script --with-gas-price`).
+- Inside the callback, `IAsyncSwapCallback(router).mevTaxOwed()` returns the exact amount still owed. Pay it with
+  `PoolManager.sync(ETH)` and `PoolManager.settleFor{value: owed}(router)`.
+
+`src/periphery/AsyncSwapFlashFiller.sol` does all of this. Inherit it and write `_route`; it checks the caller, approves
+the Router for the maker's output, and pays `mevTaxOwed()` from its ETH balance. `ethNeeded(fills)` tells the owner how
+much ETH to send with `fill`. `script/FlashFill.s.sol` sends exactly that amount.
 - Surplus above the maker's minimum stays with the filler, as in a plain fill.

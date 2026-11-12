@@ -22,4 +22,12 @@ interface IAsyncSwapCallback {
 
     /// @notice Inside the callback: continue a crossed book.
     function matchBookInCallback(PoolKey calldata key, uint8 maxMatches) external returns (uint8);
+
+    /// @notice MEV tax for `fills` fills at this transaction's priority fee. Off chain, simulate with the gas price
+    ///         you will send (`eth_call` with `gasPrice`); on chain it is exact for the running transaction.
+    function mevTaxFor(uint256 fills) external view returns (uint256);
+
+    /// @notice Inside the callback: the MEV tax the Router still owes for this flash fill, every fill charged so far
+    ///         less what was paid. Settle exactly this with `PoolManager.settleFor(router)` before returning.
+    function mevTaxOwed() external view returns (uint256);
 }

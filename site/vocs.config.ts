@@ -24,6 +24,7 @@ export default defineConfig({
   },
   topNav: [
     { text: 'Protocol', link: '/protocol/overview' },
+    { text: 'Research', link: '/research/large-swaps' },
     { text: 'Contracts', link: '/reference' },
     { text: 'Deployments', link: '/deployments' },
     { text: 'App', link: 'https://app.asyncswap.org' },
@@ -43,6 +44,7 @@ export default defineConfig({
       ],
     },
     { text: 'Deployments', link: '/deployments' },
+    { text: 'Research', items: [{ text: 'Large swaps', link: '/research/large-swaps' }] },
     {
       text: 'Security',
       items: [{ text: 'Audit scope', link: '/audit/scope' }],

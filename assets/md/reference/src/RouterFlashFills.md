@@ -1,6 +1,6 @@
 # RouterFlashFills
 
-[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/RouterFlashFills.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/8366a12e8620be597061ae730a5196e800c3049d/src/RouterFlashFills.sol)
 
 **Inherits:** [IAsyncSwapCallback](/reference/src/interfaces/IAsyncSwapCallback)
 
@@ -345,10 +345,11 @@ function _output(AsyncOrder memory order) private pure returns (Currency);
   Checks the live order against the filler's bounds and returns the output owed: the live minimum, at most
   `maxPrice`, for a live input of at least `order.amountIn`. A missing order is left for the hook to reject.
   The flash path charges no pool fee, so the hook burns exactly the live minimum it returns.
+  A Dutch auction order is stepped first, so the filler pays the scheduled price, not an older one.
 </i>
 
 ```solidity
-function _checkFill(AsyncOrder memory order, uint256 maxPrice) private view returns (uint256 livePrice);
+function _checkFill(AsyncOrder memory order, uint256 maxPrice) private returns (uint256 livePrice);
 ```
 
 **Parameters**

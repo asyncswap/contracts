@@ -30,6 +30,7 @@ An MEV-capturing DEX built as a Uniswap v4 hook: an on-chain order book and matc
 - [AsyncMatching](/reference/src/libraries/AsyncMatching): Linked matching module operating on the hook's order and radix-book storage.
 - [ClaimTransfers](/reference/src/libraries/ClaimTransfers)
 - [CurrencySettler](/reference/src/libraries/CurrencySettler): Production copy of v4-core's test-only `CurrencySettler`, using safe transfers so tokens that return no data from `transfer` / `transferFrom` (e.g. USDT) settle correctly.
+- [DutchAuction](/reference/src/libraries/DutchAuction): Linked module for Dutch auction orders. The maker of a resting order sets a floor and a duration in blocks, and the order's minimum output then falls in a straight line from its price at start to the floor. Anyone may call `step` to write the scheduled minimum into the order, by the same reprice path a maker uses, so the book always holds a real price. The Router steps the order before every filler fill.
 - [DynamicFeeOrdering](/reference/src/libraries/DynamicFeeOrdering): Linked library called by `AsyncMatching` in the hook's context.
 - [EligiblePrice](/reference/src/libraries/EligiblePrice): Exact-price summaries on a priority-key radix tree.
 - [IncomingMatching](/reference/src/libraries/IncomingMatching): Fund a crossing arrival, match it in memory, then index only its remainder.

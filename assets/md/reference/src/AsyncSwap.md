@@ -1,6 +1,6 @@
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/245c06bce0aea780bf783eff9b5e05cd627266fc/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/8366a12e8620be597061ae730a5196e800c3049d/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -138,6 +138,16 @@ Unordered nonces consumed by signed maker actions (`setExecutorWithSig`, `update
 
 ```solidity
 mapping(address maker => mapping(uint256 nonce => bool)) public nonceUsed;
+```
+
+### auctions
+
+<i>
+  Running Dutch auctions by order id; see `DutchAuction`. Last, so earlier slots keep their places.
+</i>
+
+```solidity
+mapping(bytes32 orderId => DutchAuction.Auction) private auctions;
 ```
 
 ## Functions
@@ -778,6 +788,48 @@ function updatePrice(AsyncOrder calldata order, uint256 newAmountOutMin) externa
 | ---- | ---- | ----------- |
 | order | `AsyncOrder` |  |
 | newAmountOutMin | `uint256` |  |
+
+<a id="startauction-asyncorder-uint256-uint32" />
+
+### startAuction
+
+Maker starts a Dutch auction: the order's minimum output falls from its current value to
+`floorAmountOutMin` over `duration` blocks. Direct call from the maker.
+
+```solidity
+function startAuction(AsyncOrder calldata order, uint256 floorAmountOutMin, uint32 duration) external;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+| floorAmountOutMin | `uint256` |  |
+| duration | `uint32` |  |
+
+<a id="stepauction-asyncorder" />
+
+### stepAuction
+
+Write an auction order's scheduled minimum output into the book. Anyone may call it; it does nothing
+for an order with no running auction. Returns the order's minimum output after the step.
+
+```solidity
+function stepAuction(AsyncOrder calldata order) external returns (uint256);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| order | `AsyncOrder` |  |
+
+**Returns**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| \<none> | `uint256` |  |
 
 <a id="topuppriorityfee-asyncorder-uint256" />
 

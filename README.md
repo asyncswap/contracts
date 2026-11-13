@@ -71,6 +71,7 @@ every push to `main` that touches them; preview it locally with `cd site && bun 
 - [Protocol overview](docs/protocol.md): components, custody, order placement, authorization, and deployment.
 - [Order lifecycle and priority bids](docs/order-lifecycle.md): matching, fills, cancellation, and bid settlement.
 - [Priority-fee top-ups](docs/priority-fee-top-ups.md): maker authorization, funding, queue updates, and agent calls.
+- [Dutch auction orders](docs/dutch-auction.md): a minimum output that falls to a floor, steps, and fills.
 - [Contract call sequences](docs/contract-call-sequences.md): calls, callbacks, responses, and withdrawals.
 - [Price-key crossing](docs/price-key-crossing.md): price comparisons and rounding.
 - [Large-swap research series](https://x.com/asyncswap/article/2120701882377060839): three articles on large-swap costs, opposite-side flow, and Uniswap v4 hooks.

@@ -151,16 +151,16 @@ registry="$ROOT_DIR/deployments/$chain_id/$chain_id.json"
 # ---- verify mode ----------------------------------------------------------------------------
 if [[ "$mode" == "verify" ]]; then
   [[ -f "$registry" ]] || { echo "No registry at $registry; broadcast first." >&2; exit 1; }
-  read -r lib_addr hook_addr router_addr vault_addr tick_addr ordering_addr bitmap_addr eligible_addr topup_addr incoming_addr multiasset_addr <<< "$(python3 - "$registry" <<'PY'
+  read -r lib_addr hook_addr router_addr vault_addr tick_addr ordering_addr bitmap_addr eligible_addr topup_addr incoming_addr multiasset_addr dutch_addr <<< "$(python3 - "$registry" <<'PY'
 import json, sys
 c = json.load(open(sys.argv[1]))["contracts"]
 def a(n):
     e = c.get(n)
     return e["address"] if e else "-"
-print(a("AsyncMatching"), a("AsyncSwap"), a("Router"), a("FeeVault"), a("TickPrice"), a("DynamicFeeOrdering"), a("TickBitmap"), a("EligiblePrice"), a("PriorityFeeUpdates"), a("IncomingMatching"), a("MultiAsset"))
+print(a("AsyncMatching"), a("AsyncSwap"), a("Router"), a("FeeVault"), a("TickPrice"), a("DynamicFeeOrdering"), a("TickBitmap"), a("EligiblePrice"), a("PriorityFeeUpdates"), a("IncomingMatching"), a("MultiAsset"), a("DutchAuction"))
 PY
 )"
-  for pair in "AsyncMatching:$lib_addr" "AsyncSwap:$hook_addr" "Router:$router_addr" "FeeVault:$vault_addr" "TickPrice:$tick_addr" "DynamicFeeOrdering:$ordering_addr" "TickBitmap:$bitmap_addr" "EligiblePrice:$eligible_addr" "PriorityFeeUpdates:$topup_addr" "IncomingMatching:$incoming_addr" "MultiAsset:$multiasset_addr"; do
+  for pair in "AsyncMatching:$lib_addr" "AsyncSwap:$hook_addr" "Router:$router_addr" "FeeVault:$vault_addr" "TickPrice:$tick_addr" "DynamicFeeOrdering:$ordering_addr" "TickBitmap:$bitmap_addr" "EligiblePrice:$eligible_addr" "PriorityFeeUpdates:$topup_addr" "IncomingMatching:$incoming_addr" "MultiAsset:$multiasset_addr" "DutchAuction:$dutch_addr"; do
     [[ "${pair#*:}" != "-" ]] || { echo "Registry is missing ${pair%%:*}." >&2; exit 1; }
   done
   # Constructor arguments are read from the deployment transactions themselves, so verification uses
@@ -190,6 +190,7 @@ PY
   topup_flag="src/libraries/PriorityFeeUpdates.sol:PriorityFeeUpdates:$topup_addr"
   incoming_flag="src/libraries/IncomingMatching.sol:IncomingMatching:$incoming_addr"
   multiasset_flag="src/libraries/MultiAsset.sol:MultiAsset:$multiasset_addr"
+  dutch_flag="src/libraries/DutchAuction.sol:DutchAuction:$dutch_addr"
   out_dir="$ROOT_DIR/deployments/$chain_id/verify"
   mkdir -p "$out_dir"
 
@@ -197,10 +198,11 @@ PY
     local name="$1" addr="$2" target="$3" args="$4"
     local extra=()
     [[ -n "$args" ]] && extra+=(--constructor-args "$args")
-    [[ "$name" == "AsyncSwap" ]] && extra+=(--libraries "$incoming_flag" --libraries "$topup_flag" --libraries "$multiasset_flag" --libraries "$lib_flag" --libraries "$tick_flag" --libraries "$ordering_flag" --libraries "$bitmap_flag" --libraries "$eligible_flag")
+    [[ "$name" == "AsyncSwap" ]] && extra+=(--libraries "$incoming_flag" --libraries "$topup_flag" --libraries "$multiasset_flag" --libraries "$dutch_flag" --libraries "$lib_flag" --libraries "$tick_flag" --libraries "$ordering_flag" --libraries "$bitmap_flag" --libraries "$eligible_flag")
     [[ "$name" == "IncomingMatching" ]] && extra+=(--libraries "$lib_flag" --libraries "$tick_flag" --libraries "$bitmap_flag" --libraries "$eligible_flag" --libraries "$ordering_flag")
     [[ "$name" == "AsyncMatching" ]] && extra+=(--libraries "$tick_flag" --libraries "$ordering_flag" --libraries "$bitmap_flag" --libraries "$eligible_flag")
     [[ "$name" == "PriorityFeeUpdates" ]] && extra+=(--libraries "$eligible_flag")
+    [[ "$name" == "DutchAuction" ]] && extra+=(--libraries "$tick_flag" --libraries "$eligible_flag")
     echo "== $name @ $addr"
     forge verify-contract --chain "$chain_id" --verifier sourcify --watch ${extra[@]+"${extra[@]}"} "$addr" "$target" \
       || echo "   Sourcify verification failed for $name (see above)." >&2
@@ -216,6 +218,7 @@ PY
   verify_one EligiblePrice "$eligible_addr" src/libraries/EligiblePrice.sol:EligiblePrice ""
   verify_one PriorityFeeUpdates "$topup_addr" src/libraries/PriorityFeeUpdates.sol:PriorityFeeUpdates ""
   verify_one MultiAsset "$multiasset_addr" src/libraries/MultiAsset.sol:MultiAsset ""
+  verify_one DutchAuction "$dutch_addr" src/libraries/DutchAuction.sol:DutchAuction ""
   verify_one AsyncMatching "$lib_addr" src/libraries/AsyncMatching.sol:AsyncMatching ""
   verify_one IncomingMatching "$incoming_addr" src/libraries/IncomingMatching.sol:IncomingMatching ""
   verify_one AsyncSwap "$hook_addr" src/AsyncSwap.sol:AsyncSwap "$hook_args"
@@ -313,6 +316,23 @@ if ! has_code "$multiasset_addr"; then
   fi
 fi
 
+# ---- Dutch auction module (linked to TickPrice and EligiblePrice) ------------------------------
+dutch_links=(--libraries "$tick_flag" --libraries "$eligible_flag")
+dutch_init_code="$(forge inspect src/libraries/DutchAuction.sol:DutchAuction bytecode "${dutch_links[@]}")"
+dutch_salt="$(cast keccak "asyncswap.v2.DutchAuction")"
+dutch_addr="$(cast create2 --deployer "$CREATE2_DEPLOYER" --salt "$dutch_salt" --init-code-hash "$(cast keccak "$dutch_init_code")" | awk '/Address:/ {print $2} /^0x/ {print $1}' | tail -1)"
+dutch_flag="src/libraries/DutchAuction.sol:DutchAuction:$dutch_addr"
+if ! has_code "$dutch_addr"; then
+  if [[ "$mode" == "broadcast" ]]; then
+    : "${DEPLOYER_ACCOUNT:?Set DEPLOYER_ACCOUNT to a Foundry keystore in .env.deploy}"
+    DEPLOY_DRY_RUN=false forge script "$ROOT_DIR/script/00_DeployDutchAuction.s.sol" "${dutch_links[@]}" \
+      --rpc-url "$RPC_URL" --sender "$OWNER" --broadcast --account "$DEPLOYER_ACCOUNT" ${gas_flags[@]+"${gas_flags[@]}"}
+    wait_for_code "$dutch_addr" || { echo "DutchAuction deployment missing" >&2; exit 1; }
+  else
+    DEPLOY_DRY_RUN=true forge script "$ROOT_DIR/script/00_DeployDutchAuction.s.sol" "${dutch_links[@]}" --rpc-url "$RPC_URL" --sender "$OWNER"
+  fi
+fi
+
 # ---- AsyncMatching library ------------------------------------------------------------------
 # Deterministic address: CREATE2 via the shared deployer with the salt in 00_DeployMatchingLibrary.
 lib_init_code="$(forge inspect src/libraries/AsyncMatching.sol:AsyncMatching bytecode --libraries "$tick_flag" --libraries "$ordering_flag" --libraries "$bitmap_flag" --libraries "$eligible_flag")"
@@ -370,6 +390,7 @@ forge_args=(
   --libraries "$eligible_flag"
   --libraries "$topup_flag"
   --libraries "$multiasset_flag"
+  --libraries "$dutch_flag"
   --libraries "$incoming_flag"
 )
 if [[ "$mode" == "broadcast" ]]; then

@@ -1,6 +1,6 @@
 # DutchAuction
 
-[Git Source](https://github.com/asyncswap/contracts/blob/8366a12e8620be597061ae730a5196e800c3049d/src/libraries/DutchAuction.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/dcdaa4149b4a204d108b783b34566c480885aabc/src/libraries/DutchAuction.sol)
 
 **Title:** DutchAuction
 
@@ -123,7 +123,11 @@ function amountOutMinAt(Auction memory auction, uint256 blockNumber) internal pu
 
 ```solidity
 event AuctionStarted(
-        bytes32 indexed orderId, uint256 startAmountOutMin, uint256 floorAmountOutMin, uint64 startBlock, uint32 duration
+        bytes32 indexed orderId,
+        uint256 startAmountOutMin,
+        uint256 floorAmountOutMin,
+        uint64 startBlock,
+        uint32 duration
     );
 ```
 

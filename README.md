@@ -71,7 +71,7 @@ every push to `main` that touches them; preview it locally with `cd site && bun 
 - [Protocol overview](docs/protocol.md): the entry point. Components, custody, fees, authorization, and the module and library layout.
 - [Order lifecycle and priority bids](docs/order-lifecycle.md): create, match, reprice, cancel, and bid settlement.
 - [Flash fills and non-numeraire pools](docs/flash-fills.md): fills with no inventory, nested `fillOrderInCallback`, the per-fill MEV tax, and pools without USDC.
-- [Dutch auction orders](docs/dutch-auction.md): a minimum output that falls to a floor, steps, and fills.
+- [Dutch auction orders](docs/dutch-auction.md): a falling premium above the floor that flash fillers pay, with no keeper.
 - [Priority-fee top-ups](docs/priority-fee-top-ups.md): maker authorization, funding, queue updates, and agent calls.
 - [Contract call sequences](docs/contract-call-sequences.md): calls, callbacks, responses, and withdrawals.
 - [Price-key crossing](docs/price-key-crossing.md): price comparisons and rounding.

@@ -9,8 +9,9 @@ interface IAsyncSwapFlashFiller {
     /// @notice Called by the Router inside its PoolManager unlock, after the order was closed and its input,
     ///         less the 0.02% trade fee, credited to the filler as ERC-6909 claims (`amountIn` of the input
     ///         currency, id 0 for native ETH).
-    /// @dev Before returning, the filler must hold `amountOwed` claims of the order's output currency and allow
-    ///      the Router to transfer them (`PoolManager.approve(router, id, amountOwed)` or an operator grant). Inside
+    /// @dev `amountOwed` is the order's minimum output plus any live Dutch auction premium; the Router pays the minimum
+    ///      to the hook and the premium to the maker. Before returning, the filler must hold `amountOwed` claims of the
+    ///      order's output currency and allow the Router to transfer them (`PoolManager.approve(router, id, amountOwed)` or an operator grant). Inside
     ///      the callback it may swap on any v4 pool, `burn`/`mint`/`take`/`settle`, and fill other Async Swap orders
     ///      through `IAsyncSwapCallback.fillOrderInCallback` and `matchBookInCallback`. Every delta it opens must be zero
     ///      when the Router's unlock ends.

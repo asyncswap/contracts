@@ -18,6 +18,8 @@ interface IAsyncSwapCallback {
     function fillOrderWithCallback(AsyncOrder calldata order, uint256 maxPrice, bytes calldata data) external payable;
 
     /// @notice Inside the callback: fill another open order, paying its output and receiving its input as claims.
+    ///         The filler pays the order's minimum output plus any live Dutch auction premium (`auctionPremium` on the
+    ///         hook), and approves the Router for both; `maxPrice` bounds the total.
     function fillOrderInCallback(AsyncOrder calldata order, uint256 maxPrice) external;
 
     /// @notice Inside the callback: continue a crossed book.

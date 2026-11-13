@@ -41,6 +41,8 @@ contract RouterFlashFills is IAsyncSwapCallback {
     error NotFlashFiller();
 
     event MevTaxPaid(address indexed payer, uint256 amount);
+    /// @notice A flash filler paid `maker` a Dutch auction premium on top of the order's minimum output.
+    event AuctionPremiumPaid(address indexed maker, address indexed filler, uint256 amount);
 
     /// @notice The filler left `owed` of the MEV tax of its fills unpaid.
     error MevTaxUnpaid(uint256 owed);
@@ -63,18 +65,20 @@ contract RouterFlashFills is IAsyncSwapCallback {
         require(msg.sender == address(POOLMANAGER), "Caller is not PoolManager");
         (, AsyncOrder memory order, address filler, uint256 maxPrice, bytes memory fillerData, uint256 prepaid) =
             abi.decode(data, (uint8, AsyncOrder, address, uint256, bytes, uint256));
-        _checkFill(order, maxPrice);
+        (, uint256 premium) = _checkFill(order, maxPrice);
         _chargeMevTax(filler);
         (uint256 amountIn, uint256 amountOwed) = _hookCall(BEGIN, order, filler);
         assembly ("memory-safe") {
             tstore(FLASH_FILLER_LOCATION, filler)
         }
-        IAsyncSwapFlashFiller(filler).asyncSwapFlashFill(order, amountIn, amountOwed, fillerData);
+        // The filler owes the order's minimum plus any live auction premium, and approves the Router for both.
+        IAsyncSwapFlashFiller(filler).asyncSwapFlashFill(order, amountIn, amountOwed + premium, fillerData);
         assembly ("memory-safe") {
             tstore(FLASH_FILLER_LOCATION, 0)
         }
         // The maker check is on what the filler holds at the end, whatever route it took.
         POOLMANAGER.transferFrom(filler, address(HOOK), _output(order).toId(), amountOwed);
+        _payPremium(filler, order, premium);
         _hookCall(SETTLE, order, filler);
         _settleMevTax(filler, prepaid);
         return "";
@@ -83,9 +87,10 @@ contract RouterFlashFills is IAsyncSwapCallback {
     /// @inheritdoc IAsyncSwapCallback
     function fillOrderInCallback(AsyncOrder calldata order, uint256 maxPrice) external {
         _onlyFlashFiller();
-        uint256 owed = _checkFill(order, maxPrice);
+        (uint256 owed, uint256 premium) = _checkFill(order, maxPrice);
         _chargeMevTax(msg.sender);
         POOLMANAGER.transferFrom(msg.sender, address(HOOK), _output(order).toId(), owed);
+        _payPremium(msg.sender, order, premium);
         _hookCall(FILL, order, msg.sender);
     }
 
@@ -131,6 +136,17 @@ contract RouterFlashFills is IAsyncSwapCallback {
         if (delta > 0) POOLMANAGER.take(CurrencyLibrary.ADDRESS_ZERO, filler, uint256(delta));
     }
 
+    /// @dev Pays the maker a Dutch auction premium in tokens: the filler's output claims are burnt and the same amount
+    ///      taken to the maker, so the Router's delta nets to zero.
+    function _payPremium(address filler, AsyncOrder memory order, uint256 premium) private {
+        if (premium == 0) return;
+        Currency output = _output(order);
+        POOLMANAGER.transferFrom(filler, address(this), output.toId(), premium);
+        POOLMANAGER.burn(address(this), output.toId(), premium);
+        POOLMANAGER.take(output, order.owner, premium);
+        emit AuctionPremiumPaid(order.owner, filler, premium);
+    }
+
     function _hookCall(uint8 op, AsyncOrder memory order, address filler) private returns (uint256, uint256) {
         return HOOK.flashFill(abi.encode(op, order, filler));
     }
@@ -149,16 +165,21 @@ contract RouterFlashFills is IAsyncSwapCallback {
         return order.zeroForOne ? order.key.currency1 : order.key.currency0;
     }
 
-    /// @dev Checks the live order against the filler's bounds and returns the output owed: the live minimum, at most
-    ///      `maxPrice`, for a live input of at least `order.amountIn`. A missing order is left for the hook to reject.
-    ///      The flash path charges no pool fee, so the hook burns exactly the live minimum it returns.
-    ///      A Dutch auction order is stepped first, so the filler pays the scheduled price, not an older one.
-    function _checkFill(AsyncOrder memory order, uint256 maxPrice) private returns (uint256 livePrice) {
-        HOOK.stepAuction(order);
+    /// @dev Checks the live order against the filler's bounds and returns the output owed to the hook (the live
+    ///      minimum) and the live Dutch auction premium owed to the maker. Their sum is at most `maxPrice`, for a live
+    ///      input of at least `order.amountIn`. A missing order is left for the hook to reject. Read before the hook
+    ///      closes the order, which ends the premium. The flash path charges no pool fee, so the hook burns exactly the
+    ///      live minimum it returns.
+    function _checkFill(AsyncOrder memory order, uint256 maxPrice)
+        private
+        view
+        returns (uint256 livePrice, uint256 premium)
+    {
         bytes32 id = keccak256(abi.encode(block.chainid, order.key.toId(), order.owner, order.zeroForOne, order.salt));
         uint256 liveAmountIn;
         (liveAmountIn, livePrice) = HOOK.asyncOrderInfo(order.key.toId(), id);
+        premium = HOOK.auctionPremium(order);
         require(liveAmountIn == 0 || liveAmountIn >= order.amountIn, "Input below order.amountIn");
-        require(livePrice <= maxPrice, "Price exceeds maxPrice");
+        require(livePrice + premium <= maxPrice, "Price exceeds maxPrice");
     }
 }

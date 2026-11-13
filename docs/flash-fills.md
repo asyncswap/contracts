@@ -37,20 +37,20 @@ sequenceDiagram
     F->>R: fillOrderWithCallback(order, maxPrice, data)
     R->>PM: unlock(FlashFill)
     PM->>R: unlockCallback, forwarded to RouterFlashFills
-    R->>H: stepAuction(order), then asyncOrderInfo
-    Note over R: live minimum within maxPrice,<br/>live input at least order.amountIn
+    R->>H: asyncOrderInfo and auctionPremium
+    Note over R: live minimum + premium within maxPrice,<br/>live input at least order.amountIn
     R->>PM: mint MEV tax to FeeVault (Router now owes ETH)
     R->>H: flashFill(op 0 begin)
     H->>MA: run: close the order, settle its bid,<br/>credit input less 0.02% to the filler as claims
     R->>R: tstore filler slot
-    R->>F: asyncSwapFlashFill(order, amountIn, amountOwed, data)
+    R->>F: asyncSwapFlashFill(order, amountIn, amountOwed + premium, data)
     rect rgba(128, 128, 128, 0.12)
         Note over F,V4: _route: any mix, any order
         F->>PM: burn claims, swap, take, settle, mint
         PM->>V4: swap
         loop Nested fills
             F->>R: fillOrderInCallback(other, maxPrice)
-            R->>H: stepAuction, asyncOrderInfo, check maxPrice
+            R->>H: asyncOrderInfo, auctionPremium, check maxPrice
             R->>PM: mint MEV tax to FeeVault (Router owes more)
             R->>PM: transferFrom(filler, hook, other's output claims)
             R->>H: flashFill(op 2 fill)
@@ -119,7 +119,7 @@ that. `withdraw` returns surplus ETH and claims to the owner.
 | Only the active filler may use the in-callback entry points. | `onlyFlashFiller` reads the transient filler slot, cleared before the output is collected. |
 | The maker check is on the final amount only. | The owed output is pulled once, after the callback. |
 | Resting orders filled inside a flash fill are never worse off. | `fillOrderInCallback` applies the same live minimum, `maxPrice`, `order.amountIn` bound and 0.02% fees as `fillOrder`. |
-| Dutch auction orders fill at the scheduled price. | Both entry points call `stepAuction` before reading the price. |
+| Dutch auction makers get their premium. | Both entry points read `auctionPremium` before the hook closes the order, bound floor + premium by `maxPrice`, and pay the premium to the maker in tokens. Plain fills revert `AuctionRunning` while it is live. |
 | Only the Router drives the hook side. | `flashFill` reverts `NotTrustedRouter` for any other caller and checks the maker's executor grant. Op 1 only settles the order op 0 opened in the same transaction (transient record in the hook). |
 
 ## Non-numeraire pools

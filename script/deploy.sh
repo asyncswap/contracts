@@ -202,7 +202,6 @@ PY
     [[ "$name" == "IncomingMatching" ]] && extra+=(--libraries "$lib_flag" --libraries "$tick_flag" --libraries "$bitmap_flag" --libraries "$eligible_flag" --libraries "$ordering_flag")
     [[ "$name" == "AsyncMatching" ]] && extra+=(--libraries "$tick_flag" --libraries "$ordering_flag" --libraries "$bitmap_flag" --libraries "$eligible_flag")
     [[ "$name" == "PriorityFeeUpdates" ]] && extra+=(--libraries "$eligible_flag")
-    [[ "$name" == "DutchAuction" ]] && extra+=(--libraries "$tick_flag" --libraries "$eligible_flag")
     echo "== $name @ $addr"
     forge verify-contract --chain "$chain_id" --verifier sourcify --watch ${extra[@]+"${extra[@]}"} "$addr" "$target" \
       || echo "   Sourcify verification failed for $name (see above)." >&2
@@ -316,20 +315,19 @@ if ! has_code "$multiasset_addr"; then
   fi
 fi
 
-# ---- Dutch auction module (linked to TickPrice and EligiblePrice) ------------------------------
-dutch_links=(--libraries "$tick_flag" --libraries "$eligible_flag")
-dutch_init_code="$(forge inspect src/libraries/DutchAuction.sol:DutchAuction bytecode "${dutch_links[@]}")"
+# ---- Dutch auction module (no linked libraries) -----------------------------------------------
+dutch_init_code="$(forge inspect src/libraries/DutchAuction.sol:DutchAuction bytecode)"
 dutch_salt="$(cast keccak "asyncswap.v2.DutchAuction")"
 dutch_addr="$(cast create2 --deployer "$CREATE2_DEPLOYER" --salt "$dutch_salt" --init-code-hash "$(cast keccak "$dutch_init_code")" | awk '/Address:/ {print $2} /^0x/ {print $1}' | tail -1)"
 dutch_flag="src/libraries/DutchAuction.sol:DutchAuction:$dutch_addr"
 if ! has_code "$dutch_addr"; then
   if [[ "$mode" == "broadcast" ]]; then
     : "${DEPLOYER_ACCOUNT:?Set DEPLOYER_ACCOUNT to a Foundry keystore in .env.deploy}"
-    DEPLOY_DRY_RUN=false forge script "$ROOT_DIR/script/00_DeployDutchAuction.s.sol" "${dutch_links[@]}" \
+    DEPLOY_DRY_RUN=false forge script "$ROOT_DIR/script/00_DeployDutchAuction.s.sol" \
       --rpc-url "$RPC_URL" --sender "$OWNER" --broadcast --account "$DEPLOYER_ACCOUNT" ${gas_flags[@]+"${gas_flags[@]}"}
     wait_for_code "$dutch_addr" || { echo "DutchAuction deployment missing" >&2; exit 1; }
   else
-    DEPLOY_DRY_RUN=true forge script "$ROOT_DIR/script/00_DeployDutchAuction.s.sol" "${dutch_links[@]}" --rpc-url "$RPC_URL" --sender "$OWNER"
+    DEPLOY_DRY_RUN=true forge script "$ROOT_DIR/script/00_DeployDutchAuction.s.sol" --rpc-url "$RPC_URL" --sender "$OWNER"
   fi
 fi
 

@@ -3,30 +3,28 @@ pragma solidity 0.8.26;
 
 import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 import {AsyncOrder} from "@async-swap/types/AsyncOrder.sol";
-import {PoolIdLibrary, PoolKey} from "v4-core/types/PoolKey.sol";
 
 /// @title DutchAuction
 /// @author @msakiart
-/// @notice Linked module for Dutch auction orders. The maker of a resting order sets a floor and a duration in blocks,
-///         and the order's minimum output then falls in a straight line from its price at start to the floor. Anyone
-///         may call `step` to write the scheduled minimum into the order, by the same reprice path a maker uses, so
-///         the book always holds a real price. The Router steps the order before every filler fill.
-/// @dev Between steps the stored minimum is at or above the schedule, so the maker never receives less than the
-///      schedule gives. A maker reprice stops the auction: `step` sees a reprice count it did not write.
-///      Public library calls use DELEGATECALL, so the auctions and books stay in the hook.
+/// @notice Linked module for Dutch auction orders. The order rests in the book at the maker's minimum output (the
+///         floor) the whole time. An auction adds a premium on top that only flash fillers pay: it starts at
+///         `startAmountOutMin - floor` and falls in a straight line to zero over `duration` blocks. After that the order
+///         is a plain good-till-cancelled order at the floor, with nothing to step and no keeper.
+/// @dev Book matches and pool fills during an auction pay the floor, the maker's own limit. Plain filler fills are
+///      refused while a premium is live (`requireNoPremium`), so a filler cannot skip it. A maker reprice or a partial
+///      match ends the premium: `premium` sees a reprice count or a minimum it did not record.
+///      Public library calls use DELEGATECALL, so the auctions stay in the hook.
 library DutchAuction {
-    using AsyncFiller for AsyncFiller.State;
-    using PoolIdLibrary for PoolKey;
-
     /// @notice Longest auction, in blocks.
     uint32 internal constant MAX_DURATION = 50_000;
 
     struct Auction {
         uint256 startAmountOutMin;
+        /// @dev The order's minimum output when the auction started. The premium is measured above it.
         uint256 floorAmountOutMin;
         uint64 startBlock;
         uint32 duration;
-        /// @dev The order's reprice count after the last write by this auction.
+        /// @dev The order's reprice count when the auction started.
         uint32 reprices;
     }
 
@@ -39,66 +37,62 @@ library DutchAuction {
     );
 
     error InvalidAuction();
+    /// @notice A plain fill was tried while the order's auction premium is live. Fill it with a flash fill, which pays
+    ///         the premium, or after the auction.
+    error AuctionRunning(uint256 premium);
 
-    /// @notice Start an auction on a resting order. Maker only. The order's current minimum is the start price.
+    /// @notice Start an auction on a resting order. Maker only. The order's current minimum output is the floor, and
+    ///         `startAmountOutMin` (above it) is what a flash filler pays at the start block.
     function start(
         AsyncFiller.State storage self,
-        AsyncFiller.Book storage book,
         mapping(bytes32 => Auction) storage auctions,
         AsyncOrder calldata order,
         bytes32 id,
-        uint256 floorAmountOutMin,
+        uint256 startAmountOutMin,
         uint32 duration,
         address caller
     ) public {
         if (caller != order.owner) revert AsyncFiller.NotOrderOwner();
         AsyncFiller.OrderInfo storage info = self.orders[id];
         if (info.amountIn == 0) revert AsyncFiller.OrderNotFound();
-        if (
-            duration == 0 || duration > MAX_DURATION || floorAmountOutMin == 0 || floorAmountOutMin >= info.amountOutMin
-        ) revert InvalidAuction();
-        AsyncFiller.checkMinimum(book, info.isBuy, info.amountIn, floorAmountOutMin);
+        uint256 floor = info.amountOutMin;
+        if (duration == 0 || duration > MAX_DURATION || startAmountOutMin <= floor) revert InvalidAuction();
         auctions[id] = Auction({
-            startAmountOutMin: info.amountOutMin,
-            floorAmountOutMin: floorAmountOutMin,
+            startAmountOutMin: startAmountOutMin,
+            floorAmountOutMin: floor,
             startBlock: uint64(block.number),
             duration: duration,
             reprices: info.reprices
         });
-        emit AuctionStarted(id, info.amountOutMin, floorAmountOutMin, uint64(block.number), duration);
+        emit AuctionStarted(id, startAmountOutMin, floor, uint64(block.number), duration);
     }
 
-    /// @notice Write the scheduled minimum into the order when it is below the stored one. Anyone may call it.
-    ///         Does nothing for an order with no running auction. Returns the order's minimum output after the step.
-    function step(
-        AsyncFiller.State storage self,
-        AsyncFiller.Book storage book,
-        mapping(bytes32 => Auction) storage auctions,
-        AsyncOrder calldata order,
-        bytes32 id
-    ) public returns (uint256) {
+    /// @notice The auction premium a flash filler pays on top of the order's minimum output now. Zero for an order with
+    ///         no auction, after the duration, or once the maker repriced or the order was partly matched.
+    function premium(AsyncFiller.State storage self, mapping(bytes32 => Auction) storage auctions, bytes32 id)
+        public
+        view
+        returns (uint256)
+    {
         Auction storage auction = auctions[id];
+        uint256 duration = auction.duration;
+        if (duration == 0) return 0;
+        uint256 elapsed = block.number - auction.startBlock;
+        if (elapsed >= duration) return 0;
         AsyncFiller.OrderInfo storage info = self.orders[id];
-        uint256 stored = info.amountOutMin;
-        if (auction.duration == 0) return stored;
-        if (info.amountIn == 0 || info.reprices != auction.reprices) {
-            delete auctions[id];
-            return stored;
-        }
-        uint256 scheduled = amountOutMinAt(auction, block.number);
-        if (scheduled < stored) {
-            self.updatePrice(book, order, id, scheduled, order.owner);
-            auction.reprices = info.reprices;
-        }
-        if (block.number >= auction.startBlock + auction.duration) delete auctions[id];
-        return info.amountOutMin;
+        uint256 floor = auction.floorAmountOutMin;
+        if (info.amountIn == 0 || info.reprices != auction.reprices || info.amountOutMin != floor) return 0;
+        uint256 range = auction.startAmountOutMin - floor;
+        // The schedule rounds in the maker's favour: the premium falls by whole steps, rounded down.
+        return range - range * elapsed / duration;
     }
 
-    /// @notice The scheduled minimum output at `blockNumber`, rounded up for the maker.
-    function amountOutMinAt(Auction memory auction, uint256 blockNumber) internal pure returns (uint256) {
-        uint256 elapsed = blockNumber - auction.startBlock;
-        if (elapsed >= auction.duration) return auction.floorAmountOutMin;
-        uint256 drop = (auction.startAmountOutMin - auction.floorAmountOutMin) * elapsed / auction.duration;
-        return auction.startAmountOutMin - drop;
+    /// @notice Revert while the order's premium is live, so plain fills cannot skip it.
+    function requireNoPremium(AsyncFiller.State storage self, mapping(bytes32 => Auction) storage auctions, bytes32 id)
+        public
+        view
+    {
+        uint256 live = premium(self, auctions, id);
+        if (live != 0) revert AuctionRunning(live);
     }
 }

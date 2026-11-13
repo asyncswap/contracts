@@ -6,7 +6,7 @@ import {DutchAuction} from "@async-swap/libraries/DutchAuction.sol";
 import {console} from "forge-std/Script.sol";
 
 /// @notice Deploys the external `DutchAuction` library through the deterministic CREATE2 deployer
-///         (linked to TickPrice and EligiblePrice) so its address is the same on every chain and known before any transaction is sent.
+///         (no linked libraries) so its address is the same on every chain and known before any transaction is sent.
 ///         The hook's creation code links against this address, so it must exist before
 ///         `01_DeployHook` mines the hook salt.
 /// @dev    Idempotent: if code already exists at the predicted address the script only records it.

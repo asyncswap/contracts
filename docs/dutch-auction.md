@@ -1,55 +1,44 @@
 # Dutch auction orders
 
-A maker can turn a resting order into a Dutch auction. The order's minimum output starts at its current value and
-falls in a straight line to a floor over a number of blocks. Fillers fill it as soon as the price works for them,
-so the maker gets a price found by competition rather than a fixed quote. The logic lives in the linked
-`DutchAuction` library; the auction record is stored in the hook by order id.
+A maker can open a resting order with a short Dutch auction. The order rests in the book at the maker's minimum
+output, the **floor**, the whole time. On top of it, flash fillers pay a **premium** that starts high and falls in a
+straight line to zero. Fillers fill as soon as the total works for them, so the maker gets the best price they
+compete for. When the auction ends the premium is zero and the order is a plain good-till-cancelled order at the
+floor. Nothing has to be stepped, and no keeper is needed. The logic lives in the linked `DutchAuction` library; the
+auction record is stored in the hook by order id.
 
 ## Start an auction
 
-Place the order as usual, at the price you would like to get. Then call the hook directly:
+Place the order at the amount you want to receive. Then call the hook directly:
 
 ```solidity
-hook.startAuction(order, floorAmountOutMin, duration);
+hook.startAuction(order, startAmountOutMin, duration);
 ```
 
 - Only the maker can start an auction.
-- `floorAmountOutMin` is the least output you accept. It must be above zero, below the order's current minimum,
-  and meet the pool's order minimums.
-- `duration` is in blocks, from 1 to `DutchAuction.MAX_DURATION` (50,000).
+- The order's current minimum output is the floor. `startAmountOutMin` must be above it: it is what a flash filler
+  pays in the start block. The app starts 1% above the floor.
+- `duration` is in blocks, from 1 to `DutchAuction.MAX_DURATION` (50,000). The app defaults to 60 seconds.
 - The hook emits `AuctionStarted(orderId, start, floor, startBlock, duration)`.
 
-The scheduled minimum at block `b` is:
+The premium at block `b` is:
 
 ```
-start - (start - floor) * (b - startBlock) / duration
+(start - floor) - (start - floor) * (b - startBlock) / duration
 ```
 
-It rounds in the maker's favour and stays at the floor once the duration ends.
-
-## Steps
-
-`hook.stepAuction(order)` writes the scheduled minimum into the order through the normal reprice path, so the book
-always holds a real price. Anyone can call it, untaxed. It does nothing for an order with no running auction, and
-returns the order's minimum output after the step.
+It rounds in the maker's favour and is zero once the duration ends. Read it with `hook.auctionPremium(order)`.
 
 ```mermaid
 flowchart TD
-    S["stepAuction(order)"] --> A{"Running auction?"}
-    A -- "No" --> R["Return the stored minimum"]
-    A -- "Yes" --> B{"Order still open and<br/>reprice count unchanged?"}
-    B -- "No: closed or maker repriced" --> D["Delete the auction"] --> R
-    B -- "Yes" --> C{"Scheduled minimum<br/>below the stored one?"}
-    C -- "Yes" --> U["updatePrice to the schedule<br/>AsyncOrderPriceUpdated, fresh time priority"]
-    C -- "No" --> E
-    U --> E{"Duration over?"}
-    E -- "Yes" --> D2["Delete the auction;<br/>order rests at the floor"] --> R
-    E -- "No" --> R
+    P["auctionPremium(order)"] --> A{"Auction recorded?"}
+    A -- "No" --> Z["0"]
+    A -- "Yes" --> D{"Within the duration?"}
+    D -- "No" --> Z
+    D -- "Yes" --> O{"Order open, reprice count and<br/>minimum unchanged since the start?"}
+    O -- "No: closed, repriced or partly matched" --> Z
+    O -- "Yes" --> S["start - floor, falling to 0"]
 ```
-
-Between steps the stored minimum is at or above the schedule, so a match or fill never pays the maker less than
-the schedule gives. Each step is a reprice: it gives the order fresh time priority and increments its reprice
-count, which also voids any reprice the maker signed earlier.
 
 ## Fills
 
@@ -59,30 +48,39 @@ sequenceDiagram
     actor Filler
     participant R as Router
     participant H as AsyncSwap hook
-    participant DA as DutchAuction
+    participant M as Maker
 
     alt Flash fill (fillOrderWithCallback, fillOrderInCallback)
         Filler->>R: fill with maxPrice
-        R->>H: stepAuction(order)
-        H->>DA: step: write the scheduled minimum
-        R->>H: asyncOrderInfo: live minimum within maxPrice
-        Note over R,H: filler pays the scheduled price, no extra call
+        R->>H: asyncOrderInfo and auctionPremium
+        Note over R: floor + premium within maxPrice
+        R->>Filler: asyncSwapFlashFill(..., amountOwed = floor + premium)
+        R->>H: floor, as today; the hook pays the maker less 0.02%
+        R->>M: premium in tokens (claims burnt, then taken)
     else Plain fill (Router.fillOrder)
-        Filler->>H: stepAuction(order), from the filler contract
-        Filler->>R: fillOrder(order, maxPrice), same transaction
+        Filler->>R: fillOrder(order, maxPrice)
+        R->>H: executeOrder
+        H-->>Filler: reverts AuctionRunning(premium) until the auction ends
     else Book match or pool fill
-        Filler->>H: stepAuction(order)
         Filler->>R: matchBook or fillFromPoolLiquidity
-        Note over Filler,R: send both from one contract to keep them in one transaction
+        Note over R,H: pays the floor, the maker's own limit
     end
 ```
 
-Book matches and pool fills use the stored price, so a step is what lets the book see the newer price. `maxPrice`
-still binds every filler fill.
+- **Flash fills pay floor plus premium.** The Router reads the premium before the hook closes the order. The filler's
+  callback is asked for `amountOwed` = floor + premium and approves the Router for that total. The floor goes to the
+  hook as for any flash fill; the premium goes straight to the maker in tokens, with no trade fee on it. `maxPrice`
+  bounds the total. The Router emits `AuctionPremiumPaid(maker, filler, amount)`.
+- **Plain fills wait.** `executeOrder` reverts `AuctionRunning(premium)` while a premium is live, so a filler cannot
+  skip it by using `fillOrder`.
+- **Book matches and pool fills pay the floor.** A crossing order placed in the book during the auction matches at
+  the maker's floor. The maker still gets at least what they asked for; the premium is a bonus fillers compete for,
+  not a guarantee.
 
 ## Stop or change an auction
 
 - Cancel the order as usual.
-- Or reprice it with `updatePrice` or a signed reprice. A maker reprice stops the auction, and the order then
-  rests at the maker's new price.
-- Calling `startAuction` again replaces the running schedule, starting from the order's current minimum.
+- Or reprice it with `updatePrice` or a signed reprice. A maker reprice ends the premium, and the order rests at the
+  new price.
+- A partial book match also ends the premium, since the minimum it was measured against changed.
+- Calling `startAuction` again replaces the running auction, measured from the order's current minimum.

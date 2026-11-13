@@ -402,6 +402,8 @@ contract AsyncSwap is BaseHook, EIP712 {
             }
         }
         AsyncFiller.State storage state = asyncOrders[order.key.toId()];
+        // A plain fill cannot skip a live auction premium; flash fills pay it through the Router.
+        DutchAuction.requireNoPremium(state, auctions, id);
         uint256 fee = calculatePoolFee(order.key.fee, state.orders[id].amountOutMin);
         AsyncMatching.fill(
             state,
@@ -506,27 +508,17 @@ contract AsyncSwap is BaseHook, EIP712 {
         );
     }
 
-    /// @notice Maker starts a Dutch auction: the order's minimum output falls from its current value to
-    ///         `floorAmountOutMin` over `duration` blocks. Direct call from the maker.
-    function startAuction(AsyncOrder calldata order, uint256 floorAmountOutMin, uint32 duration) external {
-        PoolId poolId = order.key.toId();
+    /// @notice Maker starts a Dutch auction. The order stays at its minimum output (the floor); flash fillers pay a
+    ///         premium that starts at `startAmountOutMin - floor` and falls to zero over `duration` blocks.
+    function startAuction(AsyncOrder calldata order, uint256 startAmountOutMin, uint32 duration) external {
         DutchAuction.start(
-            asyncOrders[poolId],
-            priceBooks[poolId],
-            auctions,
-            order,
-            order.orderId(),
-            floorAmountOutMin,
-            duration,
-            msg.sender
+            asyncOrders[order.key.toId()], auctions, order, order.orderId(), startAmountOutMin, duration, msg.sender
         );
     }
 
-    /// @notice Write an auction order's scheduled minimum output into the book. Anyone may call it; it does nothing
-    ///         for an order with no running auction. Returns the order's minimum output after the step.
-    function stepAuction(AsyncOrder calldata order) external returns (uint256) {
-        PoolId poolId = order.key.toId();
-        return DutchAuction.step(asyncOrders[poolId], priceBooks[poolId], auctions, order, order.orderId());
+    /// @notice The auction premium a flash filler pays on top of the order's minimum output now; zero for none.
+    function auctionPremium(AsyncOrder calldata order) external view returns (uint256) {
+        return DutchAuction.premium(asyncOrders[order.key.toId()], auctions, order.orderId());
     }
 
     event AsyncOrderPriorityFeeUpdated(

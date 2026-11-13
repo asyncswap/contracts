@@ -1,20 +1,21 @@
 # DutchAuction
 
-[Git Source](https://github.com/asyncswap/contracts/blob/db503f7f95d5ccf59d6e7fcbb0e4507dab24c838/src/libraries/DutchAuction.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6aa19f681f6dcda07dbe32d621088bdd4be8da99/src/libraries/DutchAuction.sol)
 
 **Title:** DutchAuction
 
 **Author:** @msakiart
 
-Linked module for Dutch auction orders. The maker of a resting order sets a floor and a duration in blocks,
-and the order's minimum output then falls in a straight line from its price at start to the floor. Anyone
-may call `step` to write the scheduled minimum into the order, by the same reprice path a maker uses, so
-the book always holds a real price. The Router steps the order before every filler fill.
+Linked module for Dutch auction orders. The order rests in the book at the maker's minimum output (the
+floor) the whole time. An auction adds a premium on top that only flash fillers pay: it starts at
+`startAmountOutMin - floor` and falls in a straight line to zero over `duration` blocks. After that the order
+is a plain good-till-cancelled order at the floor, with nothing to step and no keeper.
 
 <i>
-  Between steps the stored minimum is at or above the schedule, so the maker never receives less than the
-  schedule gives. A maker reprice stops the auction: `step` sees a reprice count it did not write.
-  Public library calls use DELEGATECALL, so the auctions and books stay in the hook.
+  Book matches and pool fills during an auction pay the floor, the maker's own limit. Plain filler fills are
+  refused while a premium is live (`requireNoPremium`), so a filler cannot skip it. A maker reprice or a partial
+  match ends the premium: `premium` sees a reprice count or a minimum it did not record.
+  Public library calls use DELEGATECALL, so the auctions stay in the hook.
 </i>
 
 ## Constants
@@ -29,20 +30,20 @@ uint32 internal constant MAX_DURATION = 50_000;
 
 ## Functions
 
-<a id="start-asyncfiller-state-asyncfiller-book-mapping-bytes32-auction-asyncorder-bytes32-uint256-uint32-address" />
+<a id="start-asyncfiller-state-mapping-bytes32-auction-asyncorder-bytes32-uint256-uint32-address" />
 
 ### start
 
-Start an auction on a resting order. Maker only. The order's current minimum is the start price.
+Start an auction on a resting order. Maker only. The order's current minimum output is the floor, and
+`startAmountOutMin` (above it) is what a flash filler pays at the start block.
 
 ```solidity
 function start(
         AsyncFiller.State storage self,
-        AsyncFiller.Book storage book,
         mapping(bytes32 => Auction) storage auctions,
         AsyncOrder calldata order,
         bytes32 id,
-        uint256 floorAmountOutMin,
+        uint256 startAmountOutMin,
         uint32 duration,
         address caller
     ) public;
@@ -53,29 +54,25 @@ function start(
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | self | `AsyncFiller.State` |  |
-| book | `AsyncFiller.Book` |  |
 | auctions | `mapping(bytes32 => Auction)` |  |
 | order | `AsyncOrder` |  |
 | id | `bytes32` |  |
-| floorAmountOutMin | `uint256` |  |
+| startAmountOutMin | `uint256` |  |
 | duration | `uint32` |  |
 | caller | `address` |  |
 
-<a id="step-asyncfiller-state-asyncfiller-book-mapping-bytes32-auction-asyncorder-bytes32" />
+<a id="premium-asyncfiller-state-mapping-bytes32-auction-bytes32" />
 
-### step
+### premium
 
-Write the scheduled minimum into the order when it is below the stored one. Anyone may call it.
-Does nothing for an order with no running auction. Returns the order's minimum output after the step.
+The auction premium a flash filler pays on top of the order's minimum output now. Zero for an order with
+no auction, after the duration, or once the maker repriced or the order was partly matched.
 
 ```solidity
-function step(
-        AsyncFiller.State storage self,
-        AsyncFiller.Book storage book,
-        mapping(bytes32 => Auction) storage auctions,
-        AsyncOrder calldata order,
-        bytes32 id
-    ) public returns (uint256);
+function premium(AsyncFiller.State storage self, mapping(bytes32 => Auction) storage auctions, bytes32 id)
+        public
+        view
+        returns (uint256);
 ```
 
 **Parameters**
@@ -83,9 +80,7 @@ function step(
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | self | `AsyncFiller.State` |  |
-| book | `AsyncFiller.Book` |  |
 | auctions | `mapping(bytes32 => Auction)` |  |
-| order | `AsyncOrder` |  |
 | id | `bytes32` |  |
 
 **Returns**
@@ -94,28 +89,25 @@ function step(
 | ---- | ---- | ----------- |
 | \<none> | `uint256` |  |
 
-<a id="amountoutminat-auction-uint256" />
+<a id="requirenopremium-asyncfiller-state-mapping-bytes32-auction-bytes32" />
 
-### amountOutMinAt
+### requireNoPremium
 
-The scheduled minimum output at `blockNumber`, rounded up for the maker.
+Revert while the order's premium is live, so plain fills cannot skip it.
 
 ```solidity
-function amountOutMinAt(Auction memory auction, uint256 blockNumber) internal pure returns (uint256);
+function requireNoPremium(AsyncFiller.State storage self, mapping(bytes32 => Auction) storage auctions, bytes32 id)
+        public
+        view;
 ```
 
 **Parameters**
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| auction | `Auction` |  |
-| blockNumber | `uint256` |  |
-
-**Returns**
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| \<none> | `uint256` |  |
+| self | `AsyncFiller.State` |  |
+| auctions | `mapping(bytes32 => Auction)` |  |
+| id | `bytes32` |  |
 
 ## Events
 
@@ -149,6 +141,21 @@ event AuctionStarted(
 error InvalidAuction();
 ```
 
+### AuctionRunning
+
+A plain fill was tried while the order's auction premium is live. Fill it with a flash fill, which pays
+the premium, or after the auction.
+
+```solidity
+error AuctionRunning(uint256 premium);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| premium | `uint256` |  |
+
 ## Structs
 
 ### Auction
@@ -156,10 +163,11 @@ error InvalidAuction();
 ```solidity
 struct Auction {
         uint256 startAmountOutMin;
+        /// @dev The order's minimum output when the auction started. The premium is measured above it.
         uint256 floorAmountOutMin;
         uint64 startBlock;
         uint32 duration;
-        /// @dev The order's reprice count after the last write by this auction.
+        /// @dev The order's reprice count when the auction started.
         uint32 reprices;
     }
 ```

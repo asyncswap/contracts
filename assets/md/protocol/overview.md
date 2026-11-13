@@ -30,7 +30,7 @@ flowchart LR
         Maker["Maker"]
         Relayer["Relayer<br/>(signed orders, cancels)"]
         Filler["Filler<br/>(EOA or flash-filler contract)"]
-        Anyone["Anyone<br/>(matchBook, fillFromPoolLiquidity,<br/>stepAuction, pool setup)"]
+        Anyone["Anyone<br/>(matchBook, fillFromPoolLiquidity,<br/>pool setup)"]
         LP["v4 LP"]
         Owner["Protocol owner"]
     end
@@ -45,7 +45,7 @@ flowchart LR
 
     subgraph Core
         PM["Uniswap v4 PoolManager<br/>unlock · swap · ERC-6909 claims"]
-        Hook["AsyncSwap hook<br/>beforeInitialize · beforeSwap · beforeAddLiquidity<br/>matchNewOrder · executeOrder · flashFill<br/>updatePrice(WithSig) · startAuction · stepAuction<br/>cancelOrder · matchBook · tryFillOrderFromPoolLiquidity"]
+        Hook["AsyncSwap hook<br/>beforeInitialize · beforeSwap · beforeAddLiquidity<br/>matchNewOrder · executeOrder · flashFill<br/>updatePrice(WithSig) · startAuction · auctionPremium<br/>cancelOrder · matchBook · tryFillOrderFromPoolLiquidity"]
         Libs["Linked libraries<br/>(see section 5)"]
         Vault["FeeVault<br/>collect(currency, recipient)"]
     end
@@ -59,7 +59,6 @@ flowchart LR
     Base -->|fillOrderWithCallback| Router
     Router -.->|fallback: DELEGATECALL| RFF
     Anyone -->|matchBook, fillFromPoolLiquidity| Router
-    Anyone -->|stepAuction| Hook
     LP -->|modifyLiquidity| PM
     Owner -->|collect| Vault
 
@@ -130,7 +129,7 @@ and on every flash fill (the outer fill and each nested `fillOrderInCallback`). 
 transactions by priority fee, searchers racing for one position bid that fee up, and the tax turns most of the
 bid into protocol revenue. A transaction with no priority fee pays nothing. Plain actions pay it in `msg.value`;
 flash fills pay it in flash-accounting style, see [paying the MEV tax](/protocol/flash-fills#paying-the-mev-tax).
-Cancels, claims, top-ups, `matchBook` and `stepAuction` are not taxed. A searcher can still race untaxed by
+Cancels, claims, top-ups and `matchBook` are not taxed. A searcher can still race untaxed by
 repricing its own order and settling it with `matchBook`; no user loses funds that way, the protocol only
 collects less (acknowledged in the 2026-11-01 Pashov review, findings 4, 5, 6 and 9).
 
@@ -210,8 +209,7 @@ flowchart LR
         p2["matchBook(key, 1..8)"]
         p3["fillFromPoolLiquidity(order)"]
         p4["fillOrder / fillOrderWithCallback (pays the maker)"]
-        p5["stepAuction(order)"]
-        p6["relay a maker's signature"]
+        p5["relay a maker's signature"]
     end
 ```
 
@@ -267,7 +265,7 @@ flowchart TB
     end
 
     Router -->|calls| Hook
-    RFF -->|"flashFill(op), stepAuction,<br/>asyncOrderInfo, matchBook"| Hook
+    RFF -->|"flashFill(op), auctionPremium,<br/>asyncOrderInfo, matchBook"| Hook
 ```
 
 `RouterFlashFills` called directly reaches the hook as itself, not as the Router, and `flashFill` refuses it

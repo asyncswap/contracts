@@ -1,6 +1,6 @@
 # AsyncSwap
 
-[Git Source](https://github.com/asyncswap/contracts/blob/db503f7f95d5ccf59d6e7fcbb0e4507dab24c838/src/AsyncSwap.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6aa19f681f6dcda07dbe32d621088bdd4be8da99/src/AsyncSwap.sol)
 
 **Inherits:** [BaseHook](/reference/src/BaseHook), EIP712
 
@@ -793,11 +793,11 @@ function updatePrice(AsyncOrder calldata order, uint256 newAmountOutMin) externa
 
 ### startAuction
 
-Maker starts a Dutch auction: the order's minimum output falls from its current value to
-`floorAmountOutMin` over `duration` blocks. Direct call from the maker.
+Maker starts a Dutch auction. The order stays at its minimum output (the floor); flash fillers pay a
+premium that starts at `startAmountOutMin - floor` and falls to zero over `duration` blocks.
 
 ```solidity
-function startAuction(AsyncOrder calldata order, uint256 floorAmountOutMin, uint32 duration) external;
+function startAuction(AsyncOrder calldata order, uint256 startAmountOutMin, uint32 duration) external;
 ```
 
 **Parameters**
@@ -805,18 +805,17 @@ function startAuction(AsyncOrder calldata order, uint256 floorAmountOutMin, uint
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | order | `AsyncOrder` |  |
-| floorAmountOutMin | `uint256` |  |
+| startAmountOutMin | `uint256` |  |
 | duration | `uint32` |  |
 
-<a id="stepauction-asyncorder" />
+<a id="auctionpremium-asyncorder" />
 
-### stepAuction
+### auctionPremium
 
-Write an auction order's scheduled minimum output into the book. Anyone may call it; it does nothing
-for an order with no running auction. Returns the order's minimum output after the step.
+The auction premium a flash filler pays on top of the order's minimum output now; zero for none.
 
 ```solidity
-function stepAuction(AsyncOrder calldata order) external returns (uint256);
+function auctionPremium(AsyncOrder calldata order) external view returns (uint256);
 ```
 
 **Parameters**

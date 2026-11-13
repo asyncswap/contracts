@@ -144,9 +144,7 @@ sequenceDiagram
     alt Private filler settles a specific order
         Caller->>Hook: asyncOrderInfo(poolId, orderId)
         Hook-->>Caller: Live remaining input and minimum output
-        opt Dutch auction order
-            Caller->>Hook: stepAuction(order), same transaction
-        end
+        Note over Caller,Hook: A Dutch auction order refuses plain fills (AuctionRunning) until its auction ends.
         Caller->>Router: fillOrder(order, maxPrice, data), msg.value = native output + MEV tax
         Note over Caller,Hook: Native output requires exact gross ETH, forwarded by Router to hook before unlock.<br/>ERC-20 output requires filler approval to Router.
         Router->>PM: unlock(fill action)

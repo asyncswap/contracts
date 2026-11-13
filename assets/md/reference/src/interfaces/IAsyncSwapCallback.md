@@ -1,6 +1,6 @@
 # IAsyncSwapCallback
 
-[Git Source](https://github.com/asyncswap/contracts/blob/db503f7f95d5ccf59d6e7fcbb0e4507dab24c838/src/interfaces/IAsyncSwapCallback.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6aa19f681f6dcda07dbe32d621088bdd4be8da99/src/interfaces/IAsyncSwapCallback.sol)
 
 **Title:** IAsyncSwapCallback
 
@@ -38,6 +38,8 @@ function fillOrderWithCallback(AsyncOrder calldata order, uint256 maxPrice, byte
 ### fillOrderInCallback
 
 Inside the callback: fill another open order, paying its output and receiving its input as claims.
+The filler pays the order's minimum output plus any live Dutch auction premium (`auctionPremium` on the
+hook), and approves the Router for both; `maxPrice` bounds the total.
 
 ```solidity
 function fillOrderInCallback(AsyncOrder calldata order, uint256 maxPrice) external;

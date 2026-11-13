@@ -16,8 +16,8 @@ stateDiagram-v2
     Open --> Open: reprice (updatePrice, updatePriceWithSig)
     Open --> Open: topUpPriorityFee
     Open --> Auction: startAuction (maker)
-    Auction --> Auction: stepAuction writes the scheduled minimum
-    Auction --> Open: maker reprice, or schedule reaches its floor
+    Auction --> Auction: flash fillers pay a falling premium on top of the floor
+    Auction --> Open: maker reprice, partial match, or the premium reaches zero
     Auction --> Closed: any fill, match to zero, or cancel
     Open --> Closed: filled in full
     Open --> Closed: remainder below the pool minimum
@@ -60,7 +60,7 @@ flowchart TD
     T --> R
     R -- "updatePrice" --> Q["New minimum; fresh time priority"]
     Q --> R
-    R -- "startAuction / stepAuction" --> DA["Minimum falls on a schedule: see dutch-auction.md"]
+    R -- "startAuction" --> DA["Premium above the floor falls to zero: see dutch-auction.md"]
     DA --> R
     R -- "cancelOrder / cancelWithSig / cancelAndWithdraw" --> C["Return remaining input; settle remaining bid"]
     C --> Z

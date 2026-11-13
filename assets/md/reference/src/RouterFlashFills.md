@@ -1,6 +1,6 @@
 # RouterFlashFills
 
-[Git Source](https://github.com/asyncswap/contracts/blob/db503f7f95d5ccf59d6e7fcbb0e4507dab24c838/src/RouterFlashFills.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/6aa19f681f6dcda07dbe32d621088bdd4be8da99/src/RouterFlashFills.sol)
 
 **Inherits:** [IAsyncSwapCallback](/reference/src/interfaces/IAsyncSwapCallback)
 
@@ -144,6 +144,8 @@ function unlockCallback(bytes calldata data) external returns (bytes memory);
 ### fillOrderInCallback
 
 Inside the callback: fill another open order, paying its output and receiving its input as claims.
+The filler pays the order's minimum output plus any live Dutch auction premium (`auctionPremium` on the
+hook), and approves the Router for both; `maxPrice` bounds the total.
 
 ```solidity
 function fillOrderInCallback(AsyncOrder calldata order, uint256 maxPrice) external;
@@ -272,6 +274,27 @@ function _settleMevTax(address filler, uint256 prepaid) private;
 | filler | `address` |  |
 | prepaid | `uint256` |  |
 
+<a id="_paypremium-address-asyncorder-uint256" />
+
+### \_payPremium
+
+<i>
+  Pays the maker a Dutch auction premium in tokens: the filler's output claims are burnt and the same amount
+  taken to the maker, so the Router's delta nets to zero.
+</i>
+
+```solidity
+function _payPremium(address filler, AsyncOrder memory order, uint256 premium) private;
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| filler | `address` |  |
+| order | `AsyncOrder` |  |
+| premium | `uint256` |  |
+
 <a id="_hookcall-uint8-asyncorder-address" />
 
 ### \_hookCall
@@ -342,14 +365,18 @@ function _output(AsyncOrder memory order) private pure returns (Currency);
 ### \_checkFill
 
 <i>
-  Checks the live order against the filler's bounds and returns the output owed: the live minimum, at most
-  `maxPrice`, for a live input of at least `order.amountIn`. A missing order is left for the hook to reject.
-  The flash path charges no pool fee, so the hook burns exactly the live minimum it returns.
-  A Dutch auction order is stepped first, so the filler pays the scheduled price, not an older one.
+  Checks the live order against the filler's bounds and returns the output owed to the hook (the live
+  minimum) and the live Dutch auction premium owed to the maker. Their sum is at most `maxPrice`, for a live
+  input of at least `order.amountIn`. A missing order is left for the hook to reject. Read before the hook
+  closes the order, which ends the premium. The flash path charges no pool fee, so the hook burns exactly the
+  live minimum it returns.
 </i>
 
 ```solidity
-function _checkFill(AsyncOrder memory order, uint256 maxPrice) private returns (uint256 livePrice);
+function _checkFill(AsyncOrder memory order, uint256 maxPrice)
+        private
+        view
+        returns (uint256 livePrice, uint256 premium);
 ```
 
 **Parameters**
@@ -364,6 +391,7 @@ function _checkFill(AsyncOrder memory order, uint256 maxPrice) private returns (
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | livePrice | `uint256` |  |
+| premium | `uint256` |  |
 
 ## Events
 
@@ -378,6 +406,22 @@ event MevTaxPaid(address indexed payer, uint256 amount);
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | payer | `address` |  |
+| amount | `uint256` |  |
+
+### AuctionPremiumPaid
+
+A flash filler paid `maker` a Dutch auction premium on top of the order's minimum output.
+
+```solidity
+event AuctionPremiumPaid(address indexed maker, address indexed filler, uint256 amount);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| maker | `address` |  |
+| filler | `address` |  |
 | amount | `uint256` |  |
 
 ## Errors

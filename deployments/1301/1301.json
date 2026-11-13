@@ -22,19 +22,19 @@
       "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
     },
     "AsyncSwap": {
-      "address": "0x91609e7a95Ec042832ce5375bF4254734D096888",
-      "startBlock": 67676984,
-      "txHash": "0x031ee13a05d276668a1f7af3837747a6a7e64d8a79433e7b658f8f8eb190240e"
+      "address": "0x91678C5047d8dc94C0fe56c45e663B8e6aa66888",
+      "startBlock": 67722716,
+      "txHash": "0x44571d961261f5ce48a1cc4f3bd76625865bc7b87069558cea9941e0342a3028"
     },
     "Router": {
-      "address": "0x411c2EEF7325CA994A5dDA4737D2Df146A9429c3",
-      "startBlock": 67676984,
-      "txHash": "0xd05b1ac118fe75f46e9d8f5389238eddbc82ab2db66d4313ecce07b4ba23300a"
+      "address": "0xd7ff662c64A670b570e8Baa6b169054fae119909",
+      "startBlock": 67722716,
+      "txHash": "0x8942703a1a9d0333723c792129a64381cd85e02289fca4c922a59921be62b663"
     },
     "FeeVault": {
-      "address": "0x500fED3e746B19Ecb497b30c822Bd6dB05322a3b",
-      "startBlock": 67676984,
-      "txHash": "0x031ee13a05d276668a1f7af3837747a6a7e64d8a79433e7b658f8f8eb190240e"
+      "address": "0xC421fC533c4159C4f2e6a06906E318FFCe6c9C55",
+      "startBlock": 67722716,
+      "txHash": "0x44571d961261f5ce48a1cc4f3bd76625865bc7b87069558cea9941e0342a3028"
     },
     "WithdrawalRouter": {
       "address": "0x023b3dc1d065887e492efd2e4474d91dd4be0341",
@@ -67,12 +67,12 @@
       "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
     },
     "DutchAuction": {
-      "address": "0x4aE06Bba0379a1b7d1B6bC7D4B89aE2b13bF13a7",
-      "startBlock": 67676958,
+      "address": "0xc52786503E19BF4411EF8C679DfB60EEc3F6f045",
+      "startBlock": 67722685,
       "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
     }
   },
-  "updatedAt": 1794529411,
+  "updatedAt": 1794575143,
   "release": "v1.3.0",
   "sourceCommit": "c9372ff9577ba3950fa321090a7bfb559fc964a4",
   "features": {

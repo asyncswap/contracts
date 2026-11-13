@@ -36,6 +36,9 @@ export default defineConfig({
       items: [
         { text: 'Overview', link: '/protocol/overview' },
         { text: 'Order lifecycle and priority bids', link: '/protocol/order-lifecycle' },
+        { text: 'Flash fills and non-numeraire pools', link: '/protocol/flash-fills' },
+        { text: 'Dutch auction orders', link: '/protocol/dutch-auction' },
+        { text: 'Signed price changes', link: '/protocol/repricing-signatures' },
         { text: 'Priority fee top-ups', link: '/protocol/priority-fee-top-ups' },
         { text: 'Contract call sequences', link: '/protocol/contract-call-sequences' },
         { text: 'Price keys and crossing', link: '/protocol/price-key-crossing' },

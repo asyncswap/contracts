@@ -68,10 +68,11 @@ Published at **[docs.asyncswap.org](https://docs.asyncswap.org)**: these guides,
 reference generated from the NatSpec in `src/`. The site (`site/`, built with [vocs](https://vocs.dev)) rebuilds on
 every push to `main` that touches them; preview it locally with `cd site && bun install && bun run dev`.
 
-- [Protocol overview](docs/protocol.md): components, custody, order placement, authorization, and deployment.
-- [Order lifecycle and priority bids](docs/order-lifecycle.md): matching, fills, cancellation, and bid settlement.
-- [Priority-fee top-ups](docs/priority-fee-top-ups.md): maker authorization, funding, queue updates, and agent calls.
+- [Protocol overview](docs/protocol.md): the entry point. Components, custody, fees, authorization, and the module and library layout.
+- [Order lifecycle and priority bids](docs/order-lifecycle.md): create, match, reprice, cancel, and bid settlement.
+- [Flash fills and non-numeraire pools](docs/flash-fills.md): fills with no inventory, nested `fillOrderInCallback`, the per-fill MEV tax, and pools without USDC.
 - [Dutch auction orders](docs/dutch-auction.md): a minimum output that falls to a floor, steps, and fills.
+- [Priority-fee top-ups](docs/priority-fee-top-ups.md): maker authorization, funding, queue updates, and agent calls.
 - [Contract call sequences](docs/contract-call-sequences.md): calls, callbacks, responses, and withdrawals.
 - [Price-key crossing](docs/price-key-crossing.md): price comparisons and rounding.
 - [Large-swap research series](https://x.com/asyncswap/article/2120701882377060839): three articles on large-swap costs, opposite-side flow, and Uniswap v4 hooks.
@@ -81,7 +82,7 @@ every push to `main` that touches them; preview it locally with `cd site && bun 
 
 v1.3.0 is deployed on **Unichain Sepolia** (test USDC) and **Robinhood Chain testnet** (test USDG). **Elysium testnet** (test USDC, native HYPE) runs a later build of the same protocol. See [addresses and previous deployments](docs/deployments.md). All nine release modules on each network have exact source matches on Sourcify. Mainnet remains subject to [audit and readiness checks](MAINNET_READINESS.md).
 
-`AsyncMatching` is an external Solidity library linked into the hook. The deployment wrapper deploys and links `TickPrice`, `DynamicFeeOrdering`, `TickBitmap`, `EligiblePrice`, and `PriorityFeeUpdates` first. The fee-amendment library links to `EligiblePrice`. `script/deploy.sh <chain-key> [dry-run|broadcast|verify]` deploys the libraries through the shared CREATE2 deployer, links the hook bytecode, mines the hook salt, deploys the hook and Router, and records the addresses under `deployments/<chainId>/`. `verify` publishes sources through Sourcify, tries Blockscout, and writes standard JSON inputs for manual upload. An `ASYNC_MATCHING_LIBRARY_ADDRESS` override must match this build's predicted address. Foundry links the libraries automatically in tests.
+`AsyncMatching` is an external Solidity library linked into the hook. The deployment wrapper deploys `TickPrice`, `DynamicFeeOrdering`, `TickBitmap`, `EligiblePrice`, `PriorityFeeUpdates`, `MultiAsset`, `DutchAuction`, `AsyncMatching` and `IncomingMatching` first and links them into the hook. The Router creates its flash-fill module, `RouterFlashFills`, in its constructor. `script/deploy.sh <chain-key> [dry-run|broadcast|verify]` deploys the libraries through the shared CREATE2 deployer, links the hook bytecode, mines the hook salt, deploys the hook and Router, and records the addresses under `deployments/<chainId>/`. `verify` publishes sources through Sourcify, tries Blockscout, and writes standard JSON inputs for manual upload. An `ASYNC_MATCHING_LIBRARY_ADDRESS` override must match this build's predicted address. Foundry links the libraries automatically in tests.
 
 The bitmap changes the order-book storage layout and requires a new hook deployment. Existing radix state cannot be reused as bitmap state. The default compiler remains solc 0.8.26.
 

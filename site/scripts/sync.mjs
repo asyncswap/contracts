@@ -19,6 +19,9 @@ const routes = {
   'README.md': '/',
   'docs/protocol.md': '/protocol/overview',
   'docs/order-lifecycle.md': '/protocol/order-lifecycle',
+  'docs/flash-fills.md': '/protocol/flash-fills',
+  'docs/dutch-auction.md': '/protocol/dutch-auction',
+  'docs/repricing-signatures.md': '/protocol/repricing-signatures',
   'docs/priority-fee-top-ups.md': '/protocol/priority-fee-top-ups',
   'docs/contract-call-sequences.md': '/protocol/contract-call-sequences',
   'docs/price-key-crossing.md': '/protocol/price-key-crossing',
@@ -29,8 +32,10 @@ const routes = {
 
 // One-line summaries for the generated guides: vocs reads them from frontmatter into llms.txt.
 const descriptions = {
-  '/protocol/overview': 'Contracts, custody, fees and authorization of the Async Swap hook, in diagrams: permissionless pools, minimum order and asset floor fixed at deployment, Router.multicall.',
+  '/protocol/overview': 'Entry point: contracts, custody, fees, authorization, module and library layout of the Async Swap hook, in diagrams.',
   '/protocol/order-lifecycle': 'How an order is placed, matched, filled, repriced and cancelled, how priority bids are paid, and how to cancel and withdraw claims in one Router.multicall.',
+  '/protocol/flash-fills': 'Flash fills with no inventory: fillOrderWithCallback, nested fillOrderInCallback, the per-fill MEV tax paid in flash-accounting style, and pools without the numeraire.',
+  '/protocol/dutch-auction': 'Dutch auction orders: a minimum output that falls to a floor over blocks, stepAuction, and how each fill path sees the price.',
   '/protocol/contract-call-sequences': 'Step-by-step contract calls for opening pools and placing, matching, filling, cancelling (alone or batched) and redeeming orders.',
   '/protocol/price-key-crossing': 'How limit prices map to price keys and when two orders cross.',
   '/protocol/dynamic-fee-ordering': 'How Async Swap captures backrun MEV with a dynamic fee on pool fills that move the price back, split between LPs and the protocol.',

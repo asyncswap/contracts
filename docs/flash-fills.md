@@ -1,117 +1,148 @@
-# Flash fills
+# Flash fills and non-numeraire pools
 
-Status: implemented on the Router and hook for the next audited deployment. v1 deployed hooks are unchanged.
-Design background: `docs/multi-asset-swaps.md`, section 4F (on the `intent-spec` branch).
-
-A flash fill lets a filler fill an order with no inventory. The Router hands the filler the order's escrowed
-input first, calls the filler back inside its own PoolManager unlock, and only then collects the maker's output.
-Inside the callback the filler can route through any Uniswap v4 pool and fill other Async Swap orders, in a loop
-it controls.
-
-## Layout
-
-Measured with solc (what CI and deployment use), the hook and Router were already within a few hundred bytes of
-EIP-170 before this feature, so neither carries the flash-fill logic:
-
-- **Router:** the callback surface lives in `RouterFlashFills`, a module the Router creates in its constructor. The
-  Router's `fallback` runs it by DELEGATECALL, so it executes as the Router (the hook sees the Router as caller), and
-  the Router's `unlockCallback` forwards a flash-fill unlock to it the same way. Its code counts toward the Router's
-  initcode, not its runtime.
-- **Hook:** one Router-only entry point, `AsyncSwap.flashFill(bytes args)`, with `args` =
-  `abi.encode(uint8 op, AsyncOrder order, address filler)`; ops 0 (begin), 1 (settle) and 2 (fill paid in claims)
-  run in the linked `MultiAsset` library. The flash path charges no pool fee (`calculatePoolFee` is zero).
+A flash fill lets a filler fill an order with no inventory. The Router gives the filler the order's escrowed input
+first, as ERC-6909 claims, calls the filler back inside its own `PoolManager.unlock`, and only then collects the
+maker's output. Inside the callback the filler can swap on any Uniswap v4 pool, fill other Async Swap orders with
+`fillOrderInCallback`, and run `matchBookInCallback`, in a loop it controls. This is v4 flash accounting: nothing
+has to be funded up front, as long as every delta is zero when the unlock ends.
 
 ## Interfaces
 
-- `IAsyncSwapCallback` (implemented by the Router): `fillOrderWithCallback` opens a fill; `fillOrderInCallback` and
-  `matchBookInCallback` are the only Router calls accepted while the callback runs, and only from its filler.
-- `IAsyncSwapFlashFiller` (implemented by the filler): `asyncSwapFlashFill`, the callback.
+- `IAsyncSwapCallback`, served by the Router: `fillOrderWithCallback` opens a fill; `fillOrderInCallback` and
+  `matchBookInCallback` work only while that callback runs, and only for its filler; `mevTaxFor` and
+  `mevTaxOwed` price the tax.
+- `IAsyncSwapFlashFiller`, implemented by the filler: `asyncSwapFlashFill(order, amountIn, amountOwed, data)`.
+- `AsyncSwapFlashFiller` (`src/periphery`): an abstract base that implements the callback. Inherit it and write
+  `_route`.
 
-A filler integrates against these two interfaces only.
+The Router serves `IAsyncSwapCallback` from `RouterFlashFills`, a module it creates in its constructor and runs by
+DELEGATECALL from its `fallback`, so every call runs as the Router. The Router's `unlockCallback` forwards a
+`FlashFill` unlock to the same module. On the hook side, `AsyncSwap.flashFill(args)` is Router only and runs three
+ops in the linked `MultiAsset` library: 0 begin, 1 settle, 2 fill paid in claims.
 
 ## Flow
 
-1. The filler contract calls `Router.fillOrderWithCallback(order, maxPrice, data)`. `msg.value` is an optional prepayment toward the MEV tax (see below).
-2. The Router opens one `unlock`, checks the live order against `maxPrice` and `order.amountIn` (as `fillOrder`
-   does), and calls `AsyncSwap.flashFill` (op 0). The hook closes the order (removes it from the book, deletes it,
-   settles its priority bid to the vault) and credits its input, less the 0.02% trade fee, to the filler as
-   ERC-6909 claims. The fee goes to the vault.
-3. The Router records the filler in a transient slot and calls
-   `IAsyncSwapFlashFiller(filler).asyncSwapFlashFill(order, amountIn, amountOwed, data)`.
-4. In the callback the filler may:
-   - fill other orders with `Router.fillOrderInCallback(order, maxPrice)`, paying their output in claims and
-     receiving their input in claims;
-   - run the matcher with `Router.matchBookInCallback(key, maxMatches)`;
-   - `burn` claims and swap on any v4 pool, `take`, `settle`, `mint`.
-   Before returning, it must hold `amountOwed` claims of the order's output and approve the Router for them on the
-   PoolManager.
-5. The Router clears the slot, transfers `amountOwed` output claims from the filler to the hook, and calls
-   `AsyncSwap.flashFill` (op 1), which burns them and pays the maker its minimum less the trade fee (ERC20 as
-   tokens, native ETH as claims, as in a plain fill). Any surplus stays with the filler. The unlock closes only if
-   every delta, the filler's included, is zero.
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Owner as Filler owner
+    participant F as Filler (AsyncSwapFlashFiller)
+    participant R as Router + RouterFlashFills
+    participant PM as PoolManager
+    participant H as AsyncSwap hook
+    participant MA as MultiAsset
+    participant V4 as Any v4 pool
 
-## Payments are claims
+    Owner->>F: fill(order, maxPrice, data)
+    F->>R: fillOrderWithCallback(order, maxPrice, data)
+    R->>PM: unlock(FlashFill)
+    PM->>R: unlockCallback, forwarded to RouterFlashFills
+    R->>H: stepAuction(order), then asyncOrderInfo
+    Note over R: live minimum within maxPrice,<br/>live input at least order.amountIn
+    R->>PM: mint MEV tax to FeeVault (Router now owes ETH)
+    R->>H: flashFill(op 0 begin)
+    H->>MA: run: close the order, settle its bid,<br/>credit input less 0.02% to the filler as claims
+    R->>R: tstore filler slot
+    R->>F: asyncSwapFlashFill(order, amountIn, amountOwed, data)
+    rect rgba(128, 128, 128, 0.12)
+        Note over F,V4: _route: any mix, any order
+        F->>PM: burn claims, swap, take, settle, mint
+        PM->>V4: swap
+        loop Nested fills
+            F->>R: fillOrderInCallback(other, maxPrice)
+            R->>H: stepAuction, asyncOrderInfo, check maxPrice
+            R->>PM: mint MEV tax to FeeVault (Router owes more)
+            R->>PM: transferFrom(filler, hook, other's output claims)
+            R->>H: flashFill(op 2 fill)
+            H->>MA: pay its maker, credit its input less 0.02% to the filler as claims
+        end
+        opt Continue a crossed book
+            F->>R: matchBookInCallback(key, maxMatches)
+            R->>H: matchBook
+        end
+        F->>PM: approve(Router, output id, amountOwed)
+        F->>R: mevTaxOwed()
+        F->>PM: sync(ETH), settleFor(Router) with the tax owed
+    end
+    R->>R: clear filler slot
+    R->>PM: transferFrom(filler, hook, amountOwed output claims)
+    R->>H: flashFill(op 1 settle)
+    H->>MA: pay the maker its minimum less 0.02%
+    R->>PM: settle any prepaid msg.value, check the Router's ETH delta
+    Note over R,PM: delta < 0 reverts MevTaxUnpaid(owed),<br/>delta > 0 is taken back to the filler
+    R-->>PM: callback returns, unlock ends only if every delta is zero
+```
 
-Every payment inside a flash fill is an ERC-6909 claim, not a token transfer and not an open delta:
+Every payment inside a flash fill is a claim: the order's input is credited to the filler as claims, a nested
+fill pulls its output from the filler as claims (`transferFrom`, so the filler approves the Router per currency),
+and the final maker check pulls the owed output as claims. A route that only moves between Async Swap books never
+opens a PoolManager delta at all. Swaps on other v4 pools are bridged with `burn` (claims to credit) and `mint`
+(credit to claims). Native ETH is claim id 0.
 
-- the order's input is credited to the filler as claims;
-- `fillOrderInCallback` pulls the resting maker's output from the filler as claims (`transferFrom`, so the filler
-  approves the Router per currency) and credits the order's input to the filler as claims;
-- the final maker check pulls the owed output as claims.
+The maker of the outer order is paid as in a plain fill: ERC-20 output as tokens, native output as claims. Any
+surplus above `amountOwed` stays with the filler.
 
-So a filler that only moves between Async Swap books never opens a PoolManager delta at all: it trades claims it
-was just credited. Swaps on other v4 pools are bridged with `burn` (claims to credit) and `mint` (credit to
-claims). Native ETH is claim id 0 and needs no `msg.value`.
+## Paying the MEV tax
 
-## Safety rules, and how each is enforced
+Each flash fill owes the MEV tax once per fill: the outer fill and every `fillOrderInCallback`.
+`matchBookInCallback` pays none, as `matchBook` is open to anyone anyway. The tax is paid flash-accounting style:
+
+```mermaid
+flowchart LR
+    A["Each fill:<br/>Router mints the tax to FeeVault<br/>as native claims"] --> B["Router's ETH delta<br/>goes negative by the tax"]
+    B --> C{"Who pays?"}
+    C -- "msg.value on fillOrderWithCallback" --> D["Router settles the prepayment<br/>after the callback"]
+    C -- "In the callback" --> E["Filler: sync(ETH),<br/>settleFor{value: mevTaxOwed()}(Router)"]
+    D --> G{"Router's ETH delta"}
+    E --> G
+    G -- "below zero" --> X["revert MevTaxUnpaid(owed)"]
+    G -- "zero" --> OK["unlock closes"]
+    G -- "above zero" --> S["take the surplus to the filler"]
+```
+
+- Off chain, `mevTaxFor(fills)` quotes the tax for `fills` fills. Call it with the gas price you will send
+  (`eth_call` with `gasPrice`, or `forge script --with-gas-price`).
+- Inside the callback, `mevTaxOwed()` returns exactly what the Router still owes: every fill charged so far
+  less what was paid.
+- With no priority fee the tax is zero.
+
+`AsyncSwapFlashFiller` pays `mevTaxOwed()` from its own ETH balance at the end of the callback.
+`ethNeeded(fills)` tells the owner how much ETH to send with `fill`, and `script/FlashFill.s.sol` sends exactly
+that. `withdraw` returns surplus ETH and claims to the owner.
+
+## Safety rules
 
 | Rule | Enforcement |
 |---|---|
-| The flash-filled order cannot be repriced, cancelled, topped up, matched or filled again during the callback. | Begin (op 0) closes and deletes the order before the callback. Every later action on it finds no order (`OrderNotFound`), and it is no longer in the book for `matchBook`. |
-| Normal Router entry points refuse reentry. | Each opens its own `PoolManager.unlock`, which v4 refuses while the flash fill holds it (`AlreadyUnlocked`). A nested `fillOrderWithCallback` reverts `FlashFillActive`. |
-| Only the active filler may use the in-unlock entry points, only while active. | `onlyFlashFiller` compares `msg.sender` with the transient filler slot; the slot is cleared before the output is collected and before the unlock returns. |
-| The maker check is on the final amount only. | The owed output is pulled once, after the callback returns. |
+| The flash-filled order cannot be repriced, cancelled, topped up, matched or filled again during the callback. | Op 0 deletes it before the callback; later calls find `OrderNotFound`. |
+| No other Router entry point runs during the callback. | Each opens its own `unlock`, which v4 refuses (`AlreadyUnlocked`). A nested `fillOrderWithCallback` reverts `FlashFillActive`. |
+| Only the active filler may use the in-callback entry points. | `onlyFlashFiller` reads the transient filler slot, cleared before the output is collected. |
+| The maker check is on the final amount only. | The owed output is pulled once, after the callback. |
 | Resting orders filled inside a flash fill are never worse off. | `fillOrderInCallback` applies the same live minimum, `maxPrice`, `order.amountIn` bound and 0.02% fees as `fillOrder`. |
-| Only the Router can drive the hook side. | `AsyncSwap.flashFill` reverts `NotTrustedRouter` for any other caller and checks the maker's executor grant. Settle (op 1) only settles the order begin (op 0) opened in the same transaction (transient record in the hook). `RouterFlashFills` called directly reaches the hook as itself, not the Router, and is refused. |
+| Dutch auction orders fill at the scheduled price. | Both entry points call `stepAuction` before reading the price. |
+| Only the Router drives the hook side. | `flashFill` reverts `NotTrustedRouter` for any other caller and checks the maker's executor grant. Op 1 only settles the order op 0 opened in the same transaction (transient record in the hook). |
 
-## Toward claims-based settlement of the numeraire
+## Non-numeraire pools
 
-Flash fills are written as a settlement primitive, not only a filler feature, and the same shape could change how
-the numeraire leg settles generally:
+A maker can place an order on a pool without the numeraire, for example ETH/TOKEN. Fillers fill it like any
+order, and a flash fill routes it through the two numeraire books with no inventory: sell into one book, buy from
+the other, and the USDC in the middle nets to zero inside the PoolManager.
 
-- Today every fill and match moves the numeraire (USDC, USDG on Robinhood) as a separate payment per order. Inside
-  a flash fill the numeraire is only ever a claim balance that rises on one book and falls on the next, and it nets
-  to zero inside the PoolManager. Nothing leaves it.
-- That generalises: a settlement pass that takes a list of fills across books (approach C in the design doc) can
-  use the same hook ops (begin, fill paid in claims, settle) and check only the final
-  claim balances, so the numeraire becomes a netting unit between books rather than a transferred asset.
-- Makers already receive native payouts as claims. Offering claims for numeraire payouts too (with
-  `withdrawClaims` to exit) would let resting liquidity stay inside the PoolManager between trades, which is what
-  a cross-book matcher wants to consume.
+```mermaid
+flowchart LR
+    O["Order on ETH/TOKEN<br/>sells ETH for TOKEN"] -->|"op 0: ETH claims to filler"| F["Flash filler"]
+    F -->|"fillOrderInCallback:<br/>pay ETH, get USDC"| B1["ETH/USDC book"]
+    F -->|"fillOrderInCallback:<br/>pay USDC, get TOKEN"| B2["TOKEN/USDC book"]
+    F -->|"op 1: TOKEN claims to the maker"| O
+```
 
-These are directions, not part of this change.
+| Rule | Detail |
+|---|---|
+| Who may open one | Anyone, once both tokens already have a numeraire pool on this hook with the same tick spacing. Otherwise `MultiAsset.initialize` reverts `NumeraireRequired`. The check reads only the hook's storage. |
+| Fee | Dynamic-fee flag, as for every pool. |
+| Quote side | `currency1`. Orders paying `currency1` are bids, orders paying `currency0` are asks. |
+| Minimum order | Each side's decimal floor, `10^(decimals - assetPrecision)` of that token, at least 1 unit. No dollar minimum. |
+| Priority bids | Not allowed, since bids are paid in the numeraire. A nonzero `priorityFee` or a top-up reverts `PriorityFeeNeedsNumeraire`. |
 
-## Decisions taken on the design's open questions
-
-- Input is credited as ERC-6909 claims the filler burns or trades, not as an open delta: deltas belong to the
-  address that creates them, and claims also let book-to-book routes run with no delta at all.
-- One order per `fillOrderWithCallback` call. A filler can still fill any number of other orders inside the callback.
-- Every fill pays the MEV tax: the outer fill and each `fillOrderInCallback`. The Router pays the FeeVault when the
-  fill runs and owes that ETH to the PoolManager until the unlock ends. The filler covers it with `msg.value`, or inside
-  its callback with `PoolManager.settleFor(router)` (for example from ETH its route earned). A surplus comes back to
-  the filler in ETH. A shortfall reverts `MevTaxUnpaid(owed)`. With no priority fee the tax is zero.
-- `matchBookInCallback` pays no tax: `matchBook` is open to anyone outside a flash fill too.
-
-### Paying the exact tax
-
-You never guess the amount:
-
-- Off chain, `IAsyncSwapCallback(router).mevTaxFor(fills)` quotes the tax for `fills` fills. Call it with the gas price
-  you will send (`eth_call` with `gasPrice`, or `forge script --with-gas-price`).
-- Inside the callback, `IAsyncSwapCallback(router).mevTaxOwed()` returns the exact amount still owed. Pay it with
-  `PoolManager.sync(ETH)` and `PoolManager.settleFor{value: owed}(router)`.
-
-`src/periphery/AsyncSwapFlashFiller.sol` does all of this. Inherit it and write `_route`; it checks the caller, approves
-the Router for the maker's output, and pays `mevTaxOwed()` from its ETH balance. `ethNeeded(fills)` tells the owner how
-much ETH to send with `fill`. `script/FlashFill.s.sol` sends exactly that amount.
-- Surplus above the maker's minimum stays with the filler, as in a plain fill.
+The floors stop dust, not small orders: 0.0001 of a cheap token can be worth very little. Stablecoins other than
+the numeraire are ordinary tokens here.

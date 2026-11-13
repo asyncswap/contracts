@@ -6,7 +6,7 @@ from pathlib import Path
 root = Path(__file__).resolve().parents[1]
 required = {'AsyncSwap', 'AsyncMatching', 'IncomingMatching', 'Router', 'FeeVault', 'NativeClaims', 'TokenClaims',
             'MatchingEngine', 'TickPrice', 'TickBitmap', 'EligiblePrice', 'PriorityFeeUpdates', 'DynamicFeeOrdering',
-            'MultiAsset', 'RouterFlashFills'}
+            'MultiAsset', 'RouterFlashFills', 'DutchAuction'}
 rows = []
 for path in sorted((root / 'out').glob('*/*.json')):
     artifact = json.loads(path.read_text())

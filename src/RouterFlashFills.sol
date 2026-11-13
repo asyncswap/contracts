@@ -152,7 +152,9 @@ contract RouterFlashFills is IAsyncSwapCallback {
     /// @dev Checks the live order against the filler's bounds and returns the output owed: the live minimum, at most
     ///      `maxPrice`, for a live input of at least `order.amountIn`. A missing order is left for the hook to reject.
     ///      The flash path charges no pool fee, so the hook burns exactly the live minimum it returns.
-    function _checkFill(AsyncOrder memory order, uint256 maxPrice) private view returns (uint256 livePrice) {
+    ///      A Dutch auction order is stepped first, so the filler pays the scheduled price, not an older one.
+    function _checkFill(AsyncOrder memory order, uint256 maxPrice) private returns (uint256 livePrice) {
+        HOOK.stepAuction(order);
         bytes32 id = keccak256(abi.encode(block.chainid, order.key.toId(), order.owner, order.zeroForOne, order.salt));
         uint256 liveAmountIn;
         (liveAmountIn, livePrice) = HOOK.asyncOrderInfo(order.key.toId(), id);

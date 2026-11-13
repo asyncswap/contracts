@@ -6,6 +6,7 @@ import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 import {IncomingMatching} from "@async-swap/libraries/IncomingMatching.sol";
 import {AsyncMatching} from "@async-swap/libraries/AsyncMatching.sol";
 import {MultiAsset} from "@async-swap/libraries/MultiAsset.sol";
+import {DutchAuction} from "@async-swap/libraries/DutchAuction.sol";
 import {PriorityFeeUpdates} from "@async-swap/libraries/PriorityFeeUpdates.sol";
 import {OrderSignatures} from "@async-swap/libraries/OrderSignatures.sol";
 import {AsyncOrder, AsyncOrderLibrary} from "@async-swap/types/AsyncOrder.sol";
@@ -64,6 +65,8 @@ contract AsyncSwap is BaseHook, EIP712 {
 
     /// @notice Unordered nonces consumed by signed maker actions (`setExecutorWithSig`, `updatePriceWithSig`).
     mapping(address maker => mapping(uint256 nonce => bool)) public nonceUsed;
+    /// @dev Running Dutch auctions by order id; see `DutchAuction`. Last, so earlier slots keep their places.
+    mapping(bytes32 orderId => DutchAuction.Auction) private auctions;
 
     /// @notice Minimum order in numeraire base units (0: none), fixed at deployment for every pool so the
     ///         owner cannot change the rules under live orders.
@@ -501,6 +504,22 @@ contract AsyncSwap is BaseHook, EIP712 {
             priceBooks[order.key.toId()],
             AsyncMatching.UpdateParams({order: order, id: id, newAmountOutMin: newAmountOutMin, caller: msg.sender})
         );
+    }
+
+    /// @notice Maker starts a Dutch auction: the order's minimum output falls from its current value to
+    ///         `floorAmountOutMin` over `duration` blocks. Direct call from the maker.
+    function startAuction(AsyncOrder calldata order, uint256 floorAmountOutMin, uint32 duration) external {
+        PoolId poolId = order.key.toId();
+        DutchAuction.start(
+            asyncOrders[poolId], priceBooks[poolId], auctions, order, order.orderId(), floorAmountOutMin, duration, msg.sender
+        );
+    }
+
+    /// @notice Write an auction order's scheduled minimum output into the book. Anyone may call it; it does nothing
+    ///         for an order with no running auction. Returns the order's minimum output after the step.
+    function stepAuction(AsyncOrder calldata order) external returns (uint256) {
+        PoolId poolId = order.key.toId();
+        return DutchAuction.step(asyncOrders[poolId], priceBooks[poolId], auctions, order, order.orderId());
     }
 
     event AsyncOrderPriorityFeeUpdated(

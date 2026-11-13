@@ -1,124 +1,127 @@
 # Order lifecycle and priority bids
 
-Current behavior, checked against the contract source. See also [contract call sequences](contract-call-sequences.md) and the [README](../README.md).
+Orders are good till cancelled (GTC). The order struct has no expiry, and nothing closes an order on a timer: it
+rests until it is fully filled or the maker cancels it. A signed message (`swapWithSig`, `updatePriceWithSig`,
+`cancelWithSig`) carries a `deadline`, but that only limits when the signature can be submitted.
 
-The current source includes incoming-order memory matching; deployed v1.3.0 contracts do not. When an arrival can cross and there is no active LP liquidity, it is staged in transient storage during funding, then matched in memory against the whole book. Only a remaining order is persisted. Noncrossing arrivals and active-LP pools use stored admission. If funding activates LP liquidity, the candidate is persisted before the usual venue selection. Persistent getters do not expose a staged order during its funding callback. See the [implementation, benchmarks and review](../benchmarks/incoming-memory/README.md).
+See the [protocol overview](protocol.md) for the contracts and the [call sequences](contract-call-sequences.md)
+for each step as calls.
 
-## Order lifecycle
+## States
 
-Orders are good till cancelled (GTC). The order struct has no expiry or deadline field, and nothing
-closes an order on a timer: it rests on the book until it is fully filled (by a later crossing
-order, pool liquidity or a filler) or the maker cancels it. Repricing changes the minimum output
-without changing the order's lifetime. Signed messages (`swapWithSig`, `updatePriceWithSig`,
-`cancelWithSig`) carry a `deadline`, but it only limits when that signature can be submitted; it does
-not expire the order.
+```mermaid
+stateDiagram-v2
+    [*] --> Open: swap / swapWithSig
+    Open --> Open: partial book match or pool fill up to a book level
+    Open --> Open: reprice (updatePrice, updatePriceWithSig)
+    Open --> Open: topUpPriorityFee
+    Open --> Auction: startAuction (maker)
+    Auction --> Auction: stepAuction writes the scheduled minimum
+    Auction --> Open: maker reprice, or schedule reaches its floor
+    Auction --> Closed: any fill, match to zero, or cancel
+    Open --> Closed: filled in full
+    Open --> Closed: remainder below the pool minimum
+    Open --> Closed: cancel
+    Open --> Closed: flash fill (closed before the filler callback)
+    Closed --> [*]
+```
 
-These diagrams describe the current source, not a deployment or mainnet-readiness guarantee. Book matching ranks the best opposing price first; higher escrowed USDC bids break ties at that price, followed by earlier submission. Zero-bid orders are valid and keep time priority behind paid bids. Private fills and explicit LP retries target a specific order and do not enforce the book's global priority queue.
+A closed order is deleted. Its remaining bid settles to the FeeVault and any unused input returns to the maker.
+
+## Lifecycle
+
+Book matching ranks the best opposing price first; a higher escrowed USDC bid breaks ties at one price, then
+earlier submission. Filler fills, flash fills and pool-fill retries target one order and do not follow the book's
+queue.
 
 ```mermaid
 flowchart TD
-    A["Submit order: input amount, minimum output, optional USDC bid"] --> D["Require pool minimum (USDC leg) and 0.0001-token asset floor; validate bid minimum only for nonzero bid"]
-    D --> E["Validate executor; escrow input and any nonzero bid at creation"]
-    E --> V{"Pool spot price strictly better than the best opposing level?"}
-    V -- "No" --> F["Match best opposing prices first; up to 8 pairs"]
-    V -- "Yes" --> PF["Try the order against pool liquidity first, limited at the best opposing level"]
-    PF -- "Filled" --> Z
-    PF -- "Filled up to the best level; rest to the book" --> F
-    PF -- "Attempt reverts" --> F
-    F --> G["Same-price ties: highest remaining bid, then earliest sequence"]
-    G --> H["Settle executable crossing pairs; reduce orders and settle bid shares"]
-    H --> I{"Incoming order still open?"}
-    I -- "No" --> Z["Order closed; return unused input if any"]
-    I -- "Yes" --> J["Try remaining input against pool liquidity"]
-    J --> K{"Full remaining input consumed and minimum output met after the dynamic fee?"}
-    K -- "Yes" --> L["Settle pool fill; 0.02% LP fee + 0.01% protocol fee; dynamic fee if it moves this pool's price back toward the reference set by the pool's first fill of a 2-block window (half to LPs, half to FeeVault); settle remaining bid"]
-    L --> Z
-    K -- "No / attempt reverts" --> M["Roll back LP attempt only; keep remaining order open"]
-    M -- "New crossing order or Router.matchBook" --> N["Bounded book matching; partial fills can remain open"]
-    N -- "Remainder" --> M
-    N -- "Input exhausted or remainder below pool minimum" --> Z
-    M -- "Router.fillFromPoolLiquidity" --> J
-    M -- "Private filler chooses order" --> O["Check live minimum against filler maxPrice"]
-    O --> FF["Filler pays exactly the minimum; maker gets it less 0.02%, filler the input less 0.02%; settle bid; close order"]
-    FF --> Z
-    M -- "Maker adds USDC priority fee" --> T["Fund additional bid; reset fee-tier queue age; keep price and maker age"]
-    T --> M
-    M -- "Maker reprices" --> Q["Update minimum; re-enter book with fresh time priority"]
-    Q --> M
-    M -- "Owner or authorized cancellation" --> C["Return remaining input; settle remaining bid; close order"]
+    A["Router.swap / swapWithSig<br/>input, minimum output, optional USDC bid, MEV tax"] --> B["beforeSwap takes the input (custom accounting)<br/>check quote minimum and asset floor<br/>escrow input and any bid"]
+    B --> V{"Active liquidity and pool spot price<br/>strictly better than the best opposing level?"}
+    V -- "No" --> F["Book first: match up to 8 crossing pairs"]
+    V -- "Yes" --> PF["Pool first, limited at the best opposing level"]
+    PF -- "Filled" --> Z["Closed"]
+    PF -- "Stopped at the level, or reverted" --> F
+    F --> I{"Still open?"}
+    I -- "No" --> Z
+    I -- "Yes" --> J["Try the remainder against pool liquidity"]
+    J -- "Filled" --> Z
+    J -- "Rolled back" --> R["Resting order"]
+
+    R -- "New crossing order or Router.matchBook" --> N["Bounded book matching"]
+    N -- "Remainder" --> R
+    N -- "Done, or remainder below minimum" --> Z
+    R -- "Router.fillFromPoolLiquidity" --> J
+    R -- "Router.fillOrder" --> O["Filler pays the live minimum<br/>if it is within maxPrice"]
+    O --> Z
+    R -- "Router.fillOrderWithCallback<br/>or fillOrderInCallback" --> FL["Flash fill: see flash-fills.md"]
+    FL --> Z
+    R -- "topUpPriorityFee" --> T["Fund extra bid; back of the new fee tier"]
+    T --> R
+    R -- "updatePrice" --> Q["New minimum; fresh time priority"]
+    Q --> R
+    R -- "startAuction / stepAuction" --> DA["Minimum falls on a schedule: see dutch-auction.md"]
+    DA --> R
+    R -- "cancelOrder / cancelWithSig / cancelAndWithdraw" --> C["Return remaining input; settle remaining bid"]
     C --> Z
 ```
 
-If no executable crossing pair exists, the initial matching pass leaves the order unchanged before the LP attempt. `Router.matchBook` accepts a bound of 1–8 pairs and does not itself retry LP liquidity. An LP retry does not require the order to be first in the book. Private fills require a maker-authorized executor (normally the Router); the filler pays exactly the live minimum in the same transaction, and the 0.02% trade fee comes out of each side's proceeds. That trade fee is separate from the LP fee on pool-liquidity fills. Book-match proceeds, and input returned below the pool minimum, are credited as PoolManager claims in every currency, redeemable through `TokenClaims` (ERC-20), `NativeClaims` (ETH) or `Router.withdrawClaims`; native fill proceeds and refunds are claims too. Filler and LP fills pay ERC-20 output directly, except a pool-first fill that stops at the best book level: the order stays open for the book, so its output is credited as claims. When the pool goes first, a remainder below the pool minimum that the book leaves is returned as claims.
+Notes:
 
-Sources: [Router](../src/Router.sol), [AsyncSwap](../src/AsyncSwap.sol), [IncomingMatching](../src/libraries/IncomingMatching.sol), [AsyncMatching](../src/libraries/AsyncMatching.sol), and [AsyncFiller](../src/libraries/AsyncFiller.sol).
+- `updatePrice` only re-ranks the order. It needs no unlock and triggers no matching; a later crossing order,
+  `matchBook`, a filler or a pool-fill retry executes it. Each reprice increments `orderReprices`, which voids
+  older signed reprices.
+- `Router.matchBook` accepts 1 to 8 pairs and does not retry pool liquidity. `matchBook` skips a pool while a
+  new order on it is still being funded.
+- A crossing arrival on a pool with no active LP liquidity is staged in transient storage by `IncomingMatching`
+  while it is funded, matched in memory against the book, and only its remainder is stored.
+- Book-match proceeds and refunds below the pool minimum are paid as PoolManager claims, so a token that refuses
+  a recipient cannot block matching. Filler and pool fills pay ERC-20 output directly; native output is paid as
+  claims (id 0). Flash fills pay the filler in claims.
+- Holders redeem claims through `TokenClaims`, `NativeClaims` or `Router.withdrawClaims`.
+  `Router.cancelAndWithdraw` cancels and withdraws native input in one step.
 
-## Fee top-ups
+Sources: [Router](../src/Router.sol), [AsyncSwap](../src/AsyncSwap.sol),
+[IncomingMatching](../src/libraries/IncomingMatching.sol), [AsyncMatching](../src/libraries/AsyncMatching.sol),
+[AsyncFiller](../src/libraries/AsyncFiller.sol).
 
-An open order's maker can increase its remaining USDC bid through `Router.topUpPriorityFee(order, addedFee)`.
-The positive delta is funded atomically with the queue update. The resulting bid must meet the current
-remaining order's nonzero-bid minimum. A changed bid joins the back of its new fee tier; its input,
-limit price and original maker age stay unchanged. Matching is separate, optionally batched through
-`Router.multicall`. See [the API and agent example](priority-fee-top-ups.md).
+## Priority bids
 
-## Priority-bid settlement
-
-Priority bids are optional. An order with no bid pays no priority fee at creation and keeps time priority among other zero-bid orders. A nonzero bid is escrowed in USDC and is **non-refundable**; it must be at least `min(0.10 USDC, 0.1% of the order’s USDC notional)`, rounded down to base units. An unlock cannot finish with an unpaid nonzero bid debt. Bids rank same-price orders within the book; they do not purchase block inclusion or transaction ordering from the chain. The chain's own priority fee is a different thing: the Router taxes it on order creation and fills (the MEV tax, see [protocol.md](protocol.md)), so an order sent with no priority fee pays no tax.
+Bids are optional and paid in USDC, so only numeraire pools accept them. A zero-bid order pays nothing and keeps
+time priority among zero-bid orders. A nonzero bid is escrowed and **non-refundable**; it must be at least
+`min(0.10 USDC, 0.1% of the order's USDC notional)`. Bids rank same-price orders in the book; they do not buy
+block inclusion. The chain's priority fee is a different thing: the Router taxes it (the MEV tax, see the
+[overview](protocol.md#2-where-funds-live)).
 
 ```mermaid
 flowchart TD
-    A["Escrow USDC bid as PoolManager claims"] --> B{"Order event"}
-    B -- "Book match, or pool fill up to the best book level" --> C["Settle proportional bid share for each order's consumed input"]
-    C --> D{"Remaining order meets pool minimum?"}
-    D -- "Yes" --> E["Keep unspent bid escrowed; update remaining order and rank"]
+    A["Bid escrowed as hook claims"] --> B{"Order event"}
+    B -- "Book match, or pool fill up to a book level" --> C["Settle the filled share:<br/>floor(remainingBid * inputUsed / remainingInput)"]
+    C --> D{"Remainder meets the pool minimum?"}
+    D -- "Yes" --> E["Keep the rest escrowed; re-rank"]
     E --> B
-    D -- "No" --> F["Settle all remaining bid; return unused input; close order"]
-    B -- "Successful LP or private fill" --> F
-    B -- "Authorized cancellation" --> F
-    B -- "Reprice" --> E
-    B -- "Maker funds top-up" --> E
-    C --> G{"Bid amount to settle is nonzero?"}
-    F --> G
-    G -- "No" --> H["No bid transfer"]
-    G -- "Yes" --> K["Transfer bid claims to protocol FeeVault"]
-    K --> L["Commit with the order operation in the same unlock"]
-    H --> L
-    L -. "Any later revert" .-> M["Roll back operation and bid settlement together"]
+    D -- "No" --> F["Settle all remaining bid; close"]
+    B -- "Filler, flash or pool fill in full" --> F
+    B -- "Cancel" --> F
+    B -- "Reprice or auction step" --> E
+    B -- "Top-up" --> E
+    C --> K["Bid claims to FeeVault, in the same unlock"]
+    F --> K
 ```
 
-For each book match, the settled share is `floor(remainingBid * inputUsed / remainingInputBeforeFill)`. If the order terminates, any residual bid is settled too; it is never returned to the maker. A partial fill can leave a bid below the creation minimum. Its remaining bid determines its new same-price rank. If the remaining price key changes, it also receives a fresh sequence number. Maker repricing always assigns fresh time priority without refunding the bid.
+Bids always go to the FeeVault, never to LPs, so liquidity added just before a settlement earns none of them. A
+failed pool-fill self-call rolls back its fee and bid changes and keeps earlier book matches.
 
-Bids always go to the FeeVault, whatever liquidity is in range, so liquidity added for the moment of settlement captures none of them. A failed LP self-call rolls back that attempt, including its fee and bid changes, while preserving prior successful book matches in the surrounding transaction. A revert of the surrounding transaction rolls everything back.
+Raising a sell's minimum output requires a nonzero remaining bid to meet the new notional's bid floor. A
+partially filled order keeps its prorated bid when repriced to unchanged or lower terms. Sources:
+[`_reduceAfterMatch` and `_settleMatchedPriorityFee`](../src/libraries/AsyncMatching.sol),
+[`settlePriorityFee`, `fill` and `cancel`](../src/libraries/AsyncFiller.sol).
 
-Sources: [`_reduceAfterMatch` and `_settleMatchedPriorityFee`](../src/libraries/AsyncMatching.sol), [`settlePriorityFee`, `fill`, and `cancel`](../src/libraries/AsyncFiller.sol). The [original chat diagrams](historical-matching-diagrams.md) are retained as historical references.
+## Top-ups, cancels and withdrawals
 
-
-Raising a sell's minimum output requires any nonzero remaining bid to meet the new notional's bid floor; a zero bid remains valid.
-A partially filled sell can retain its prorated bid when repricing to unchanged or lower terms.
-Book selection compares exact prices first, even within a shared tick; fee and queue age only
-break exact-price ties. Settlement age remains the immutable creation sequence.
-
-### Cancel and withdraw
-
-The updated Router exposes `cancelAndWithdraw(order)`. The maker authorizes that
-Router as an executor for the pool and approves its exact native claim allowance
-on PoolManager (claim ID 0). Cancellation and withdrawal then execute atomically:
-the remaining native input goes directly to the maker's wallet, while pre-existing
-claims are left untouched. ERC20 cancellation already returns real tokens.
-A failed withdrawal reverts the cancellation as well.
-
-`withdrawClaims(currencies, amounts)` redeems existing native or ERC20 PoolManager
-claims to the caller's wallet. Approve each currency's ERC-6909 claim ID on
-PoolManager; an ERC20 approval is not a claim approval. The Router accepts up to
-16 distinct currencies and never withdraws another wallet's claims.
-
-`Router.multicall(calls)` batches these with `cancelOrder` and other Router calls in
-one atomic transaction, each running as the caller: for example, cancel several
-orders and withdraw the resulting claims together. If any call fails, the whole
-batch reverts. It replaces the earlier BatchActions, BatchCancels and BatchClaims
-contracts, which needed their own executor and operator grants. `multicall` is not
-payable, so send native-value calls on their own.
-
-For existing immutable hooks, an updated Router can be deployed alongside the
-creation Router. The registry records it as `WithdrawalRouter`; `Router` remains
-the original creation route. Existing orders and balances do not move.
+- `Router.topUpPriorityFee(order, addedFee)` funds a larger bid. The order joins the back of its new fee tier;
+  its input, limit price and maker age stay the same. See [priority fee top-ups](priority-fee-top-ups.md).
+- `Router.cancelAndWithdraw(order)` cancels and sends native input straight to the maker's wallet, given an
+  exact claim allowance for id 0. ERC-20 cancels already return tokens.
+- `Router.withdrawClaims(currencies, amounts)` redeems up to 16 currencies of the caller's own claims.
+- `Router.multicall(calls)` batches any of these atomically, each as the caller.

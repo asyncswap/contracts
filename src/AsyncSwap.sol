@@ -511,7 +511,14 @@ contract AsyncSwap is BaseHook, EIP712 {
     function startAuction(AsyncOrder calldata order, uint256 floorAmountOutMin, uint32 duration) external {
         PoolId poolId = order.key.toId();
         DutchAuction.start(
-            asyncOrders[poolId], priceBooks[poolId], auctions, order, order.orderId(), floorAmountOutMin, duration, msg.sender
+            asyncOrders[poolId],
+            priceBooks[poolId],
+            auctions,
+            order,
+            order.orderId(),
+            floorAmountOutMin,
+            duration,
+            msg.sender
         );
     }
 

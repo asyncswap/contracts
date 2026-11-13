@@ -31,7 +31,11 @@ library DutchAuction {
     }
 
     event AuctionStarted(
-        bytes32 indexed orderId, uint256 startAmountOutMin, uint256 floorAmountOutMin, uint64 startBlock, uint32 duration
+        bytes32 indexed orderId,
+        uint256 startAmountOutMin,
+        uint256 floorAmountOutMin,
+        uint64 startBlock,
+        uint32 duration
     );
 
     error InvalidAuction();
@@ -51,8 +55,7 @@ library DutchAuction {
         AsyncFiller.OrderInfo storage info = self.orders[id];
         if (info.amountIn == 0) revert AsyncFiller.OrderNotFound();
         if (
-            duration == 0 || duration > MAX_DURATION || floorAmountOutMin == 0
-                || floorAmountOutMin >= info.amountOutMin
+            duration == 0 || duration > MAX_DURATION || floorAmountOutMin == 0 || floorAmountOutMin >= info.amountOutMin
         ) revert InvalidAuction();
         AsyncFiller.checkMinimum(book, info.isBuy, info.amountIn, floorAmountOutMin);
         auctions[id] = Auction({

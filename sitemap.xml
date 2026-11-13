@@ -17,7 +17,15 @@
     <lastmod>2026-11-13</lastmod>
   </url>
   <url>
+    <loc>https://docs.asyncswap.org/protocol/dutch-auction</loc>
+    <lastmod>2026-11-13</lastmod>
+  </url>
+  <url>
     <loc>https://docs.asyncswap.org/protocol/dynamic-fee-ordering</loc>
+    <lastmod>2026-11-13</lastmod>
+  </url>
+  <url>
+    <loc>https://docs.asyncswap.org/protocol/flash-fills</loc>
     <lastmod>2026-11-13</lastmod>
   </url>
   <url>
@@ -34,6 +42,10 @@
   </url>
   <url>
     <loc>https://docs.asyncswap.org/protocol/priority-fee-top-ups</loc>
+    <lastmod>2026-11-13</lastmod>
+  </url>
+  <url>
+    <loc>https://docs.asyncswap.org/protocol/repricing-signatures</loc>
     <lastmod>2026-11-13</lastmod>
   </url>
   <url>

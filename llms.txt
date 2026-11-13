@@ -3,8 +3,11 @@
 An MEV-capturing DEX built as a Uniswap v4 hook: an on-chain order book and matching engine for limit orders against USDC, matched by price, priority bid and time. Priority bids auction ordering to the protocol and a dynamic fee returns backrun profit to LPs.
 
 - [Async Swap, an MEV-capturing on-chain order book DEX on Uniswap v4](/index): An MEV-capturing DEX built as a Uniswap v4 hook. An on-chain order book and matching engine for USDC limit orders, where priority bids auction ordering to the protocol and a dynamic fee returns backrun profit to LPs.
-- [Async Swap protocol map](/protocol/overview): Contracts, custody, fees and authorization of the Async Swap hook, in diagrams: permissionless pools, minimum order and asset floor fixed at deployment, Router.multicall.
+- [Async Swap protocol](/protocol/overview): Entry point: contracts, custody, fees, authorization, module and library layout of the Async Swap hook, in diagrams.
 - [Order lifecycle and priority bids](/protocol/order-lifecycle): How an order is placed, matched, filled, repriced and cancelled, how priority bids are paid, and how to cancel and withdraw claims in one Router.multicall.
+- [Flash fills and non-numeraire pools](/protocol/flash-fills): Flash fills with no inventory: fillOrderWithCallback, nested fillOrderInCallback, the per-fill MEV tax paid in flash-accounting style, and pools without the numeraire.
+- [Dutch auction orders](/protocol/dutch-auction): Dutch auction orders: a minimum output that falls to a floor over blocks, stepAuction, and how each fill path sees the price.
+- [Signed price changes](/protocol/repricing-signatures)
 - [Priority fee top-ups](/protocol/priority-fee-top-ups)
 - [Contract call sequences](/protocol/contract-call-sequences): Step-by-step contract calls for opening pools and placing, matching, filling, cancelling (alone or batched) and redeeming orders.
 - [Price keys and crossing](/protocol/price-key-crossing): How limit prices map to price keys and when two orders cross.

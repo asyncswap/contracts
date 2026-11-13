@@ -1,10 +1,10 @@
 # Contract call sequences
 
-The [protocol overview](/protocol/overview#3-placing-an-order) contains the short order sequence; this page contains the detailed sequences. See [order lifecycle and priority bids](/protocol/order-lifecycle) for the flowcharts.
+The [protocol overview](/protocol/overview#3-placing-an-order) has the short order sequence; this page has the detailed ones. See [order lifecycle and priority bids](/protocol/order-lifecycle) for the flowcharts, [flash fills](/protocol/flash-fills#flow) for the flash-fill sequence and [Dutch auctions](/protocol/dutch-auction#fills) for auction fills.
 
 Solid arrows are calls or actions; dashed arrows are returns or delivered results. Each sequence groups related transactions; it is not one transaction from top to bottom. The app and wallet represent the user interface, not trusted settlement components. An indexer may observe emitted events for discovery, but neither an API nor an indexer is required by the contracts.
 
-`IncomingMatching` and `AsyncMatching` are linked external libraries called in the hook's context. `AsyncFiller`, the price tree, and currency-settlement helpers operate on that same context; they are not independent custodians. Arrows from the matching library to PoolManager therefore execute as the hook. ERC-6909 claims and LP fee accounting live inside PoolManager. These sequences describe current source; deployed v1.3.0 contracts predate the incoming-memory path.
+`IncomingMatching`, `AsyncMatching`, `MultiAsset` and `DutchAuction` are linked libraries called by DELEGATECALL in the hook's context, and `AsyncFiller` is internal to them, so arrows from them to PoolManager execute as the hook. ERC-6909 claims and LP fee accounting live inside PoolManager. Every Router action is one `PoolManager.unlock` (v4 flash accounting): it can only finish once every delta is zero.
 
 ### User order, book matching, and LP fallback
 
@@ -33,7 +33,7 @@ sequenceDiagram
     end
     Note over Wallet,Token: Direct ERC-20 input needs Router approval, signed input needs Permit2 approval.<br/>A nonzero USDC bid separately needs Router approval.
     alt Direct order, including native ETH input
-        Wallet->>Router: swap(order, userData), exact ETH value if native
+        Wallet->>Router: swap(order, userData), msg.value = native input + MEV tax
     else Signed ERC-20 order
         Wallet-->>Relayer: Permit2 order-witness signature and optional executor grant
         Relayer->>Router: swapWithSig(order, permit, grant)
@@ -44,14 +44,17 @@ sequenceDiagram
     end
     Router->>PM: unlock(create action)
     PM->>Router: unlockCallback(data)
+    opt Nonzero MEV tax
+        Router->>PM: settle the tax in ETH, mint it to FeeVault as native claims
+    end
     Router->>PM: swap(exact input, hook data)
     PM->>Hook: beforeSwap(...)
     Hook->>PM: mint input escrow claims to hook
     Hook->>Match: Check minimums and stage crossing arrival, or add to price book
     Match->>PM: mint bid escrow claims to hook, hook owes bid
     Match-->>Hook: Order staged or indexed
-    Note over Hook,Match: Without active LPs, potentially crossing arrivals use transient storage during funding.<br/>AsyncOrderCreated is emitted; matching waits until input and bid funding finish.
-    Hook-->>PM: beforeSwap selector and custom accounting delta
+    Note over Hook,Match: Without active LPs, potentially crossing arrivals use transient storage during funding.<br/>AsyncOrderCreated is emitted, and matching waits until input and bid funding finish.
+    Hook-->>PM: BeforeSwapDelta takes the whole input (custom accounting)
     PM-->>Router: Swap delta
     alt Direct input funding
         Router->>PM: Settle input using ERC-20 transfer or forwarded ETH
@@ -105,7 +108,7 @@ sequenceDiagram
             PM-->>Wallet: ERC-20 proceeds or native claims
             Match-->>Hook: Order removed, liquidity fill event
         else Pool first, stopped at the book level, pro-rata minimum met
-            Match->>Match: Reduce the order, keeping the maker's limit; settle the filled bid share
+            Match->>Match: Reduce the order, keeping the maker's limit, and settle the filled bid share
             Match->>PM: Credit output less the dynamic fee as claims
             Match-->>Hook: Order stays open for the book, liquidity fill event
         else Insufficient liquidity, partial execution without a limit, or limit not met
@@ -141,10 +144,14 @@ sequenceDiagram
     alt Private filler settles a specific order
         Caller->>Hook: asyncOrderInfo(poolId, orderId)
         Hook-->>Caller: Live remaining input and minimum output
-        Caller->>Router: fillOrder(order, maxPrice, data)
+        opt Dutch auction order
+            Caller->>Hook: stepAuction(order), same transaction
+        end
+        Caller->>Router: fillOrder(order, maxPrice, data), msg.value = native output + MEV tax
         Note over Caller,Hook: Native output requires exact gross ETH, forwarded by Router to hook before unlock.<br/>ERC-20 output requires filler approval to Router.
         Router->>PM: unlock(fill action)
         PM->>Router: unlockCallback(data)
+        Router->>PM: settle the MEV tax, mint it to FeeVault
         Router->>Hook: Read live input, minimum and surcharge (calculatePoolFee, zero)
         Hook-->>Router: Live input and minimum
         Router->>Router: Require live input at least order.amountIn and the minimum no greater than maxPrice
@@ -182,9 +189,10 @@ sequenceDiagram
         PM-->>Router: Unlock complete
         Router-->>Caller: Transaction succeeds
     else Retry a specific order against LP liquidity
-        Caller->>Router: fillFromPoolLiquidity(order)
+        Caller->>Router: fillFromPoolLiquidity(order), msg.value = MEV tax
         Router->>PM: unlock(pool fill action)
         PM->>Router: unlockCallback(data)
+        Router->>PM: settle the MEV tax, mint it to FeeVault
         Router->>Hook: tryFillOrderFromPoolLiquidity(order)
         Note over Hook,PM: Same guarded LP self-call as above, including the dynamic fee, no book-priority check.
         Hook-->>Router: true if filled, false if LP attempt rolled back
@@ -249,8 +257,13 @@ sequenceDiagram
 
     Operator->>PM: initialize(key, sqrtPriceX96)
     PM->>Hook: beforeInitialize(...)
-    Hook->>Hook: Require configured USDC and dynamic-fee pool (any caller may initialize)
-    Hook->>Hook: Copy the deployment minimum order and bid cap to the pool
+    Hook->>Hook: MultiAsset.initialize: require the dynamic-fee flag
+    alt Pool holds the numeraire
+        Hook->>Hook: Copy the deployment minimum order and bid cap to the pool
+    else Pool without the numeraire
+        Hook->>Hook: Require numeraire pools for both tokens, same tick spacing
+        Hook->>Hook: Quote-side floor from currency1 decimals, no priority bids
+    end
     Hook->>Hook: Reject an asset with no code, read its decimals and store its 0.0001-token floor
     Hook-->>PM: beforeInitialize selector
     PM-->>Operator: Initialized tick, Initialize event

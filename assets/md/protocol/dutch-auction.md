@@ -55,7 +55,7 @@ sequenceDiagram
         R->>H: asyncOrderInfo and auctionPremium
         Note over R: floor + premium within maxPrice
         R->>Filler: asyncSwapFlashFill(..., amountOwed = floor + premium)
-        R->>H: floor, as today; the hook pays the maker less 0.02%
+        R->>H: floor, as today: the hook pays the maker less 0.02%
         R->>M: premium in tokens (claims burnt, then taken)
     else Plain fill (Router.fillOrder)
         Filler->>R: fillOrder(order, maxPrice)

@@ -26,6 +26,7 @@ export default defineConfig({
     { text: 'Protocol', link: '/protocol/overview' },
     { text: 'Contracts', link: '/reference' },
     { text: 'Deployments', link: '/deployments' },
+    { text: 'Governance', link: '/governance' },
     { text: 'App', link: 'https://app.asyncswap.org' },
   ],
   socials: [{ icon: 'github', link: 'https://github.com/asyncswap/contracts' }],
@@ -46,6 +47,7 @@ export default defineConfig({
       ],
     },
     { text: 'Deployments', link: '/deployments' },
+    { text: 'Governance', link: '/governance' },
     {
       text: 'Security',
       items: [{ text: 'Audit scope', link: '/audit/scope' }],

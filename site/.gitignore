@@ -7,6 +7,7 @@ src/generated/
 src/pages/protocol/
 src/pages/audit/
 src/pages/deployments.md
+src/pages/governance.md
 src/pages/reference/src/
 public/assets/
 public/deployments.json

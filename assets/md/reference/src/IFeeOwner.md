@@ -1,6 +1,6 @@
 # IFeeOwner
 
-[Git Source](https://github.com/asyncswap/contracts/blob/84f3d45a9d5fd5044b514fe8372b641bb2c45527/src/FeeVault.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/82ee65e823d10e04aa4d76aae56bc22e47e2407e/src/FeeVault.sol)
 
 ## Functions
 

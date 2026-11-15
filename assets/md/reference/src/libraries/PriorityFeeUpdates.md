@@ -1,6 +1,6 @@
 # PriorityFeeUpdates
 
-[Git Source](https://github.com/asyncswap/contracts/blob/84f3d45a9d5fd5044b514fe8372b641bb2c45527/src/libraries/PriorityFeeUpdates.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/82ee65e823d10e04aa4d76aae56bc22e47e2407e/src/libraries/PriorityFeeUpdates.sol)
 
 Funded priority amendments, linked separately to keep the hook within EIP-170.
 

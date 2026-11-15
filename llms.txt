@@ -13,6 +13,7 @@ An MEV-capturing DEX built as a Uniswap v4 hook: an on-chain order book and matc
 - [Price keys and crossing](/protocol/price-key-crossing): How limit prices map to price keys and when two orders cross.
 - [Dynamic fee ordering](/protocol/dynamic-fee-ordering): How Async Swap captures backrun MEV with a dynamic fee on pool fills that move the price back, split between LPs and the protocol.
 - [Deployments](/deployments): Contract addresses and faucets for the three testnets (Unichain Sepolia, Robinhood Chain testnet, Elysium testnet); no mainnet yet. Also at /deployments.json.
+- [Governance token (ASWAP)](/governance): The ASWAP governance token: one address on Base, Ethereum, Optimism and Unichain, fixed 1B supply, bridging routes, delegation and voting, permits and flash loans.
 - [Audit scope: Async Swap (2026-11-05)](/audit/scope): Audit scope: frozen commit, files in scope, trust assumptions, known issues and the status of every previous finding.
 - [Contract reference](/reference/): Contracts, libraries, interfaces and types, generated from the NatSpec in src/.
 - [AsyncSwap](/reference/src/AsyncSwap): Uniswap v4 hook that converts an exact-input swap into an open async order: the maker deposits their input via `_beforeSwap`. Crossing orders settle directly at the resting limit; fillers settle unmatched orders.

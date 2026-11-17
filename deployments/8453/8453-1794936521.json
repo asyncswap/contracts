@@ -1,0 +1,26 @@
+{
+  "chainId": 8453,
+  "contracts": {
+    "TickPrice": {
+      "address": "0x98Ed83727D618a3a6975e6a9E9E34a29EE74D30d",
+      "startBlock": 58730390,
+      "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "DynamicFeeOrdering": {
+      "address": "0xE5BEe42D0ed34b2cE12B6046219CA49C5a3Fa8F8",
+      "startBlock": 58730474,
+      "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "TickBitmap": {
+      "address": "0x977Aee08690CB39A5dab41937eCdbD70e1Bf4a21",
+      "startBlock": 58730553,
+      "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "EligiblePrice": {
+      "address": "0x5C51B17E1b1D842C168aeDcF001014Fe55b60f8e",
+      "startBlock": 58730641,
+      "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  },
+  "updatedAt": 1794936503
+}

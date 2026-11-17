@@ -1,0 +1,16 @@
+{
+  "chainId": 8453,
+  "contracts": {
+    "TickPrice": {
+      "address": "0x98Ed83727D618a3a6975e6a9E9E34a29EE74D30d",
+      "startBlock": 58730390,
+      "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "DynamicFeeOrdering": {
+      "address": "0xE5BEe42D0ed34b2cE12B6046219CA49C5a3Fa8F8",
+      "startBlock": 58730474,
+      "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  },
+  "updatedAt": 1794936470
+}

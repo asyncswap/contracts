@@ -1,0 +1,71 @@
+{
+  "chainId": 8453,
+  "contracts": {
+    "TickPrice": {
+      "address": "0x98Ed83727D618a3a6975e6a9E9E34a29EE74D30d",
+      "startBlock": 58730390,
+      "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "DynamicFeeOrdering": {
+      "address": "0xE5BEe42D0ed34b2cE12B6046219CA49C5a3Fa8F8",
+      "startBlock": 58730474,
+      "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "TickBitmap": {
+      "address": "0x977Aee08690CB39A5dab41937eCdbD70e1Bf4a21",
+      "startBlock": 58730553,
+      "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "EligiblePrice": {
+      "address": "0x5C51B17E1b1D842C168aeDcF001014Fe55b60f8e",
+      "startBlock": 58730641,
+      "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "PriorityFeeUpdates": {
+      "address": "0x95A03d8E4dFb9B7193e856612180948102618260",
+      "startBlock": 58730728,
+      "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "MultiAsset": {
+      "address": "0x173FFa2E5B59ED96933Ad5dD480dC65F81E5b3DB",
+      "startBlock": 58730809,
+      "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "DutchAuction": {
+      "address": "0xc52786503E19BF4411EF8C679DfB60EEc3F6f045",
+      "startBlock": 58730892,
+      "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "AsyncMatching": {
+      "address": "0xef15D16Cdb780c4d5B34d55a6a64F2b430c9BfAC",
+      "startBlock": 58730978,
+      "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "IncomingMatching": {
+      "address": "0x543EfE2Bc6B4eCFfa42C71860F7a98e0B689954e",
+      "startBlock": 58731063,
+      "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "PoolManager": {
+      "address": "0x498581fF718922c3f8e6A244956aF099B2652b2b",
+      "startBlock": 25350988,
+      "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "AsyncSwap": {
+      "address": "0x91E8942922DAA3Ef081f7D407823Bf280aE62888",
+      "startBlock": 58731234,
+      "txHash": "0xd7f380e3b050c6c83f71226be1d61d401585a8346fac5d467ee7e71d06fe9699"
+    },
+    "Router": {
+      "address": "0x3BD71f850D59273d8Efe9e63B1EDcdE53cdB520F",
+      "startBlock": 58731234,
+      "txHash": "0x8d85b44910472e464f8bba6af2e32baef89ddbb173d037aaa1171e3a02f72e91"
+    },
+    "FeeVault": {
+      "address": "0x03f81AcC97Ed7CDfb6d4e7819942cdCa7aBF7cA5",
+      "startBlock": 58731234,
+      "txHash": "0xd7f380e3b050c6c83f71226be1d61d401585a8346fac5d467ee7e71d06fe9699"
+    }
+  },
+  "updatedAt": 1794936622
+}

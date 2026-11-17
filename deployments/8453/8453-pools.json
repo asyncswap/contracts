@@ -1,0 +1,90 @@
+[
+  {
+    "symbol": "AAPLc",
+    "poolId": "0x3e199ede3ae9e158a922088eddae7c79f9fd488a3bd1e80e4a131c4c4197cf90",
+    "currency0": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "currency1": "0xb200000000000000000000C2e324d24d7eEcd1fb",
+    "fee": 8388608,
+    "tickSpacing": 60,
+    "hooks": "0x91E8942922DAA3Ef081f7D407823Bf280aE62888",
+    "sqrtPriceX96": "42239195887310095226022920192",
+    "initialUsdPrice": 351.83
+  },
+  {
+    "symbol": "NVDAc",
+    "poolId": "0xb66ffeab1baec2e234ee86d15317b4ef3e635c69f20c319004d9b449051a6b79",
+    "currency0": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "currency1": "0xb20000000000000000000078ee7ce2fE4908108C",
+    "fee": 8388608,
+    "tickSpacing": 60,
+    "hooks": "0x91E8942922DAA3Ef081f7D407823Bf280aE62888",
+    "sqrtPriceX96": "63725406790857475945561849856",
+    "initialUsdPrice": 154.57
+  },
+  {
+    "symbol": "TSLAc",
+    "poolId": "0x6f803a98ba093abdae331f2b436941b6836a9c2b21a4efd2e2b1502356b380d8",
+    "currency0": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "currency1": "0xb2000000000000000000001e800a7f5189430cD0",
+    "fee": 8388608,
+    "tickSpacing": 60,
+    "hooks": "0x91E8942922DAA3Ef081f7D407823Bf280aE62888",
+    "sqrtPriceX96": "40609540576710921770948886528",
+    "initialUsdPrice": 380.63
+  },
+  {
+    "symbol": "MSFTc",
+    "poolId": "0xf0e6ce0ee194e1608174d2947fce7c828933e1e6fa9e15810e59498974b77650",
+    "currency0": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "currency1": "0xB200000000000000000000Ab99cFa739E253872B",
+    "fee": 8388608,
+    "tickSpacing": 60,
+    "hooks": "0x91E8942922DAA3Ef081f7D407823Bf280aE62888",
+    "sqrtPriceX96": "35339091510286358743101734912",
+    "initialUsdPrice": 502.63
+  },
+  {
+    "symbol": "AMZNc",
+    "poolId": "0x58753c3e046bd5c7b462d67a10b12676c5d69f2a0088d4897ac06d9dd3947b82",
+    "currency0": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "currency1": "0xb200000000000000000000d9192b6B456483C2E8",
+    "fee": 8388608,
+    "tickSpacing": 60,
+    "hooks": "0x91E8942922DAA3Ef081f7D407823Bf280aE62888",
+    "sqrtPriceX96": "49447150938583754052154163200",
+    "initialUsdPrice": 256.73
+  },
+  {
+    "symbol": "GOOGLc",
+    "poolId": "0x2b9c42a33fe2d87edec72027c54b82f1d13ad9d58c8357e5a61d1fafbe448cbc",
+    "currency0": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "currency1": "0xb2000000000000000000002D0BA3164cc74f58B7",
+    "fee": 8388608,
+    "tickSpacing": 60,
+    "hooks": "0x91E8942922DAA3Ef081f7D407823Bf280aE62888",
+    "sqrtPriceX96": "47156996632806419932335046656",
+    "initialUsdPrice": 282.27
+  },
+  {
+    "symbol": "METAc",
+    "poolId": "0x2352dd8e811d7e01f2b52b13b2051a85587956706c0d76d2d19bc701844a3f35",
+    "currency0": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "currency1": "0xb2000000000000000000008bC8786B856E61707C",
+    "fee": 8388608,
+    "tickSpacing": 60,
+    "hooks": "0x91E8942922DAA3Ef081f7D407823Bf280aE62888",
+    "sqrtPriceX96": "31774623063377466104894980096",
+    "initialUsdPrice": 621.73
+  },
+  {
+    "symbol": "HOODc",
+    "poolId": "0x7e78a61c55668139d428f4963b654754942d36a4a4cb87db4c326f6d096e92ec",
+    "currency0": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "currency1": "0xb2000000000000000000006F944897540579D3f2",
+    "fee": 8388608,
+    "tickSpacing": 60,
+    "hooks": "0x91E8942922DAA3Ef081f7D407823Bf280aE62888",
+    "sqrtPriceX96": "95852987851880384953176817664",
+    "initialUsdPrice": 68.32
+  }
+]

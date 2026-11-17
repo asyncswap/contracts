@@ -19297,20 +19297,18 @@
       "contracts": {
         "poolManager": "0x498581ff718922c3f8e6a244956af099b2652b2b",
         "permit2": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
-        "usdc": null,
+        "usdc": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
         "asyncSwapHook": null,
         "router": null
       },
       "deployment": {
-        "status": "config_only",
+        "status": "prepared",
         "ordering": "priority",
-        "mevTaxGas": null,
-        "script": null,
+        "mevTaxGas": 20000000,
+        "script": "script/deploy-base.sh",
         "requires": [
-          "chain-specific deployment wrapper",
-          "configured RPC",
-          "verified USDC address",
-          "deployment and pool configuration"
+          "RPC_URL_BASE in .env.deploy",
+          "funded deployer keystore"
         ]
       }
     },

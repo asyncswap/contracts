@@ -1,4 +1,4 @@
-# Unichain mainnet readiness
+# Mainnet readiness
 
 **Blocked: waiting for audit.** Scope: [`audit/AUDIT_SCOPE_11_05_26.md`](audit/AUDIT_SCOPE_11_05_26.md), frozen at
 `c9372ff9577ba3950fa321090a7bfb559fc964a4`. If `src/` or `script/` changes before the audit starts, re-freeze in a new dated scope.
@@ -7,11 +7,17 @@
 
 Fixed at deployment, with no setter:
 
-- **Owner:** `0xb1F0982E02f9F71E60512fd47471d76610CcB556`
-- **USDC:** `0x078D782b760474a361dDA0AF3839290b0EF57AD6`
-- **PoolManager:** `0x1F98400000000000000000000000000000000004`
 - **Minimum order:** `DEPLOY_MIN_ORDER_USD`, default 0
-- **MEV tax gas:** 20,000,000, set in `script/config/chains.json`
+
+| | Unichain (130) | Base (8453) |
+|---|---|---|
+| Owner | `0xb1F0982E02f9F71E60512fd47471d76610CcB556` | `0x33ce69DA05c3ad30A3b525625F950fAda8673205` |
+| USDC | `0x078D782b760474a361dDA0AF3839290b0EF57AD6` | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
+| PoolManager | `0x1F98400000000000000000000000000000000004` | `0x498581fF718922c3f8e6A244956aF099B2652b2b` |
+| MEV tax gas | 20,000,000 | 20,000,000 |
+| Script | `script/deploy-unichain.sh` | `script/deploy-base.sh` |
+
+MEV tax gas is set per chain in `script/config/chains.json`.
 
 ## After the audit
 
@@ -29,7 +35,7 @@ Fixed at deployment, with no setter:
   but no workload fit 100 crossing transactions into a 30-million-gas block.
   The observed first blocks held 44–51 single-fill transactions or 10–12
   eight-fill transactions. This capacity target remains unmet at that budget.
-- [ ] Rehearse the deployment on a Unichain fork, then pin and verify the bytecode.
+- [ ] Rehearse the deployment on a Unichain and a Base fork, then pin and verify the bytecode.
 - [ ] Deploy `TokenClaims` and `NativeClaims` with the core contracts.
 - [ ] Ship claim redemption in the indexer and frontend.
 

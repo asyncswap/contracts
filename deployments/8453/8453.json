@@ -1,5 +1,9 @@
 {
   "chainId": 8453,
+  "features": {
+    "priorityFeeTopUps": true,
+    "tickBitmap": true
+  },
   "contracts": {
     "TickPrice": {
       "address": "0x98Ed83727D618a3a6975e6a9E9E34a29EE74D30d",

@@ -35,11 +35,6 @@
       "startBlock": 58730809,
       "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
     },
-    "DutchAuction": {
-      "address": "0xc52786503E19BF4411EF8C679DfB60EEc3F6f045",
-      "startBlock": 58730892,
-      "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
-    },
     "AsyncMatching": {
       "address": "0xef15D16Cdb780c4d5B34d55a6a64F2b430c9BfAC",
       "startBlock": 58730978,

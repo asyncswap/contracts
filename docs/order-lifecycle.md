@@ -97,7 +97,7 @@ flowchart TD
     D -- "No" --> F["Settle all remaining bid; close"]
     B -- "Filler, flash or pool fill in full" --> F
     B -- "Cancel" --> F
-    B -- "Reprice or auction step" --> E
+    B -- "Reprice" --> E
     B -- "Top-up" --> E
     C --> K["Bid claims to FeeVault, in the same unlock"]
     F --> K

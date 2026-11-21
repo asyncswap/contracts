@@ -41,6 +41,9 @@ contract RouterFlashFills is IAsyncSwapCallback {
     error NotFlashFiller();
 
     event MevTaxPaid(address indexed payer, uint256 amount);
+    /// @notice A flash filler paid `amount` wei more MEV tax than its fills owed; it got the surplus back as native
+    ///         claims (id 0).
+    event MevTaxRefunded(address indexed filler, uint256 amount);
     /// @notice A flash filler paid `maker` a Dutch auction premium on top of the order's minimum output.
     event AuctionPremiumPaid(address indexed maker, address indexed filler, uint256 amount);
 
@@ -78,8 +81,9 @@ contract RouterFlashFills is IAsyncSwapCallback {
         }
         // The maker check is on what the filler holds at the end, whatever route it took.
         POOLMANAGER.transferFrom(filler, address(HOOK), _output(order).toId(), amountOwed);
-        _payPremium(filler, order, premium);
+        // Settle the maker from the amounts BEGIN recorded, then pay the premium, which can run the maker's code.
         _hookCall(SETTLE, order, filler);
+        _payPremium(filler, order, premium);
         _settleMevTax(filler, prepaid);
         return "";
     }
@@ -90,8 +94,12 @@ contract RouterFlashFills is IAsyncSwapCallback {
         (uint256 owed, uint256 premium) = _checkFill(order, maxPrice);
         _chargeMevTax(msg.sender);
         POOLMANAGER.transferFrom(msg.sender, address(HOOK), _output(order).toId(), owed);
+        // The hook burns exactly `owed` (it reverts if the live minimum moved) and closes the order before the
+        // premium payout, which can run the maker's code: a maker that reprices then finds its order gone.
+        AsyncOrder memory paid = order;
+        paid.amountOutMin = owed;
+        _hookCall(FILL, paid, msg.sender);
         _payPremium(msg.sender, order, premium);
-        _hookCall(FILL, order, msg.sender);
     }
 
     /// @inheritdoc IAsyncSwapCallback
@@ -125,7 +133,8 @@ contract RouterFlashFills is IAsyncSwapCallback {
     }
 
     /// @dev Settles the prepayment, then requires the Router's native delta to be covered: the filler may have paid
-    ///      with `settleFor(router)` in its callback. A surplus goes back to the filler.
+    ///      with `settleFor(router)` in its callback. A surplus goes back to the filler as native claims (id 0), so no
+    ///      filler code runs and a filler that cannot receive ETH can still overpay.
     function _settleMevTax(address filler, uint256 prepaid) private {
         if (prepaid != 0) {
             POOLMANAGER.sync(CurrencyLibrary.ADDRESS_ZERO);
@@ -133,14 +142,23 @@ contract RouterFlashFills is IAsyncSwapCallback {
         }
         int256 delta = TransientStateLibrary.currencyDelta(POOLMANAGER, address(this), CurrencyLibrary.ADDRESS_ZERO);
         if (delta < 0) revert MevTaxUnpaid(uint256(-delta));
-        if (delta > 0) POOLMANAGER.take(CurrencyLibrary.ADDRESS_ZERO, filler, uint256(delta));
+        if (delta > 0) {
+            POOLMANAGER.mint(filler, CurrencyLibrary.ADDRESS_ZERO.toId(), uint256(delta));
+            emit MevTaxRefunded(filler, uint256(delta));
+        }
     }
 
-    /// @dev Pays the maker a Dutch auction premium in tokens: the filler's output claims are burnt and the same amount
-    ///      taken to the maker, so the Router's delta nets to zero.
+    /// @dev Pays the maker a Dutch auction premium in the form the hook pays its floor: native ETH as claims (id 0), moved
+    ///      straight from the filler so no maker code runs; ERC20 as tokens, the filler's output claims burnt and the
+    ///      same amount taken to the maker, so the Router's delta nets to zero.
     function _payPremium(address filler, AsyncOrder memory order, uint256 premium) private {
         if (premium == 0) return;
         Currency output = _output(order);
+        if (output.isAddressZero()) {
+            POOLMANAGER.transferFrom(filler, order.owner, output.toId(), premium);
+            emit AuctionPremiumPaid(order.owner, filler, premium);
+            return;
+        }
         POOLMANAGER.transferFrom(filler, address(this), output.toId(), premium);
         POOLMANAGER.burn(address(this), output.toId(), premium);
         POOLMANAGER.take(output, order.owner, premium);

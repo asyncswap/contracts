@@ -24,7 +24,8 @@ library MultiAsset {
     uint8 internal constant BEGIN = 0;
     /// @notice Pay the maker of the open flash fill out of the output claims the Router has transferred to the hook.
     uint8 internal constant SETTLE = 1;
-    /// @notice A full fill paid in claims (inside a flash fill): the hook already holds the output as claims.
+    /// @notice A full fill paid in claims (inside a flash fill): the hook already holds the output as claims, exactly
+    ///         `order.amountOutMin` of them, which must equal the order's live minimum.
     uint8 internal constant FILL = 2;
 
     /// @dev Transient record of the open flash fill, in the hook's context: its id, then the input and minimum output
@@ -48,6 +49,8 @@ library MultiAsset {
     error DynamicFeeRequired();
     error AssetHasNoCode();
     error NoFlashFill();
+    /// @notice An in-callback fill found the order's minimum output changed from what the Router was paid.
+    error FillAmountMismatch(uint256 paid, uint256 owed);
 
     /// @notice Set up a new pool's state and book. Anyone may open a pool that pairs the numeraire with a dynamic fee. A
     ///         pool without the numeraire (for example ETH/TOKEN) may be opened only once both of its tokens have a
@@ -159,6 +162,9 @@ library MultiAsset {
         address filler
     ) private {
         (uint256 amountIn, uint256 amountOut) = self.beginFlashFill(book, order, id, executor, filler);
+        // The Router passes what it transferred to the hook as `order.amountOutMin`; the hook's output claims are
+        // shared by every order, so burning any other amount would pay this maker from, or leave dust in, others' escrow.
+        if (amountOut != order.amountOutMin) revert FillAmountMismatch(order.amountOutMin, amountOut);
         self.settleClaimsOutput(order, id, filler, amountIn, amountOut);
     }
 

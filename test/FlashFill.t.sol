@@ -630,6 +630,18 @@ contract FlashFillMevTaxTest is FlashFillTest {
         assertEq(address(filler).balance, 0);
     }
 
+    /// @notice Paying exactly the tax refunds nothing, so no `MevTaxRefunded` is emitted.
+    function test_mevTax_exactPaymentEmitsNoRefund() public {
+        (AsyncOrder memory a, AsyncOrder memory b, AsyncOrder memory c) = _crossBook();
+        _priority();
+        vm.recordLogs();
+        filler.run{value: 3 * TAX}(a, 90 ether, _steps2(_fillStep(b), _fillStep(c)), 0);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i; i < logs.length; ++i) {
+            assertTrue(logs[i].topics[0] != RouterFlashFills.MevTaxRefunded.selector, "no refund event");
+        }
+    }
+
     function test_mevTax_underpaidReverts() public {
         (AsyncOrder memory a, AsyncOrder memory b, AsyncOrder memory c) = _crossBook();
         _priority();
@@ -646,9 +658,14 @@ contract FlashFillMevTaxTest is FlashFillTest {
 
     function test_mevTax_surplusReturned() public {
         (AsyncOrder memory a, AsyncOrder memory b, AsyncOrder memory c) = _crossBook();
+        // The route leaves the filler this much ETH claims on its own (Alice's 1 ETH, less fee, less Bob's 0.99).
+        uint256 ethClaims = (1 ether - _fee(1 ether)) - 0.99 ether;
         _priority();
+        vm.expectEmit(true, false, false, true, address(router));
+        emit RouterFlashFills.MevTaxRefunded(address(filler), 5);
         filler.run{value: 3 * TAX + 5}(a, 90 ether, _steps2(_fillStep(b), _fillStep(c)), 0);
-        assertEq(address(filler).balance, 5, "surplus back to filler");
+        assertEq(address(filler).balance, 0, "no plain ETH sent to the filler");
+        assertEq(manager.balanceOf(address(filler), ETH.toId()), ethClaims + 5, "surplus back as native claims");
         assertEq(_vaultEth(), _fee(1 ether) + _fee(0.99 ether) + 3 * TAX);
     }
 

@@ -119,7 +119,7 @@ flowchart TB
 | LP fee, pool fill | 0.02% dynamic LP fee | the order | PoolManager `Swap` |
 | Dynamic fee, pool fill that backruns | half the price gap it closes | the order, in its output | `DynamicFeeCharged` |
 | Priority bid | maker's choice, USDC, non-refundable | the maker | settles with fills and closes |
-| MEV tax | priority fee per gas × `MEV_TAX_GAS`, in ETH | the transaction, per order creation or fill | Router `MevTaxPaid(payer, amount)` |
+| MEV tax | priority fee per gas × `MEV_TAX_GAS`, in ETH | the transaction, per order creation or fill | Router `MevTaxPaid(payer, amount)`; a flash filler's overpayment, `MevTaxRefunded(filler, amount)` |
 
 `calculatePoolFee` and `calculateHookFee` are zero. A maker's guarantee is its minimum output minus 0.02%.
 Refunds and cancels are not charged. See [dynamic fee ordering](dynamic-fee-ordering.md) for the pool-fill fee.

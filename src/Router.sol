@@ -111,6 +111,9 @@ contract Router is EIP712, Multicall {
 
     /// @notice A taxed action paid `amount` wei of MEV tax, credited to the FeeVault as native claims.
     event MevTaxPaid(address indexed payer, uint256 amount);
+    /// @notice A flash filler overpaid the MEV tax and got `amount` wei back as native claims. Emitted by the flash-fill
+    ///         module (`FLASH_FILLS`) in this contract's context.
+    event MevTaxRefunded(address indexed filler, uint256 amount);
 
     constructor(IPoolManager _poolManager, AsyncSwap _hook, ISignatureTransfer _permit2, uint256 _mevTaxGas)
         EIP712("AsyncSwap Router", "1")

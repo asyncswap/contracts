@@ -97,7 +97,7 @@ flowchart LR
     E --> G
     G -- "below zero" --> X["revert MevTaxUnpaid(owed)"]
     G -- "zero" --> OK["unlock closes"]
-    G -- "above zero" --> S["take the surplus to the filler"]
+    G -- "above zero" --> S["mint the surplus to the filler<br/>as native claims"]
 ```
 
 - Off chain, `mevTaxFor(fills)` quotes the tax for `fills` fills. Call it with the gas price you will send
@@ -105,6 +105,8 @@ flowchart LR
 - Inside the callback, `mevTaxOwed()` returns exactly what the Router still owes: every fill charged so far
   less what was paid.
 - With no priority fee the tax is zero.
+- Anything paid above the tax comes back to the filler as native claims (id 0), with
+  `MevTaxRefunded(filler, amount)` stating the amount.
 
 `AsyncSwapFlashFiller` pays `mevTaxOwed()` from its own ETH balance at the end of the callback.
 `ethNeeded(fills)` tells the owner how much ETH to send with `fill`, and `script/FlashFill.s.sol` sends exactly

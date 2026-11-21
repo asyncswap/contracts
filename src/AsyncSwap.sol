@@ -6,7 +6,6 @@ import {AsyncFiller} from "@async-swap/libraries/AsyncFiller.sol";
 import {IncomingMatching} from "@async-swap/libraries/IncomingMatching.sol";
 import {AsyncMatching} from "@async-swap/libraries/AsyncMatching.sol";
 import {MultiAsset} from "@async-swap/libraries/MultiAsset.sol";
-import {DutchAuction} from "@async-swap/libraries/DutchAuction.sol";
 import {PriorityFeeUpdates} from "@async-swap/libraries/PriorityFeeUpdates.sol";
 import {OrderSignatures} from "@async-swap/libraries/OrderSignatures.sol";
 import {AsyncOrder, AsyncOrderLibrary} from "@async-swap/types/AsyncOrder.sol";
@@ -65,8 +64,6 @@ contract AsyncSwap is BaseHook, EIP712 {
 
     /// @notice Unordered nonces consumed by signed maker actions (`setExecutorWithSig`, `updatePriceWithSig`).
     mapping(address maker => mapping(uint256 nonce => bool)) public nonceUsed;
-    /// @dev Running Dutch auctions by order id; see `DutchAuction`. Last, so earlier slots keep their places.
-    mapping(bytes32 orderId => DutchAuction.Auction) private auctions;
 
     /// @notice Minimum order in numeraire base units (0: none), fixed at deployment for every pool so the
     ///         owner cannot change the rules under live orders.
@@ -402,8 +399,6 @@ contract AsyncSwap is BaseHook, EIP712 {
             }
         }
         AsyncFiller.State storage state = asyncOrders[order.key.toId()];
-        // A plain fill cannot skip a live auction premium; flash fills pay it through the Router.
-        DutchAuction.requireNoPremium(state, auctions, id);
         uint256 fee = calculatePoolFee(order.key.fee, state.orders[id].amountOutMin);
         AsyncMatching.fill(
             state,
@@ -506,19 +501,6 @@ contract AsyncSwap is BaseHook, EIP712 {
             priceBooks[order.key.toId()],
             AsyncMatching.UpdateParams({order: order, id: id, newAmountOutMin: newAmountOutMin, caller: msg.sender})
         );
-    }
-
-    /// @notice Maker starts a Dutch auction. The order stays at its minimum output (the floor); flash fillers pay a
-    ///         premium that starts at `startAmountOutMin - floor` and falls to zero over `duration` blocks.
-    function startAuction(AsyncOrder calldata order, uint256 startAmountOutMin, uint32 duration) external {
-        DutchAuction.start(
-            asyncOrders[order.key.toId()], auctions, order, order.orderId(), startAmountOutMin, duration, msg.sender
-        );
-    }
-
-    /// @notice The auction premium a flash filler pays on top of the order's minimum output now; zero for none.
-    function auctionPremium(AsyncOrder calldata order) external view returns (uint256) {
-        return DutchAuction.premium(asyncOrders[order.key.toId()], auctions, order.orderId());
     }
 
     event AsyncOrderPriorityFeeUpdated(

@@ -112,7 +112,7 @@ contract StressCompletionTest is SetupHook {
             assertGe(token1.balanceOf(waiting[i].owner) - beforeBalance, waiting[i].amountOutMin);
         }
         for (uint256 i; i < 512; ++i) {
-            vm.roll(block.number + 1);
+            vm.roll(vm.getBlockNumber() + 1);
             bool sell = i % 2 == 0;
             address maker = makers[i % 32];
             uint256 beforeOutput = sell ? token1.balanceOf(maker) : token0.balanceOf(maker);
@@ -132,8 +132,8 @@ contract StressCompletionTest is SetupHook {
         uint256 rounds = vm.envOr("STRESS_ROUNDS", uint256(32));
         require(rounds > 0 && rounds <= 1024, "Invalid stress rounds");
         for (uint256 round; round < rounds; ++round) {
-            vm.roll(block.number + 1);
-            vm.warp(block.timestamp + 2);
+            vm.roll(vm.getBlockNumber() + 1);
+            vm.warp(vm.getBlockTimestamp() + 2);
             for (uint256 i; i < 16; ++i) {
                 (, bytes32 ask) = submit(makers[i], true, SIZE, SIZE);
                 (, bytes32 bid) = submit(makers[16 + i], false, SIZE, SIZE);
@@ -159,7 +159,7 @@ contract StressCompletionTest is SetupHook {
 contract NativeWithdrawalStressTest is RouterClaimsTest {
     function test_stress_nativePartialWithdrawalAndDoubleSpend() public {
         for (uint256 i; i < 256; ++i) {
-            vm.roll(block.number + 1);
+            vm.roll(vm.getBlockNumber() + 1);
             AsyncOrder memory o = _order(alice, true, 0.1 ether, 1 ether);
             vm.prank(alice);
             router.swap{value: 0.1 ether}(o, abi.encode(AsyncSwap.UserParams(alice, address(router), 1 ether, 100_000)));

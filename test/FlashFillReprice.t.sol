@@ -92,7 +92,8 @@ contract EthCredit {
 }
 
 /// @notice A fill inside a flash fill (`fillOrderInCallback`) must pay the maker exactly what the filler paid in. A
-///         maker that reprices while being paid its auction premium must not draw on other makers' escrow.
+///         maker that tries to reprice while it is being paid must not draw on other makers' escrow: the hook closes
+///         the order and burns exactly what was paid before any payout runs the maker's code.
 contract FlashFillRepriceTest is FlashFillTest {
     using PoolIdLibrary for PoolKey;
 
@@ -128,21 +129,16 @@ contract FlashFillRepriceTest is FlashFillTest {
         _setUpCallbackPool();
         // The pot: the victim escrows 1000 CBT selling for USDC.
         _place(victim, cbtUsdc, CBT, 1000 ether, 100_000 ether); // 100 USDC per CBT, above the attacker's bid
-        // The attacker sells 200 USDC for at least 10 CBT, auctioned from 20 CBT; halfway the premium is 5 CBT.
+        // The attacker sells 200 USDC for at least 10 CBT, and tries to raise that to 900 CBT while being paid.
         AsyncOrder memory evil = _place(attacker, cbtUsdc, USDC, 200 ether, 10 ether);
-        vm.prank(attacker);
-        hook.startAuction(evil, 20 ether, 100);
-        vm.roll(block.number + 50);
-        uint256 premium = hook.auctionPremium(evil);
-        assertGt(premium, 0);
-        uint256 owed = 10 ether + premium;
+        uint256 owed = 10 ether;
         vm.etch(attacker, address(new RepricingMaker()).code);
         RepricingMaker(payable(attacker)).arm(hook, evil, 900 ether);
 
         // The outer flash fill: Bob sells 1 TOKEN for 100 USDC, paid from the USDC the in-callback fill releases.
         AsyncOrder memory outer = _place(bob, tokenUsdc, TOKEN, 1 ether, 100 ether);
 
-        // The filler brings 15 CBT as claims and fills the attacker's order for floor 10 plus premium 5.
+        // The filler brings 10 CBT as claims and fills the attacker's order at its minimum.
         cbt.mint(address(filler), owed);
         MockFlashFiller.Step[] memory steps = new MockFlashFiller.Step[](5);
         steps[0] = _step(address(manager), abi.encodeCall(IPoolManager.sync, (CBT)));
@@ -165,7 +161,7 @@ contract FlashFillRepriceTest is FlashFillTest {
         assertGe(manager.balanceOf(address(hook), CBT.toId()), 1000 ether, "victim escrow drained");
     }
 
-    /// @notice The same attack with native ETH output: the premium must not run the maker's `receive`.
+    /// @notice The same attempt with native ETH output: the payout is claims, so the maker's `receive` never runs.
     function test_inCallbackFill_nativeMakerRepriceWhilePaidCannotDrainEscrow() public {
         address victimEth = makeAddr("victimEth");
         address attackerEth = makeAddr("attackerEth");
@@ -180,12 +176,9 @@ contract FlashFillRepriceTest is FlashFillTest {
 
         // The pot: 50 ETH escrowed, asking far above the attacker's bid.
         _place(victimEth, ethUsdc, ETH, 50 ether, 1_000_000 ether);
-        // The attacker buys ETH with 200 USDC, floor 0.1 ETH, auctioned from 0.2 ETH.
+        // The attacker buys ETH with 200 USDC for at least 0.1 ETH.
         AsyncOrder memory evil = _place(attackerEth, ethUsdc, USDC, 200 ether, 0.1 ether);
-        vm.prank(attackerEth);
-        hook.startAuction(evil, 0.2 ether, 100);
-        vm.roll(block.number + 50);
-        uint256 owed = 0.1 ether + hook.auctionPremium(evil);
+        uint256 owed = 0.1 ether;
         vm.etch(attackerEth, address(new RepricingMaker()).code);
         RepricingMaker(payable(attackerEth)).arm(hook, evil, 40 ether);
 

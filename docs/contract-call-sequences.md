@@ -1,10 +1,10 @@
 # Contract call sequences
 
-The [protocol overview](protocol.md#3-placing-an-order) has the short order sequence; this page has the detailed ones. See [order lifecycle and priority bids](order-lifecycle.md) for the flowcharts, [flash fills](flash-fills.md#flow) for the flash-fill sequence and [Dutch auctions](dutch-auction.md#fills) for auction fills.
+The [protocol overview](protocol.md#3-placing-an-order) has the short order sequence; this page has the detailed ones. See [order lifecycle and priority bids](order-lifecycle.md) for the flowcharts and [flash fills](flash-fills.md#flow) for the flash-fill sequence.
 
 Solid arrows are calls or actions; dashed arrows are returns or delivered results. Each sequence groups related transactions; it is not one transaction from top to bottom. The app and wallet represent the user interface, not trusted settlement components. An indexer may observe emitted events for discovery, but neither an API nor an indexer is required by the contracts.
 
-`IncomingMatching`, `AsyncMatching`, `MultiAsset` and `DutchAuction` are linked libraries called by DELEGATECALL in the hook's context, and `AsyncFiller` is internal to them, so arrows from them to PoolManager execute as the hook. ERC-6909 claims and LP fee accounting live inside PoolManager. Every Router action is one `PoolManager.unlock` (v4 flash accounting): it can only finish once every delta is zero.
+`IncomingMatching`, `AsyncMatching` and `MultiAsset` are linked libraries called by DELEGATECALL in the hook's context, and `AsyncFiller` is internal to them, so arrows from them to PoolManager execute as the hook. ERC-6909 claims and LP fee accounting live inside PoolManager. Every Router action is one `PoolManager.unlock` (v4 flash accounting): it can only finish once every delta is zero.
 
 ### User order, book matching, and LP fallback
 
@@ -144,7 +144,6 @@ sequenceDiagram
     alt Private filler settles a specific order
         Caller->>Hook: asyncOrderInfo(poolId, orderId)
         Hook-->>Caller: Live remaining input and minimum output
-        Note over Caller,Hook: A Dutch auction order refuses plain fills (AuctionRunning) until its auction ends.
         Caller->>Router: fillOrder(order, maxPrice, data), msg.value = native output + MEV tax
         Note over Caller,Hook: Native output requires exact gross ETH, forwarded by Router to hook before unlock.<br/>ERC-20 output requires filler approval to Router.
         Router->>PM: unlock(fill action)

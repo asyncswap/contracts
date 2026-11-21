@@ -66,7 +66,7 @@ contract MatchingHandler is Test {
         uint256 bid = priority ? bound(fee, 100_000, 10e6) : 100_000;
         uint256 amount = sell ? quantity : quote;
         uint256 minimum = sell ? quote : quantity;
-        vm.roll(block.number + 1); // unique salt, including repeated actor/amount combinations
+        vm.roll(vm.getBlockNumber() + 1); // unique salt, including repeated actor/amount combinations
         AsyncOrder memory order = AsyncOrder(key, actor, sell, amount, minimum, bid, 2 ** 96, bytes32(0));
         vm.prank(actor);
         router.swap{value: sell ? amount : 0}(
@@ -143,7 +143,7 @@ contract MatchingHandler is Test {
         if (hook.asyncOrder(key.toId(), orderId) == 0) ++lpFills;
     }
 
-    function _record(AsyncOrder memory order) internal {
+    function _record(AsyncOrder memory order) internal virtual {
         orders.push(order);
         ids.push(id(order));
         sells.push(order.zeroForOne);

@@ -108,7 +108,7 @@ contract BackrunCaptureTest is SetupHook {
     /// Once the window has passed, the earlier price is no longer a reference: no premium.
     function test_noPremiumAfterTheWindow() public {
         uint256 received = _bigSell();
-        vm.roll(block.number + 3);
+        vm.roll(vm.getBlockNumber() + 3);
         uint256 vault = manager.balanceOf(address(hook.feeVault()), currency0.toId());
         _backrun(received, 1);
         // Only the 0.01% protocol fee on the USDC input; no premium in the asset.

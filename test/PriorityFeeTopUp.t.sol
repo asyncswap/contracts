@@ -37,7 +37,7 @@ contract PriorityFeeTopUpTest is SetupHook {
         internal
         returns (AsyncOrder memory o)
     {
-        vm.roll(block.number + 1);
+        vm.roll(vm.getBlockNumber() + 1);
         o = AsyncOrder(key, maker, sell, input, minimum, fee, 2 ** 96, bytes32(0));
         vm.prank(maker);
         router.swap(o, abi.encode(AsyncSwap.UserParams(maker, address(router), minimum, fee)));

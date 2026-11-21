@@ -45,7 +45,7 @@ contract RouterClaimsTest is NativeAsyncSwapTest {
         AsyncOrder memory first = _openNative();
         vm.prank(alice);
         router.cancelOrder(first);
-        vm.roll(block.number + 1);
+        vm.roll(vm.getBlockNumber() + 1);
         AsyncOrder memory second = _openNative();
         uint256 beforeETH = alice.balance;
         vm.startPrank(alice);
@@ -274,7 +274,7 @@ contract RouterClaimsTest is NativeAsyncSwapTest {
         AsyncOrder memory cancelled = _openNative();
         vm.prank(alice);
         router.cancelOrder(cancelled);
-        vm.roll(block.number + 1);
+        vm.roll(vm.getBlockNumber() + 1);
         _openNative();
         AsyncOrder memory buy = _order(bob, false, 1 ether, 1 ether);
         vm.startPrank(bob);

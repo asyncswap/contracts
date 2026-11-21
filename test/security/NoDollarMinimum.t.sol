@@ -56,10 +56,10 @@ contract NoDollarMinimumTest is DustBase {
         } catch {
             emit log("sell with zero minimum rejected");
         }
-        vm.warp(block.timestamp + 1);
+        vm.warp(vm.getBlockTimestamp() + 1);
         _submit(_order(bob, false, 2_000_000, 1e15));
         hook.matchBook(key, 8);
-        vm.warp(block.timestamp + 1);
+        vm.warp(vm.getBlockTimestamp() + 1);
         _submit(_order(alice, true, 1e15, 2_000_000));
         hook.matchBook(key, 8);
     }
@@ -73,14 +73,14 @@ contract NoDollarMinimumTest is DustBase {
         uint256 worse = bidPrice * FLOOR / 1e12;
 
         _submit(_order(bob, false, worse * 10, FLOOR * 10)); // older, worse-or-equal bid
-        vm.warp(block.timestamp + 1);
+        vm.warp(vm.getBlockTimestamp() + 1);
         _submit(_order(bob, false, worse + worse / 100, FLOOR)); // newer bid, 1% better, taken first
-        vm.warp(block.timestamp + 1);
+        vm.warp(vm.getBlockTimestamp() + 1);
         uint256 sellIn = FLOOR + remainder;
         _submit(_order(alice, true, sellIn, askPrice * sellIn / 1e12 + 1));
         hook.matchBook(key, 8);
 
-        vm.warp(block.timestamp + 1);
+        vm.warp(vm.getBlockTimestamp() + 1);
         uint256 before = token0.balanceOf(bob) + manager.balanceOf(bob, currency0.toId());
         _submit(_order(alice, true, FLOOR, 1)); // far below every bid
         hook.matchBook(key, 8);

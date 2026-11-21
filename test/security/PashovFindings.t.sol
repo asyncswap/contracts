@@ -213,7 +213,7 @@ contract EmptyRangeTest is PashovBase {
         router.cancelOrder(buy);
         vm.stopPrank();
 
-        vm.roll(block.number + 3); // outside the dynamic-fee window
+        vm.roll(vm.getBlockNumber() + 3); // outside the dynamic-fee window
         (, bytes32 sellId) = _order(bob, true, 1 ether, 0.5 ether, 0);
         assertEq(hook.asyncOrder(poolId, sellId), 0, "a later sell fills from the pool");
     }

@@ -178,7 +178,7 @@ contract MatchingReferenceTest is SetupHook {
         topUp(actor, 1e30);
         vm.prank(actor);
         token0.approve(address(router), type(uint256).max);
-        vm.roll(block.number + 1);
+        vm.roll(vm.getBlockNumber() + 1);
         AsyncOrder memory o = AsyncOrder(key, actor, sell, input, minimum, fee, 2 ** 96, bytes32(0));
         vm.recordLogs();
         vm.prank(actor);

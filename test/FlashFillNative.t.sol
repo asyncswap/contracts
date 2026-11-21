@@ -44,80 +44,57 @@ contract NoReceiveFiller is IAsyncSwapFlashFiller {
 }
 
 /// @notice Flash fills whose output is native ETH. Every native payout to a maker is a PoolManager claim (id 0), so
-///         no fill ever calls the maker's code; that includes a Dutch auction premium.
+///         no fill ever calls the maker's code.
 contract FlashFillNativeTest is FlashFillTest {
     using PoolIdLibrary for PoolKey;
 
-    /// @dev Alice sells 100 TOKEN for at least 0.9 ETH; the auction starts at 1 ETH and lasts 100 blocks. Bob bids
-    ///      USDC for TOKEN and Carol asks USDC for ETH, so a filler can route 100 TOKEN into about 0.9998 ETH.
-    function _nativeAuction() internal returns (AsyncOrder memory a, AsyncOrder memory bid, AsyncOrder memory ask) {
+    /// @dev Alice sells 100 TOKEN for at least 0.9 ETH. Bob bids USDC for TOKEN and Carol asks USDC for ETH, so a
+    ///      filler can route 100 TOKEN into about 0.9998 ETH.
+    function _nativeBook() internal returns (AsyncOrder memory a, AsyncOrder memory bid, AsyncOrder memory ask) {
         bid = _place(bob, tokenUsdc, USDC, 2500 ether, 99 ether);
         ask = _place(carol, ethUsdc, ETH, 1 ether, 2400 ether);
         a = _place(alice, ethToken, TOKEN, 100 ether, 0.9 ether);
-        vm.prank(alice);
-        hook.startAuction(a, 1 ether, 100);
-        vm.roll(block.number + 50); // floor 0.9 + premium 0.05
     }
 
-    /// @notice The premium on an ETH-output order arrives as native claims, like the floor, not as a plain transfer.
-    function test_nativeOutput_auctionPremiumPaidAsClaims() public {
-        (AsyncOrder memory a, AsyncOrder memory bid, AsyncOrder memory ask) = _nativeAuction();
-        assertEq(hook.auctionPremium(a), 0.05 ether);
+    /// @notice A maker whose code refuses ETH is still filled: its ETH arrives as claims, no plain transfer.
+    function test_nativeOutput_makerThatRefusesEth() public {
+        (AsyncOrder memory a, AsyncOrder memory bid, AsyncOrder memory ask) = _nativeBook();
+        vm.etch(alice, address(new RefusesEth()).code);
         uint256 aliceEth = alice.balance;
 
-        filler.run(a, 0.95 ether, _steps2(_fillStep(bid), _fillStep(ask)), 0);
+        filler.run(a, 0.9 ether, _steps2(_fillStep(bid), _fillStep(ask)), 0);
 
         assertEq(alice.balance, aliceEth, "no plain ETH sent to the maker");
-        assertEq(
-            manager.balanceOf(alice, ETH.toId()),
-            0.9 ether - _fee(0.9 ether) + 0.05 ether,
-            "floor less fee, plus premium"
-        );
+        assertEq(manager.balanceOf(alice, ETH.toId()), 0.9 ether - _fee(0.9 ether), "minimum less fee, as claims");
         assertEq(manager.balanceOf(address(router), ETH.toId()), 0, "router keeps nothing");
         assertEq(address(router).balance, 0);
         assertEq(_live(a), 0);
     }
 
-    /// @notice A maker whose code refuses ETH cannot block, or be broken by, a flash fill of its ETH-output auction.
-    function test_nativeOutput_auctionPremiumToContractThatRefusesEth() public {
-        (AsyncOrder memory a, AsyncOrder memory bid, AsyncOrder memory ask) = _nativeAuction();
-        vm.etch(alice, address(new RefusesEth()).code);
-
-        filler.run(a, 0.95 ether, _steps2(_fillStep(bid), _fillStep(ask)), 0);
-
-        assertEq(manager.balanceOf(alice, ETH.toId()), 0.9 ether - _fee(0.9 ether) + 0.05 ether);
-        assertEq(_live(a), 0);
-    }
-
-    /// @notice The same holds for an ETH-output auction filled inside another flash fill (`fillOrderInCallback`).
-    function test_nativeOutput_inCallbackAuctionPremiumPaidAsClaims() public {
+    /// @notice The same for an ETH-output order filled inside another flash fill (`fillOrderInCallback`).
+    function test_nativeOutput_inCallbackMakerThatRefusesEth() public {
         // Outer: Carol sells 1 ETH for at least 2400 USDC. Inside, the filler spends that ETH on Alice's ETH-output
-        // auction and sells her TOKEN into Bob's TOKEN/USDC bid to pay Carol.
+        // order and sells her TOKEN into Bob's TOKEN/USDC bid to pay Carol.
         AsyncOrder memory bid = _place(bob, tokenUsdc, USDC, 2500 ether, 99 ether);
         AsyncOrder memory outer = _place(carol, ethUsdc, ETH, 1 ether, 2400 ether);
         AsyncOrder memory a = _place(alice, ethToken, TOKEN, 100 ether, 0.9 ether);
-        vm.prank(alice);
-        hook.startAuction(a, 1 ether, 100);
-        vm.roll(block.number + 50);
         vm.etch(alice, address(new RefusesEth()).code);
 
-        // Pay Alice 0.95 ETH claims for her 100 TOKEN, then sell 99 TOKEN to Bob for 2500 USDC to pay Carol.
         MockFlashFiller.Step memory fillAlice = MockFlashFiller.Step({
             payCurrency: ETH,
-            payAmount: 0.95 ether,
+            payAmount: 0.9 ether,
             target: address(router),
-            callData: abi.encodeCall(IAsyncSwapCallback.fillOrderInCallback, (a, 0.95 ether))
+            callData: abi.encodeCall(IAsyncSwapCallback.fillOrderInCallback, (a, 0.9 ether))
         });
         filler.run(outer, 2400 ether, _steps2(fillAlice, _fillStep(bid)), 0);
 
-        assertEq(manager.balanceOf(alice, ETH.toId()), 0.9 ether - _fee(0.9 ether) + 0.05 ether);
+        assertEq(manager.balanceOf(alice, ETH.toId()), 0.9 ether - _fee(0.9 ether));
         assertEq(_live(a), 0);
         assertEq(_live(outer), 0);
     }
 }
 
-/// @notice The native-output auction with a live MEV tax, filled by a base-contract filler: the tax ledger (the
-///         Router's native delta) stays exact while the ETH premium moves as claims.
+/// @notice ETH-output flash fills with a live MEV tax: the tax ledger (the Router's native delta) stays exact.
 contract FlashFillNativeMevTaxTest is FlashFillNativeTest {
     uint256 constant TAX_GAS = 100_000;
     uint256 constant PRIORITY = 2 gwei;
@@ -127,8 +104,8 @@ contract FlashFillNativeMevTaxTest is FlashFillNativeTest {
         return TAX_GAS;
     }
 
-    function test_nativeOutput_auctionWithMevTax_baseFiller() public {
-        (AsyncOrder memory a, AsyncOrder memory bid, AsyncOrder memory ask) = _nativeAuction();
+    function test_nativeOutput_withMevTax_baseFiller() public {
+        (AsyncOrder memory a, AsyncOrder memory bid, AsyncOrder memory ask) = _nativeBook();
         BookFiller base = new BookFiller(manager, IAsyncSwapCallback(address(router)));
         vm.etch(alice, address(new RefusesEth()).code);
         vm.fee(1 gwei);
@@ -138,16 +115,16 @@ contract FlashFillNativeMevTaxTest is FlashFillNativeTest {
         route[1] = ask;
         uint256 vaultBefore = manager.balanceOf(address(hook.feeVault()), ETH.toId());
 
-        base.fill{value: 3 * TAX}(a, 0.95 ether, abi.encode(route));
+        base.fill{value: 3 * TAX}(a, 0.9 ether, abi.encode(route));
 
-        assertEq(manager.balanceOf(alice, ETH.toId()), 0.9 ether - _fee(0.9 ether) + 0.05 ether, "alice");
+        assertEq(manager.balanceOf(alice, ETH.toId()), 0.9 ether - _fee(0.9 ether), "alice");
         assertEq(address(base).balance, 0, "exactly three fills taxed");
         // Vault: the tax for three fills, Carol's ETH input fee, Alice's ETH output fee.
         assertEq(
             manager.balanceOf(address(hook.feeVault()), ETH.toId()) - vaultBefore,
             3 * TAX + _fee(1 ether) + _fee(0.9 ether)
         );
-        assertEq(manager.balanceOf(address(base), ETH.toId()), (1 ether - _fee(1 ether)) - 0.95 ether, "surplus");
+        assertEq(manager.balanceOf(address(base), ETH.toId()), (1 ether - _fee(1 ether)) - 0.9 ether, "surplus");
         assertEq(address(router).balance, 0);
         assertEq(_live(a), 0);
     }

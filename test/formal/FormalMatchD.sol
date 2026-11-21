@@ -194,7 +194,7 @@ abstract contract FormalMatchD is HookUnlockBase {
             abi.encode(block.chainid, k.toId(), maker, zeroForOne, _saltOf(maker, amountIn, amountOutMin, bid))
         );
         if (hook.asyncOrder(k.toId(), id) != 0) {
-            vm.roll(block.number + 1);
+            vm.roll(vm.getBlockNumber() + 1);
             return _rest(k, maker, zeroForOne, amountIn, amountOutMin, bid);
         }
         if (!hook.isExecutor(k.toId(), maker, address(router))) {

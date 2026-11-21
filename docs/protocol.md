@@ -14,7 +14,6 @@ what. Every box names a contract, library or function in `src/`, so the diagrams
 |---|---|
 | [Order lifecycle and priority bids](order-lifecycle.md) | Create, match, reprice, top up, cancel; bid settlement |
 | [Flash fills and non-numeraire pools](flash-fills.md) | `fillOrderWithCallback`, nested `fillOrderInCallback`, the per-fill MEV tax, pools without USDC |
-| [Dutch auction orders](dutch-auction.md) | `startAuction`, steps, fills |
 | [Contract call sequences](contract-call-sequences.md) | Step-by-step calls for placement, fills, cancels, setup and withdrawals |
 | [Priority fee top-ups](priority-fee-top-ups.md) | `topUpPriorityFee` and agent batching |
 | [Signed price changes](repricing-signatures.md) | `UpdatePrice` and `CancelOrder` typed data |
@@ -45,13 +44,13 @@ flowchart LR
 
     subgraph Core
         PM["Uniswap v4 PoolManager<br/>unlock · swap · ERC-6909 claims"]
-        Hook["AsyncSwap hook<br/>beforeInitialize · beforeSwap · beforeAddLiquidity<br/>matchNewOrder · executeOrder · flashFill<br/>updatePrice(WithSig) · startAuction · auctionPremium<br/>cancelOrder · matchBook · tryFillOrderFromPoolLiquidity"]
+        Hook["AsyncSwap hook<br/>beforeInitialize · beforeSwap · beforeAddLiquidity<br/>matchNewOrder · executeOrder · flashFill<br/>updatePrice(WithSig)<br/>cancelOrder · matchBook · tryFillOrderFromPoolLiquidity"]
         Libs["Linked libraries<br/>(see section 5)"]
         Vault["FeeVault<br/>collect(currency, recipient)"]
     end
 
     Maker -->|orders, cancels, claims| Router
-    Maker -->|setExecutor, updatePrice, startAuction| Hook
+    Maker -->|setExecutor, updatePrice| Hook
     Relayer -->|swapWithSig, cancelWithSig| Router
     Relayer -->|updatePriceWithSig| Hook
     Filler -->|fillOrder| Router
@@ -187,7 +186,7 @@ the book matches first and the pool must take the whole remainder or roll back. 
 flowchart LR
     subgraph MakerRights["Maker (order.owner)"]
         m1["Router: swap, cancelOrder, cancelAndWithdraw,<br/>withdrawClaims, topUpPriorityFee"]
-        m2["Hook: updatePrice, startAuction,<br/>setExecutor, invalidateNonce"]
+        m2["Hook: updatePrice,<br/>setExecutor, invalidateNonce"]
         m3["Signatures: Permit2 order witness,<br/>SetExecutor, UpdatePrice, CancelOrder"]
     end
     subgraph RouterRights["Router (trusted, fixed in the hook)"]
@@ -237,7 +236,6 @@ flowchart TB
         IM["IncomingMatching<br/>stage · matchNewOrder · venue choice"]
         AM["AsyncMatching<br/>matchBook · fill · cancel · updatePrice<br/>fillFromPoolLiquidity"]
         MA["MultiAsset<br/>initialize (pool setup) · run (flashFill ops)"]
-        DA["DutchAuction<br/>start · step"]
         PFU["PriorityFeeUpdates<br/>topUp"]
         DFO["DynamicFeeOrdering<br/>charge"]
         TP["TickPrice<br/>limit price to tick key"]
@@ -248,7 +246,6 @@ flowchart TB
         Hook -.->|linked| IM
         Hook -.->|linked| AM
         Hook -.->|linked| MA
-        Hook -.->|linked| DA
         Hook -.->|linked| PFU
         IM -.->|linked| AM
         AM -.->|linked| DFO
@@ -257,15 +254,12 @@ flowchart TB
         AM -.->|linked| EP
         MA -.->|linked| EP
         PFU -.->|linked| EP
-        DA -.->|linked| TP
-        DA -.->|linked| EP
         AM --> AF
         MA --> AF
-        DA --> AF
     end
 
     Router -->|calls| Hook
-    RFF -->|"flashFill(op), auctionPremium,<br/>asyncOrderInfo, matchBook"| Hook
+    RFF -->|"flashFill(op),<br/>asyncOrderInfo, matchBook"| Hook
 ```
 
 `RouterFlashFills` called directly reaches the hook as itself, not as the Router, and `flashFill` refuses it
@@ -275,7 +269,7 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-    D["CREATE2 deployer"] -->|fixed salts, same address on every chain| Libs["TickPrice · DynamicFeeOrdering · TickBitmap<br/>EligiblePrice · PriorityFeeUpdates · MultiAsset<br/>DutchAuction · AsyncMatching · IncomingMatching"]
+    D["CREATE2 deployer"] -->|fixed salts, same address on every chain| Libs["TickPrice · DynamicFeeOrdering · TickBitmap<br/>EligiblePrice · PriorityFeeUpdates · MultiAsset<br/>AsyncMatching · IncomingMatching"]
     Libs -.->|linked into bytecode| Hook["AsyncSwap hook<br/>mined salt for the hook flags"]
     D --> Hook
     Hook -->|constructor| Vault["FeeVault"]

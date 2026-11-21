@@ -28,7 +28,7 @@ contract GrantReplayPoc is PocSignedBase {
         vm.expectRevert(AsyncSwap.CannotRevokeTrustedRouter.selector);
         hook.setExecutor(poolId, address(router), false);
 
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
         vm.prank(attacker);
         vm.expectRevert(AsyncSwap.NonceAlreadyUsed.selector);
         hook.setExecutorWithSig(key, maker, address(router), true, grant.nonce, grant.deadline, grant.signature);

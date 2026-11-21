@@ -1,6 +1,6 @@
 # MultiAsset
 
-[Git Source](https://github.com/asyncswap/contracts/blob/82ee65e823d10e04aa4d76aae56bc22e47e2407e/src/libraries/MultiAsset.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/19de7b313503f14cf5931e5bc16bd42698ddb96a/src/libraries/MultiAsset.sol)
 
 **Title:** MultiAsset
 
@@ -31,7 +31,8 @@ uint8 internal constant SETTLE = 1;
 
 ### FILL
 
-A full fill paid in claims (inside a flash fill): the hook already holds the output as claims.
+A full fill paid in claims (inside a flash fill): the hook already holds the output as claims, exactly
+`order.amountOutMin` of them, which must equal the order's live minimum.
 
 ```solidity
 uint8 internal constant FILL = 2;
@@ -316,6 +317,21 @@ error AssetHasNoCode();
 ```solidity
 error NoFlashFill();
 ```
+
+### FillAmountMismatch
+
+An in-callback fill found the order's minimum output changed from what the Router was paid.
+
+```solidity
+error FillAmountMismatch(uint256 paid, uint256 owed);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| paid | `uint256` |  |
+| owed | `uint256` |  |
 
 ## Structs
 

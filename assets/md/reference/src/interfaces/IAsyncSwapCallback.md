@@ -1,6 +1,6 @@
 # IAsyncSwapCallback
 
-[Git Source](https://github.com/asyncswap/contracts/blob/82ee65e823d10e04aa4d76aae56bc22e47e2407e/src/interfaces/IAsyncSwapCallback.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/19de7b313503f14cf5931e5bc16bd42698ddb96a/src/interfaces/IAsyncSwapCallback.sol)
 
 **Title:** IAsyncSwapCallback
 
@@ -18,8 +18,8 @@ accepted while that callback runs, and only from its filler. Every other Router 
 Fill `order` with no inventory: input first as claims, callback, then the owed output as claims.
 Every fill in the callback (this one and each `fillOrderInCallback`) owes the MEV tax, paid to the
 FeeVault when the fill runs. `msg.value` prepays it, any amount; the filler may also pay inside its
-callback with `PoolManager.settleFor(router)`. A surplus is returned to the filler in ETH and a
-shortfall reverts `MevTaxUnpaid`.
+callback with `PoolManager.settleFor(router)`. A surplus is returned to the filler as native claims
+(id 0) and a shortfall reverts `MevTaxUnpaid`.
 
 ```solidity
 function fillOrderWithCallback(AsyncOrder calldata order, uint256 maxPrice, bytes calldata data) external payable;

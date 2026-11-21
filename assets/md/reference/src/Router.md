@@ -1,6 +1,6 @@
 # Router
 
-[Git Source](https://github.com/asyncswap/contracts/blob/82ee65e823d10e04aa4d76aae56bc22e47e2407e/src/Router.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/19de7b313503f14cf5931e5bc16bd42698ddb96a/src/Router.sol)
 
 **Inherits:** EIP712, Multicall
 
@@ -597,6 +597,22 @@ event MevTaxPaid(address indexed payer, uint256 amount);
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | payer | `address` |  |
+| amount | `uint256` |  |
+
+### MevTaxRefunded
+
+A flash filler overpaid the MEV tax and got `amount` wei back as native claims. Emitted by the flash-fill
+module (`FLASH_FILLS`) in this contract's context.
+
+```solidity
+event MevTaxRefunded(address indexed filler, uint256 amount);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| filler | `address` |  |
 | amount | `uint256` |  |
 
 ### ClaimWithdrawn

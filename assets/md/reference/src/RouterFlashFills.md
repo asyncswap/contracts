@@ -1,6 +1,6 @@
 # RouterFlashFills
 
-[Git Source](https://github.com/asyncswap/contracts/blob/82ee65e823d10e04aa4d76aae56bc22e47e2407e/src/RouterFlashFills.sol)
+[Git Source](https://github.com/asyncswap/contracts/blob/19de7b313503f14cf5931e5bc16bd42698ddb96a/src/RouterFlashFills.sol)
 
 **Inherits:** [IAsyncSwapCallback](/reference/src/interfaces/IAsyncSwapCallback)
 
@@ -101,8 +101,8 @@ constructor(IPoolManager _poolManager, AsyncSwap _hook, uint256 _mevTaxGas);
 Fill `order` with no inventory: input first as claims, callback, then the owed output as claims.
 Every fill in the callback (this one and each `fillOrderInCallback`) owes the MEV tax, paid to the
 FeeVault when the fill runs. `msg.value` prepays it, any amount; the filler may also pay inside its
-callback with `PoolManager.settleFor(router)`. A surplus is returned to the filler in ETH and a
-shortfall reverts `MevTaxUnpaid`.
+callback with `PoolManager.settleFor(router)`. A surplus is returned to the filler as native claims
+(id 0) and a shortfall reverts `MevTaxUnpaid`.
 
 ```solidity
 function fillOrderWithCallback(AsyncOrder calldata order, uint256 maxPrice, bytes calldata data) external payable;
@@ -260,7 +260,8 @@ function _chargeMevTax(address filler) private;
 
 <i>
   Settles the prepayment, then requires the Router's native delta to be covered: the filler may have paid
-  with `settleFor(router)` in its callback. A surplus goes back to the filler.
+  with `settleFor(router)` in its callback. A surplus goes back to the filler as native claims (id 0), so no
+  filler code runs and a filler that cannot receive ETH can still overpay.
 </i>
 
 ```solidity
@@ -279,8 +280,9 @@ function _settleMevTax(address filler, uint256 prepaid) private;
 ### \_payPremium
 
 <i>
-  Pays the maker a Dutch auction premium in tokens: the filler's output claims are burnt and the same amount
-  taken to the maker, so the Router's delta nets to zero.
+  Pays the maker a Dutch auction premium in the form the hook pays its floor: native ETH as claims (id 0), moved
+  straight from the filler so no maker code runs; ERC20 as tokens, the filler's output claims burnt and the
+  same amount taken to the maker, so the Router's delta nets to zero.
 </i>
 
 ```solidity
@@ -406,6 +408,22 @@ event MevTaxPaid(address indexed payer, uint256 amount);
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | payer | `address` |  |
+| amount | `uint256` |  |
+
+### MevTaxRefunded
+
+A flash filler paid `amount` wei more MEV tax than its fills owed; it got the surplus back as native
+claims (id 0).
+
+```solidity
+event MevTaxRefunded(address indexed filler, uint256 amount);
+```
+
+**Parameters**
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| filler | `address` |  |
 | amount | `uint256` |  |
 
 ### AuctionPremiumPaid

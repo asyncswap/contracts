@@ -35,8 +35,8 @@ flowchart TD
     A -- "No" --> Z["0"]
     A -- "Yes" --> D{"Within the duration?"}
     D -- "No" --> Z
-    D -- "Yes" --> O{"Order open, reprice count and<br/>minimum unchanged since the start?"}
-    O -- "No: closed, repriced or partly matched" --> Z
+    D -- "Yes" --> O{"Same order still open, reprice count<br/>and minimum unchanged since the start?"}
+    O -- "No: closed, replaced, repriced or partly matched" --> Z
     O -- "Yes" --> S["start - floor, falling to 0"]
 ```
 
@@ -83,4 +83,6 @@ sequenceDiagram
 - Or reprice it with `updatePrice` or a signed reprice. A maker reprice ends the premium, and the order rests at the
   new price.
 - A partial book match also ends the premium, since the minimum it was measured against changed.
+- An auction belongs to one order. An identical order placed in the same block after this one closed gets the same
+  id but not the auction: the auction records the order's creation sequence.
 - Calling `startAuction` again replaces the running auction, measured from the order's current minimum.

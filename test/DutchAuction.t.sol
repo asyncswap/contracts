@@ -126,6 +126,24 @@ contract DutchAuctionTest is FlashFillTest {
         assertEq(_live(a), 0);
     }
 
+    /// @notice An identical order placed in the same block after the first one closed gets the same id. It must not
+    ///         inherit the closed order's auction: the maker never auctioned it, and plain fills must go through.
+    function test_auction_replacedOrderInheritsNoAuction() public {
+        (AsyncOrder memory a,,) = _auction();
+        vm.prank(alice);
+        router.cancelOrder(a);
+        AsyncOrder memory again = _place(alice, ethToken, ETH, 1 ether, 90 ether);
+        assertEq(again.salt, a.salt, "same id: the test exercises a reused id");
+
+        assertEq(hook.auctionPremium(again), 0, "no premium on an order that was never auctioned");
+        token.mint(bob, 100 ether);
+        uint256 aliceToken = token.balanceOf(alice);
+        vm.prank(bob);
+        router.fillOrder(again, 90 ether, "");
+        assertEq(token.balanceOf(alice) - aliceToken, 90 ether - _fee(90 ether));
+        assertEq(_live(again), 0);
+    }
+
     function testFuzz_auction_premiumWithinRange(uint256 elapsed) public {
         (AsyncOrder memory a,,) = _auction();
         elapsed = bound(elapsed, 0, 200);

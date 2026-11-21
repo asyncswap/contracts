@@ -26,6 +26,9 @@ library DutchAuction {
         uint32 duration;
         /// @dev The order's reprice count when the auction started.
         uint32 reprices;
+        /// @dev The order's creation sequence. An identical order placed in the same block after this one closed gets
+        ///      the same id; the sequence keeps it from inheriting this auction.
+        uint64 createdSequence;
     }
 
     event AuctionStarted(
@@ -62,13 +65,15 @@ library DutchAuction {
             floorAmountOutMin: floor,
             startBlock: uint64(block.number),
             duration: duration,
-            reprices: info.reprices
+            reprices: info.reprices,
+            createdSequence: info.createdSequence
         });
         emit AuctionStarted(id, startAmountOutMin, floor, uint64(block.number), duration);
     }
 
     /// @notice The auction premium a flash filler pays on top of the order's minimum output now. Zero for an order with
-    ///         no auction, after the duration, or once the maker repriced or the order was partly matched.
+    ///         no auction, after the duration, once the maker repriced or the order was partly matched, or for a new
+    ///         order that reuses a closed order's id.
     function premium(AsyncFiller.State storage self, mapping(bytes32 => Auction) storage auctions, bytes32 id)
         public
         view
@@ -81,7 +86,10 @@ library DutchAuction {
         if (elapsed >= duration) return 0;
         AsyncFiller.OrderInfo storage info = self.orders[id];
         uint256 floor = auction.floorAmountOutMin;
-        if (info.amountIn == 0 || info.reprices != auction.reprices || info.amountOutMin != floor) return 0;
+        if (
+            info.amountIn == 0 || info.createdSequence != auction.createdSequence || info.reprices != auction.reprices
+                || info.amountOutMin != floor
+        ) return 0;
         uint256 range = auction.startAmountOutMin - floor;
         // The schedule rounds in the maker's favour: the premium falls by whole steps, rounded down.
         return range - range * elapsed / duration;
